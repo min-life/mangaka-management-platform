@@ -37,6 +37,8 @@ npx prisma generate
 npm run start:dev
 ```
 
+demo
+
 ## Lệnh hữu ích
 
 - `npm run build` để build production.
