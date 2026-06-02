@@ -10,3 +10,342 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum PROGRESS_STATUS {
+  PENDING
+  INPROGRESS
+  REVIEW
+  DONE
+}
+
+enum SCOPE {
+  SYS
+  CO
+  PRJ
+}
+
+model User {
+  id          BigInt   @id @default(autoincrement())
+  email       String   @unique
+  password    String
+  displayName String   @map("display_name")
+  avatarUrl   String?  @map("avatar_url")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations with role model
+  createdRoles Role[] @relation("createdByUser")
+  updatedRoles Role[] @relation("updatedByUser")
+
+  // Relations with userRole model
+  userRoles UserRole[]
+
+  // Relations with company model
+  createdCompanies Company[] @relation("createdByUser")
+  updatedCompanies Company[] @relation("updatedByUser")
+
+  // Relations with project model
+  createdProjects Project[] @relation("createdByUser")
+  updatedProjects Project[] @relation("updatedByUser")
+
+  // Relations with folder model
+  createdFolders Folder[] @relation("createdByUser")
+  updatedFolders Folder[] @relation("updatedByUser")
+
+  // Relations with file model
+  createdFiles File[] @relation("createdByUser")
+  updatedFiles File[] @relation("updatedByUser")
+
+  // Relations with task model
+  createdTasks Task[] @relation("createdByUser")
+  updatedTasks Task[] @relation("updatedByUser")
+
+  // Relations with taskCommentFrame model
+  createdTaskCommentFrames TaskCommentFrame[] @relation("createdByUser")
+  updatedTaskCommentFrames TaskCommentFrame[] @relation("updatedByUser")
+
+  // Relations with taskComment model
+  createdTaskComments TaskComment[] @relation("createdByUser")
+  updatedTaskComments TaskComment[] @relation("updatedByUser")
+
+  // Relations with refreshToken model
+  refreshTokens RefreshToken[]
+
+  @@index([email])
+  // Configs
+  @@map("users")
+}
+
+model Role {
+  id        BigInt   @id @default(autoincrement())
+  name      String   @unique
+  code      String?
+  companyId BigInt?  @map("company_id")
+  projectId BigInt?  @map("project_id")
+  createdBy BigInt?  @map("created_by")
+  updatedBy BigInt?  @map("updated_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations with user model
+  createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
+  updatedByUser User? @relation("updatedByUser", fields: [updatedBy], references: [id])
+
+  // Relations with rolePermission model
+  rolePermissions RolePermission[]
+
+  // Relations with userRole model
+  userRoles UserRole[]
+
+  // Relations with company model
+  company Company? @relation(fields: [companyId], references: [id])
+
+  // Relations with project model
+  project Project? @relation(fields: [projectId], references: [id])
+
+  @@index([name])
+  // Configs
+  @@map("roles")
+}
+
+model Permission {
+  id    BigInt @id @default(autoincrement())
+  name  String @unique
+  scope SCOPE
+
+  // Relations with rolePermission model
+  rolePermissions RolePermission[]
+
+  @@index([name])
+  // Configs
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       BigInt @map("role_id")
+  permissionId BigInt @map("permission_id")
+
+  // Relations with role and permission models
+  role       Role       @relation(fields: [roleId], references: [id])
+  permission Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+  // Configs
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId BigInt @map("user_id")
+  roleId BigInt @map("role_id")
+
+  // Relations with user and role models
+  user User @relation(fields: [userId], references: [id])
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@id([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+  // Configs
+  @@map("user_roles")
+}
+
+model Company {
+  id        BigInt   @id @default(autoincrement())
+  name      String
+  createdBy BigInt?  @map("created_by")
+  updatedBy BigInt?  @map("updated_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations with user model
+  createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
+  updatedByUser User? @relation("updatedByUser", fields: [updatedBy], references: [id])
+
+  // Relations with project model
+  projects Project[]
+
+  // Relations with role model
+  roles Role[]
+
+  // Configs
+  @@map("companies")
+}
+
+model Project {
+  id        BigInt   @id @default(autoincrement())
+  name      String
+  companyId BigInt   @map("company_id")
+  createdBy BigInt?  @map("created_by")
+  updatedBy BigInt?  @map("updated_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations with company model
+  company Company @relation(fields: [companyId], references: [id])
+
+  // Relations with user model
+  createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
+  updatedByUser User? @relation("updatedByUser", fields: [updatedBy], references: [id])
+
+  // Relations with role model
+  roles Role[]
+
+  // Relations with folder model
+  folders Folder[]
+
+  // Configs
+  @@map("projects")
+}
+
+model Folder {
+  id          BigInt   @id @default(autoincrement())
+  name        String
+  description String?
+  index       Int      @default(autoincrement())
+  parentId    BigInt?  @map("parent_id")
+  projectId   BigInt   @map("project_id")
+  createdBy   BigInt?  @map("created_by")
+  updatedBy   BigInt?  @map("updated_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations with project model
+  project Project @relation(fields: [projectId], references: [id])
+
+  // Relations with user model
+  createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
+  updatedByUser User? @relation("updatedByUser", fields: [updatedBy], references: [id])
+
+  // Relations with itself for parent-child relationship
+  parent   Folder?  @relation("FolderToFolder", fields: [parentId], references: [id])
+  children Folder[] @relation("FolderToFolder")
+
+  // Relations with file model
+  files File[]
+
+  // Configs
+  @@map("folders")
+}
+
+model File {
+  id        BigInt   @id @default(autoincrement())
+  name      String
+  index     Int      @default(autoincrement())
+  folderId  BigInt   @map("folder_id")
+  createdBy BigInt?  @map("created_by")
+  updatedBy BigInt?  @map("updated_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations with folder model
+  folder Folder @relation(fields: [folderId], references: [id])
+
+  // Relations with user model
+  createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
+  updatedByUser User? @relation("updatedByUser", fields: [updatedBy], references: [id])
+
+  // Relations with task model
+  tasks Task[]
+
+  // Configs
+  @@map("files")
+}
+
+model Task {
+  id          BigInt          @id @default(autoincrement())
+  title       String
+  description String?
+  status      PROGRESS_STATUS @default(PENDING)
+  index       Int             @default(autoincrement())
+  parent_id   BigInt?         @map("parent_id")
+  fileId      BigInt          @map("file_id")
+  createdBy   BigInt?         @map("created_by")
+  updatedBy   BigInt?         @map("updated_by")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  // Relations with itself for parent-child relationship
+  parent   Task?  @relation("TaskToTask", fields: [parent_id], references: [id])
+  children Task[] @relation("TaskToTask")
+
+  // Relations with file model
+  file File @relation(fields: [fileId], references: [id])
+
+  // Relations with user model
+  createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
+  updatedByUser User? @relation("updatedByUser", fields: [updatedBy], references: [id])
+
+  // Relations with taskCommentFrame model
+  commentFrames TaskCommentFrame[]
+
+  // Configs
+  @@map("tasks")
+}
+
+model TaskCommentFrame {
+  id        BigInt   @id @default(autoincrement())
+  startX    Float    @map("start_x")
+  startY    Float    @map("start_y")
+  endX      Float    @map("end_x")
+  endY      Float    @map("end_y")
+  taskId    BigInt   @map("task_id")
+  createdBy BigInt?  @map("created_by")
+  updatedBy BigInt?  @map("updated_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations with task model
+  task Task @relation(fields: [taskId], references: [id])
+
+  // Relations with user model
+  createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
+  updatedByUser User? @relation("updatedByUser", fields: [updatedBy], references: [id])
+
+  // Relations with taskComment model
+  comments TaskComment[]
+
+  // Configs
+  @@map("task_comment_frames")
+}
+
+model TaskComment {
+  id        BigInt   @id @default(autoincrement())
+  content   String
+  frameId   BigInt   @map("frame_id")
+  createdBy BigInt?  @map("created_by")
+  updatedBy BigInt?  @map("updated_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations with frame model
+  frame TaskCommentFrame @relation(fields: [frameId], references: [id])
+
+  // Relations with user model
+  createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
+  updatedByUser User? @relation("updatedByUser", fields: [updatedBy], references: [id])
+
+  // Configs
+  @@map("task_comments")
+}
+
+model RefreshToken {
+  token     String   @id
+  userId    BigInt   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+
+  // Relations with user model
+  user User @relation(fields: [userId], references: [id])
+
+  // Configs
+  @@map("refresh_tokens")
+}
+
+model BlacklistToken {
+  token     String   @id
+  expiresAt DateTime @map("expires_at")
+
+  // Configs
+  @@map("blacklist_tokens")
+}
