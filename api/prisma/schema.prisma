@@ -110,10 +110,10 @@ model Role {
   userRoles UserRole[]
 
   // Relations with company model
-  company Company? @relation(fields: [companyId], references: [id])
+  company Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   // Relations with project model
-  project Project? @relation(fields: [projectId], references: [id])
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   // Configs
   @@map("roles")
@@ -193,7 +193,7 @@ model Project {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations with company model
-  company Company @relation(fields: [companyId], references: [id])
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   // Relations with user model
   createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
@@ -223,14 +223,14 @@ model Folder {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations with project model
-  project Project @relation(fields: [projectId], references: [id])
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   // Relations with user model
   createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
   updatedByUser User? @relation("updatedByUser", fields: [updatedBy], references: [id])
 
   // Relations with itself for parent-child relationship
-  parent   Folder?  @relation("FolderToFolder", fields: [parentId], references: [id])
+  parent   Folder?  @relation("FolderToFolder", fields: [parentId], references: [id], onDelete: Cascade)
   children Folder[] @relation("FolderToFolder")
 
   // Relations with file model
@@ -253,7 +253,7 @@ model File {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations with folder model
-  folder Folder @relation(fields: [folderId], references: [id])
+  folder Folder @relation(fields: [folderId], references: [id], onDelete: Cascade)
 
   // Relations with user model
   createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
@@ -281,11 +281,11 @@ model Task {
   updatedAt   DateTime        @updatedAt @map("updated_at")
 
   // Relations with itself for parent-child relationship
-  parent   Task?  @relation("TaskToTask", fields: [parentId], references: [id])
+  parent   Task?  @relation("TaskToTask", fields: [parentId], references: [id], onDelete: Cascade)
   children Task[] @relation("TaskToTask")
 
   // Relations with file model
-  file File @relation(fields: [fileId], references: [id])
+  file File @relation(fields: [fileId], references: [id], onDelete: Cascade)
 
   // Relations with user model
   createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
@@ -313,7 +313,7 @@ model TaskCommentFrame {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations with task model
-  task Task @relation(fields: [taskId], references: [id])
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   // Relations with user model
   createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
@@ -337,7 +337,7 @@ model TaskComment {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations with frame model
-  frame TaskCommentFrame @relation(fields: [frameId], references: [id])
+  frame TaskCommentFrame @relation(fields: [frameId], references: [id], onDelete: Cascade)
 
   // Relations with user model
   createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
