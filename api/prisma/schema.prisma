@@ -92,6 +92,7 @@ model Role {
   id        BigInt   @id @default(autoincrement())
   name      String   @unique
   code      String?
+  scope     SCOPE    @default(SYS)
   companyId BigInt?  @map("company_id")
   projectId BigInt?  @map("project_id")
   createdBy BigInt?  @map("created_by")
@@ -122,7 +123,7 @@ model Role {
 model Permission {
   id    BigInt @id @default(autoincrement())
   name  String @unique
-  scope SCOPE
+  scope SCOPE  @default(SYS)
 
   // Relations with rolePermission model
   rolePermissions RolePermission[]
