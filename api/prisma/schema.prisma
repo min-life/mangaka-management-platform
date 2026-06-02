@@ -25,13 +25,26 @@ enum SCOPE {
 }
 
 model User {
-  id          BigInt   @id @default(autoincrement())
-  email       String   @unique
+  id          BigInt    @id @default(autoincrement())
+  email       String    @unique
   password    String
-  displayName String   @map("display_name")
-  avatarUrl   String?  @map("avatar_url")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  displayName String    @map("display_name")
+  avatarUrl   String?   @map("avatar_url")
+  isDeleted   Boolean   @default(false) @map("is_deleted")
+  createdBy   BigInt?   @map("created_by")
+  updatedBy   BigInt?   @map("updated_by")
+  deletedBy   BigInt?   @map("deleted_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  // Relations with itself for createdBy, updatedBy, deletedBy
+  createdByUser User?  @relation("createdByUser", fields: [createdBy], references: [id])
+  updatedByUser User?  @relation("updatedByUser", fields: [updatedBy], references: [id])
+  deletedByUser User?  @relation("deletedByUser", fields: [deletedBy], references: [id])
+  createdUsers  User[] @relation("createdByUser")
+  updatedUsers  User[] @relation("updatedByUser")
+  deletedUsers  User[] @relation("deletedByUser")
 
   // Relations with role model
   createdRoles Role[] @relation("createdByUser")
@@ -71,7 +84,6 @@ model User {
   // Relations with refreshToken model
   refreshTokens RefreshToken[]
 
-  @@index([email])
   // Configs
   @@map("users")
 }
@@ -103,7 +115,6 @@ model Role {
   // Relations with project model
   project Project? @relation(fields: [projectId], references: [id])
 
-  @@index([name])
   // Configs
   @@map("roles")
 }
@@ -116,7 +127,6 @@ model Permission {
   // Relations with rolePermission model
   rolePermissions RolePermission[]
 
-  @@index([name])
   // Configs
   @@map("permissions")
 }
@@ -195,6 +205,7 @@ model Project {
   // Relations with folder model
   folders Folder[]
 
+  @@index([companyId])
   // Configs
   @@map("projects")
 }
@@ -225,6 +236,8 @@ model Folder {
   // Relations with file model
   files File[]
 
+  @@index([projectId])
+  @@index([parentId])
   // Configs
   @@map("folders")
 }
@@ -249,6 +262,7 @@ model File {
   // Relations with task model
   tasks Task[]
 
+  @@index([folderId])
   // Configs
   @@map("files")
 }
@@ -259,7 +273,7 @@ model Task {
   description String?
   status      PROGRESS_STATUS @default(PENDING)
   index       Int             @default(autoincrement())
-  parent_id   BigInt?         @map("parent_id")
+  parentId    BigInt?         @map("parent_id")
   fileId      BigInt          @map("file_id")
   createdBy   BigInt?         @map("created_by")
   updatedBy   BigInt?         @map("updated_by")
@@ -267,7 +281,7 @@ model Task {
   updatedAt   DateTime        @updatedAt @map("updated_at")
 
   // Relations with itself for parent-child relationship
-  parent   Task?  @relation("TaskToTask", fields: [parent_id], references: [id])
+  parent   Task?  @relation("TaskToTask", fields: [parentId], references: [id])
   children Task[] @relation("TaskToTask")
 
   // Relations with file model
@@ -280,16 +294,18 @@ model Task {
   // Relations with taskCommentFrame model
   commentFrames TaskCommentFrame[]
 
+  @@index([fileId])
+  @@index([parentId])
   // Configs
   @@map("tasks")
 }
 
 model TaskCommentFrame {
   id        BigInt   @id @default(autoincrement())
-  startX    Float    @map("start_x")
-  startY    Float    @map("start_y")
-  endX      Float    @map("end_x")
-  endY      Float    @map("end_y")
+  startX    Decimal  @map("start_x") @db.Decimal(10, 4)
+  startY    Decimal  @map("start_y") @db.Decimal(10, 4)
+  endX      Decimal  @map("end_x") @db.Decimal(10, 4)
+  endY      Decimal  @map("end_y") @db.Decimal(10, 4)
   taskId    BigInt   @map("task_id")
   createdBy BigInt?  @map("created_by")
   updatedBy BigInt?  @map("updated_by")
@@ -306,6 +322,7 @@ model TaskCommentFrame {
   // Relations with taskComment model
   comments TaskComment[]
 
+  @@index([taskId])
   // Configs
   @@map("task_comment_frames")
 }
@@ -326,6 +343,7 @@ model TaskComment {
   createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
   updatedByUser User? @relation("updatedByUser", fields: [updatedBy], references: [id])
 
+  @@index([frameId])
   // Configs
   @@map("task_comments")
 }
