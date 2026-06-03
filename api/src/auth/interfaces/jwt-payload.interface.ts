@@ -1,5 +1,5 @@
 // ChuongTV #005
 export interface JwtPayload {
-    userId: number;
-    email: string;
+  userId: number;
+  email: string;
 }

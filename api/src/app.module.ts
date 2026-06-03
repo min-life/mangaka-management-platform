@@ -20,4 +20,4 @@ import { AccessTokenStrategy, RefreshTokenStrategy } from '@auth/strategies';
     RefreshTokenStrategy,
   ],
 })
-export class AppModule { }
+export class AppModule {}
