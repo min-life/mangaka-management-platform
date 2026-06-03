@@ -1,0 +1,1 @@
+export * from '@auth/interfaces/jwt-payload.interface';
