@@ -222,15 +222,12 @@ export class RoleService {
   }
 
   async findOne(currentUserId: bigint, roleId: bigint) {
-    // Tìm role theo id
     const role = await this.prisma.role.findUnique({
       where: { id: roleId },
 
-      // Include project để nếu role là PRJ thì biết project thuộc company nào khi cần
       include: { project: true },
     });
 
-    // Nếu không có role thì trả 404
     if (!role) {
       throw new NotFoundException('Role not found');
     }
@@ -347,39 +344,38 @@ export class RoleService {
       },
     });
 
-    // Nếu role không tồn tại thì trả 404.
+    // Nếu role không tồn tại thì trả 404
     if (!role) {
       throw new NotFoundException('Role not found');
     }
 
-    // Nếu role là default role thì cấm delete.
+    // Nếu role là default role thì cấm delete
     if (isDefaultRole(role.scope, role.code)) {
       throw new ForbiddenException('Default role cannot be deleted');
     }
 
-    // Kiểm tra user có quyền quản lý role này không.
+    // Kiểm tra user có quyền quản lý role này không
     await this.assertCanAccessRole(currentUserId, role);
 
-    // Đếm xem role này đang được gán cho bao nhiêu user.
+    // Đếm xem role này đang được gán cho bao nhiêu user
     const assignedCount = await this.prisma.userRole.count({
       where: { roleId },
     });
 
-    // Nếu role đang được gán cho user thì không cho xóa.
+    // Nếu role đang được gán cho user thì không cho xóa
     if (assignedCount > 0) {
       throw new ForbiddenException('Role is assigned to users');
     }
 
-    // Xóa role khỏi database.
     await this.prisma.role.delete({
       where: { id: roleId },
     });
 
-    // Trả kết quả xóa thành công.
+    // Trả kết quả xóa thành công
     return { success: true };
   }
 
-  //Convert Prisma role object sang JSON response.
+  //Convert Prisma role object sang JSON response
   private serializeRole(role: {
     id: bigint;
     name: string;
@@ -394,16 +390,14 @@ export class RoleService {
 
     // Trả object JSON-safe cho client.
     return {
-      // BigInt không serialize JSON được nên đổi sang string.
+      //  Các kiểu BigInt không serialize JSON được nên đổi sang string.
       id: role.id.toString(),
       name: role.name,
       code: role.code,
       scope: role.scope,
 
-      // Convert companyId BigInt sang string nếu có.
       companyId: role.companyId?.toString() ?? null,
 
-      // Convert projectId BigInt sang string nếu có.
       projectId: role.projectId?.toString() ?? null,
 
       // Field isDefault này computed, không có trong DB.
