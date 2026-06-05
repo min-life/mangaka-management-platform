@@ -91,7 +91,7 @@ model User {
 
 model Role {
   id        BigInt   @id @default(autoincrement())
-  name      String   @unique
+  name      String
   code      String?
   scope     SCOPE    @default(SYS)
   companyId BigInt?  @map("company_id")
