@@ -1,10 +1,18 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma, SCOPE } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { DEFAULT_ROLE_CODES, isDefaultRole } from './role-default';
+import { ROLE_MESSAGES } from './role-messages';
 
+//DongNNP #002 start
 @Injectable()
 export class RoleService {
   constructor(private readonly prisma: PrismaService) {}
@@ -21,7 +29,7 @@ export class RoleService {
       },
     });
     if (!userRole) {
-      throw new ForbiddenException('You do not have permissions to manage Platform role.');
+      throw new ForbiddenException(ROLE_MESSAGES.CANNOT_MANAGE_PLATFORM_ROLES);
     }
   }
 
@@ -34,7 +42,7 @@ export class RoleService {
           OR: [
             {
               scope: SCOPE.CO,
-              code: 'admin',
+              code: 'co_admin',
               companyId,
             },
             {
@@ -48,7 +56,7 @@ export class RoleService {
       },
     });
     if (!userRole) {
-      throw new ForbiddenException('You do not have permissions to access this company');
+      throw new ForbiddenException(ROLE_MESSAGES.CANNOT_ACCESS_COMPANY);
     }
   }
 
@@ -65,7 +73,7 @@ export class RoleService {
       },
     });
     if (!userRole) {
-      throw new ForbiddenException('You do not have permissions to manage company roles. ');
+      throw new ForbiddenException(ROLE_MESSAGES.CANNOT_MANAGE_COMPANY_ROLES);
     }
   }
 
@@ -81,7 +89,7 @@ export class RoleService {
       },
     });
     if (!userRole) {
-      throw new ForbiddenException('You do not have permissions to access this project');
+      throw new ForbiddenException(ROLE_MESSAGES.CANNOT_ACCESS_PROJECT);
     }
   }
 
@@ -98,7 +106,7 @@ export class RoleService {
       },
     });
     if (!userRole) {
-      throw new ForbiddenException('You do not have permissions to manage project roles. ');
+      throw new ForbiddenException(ROLE_MESSAGES.CANNOT_MANAGE_PROJECT_ROLES);
     }
   }
 
@@ -134,11 +142,38 @@ export class RoleService {
     }
   }
 
+  private async assertCanManageRole(
+    currentUserId: bigint,
+    role: Prisma.RoleGetPayload<{ include: { project: true } }>,
+  ) {
+    if (role.scope === SCOPE.SYS) {
+      await this.assertCanManagePlatformRoles(currentUserId);
+      return;
+    }
+
+    if (role.scope === SCOPE.CO) {
+      if (!role.companyId) {
+        throw new BadRequestException(ROLE_MESSAGES.INVALID_COMPANY_ROLE);
+      }
+
+      await this.assertCanManageCompanyRoles(currentUserId, role.companyId);
+      return;
+    }
+
+    if (role.scope === SCOPE.PRJ) {
+      if (!role.projectId) {
+        throw new BadRequestException(ROLE_MESSAGES.INVALID_PROJECT_ROLE);
+      }
+
+      await this.assertCanManageProjectRoles(currentUserId, role.projectId);
+    }
+  }
+
   // Không tạo mới code của role trùng với code của role default
   private assertNotReservedDefaultCode(scope: SCOPE, code?: string | null) {
     // Nếu code thuộc default role của scope này
     if (isDefaultRole(scope, code)) {
-      throw new ForbiddenException('Cannot use reserved default role code');
+      throw new BadRequestException(ROLE_MESSAGES.RESERVED_DEFAULT_CODE);
     }
   }
 
@@ -171,7 +206,10 @@ export class RoleService {
       },
     });
     //Convert dữ liệu Prisma sang response JSON
-    return roles.map((role) => this.serializeRole(role));
+    return {
+      message: ROLE_MESSAGES.PLATFORM_ROLES_FOUND,
+      data: roles.map((role) => this.serializeRole(role)),
+    };
   }
 
   //List tất cả role cho Company Role Management Page
@@ -196,7 +234,10 @@ export class RoleService {
         ],
       },
     });
-    return roles.map((role) => this.serializeRole(role));
+    return {
+      message: ROLE_MESSAGES.COMPANY_ROLES_FOUND,
+      data: roles.map((role) => this.serializeRole(role)),
+    };
   }
 
   //List tất cả role cho Project Role Management Page
@@ -218,7 +259,10 @@ export class RoleService {
         ],
       },
     });
-    return roles.map((role) => this.serializeRole(role));
+    return {
+      message: ROLE_MESSAGES.PROJECT_ROLES_FOUND,
+      data: roles.map((role) => this.serializeRole(role)),
+    };
   }
 
   async findOne(currentUserId: bigint, roleId: bigint) {
@@ -229,13 +273,16 @@ export class RoleService {
     });
 
     if (!role) {
-      throw new NotFoundException('Role not found');
+      throw new NotFoundException(ROLE_MESSAGES.ROLE_NOT_FOUND);
     }
 
     // Kiểm tra user có quyền xem role này không
     await this.assertCanAccessRole(currentUserId, role);
 
-    return this.serializeRole(role);
+    return {
+      message: ROLE_MESSAGES.ROLE_FOUND,
+      data: this.serializeRole(role),
+    };
   }
 
   async createPlatformRole(currentUserId: bigint, dto: CreateRoleDto) {
@@ -254,11 +301,14 @@ export class RoleService {
         updatedBy: currentUserId,
       },
     });
-    return this.serializeRole(role);
+    return {
+      message: ROLE_MESSAGES.PLATFORM_ROLE_CREATED,
+      data: this.serializeRole(role),
+    };
   }
 
   async createCompanyRole(currentUserId: bigint, companyId: bigint, dto: CreateRoleDto) {
-    await this.assertCanAccessCompanyRoles(currentUserId, companyId);
+    await this.assertCanManageCompanyRoles(currentUserId, companyId);
 
     this.assertNotReservedDefaultCode(SCOPE.CO, dto.code);
 
@@ -266,7 +316,7 @@ export class RoleService {
       data: {
         name: dto.name,
         code: dto.code,
-        scope: SCOPE.SYS,
+        scope: SCOPE.CO,
         companyId,
         //role thuộc scope CO không thuộc project
         projectId: null,
@@ -274,11 +324,14 @@ export class RoleService {
         updatedBy: currentUserId,
       },
     });
-    return this.serializeRole(role);
+    return {
+      message: ROLE_MESSAGES.COMPANY_ROLE_CREATED,
+      data: this.serializeRole(role),
+    };
   }
 
   async createProjectRole(currentUserId: bigint, projectId: bigint, dto: CreateRoleDto) {
-    await this.assertCanAccessProjectRoles(currentUserId, projectId);
+    await this.assertCanManageProjectRoles(currentUserId, projectId);
 
     this.assertNotReservedDefaultCode(SCOPE.PRJ, dto.code);
 
@@ -286,14 +339,17 @@ export class RoleService {
       data: {
         name: dto.name,
         code: dto.code,
-        scope: SCOPE.SYS,
+        scope: SCOPE.PRJ,
         companyId: null,
         projectId,
         createdBy: currentUserId,
         updatedBy: currentUserId,
       },
     });
-    return this.serializeRole(role);
+    return {
+      message: ROLE_MESSAGES.PROJECT_ROLE_CREATED,
+      data: this.serializeRole(role),
+    };
   }
 
   async updateRole(currentUserId: bigint, roleId: bigint, dto: UpdateRoleDto) {
@@ -309,18 +365,18 @@ export class RoleService {
     });
 
     if (!role) {
-      throw new NotFoundException('Role not found');
+      throw new NotFoundException(ROLE_MESSAGES.ROLE_NOT_FOUND);
     }
 
     if (isDefaultRole(role.scope, role.code)) {
-      throw new ForbiddenException('Default role cannot be updated');
+      throw new ForbiddenException(ROLE_MESSAGES.DEFAULT_ROLE_UPDATE_FORBIDDEN);
     }
 
     if (dto.code) {
       this.assertNotReservedDefaultCode(role.scope, dto.code);
     }
 
-    await this.assertCanAccessRole(currentUserId, role);
+    await this.assertCanManageRole(currentUserId, role);
 
     const updatedRole = await this.prisma.role.update({
       where: { id: roleId },
@@ -330,7 +386,10 @@ export class RoleService {
         updatedBy: currentUserId,
       },
     });
-    return this.serializeRole(updatedRole);
+    return {
+      message: ROLE_MESSAGES.ROLE_UPDATED,
+      data: this.serializeRole(updatedRole),
+    };
   }
 
   async deleteRole(currentUserId: bigint, roleId: bigint) {
@@ -346,16 +405,16 @@ export class RoleService {
 
     // Nếu role không tồn tại thì trả 404
     if (!role) {
-      throw new NotFoundException('Role not found');
+      throw new NotFoundException(ROLE_MESSAGES.ROLE_NOT_FOUND);
     }
 
     // Nếu role là default role thì cấm delete
     if (isDefaultRole(role.scope, role.code)) {
-      throw new ForbiddenException('Default role cannot be deleted');
+      throw new ForbiddenException(ROLE_MESSAGES.DEFAULT_ROLE_DELETE_FORBIDDEN);
     }
 
     // Kiểm tra user có quyền quản lý role này không
-    await this.assertCanAccessRole(currentUserId, role);
+    await this.assertCanManageRole(currentUserId, role);
 
     // Đếm xem role này đang được gán cho bao nhiêu user
     const assignedCount = await this.prisma.userRole.count({
@@ -364,7 +423,7 @@ export class RoleService {
 
     // Nếu role đang được gán cho user thì không cho xóa
     if (assignedCount > 0) {
-      throw new ForbiddenException('Role is assigned to users');
+      throw new ConflictException(ROLE_MESSAGES.ASSIGNED_ROLE_DELETE_CONFLICT);
     }
 
     await this.prisma.role.delete({
@@ -372,7 +431,12 @@ export class RoleService {
     });
 
     // Trả kết quả xóa thành công
-    return { success: true };
+    return {
+      message: ROLE_MESSAGES.ROLE_DELETED,
+      data: {
+        success: true,
+      },
+    };
   }
 
   //Convert Prisma role object sang JSON response
