@@ -1,5 +1,4 @@
-import { SCOPE } from '@prisma/client';
-import { IsEnum, IsString, IsOptional } from 'class-validator';
+import { IsString, IsOptional } from 'class-validator';
 
 export class UpdateRoleDto {
   @IsString()
@@ -9,8 +8,4 @@ export class UpdateRoleDto {
   @IsString()
   @IsOptional()
   code?: string;
-
-  @IsEnum(SCOPE)
-  @IsOptional()
-  scope?: SCOPE;
 }
