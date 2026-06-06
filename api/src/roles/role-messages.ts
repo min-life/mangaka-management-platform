@@ -16,9 +16,6 @@ export const ROLE_MESSAGES = {
   CANNOT_MANAGE_PROJECT_ROLES: 'You do not have permission to manage project roles.',
   INVALID_COMPANY_ROLE: 'Invalid company role: companyId is required for custom company roles.',
   INVALID_PROJECT_ROLE: 'Invalid project role: projectId is required for custom project roles.',
-  RESERVED_DEFAULT_CODE: 'Cannot use a reserved default role code.',
-  DEFAULT_ROLE_UPDATE_FORBIDDEN: 'Default roles cannot be updated.',
-  DEFAULT_ROLE_DELETE_FORBIDDEN: 'Default roles cannot be deleted.',
   ASSIGNED_ROLE_DELETE_CONFLICT:
     'Cannot delete this role because it is assigned to one or more users.',
 } as const;
