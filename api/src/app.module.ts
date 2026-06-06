@@ -5,10 +5,14 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from '@auth/auth.module';
 import { GlobalAuthGuard } from '@auth/guards';
+import { PermissionModule } from './permission/permission.module';
+import { RolePermissionModule } from './role-permission/role-permission.module';
+
+
 import { AccessTokenStrategy, RefreshTokenStrategy } from '@auth/strategies';
 
 @Module({
-  imports: [PrismaModule, AuthModule],
+  imports: [PrismaModule, PermissionModule, RolePermissionModule,AuthModule],
   controllers: [AppController],
   providers: [
     AppService,
