@@ -4,13 +4,15 @@ import { JwtModule } from '@nestjs/jwt';
 import { PrismaModule } from './prisma/prisma.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { CompaniesModule } from './companies/companies.module';
+import { ProjectsModule } from './projects/projects.module';
 import { AuthModule } from '@auth/auth.module';
 import { GlobalAuthGuard, PermissionGuard } from '@auth/guards';
 import { AccessTokenStrategy, RefreshTokenStrategy } from '@auth/strategies';
 import { UsersModule } from './users/users.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, JwtModule, UsersModule],
+  imports: [PrismaModule, AuthModule, JwtModule, UsersModule, CompaniesModule, ProjectsModule],
   controllers: [AppController],
   providers: [
     AppService,
