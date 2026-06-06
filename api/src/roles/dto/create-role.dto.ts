@@ -1,4 +1,5 @@
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { SCOPE } from '@prisma/client';
+import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CreateRoleDto {
   @IsNotEmpty()
@@ -7,5 +8,9 @@ export class CreateRoleDto {
 
   @IsString()
   @IsOptional()
-  code!: string;
+  code?: string;
+
+  @IsEnum(SCOPE)
+  @IsOptional()
+  scope?: SCOPE;
 }
