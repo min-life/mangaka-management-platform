@@ -3,7 +3,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '@/prisma/prisma.service';
 
 @Injectable()
-export class RolePermissionService {
+export class RolesService {
   constructor(private readonly prisma: PrismaService) {}
 
   private async validateRoleAndPermissions(roleId: bigint, permissionIds: bigint[]): Promise<void> {
@@ -13,8 +13,9 @@ export class RolePermissionService {
       },
     });
 
+    // Role phải tồn tại
     if (!role) {
-      throw new NotFoundException('Role not found');
+      throw new BadRequestException('Invalid permissions');
     }
 
     const permissions = await this.prisma.permission.findMany({
@@ -25,39 +26,22 @@ export class RolePermissionService {
       },
     });
 
+    // Tất cả permission phải tồn tại trong hệ thống
     if (permissions.length !== permissionIds.length) {
-      throw new NotFoundException('One or more permissions not found');
+      throw new BadRequestException('Invalid permissions');
     }
 
-    // Chỉ cho phép gán permission cùng scope với role
-    const invalidPermission = permissions.find((permission) => permission.scope !== role.scope);
+    // Permission phải cùng scope với role
+    const hasInvalidScope = permissions.some((permission) => permission.scope !== role.scope);
 
-    if (invalidPermission) {
-      throw new BadRequestException('Role scope and permission scope must match');
+    if (hasInvalidScope) {
+      throw new BadRequestException('Invalid permissions');
     }
-  }
-
-  async assignPermissions(roleId: bigint, permissionIds: bigint[]) {
-    await this.validateRoleAndPermissions(roleId, permissionIds);
-
-    await this.prisma.rolePermission.createMany({
-      data: permissionIds.map((permissionId) => ({
-        roleId,
-        permissionId,
-      })),
-      skipDuplicates: true,
-    });
-
-    return {
-      message: 'Permissions assigned successfully',
-    };
   }
 
   async replacePermissions(roleId: bigint, permissionIds: bigint[]) {
     await this.validateRoleAndPermissions(roleId, permissionIds);
 
-    // Đảm bảo role luôn ở trạng thái đồng bộ permission,
-    // tránh trường hợp xóa thành công nhưng thêm mới thất bại.
     await this.prisma.$transaction([
       this.prisma.rolePermission.deleteMany({
         where: {
@@ -74,45 +58,7 @@ export class RolePermissionService {
     ]);
 
     return {
-      message: 'Permissions replaced successfully',
-    };
-  }
-
-  async removePermissions(roleId: bigint, permissionIds: bigint[]) {
-    const role = await this.prisma.role.findUnique({
-      where: {
-        id: roleId,
-      },
-    });
-
-    if (!role) {
-      throw new NotFoundException('Role not found');
-    }
-
-    const rolePermissions = await this.prisma.rolePermission.findMany({
-      where: {
-        roleId,
-        permissionId: {
-          in: permissionIds,
-        },
-      },
-    });
-
-    if (!rolePermissions.length) {
-      throw new NotFoundException('Role permissions not found');
-    }
-
-    await this.prisma.rolePermission.deleteMany({
-      where: {
-        roleId,
-        permissionId: {
-          in: permissionIds,
-        },
-      },
-    });
-
-    return {
-      message: 'Permissions removed successfully',
+      message: 'Permissions updated successfully',
     };
   }
 
@@ -140,7 +86,7 @@ export class RolePermissionService {
 
     // Không cho phép clone permission giữa các scope khác nhau
     if (sourceRole.scope !== targetRole.scope) {
-      throw new BadRequestException('Role scope and permission scope must match');
+      throw new BadRequestException('Invalid role scope');
     }
 
     const rolePermissions = await this.prisma.rolePermission.findMany({
