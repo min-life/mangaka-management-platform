@@ -7,9 +7,10 @@ import { AppService } from './app.service';
 import { AuthModule } from '@auth/auth.module';
 import { GlobalAuthGuard, PermissionGuard } from '@auth/guards';
 import { AccessTokenStrategy, RefreshTokenStrategy } from '@auth/strategies';
+import { UsersModule } from './users/users.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, JwtModule],
+  imports: [PrismaModule, AuthModule, JwtModule, UsersModule],
   controllers: [AppController],
   providers: [
     AppService,
