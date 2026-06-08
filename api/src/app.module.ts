@@ -8,9 +8,11 @@ import { RolesModule } from './roles/roles.module';
 import { CompaniesModule } from './companies/companies.module';
 import { ProjectsModule } from './projects/projects.module';
 import { AuthModule } from '@auth/auth.module';
-import { GlobalAuthGuard, PermissionGuard } from '@auth/guards';
+import { GlobalAuthGuard } from '@auth/guards';
+import { PermissionGuard } from '@auth/guards/permission.guard';
 import { AccessTokenStrategy, RefreshTokenStrategy } from '@auth/strategies';
-import { UsersModule } from './users/users.module';
+import { UsersModule } from '@users/users.module';
+import { PermissionsModule } from '@permissions/permissions.module';
 
 @Module({
   imports: [
@@ -18,9 +20,10 @@ import { UsersModule } from './users/users.module';
     AuthModule,
     JwtModule,
     UsersModule,
+    RolesModule,
+    PermissionsModule,
     CompaniesModule,
     ProjectsModule,
-    RolesModule,
   ],
   controllers: [AppController],
   providers: [

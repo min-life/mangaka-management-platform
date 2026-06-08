@@ -1,40 +1,85 @@
-import { Body, Controller, Delete, Get, Patch, Post, Param } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Patch,
+  Post,
+  Param,
+  Put,
+} from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Permissions } from '../auth/decorators/permission.decorator';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
-import { RoleService } from './roles.service';
+import { RolesService } from './roles.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
+import { RolePermissionDto } from './dto/roles.dto';
+import { ROLE_PERMISSIONS } from './role-permissions';
 
-@Controller()
-export class RoleController {
-  constructor(private readonly roleService: RoleService) {}
+@Controller('roles')
+export class RolesController {
+  constructor(private readonly rolesService: RolesService) {}
 
-  @Get('roles')
-  findPlatformRoles(@CurrentUser() currentUser: JwtPayload) {
-    return this.roleService.findPlatformRoles(BigInt(currentUser.userId));
+  @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.PLATFORM_ROLE_READ] })
+  @Get('')
+  findPlatformRoles() {
+    return this.rolesService.findPlatformRoles();
   }
 
-  @Post('roles/system')
+  @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.PLATFORM_ROLE_READ] })
+  @Get('/system')
+  findSystemRoles() {
+    return this.rolesService.findPlatformRoles();
+  }
+
+  @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.PLATFORM_ROLE_CREATE] })
+  @Post('/system')
   createSystemRole(@CurrentUser() currentUser: JwtPayload, @Body() dto: CreateRoleDto) {
-    return this.roleService.createPlatformRole(BigInt(currentUser.userId), dto);
+    return this.rolesService.createPlatformRole(BigInt(currentUser.userId), dto);
   }
 
-  @Get('roles/:id')
-  findOne(@CurrentUser() currentUser: JwtPayload, @Param('id') id: string) {
-    return this.roleService.findOne(BigInt(currentUser.userId), BigInt(id));
+  @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.PLATFORM_ROLE_READ] })
+  @Get('/:id')
+  findOne(@Param('id') id: string) {
+    return this.rolesService.findOne(this.parseBigIntParam(id, 'id'));
   }
 
-  @Patch('roles/:id')
+  @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.PLATFORM_ROLE_UPDATE] })
+  @Patch('/:id')
   updateRole(
     @CurrentUser() currentUser: JwtPayload,
     @Param('id') id: string,
     @Body() dto: UpdateRoleDto,
   ) {
-    return this.roleService.updateRole(BigInt(currentUser.userId), BigInt(id), dto);
+    return this.rolesService.updateRole(
+      BigInt(currentUser.userId),
+      this.parseBigIntParam(id, 'id'),
+      dto,
+    );
   }
 
-  @Delete('roles/:id')
-  deleteRole(@CurrentUser() currentUser: JwtPayload, @Param('id') id: string) {
-    return this.roleService.deleteRole(BigInt(currentUser.userId), BigInt(id));
+  @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.PLATFORM_ROLE_DELETE] })
+  @Delete('/:id')
+  deleteRole(@Param('id') id: string) {
+    return this.rolesService.deleteRole(this.parseBigIntParam(id, 'id'));
+  }
+
+  @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.ROLE_PERMISSION_UPDATE] })
+  @Put(':roleId/permissions')
+  replacePermissions(@Param('roleId') roleId: string, @Body() dto: RolePermissionDto) {
+    return this.rolesService.replacePermissions(
+      this.parseBigIntParam(roleId, 'roleId'),
+      dto.permissionIds.map((id) => this.parseBigIntParam(id, 'permissionId')),
+    );
+  }
+
+  private parseBigIntParam(value: string, paramName: string): bigint {
+    if (!/^\d+$/.test(value)) {
+      throw new BadRequestException(`${paramName} must be a numeric string`);
+    }
+
+    return BigInt(value);
   }
 }

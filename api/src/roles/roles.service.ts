@@ -1,11 +1,10 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, SCOPE } from '@prisma/client';
+import { SCOPE } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
@@ -13,159 +12,10 @@ import { ROLE_MESSAGES } from './role-messages';
 import { serializeRole } from './role-serializer';
 
 @Injectable()
-export class RoleService {
+export class RolesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async assertCanManagePlatformRoles(currentUserId: bigint) {
-    const userRole = await this.prisma.userRole.findFirst({
-      where: {
-        userId: currentUserId,
-        role: {
-          scope: SCOPE.SYS,
-          code: 'admin',
-        },
-      },
-    });
-
-    if (!userRole) {
-      throw new ForbiddenException(ROLE_MESSAGES.CANNOT_MANAGE_PLATFORM_ROLES);
-    }
-  }
-
-  private async assertCanAccessCompanyRoles(currentUserId: bigint, companyId: bigint) {
-    const userRole = await this.prisma.userRole.findFirst({
-      where: {
-        userId: currentUserId,
-        role: {
-          OR: [
-            {
-              scope: SCOPE.CO,
-              code: 'co_admin',
-              companyId,
-            },
-            {
-              scope: SCOPE.PRJ,
-              project: {
-                companyId,
-              },
-            },
-          ],
-        },
-      },
-    });
-
-    if (!userRole) {
-      throw new ForbiddenException(ROLE_MESSAGES.CANNOT_ACCESS_COMPANY);
-    }
-  }
-
-  private async assertCanManageCompanyRoles(currentUserId: bigint, companyId: bigint) {
-    const userRole = await this.prisma.userRole.findFirst({
-      where: {
-        userId: currentUserId,
-        role: {
-          scope: SCOPE.CO,
-          companyId,
-          code: 'co_admin',
-        },
-      },
-    });
-
-    if (!userRole) {
-      throw new ForbiddenException(ROLE_MESSAGES.CANNOT_MANAGE_COMPANY_ROLES);
-    }
-  }
-
-  private async assertCanAccessProjectRoles(currentUserId: bigint, projectId: bigint) {
-    const userRole = await this.prisma.userRole.findFirst({
-      where: {
-        userId: currentUserId,
-        role: {
-          scope: SCOPE.PRJ,
-          projectId,
-        },
-      },
-    });
-
-    if (!userRole) {
-      throw new ForbiddenException(ROLE_MESSAGES.CANNOT_ACCESS_PROJECT);
-    }
-  }
-
-  private async assertCanManageProjectRoles(currentUserId: bigint, projectId: bigint) {
-    const userRole = await this.prisma.userRole.findFirst({
-      where: {
-        userId: currentUserId,
-        role: {
-          scope: SCOPE.PRJ,
-          projectId,
-          code: 'manager',
-        },
-      },
-    });
-
-    if (!userRole) {
-      throw new ForbiddenException(ROLE_MESSAGES.CANNOT_MANAGE_PROJECT_ROLES);
-    }
-  }
-
-  private async assertCanAccessRole(
-    currentUserId: bigint,
-    role: Prisma.RoleGetPayload<{ include: { project: true } }>,
-  ) {
-    if (role.scope === SCOPE.SYS) {
-      await this.assertCanManagePlatformRoles(currentUserId);
-      return;
-    }
-
-    if (role.scope === SCOPE.CO) {
-      if (!role.companyId) {
-        return;
-      }
-
-      await this.assertCanAccessCompanyRoles(currentUserId, role.companyId);
-      return;
-    }
-
-    if (role.scope === SCOPE.PRJ) {
-      if (!role.projectId) {
-        return;
-      }
-
-      await this.assertCanAccessProjectRoles(currentUserId, role.projectId);
-    }
-  }
-
-  private async assertCanManageRole(
-    currentUserId: bigint,
-    role: Prisma.RoleGetPayload<{ include: { project: true } }>,
-  ) {
-    if (role.scope === SCOPE.SYS) {
-      await this.assertCanManagePlatformRoles(currentUserId);
-      return;
-    }
-
-    if (role.scope === SCOPE.CO) {
-      if (!role.companyId) {
-        throw new BadRequestException(ROLE_MESSAGES.INVALID_COMPANY_ROLE);
-      }
-
-      await this.assertCanManageCompanyRoles(currentUserId, role.companyId);
-      return;
-    }
-
-    if (role.scope === SCOPE.PRJ) {
-      if (!role.projectId) {
-        throw new BadRequestException(ROLE_MESSAGES.INVALID_PROJECT_ROLE);
-      }
-
-      await this.assertCanManageProjectRoles(currentUserId, role.projectId);
-    }
-  }
-
-  async findPlatformRoles(currentUserId: bigint) {
-    await this.assertCanManagePlatformRoles(currentUserId);
-
+  async findPlatformRoles() {
     const roles = await this.prisma.role.findMany({
       where: {
         OR: [
@@ -192,17 +42,25 @@ export class RoleService {
     };
   }
 
-  async findOne(currentUserId: bigint, roleId: bigint) {
-    const role = await this.prisma.role.findUnique({
-      where: { id: roleId },
-      include: { project: true },
+  async findOne(roleId: bigint) {
+    const role = await this.prisma.role.findFirst({
+      where: {
+        id: roleId,
+        OR: [
+          {
+            scope: SCOPE.SYS,
+          },
+          {
+            companyId: null,
+            projectId: null,
+          },
+        ],
+      },
     });
 
     if (!role) {
       throw new NotFoundException(ROLE_MESSAGES.ROLE_NOT_FOUND);
     }
-
-    await this.assertCanAccessRole(currentUserId, role);
 
     return {
       message: ROLE_MESSAGES.ROLE_FOUND,
@@ -211,8 +69,6 @@ export class RoleService {
   }
 
   async createPlatformRole(currentUserId: bigint, dto: CreateRoleDto) {
-    await this.assertCanManagePlatformRoles(currentUserId);
-
     const role = await this.prisma.role.create({
       data: {
         name: dto.name,
@@ -232,20 +88,24 @@ export class RoleService {
   }
 
   async updateRole(currentUserId: bigint, roleId: bigint, dto: UpdateRoleDto) {
-    const role = await this.prisma.role.findUnique({
+    const role = await this.prisma.role.findFirst({
       where: {
         id: roleId,
-      },
-      include: {
-        project: true,
+        OR: [
+          {
+            scope: SCOPE.SYS,
+          },
+          {
+            companyId: null,
+            projectId: null,
+          },
+        ],
       },
     });
 
     if (!role) {
       throw new NotFoundException(ROLE_MESSAGES.ROLE_NOT_FOUND);
     }
-
-    await this.assertCanManageRole(currentUserId, role);
 
     const updatedRole = await this.prisma.role.update({
       where: { id: roleId },
@@ -262,21 +122,25 @@ export class RoleService {
     };
   }
 
-  async deleteRole(currentUserId: bigint, roleId: bigint) {
-    const role = await this.prisma.role.findUnique({
+  async deleteRole(roleId: bigint) {
+    const role = await this.prisma.role.findFirst({
       where: {
         id: roleId,
-      },
-      include: {
-        project: true,
+        OR: [
+          {
+            scope: SCOPE.SYS,
+          },
+          {
+            companyId: null,
+            projectId: null,
+          },
+        ],
       },
     });
 
     if (!role) {
       throw new NotFoundException(ROLE_MESSAGES.ROLE_NOT_FOUND);
     }
-
-    await this.assertCanManageRole(currentUserId, role);
 
     const assignedCount = await this.prisma.userRole.count({
       where: { roleId },
@@ -295,6 +159,109 @@ export class RoleService {
       data: {
         success: true,
       },
+    };
+  }
+
+  private async validateRoleAndPermissions(roleId: bigint, permissionIds: bigint[]): Promise<void> {
+    const role = await this.prisma.role.findUnique({
+      where: {
+        id: roleId,
+      },
+    });
+
+    if (!role) {
+      throw new BadRequestException('Invalid permissions');
+    }
+
+    const permissions = await this.prisma.permission.findMany({
+      where: {
+        id: {
+          in: permissionIds,
+        },
+      },
+    });
+
+    if (permissions.length !== permissionIds.length) {
+      throw new BadRequestException('Invalid permissions');
+    }
+
+    const hasInvalidScope = permissions.some((permission) => permission.scope !== role.scope);
+
+    if (hasInvalidScope) {
+      throw new BadRequestException('Invalid permissions');
+    }
+  }
+
+  async replacePermissions(roleId: bigint, permissionIds: bigint[]) {
+    await this.validateRoleAndPermissions(roleId, permissionIds);
+
+    await this.prisma.$transaction([
+      this.prisma.rolePermission.deleteMany({
+        where: {
+          roleId,
+        },
+      }),
+
+      this.prisma.rolePermission.createMany({
+        data: permissionIds.map((permissionId) => ({
+          roleId,
+          permissionId,
+        })),
+      }),
+    ]);
+
+    return {
+      message: 'Permissions updated successfully',
+    };
+  }
+
+  async clonePermissions(sourceRoleId: bigint, targetRoleId: bigint) {
+    const sourceRole = await this.prisma.role.findUnique({
+      where: {
+        id: sourceRoleId,
+      },
+    });
+
+    if (!sourceRole) {
+      throw new NotFoundException('Source role not found');
+    }
+
+    const targetRole = await this.prisma.role.findUnique({
+      where: {
+        id: targetRoleId,
+      },
+    });
+
+    if (!targetRole) {
+      throw new NotFoundException('Target role not found');
+    }
+
+    if (sourceRole.scope !== targetRole.scope) {
+      throw new BadRequestException('Invalid role scope');
+    }
+
+    const rolePermissions = await this.prisma.rolePermission.findMany({
+      where: {
+        roleId: sourceRoleId,
+      },
+    });
+
+    if (!rolePermissions.length) {
+      return {
+        message: 'Source role has no permissions',
+      };
+    }
+
+    await this.prisma.rolePermission.createMany({
+      data: rolePermissions.map((rolePermission) => ({
+        roleId: targetRoleId,
+        permissionId: rolePermission.permissionId,
+      })),
+      skipDuplicates: true,
+    });
+
+    return {
+      message: 'Permissions cloned successfully',
     };
   }
 }
