@@ -28,12 +28,6 @@ export class RolesController {
     return this.rolesService.findPlatformRoles();
   }
 
-  @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.PLATFORM_ROLE_READ] })
-  @Get('/system')
-  findSystemRoles() {
-    return this.rolesService.findPlatformRoles();
-  }
-
   @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.PLATFORM_ROLE_CREATE] })
   @Post('/system')
   createSystemRole(@CurrentUser() currentUser: JwtPayload, @Body() dto: CreateRoleDto) {
