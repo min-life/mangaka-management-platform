@@ -5,7 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from '@auth/auth.module';
 import { GlobalAuthGuard } from '@auth/guards';
-import { PermissionModule } from './permission/permission.module';
+import { PermissionModule } from './permissions/permissions.module';
 import { RolesModule } from './roles/roles.module';
 
 import { AccessTokenStrategy, RefreshTokenStrategy } from '@auth/strategies';

@@ -1,6 +1,6 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 
-import { PermissionService } from './permission.service';
+import { PermissionService } from './permissions.service';
 import { PermissionFilterDto } from './dto/permission-filter.dto';
 
 @Controller('permissions')
