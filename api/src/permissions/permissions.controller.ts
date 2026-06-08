@@ -1,19 +1,19 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 
-import { PermissionService } from './permissions.service';
+import { PermissionsService } from './permissions.service';
 import { PermissionFilterDto } from './dto/permission-filter.dto';
 
 @Controller('permissions')
-export class PermissionController {
-  constructor(private readonly permissionService: PermissionService) {}
+export class PermissionsController {
+  constructor(private readonly permissionsService: PermissionsService) {}
 
   @Get()
   findAll(@Query() query: PermissionFilterDto) {
-    return this.permissionService.findAll(query);
+    return this.permissionsService.findAll(query);
   }
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.permissionService.findOne(BigInt(id));
+    return this.permissionsService.findOne(BigInt(id));
   }
 }

@@ -8,7 +8,7 @@ import { PermissionResponseDto } from './dto/permission.dto';
 import { PermissionFilterDto } from './dto/permission-filter.dto';
 
 @Injectable()
-export class PermissionService {
+export class PermissionsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll(query: PermissionFilterDto): Promise<PermissionResponseDto[]> {
