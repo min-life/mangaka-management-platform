@@ -31,6 +31,10 @@ Sau khi cài xong dependencies, tạo Prisma client nếu cần:
 npx prisma generate
 ```
 
+```bash
+npx prisma migrate dev
+```
+
 ## Chạy ứng dụng
 
 ```bash
