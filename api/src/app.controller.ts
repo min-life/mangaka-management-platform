@@ -9,6 +9,6 @@ export class AppController {
   @Public()
   @Get()
   getHello() {
-    return 'Mangaka Management Platform API is running!';
+    return this.appService.getHello();
   }
 }
