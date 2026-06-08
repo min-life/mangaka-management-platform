@@ -5,12 +5,15 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from '@auth/auth.module';
-import { GlobalAuthGuard, PermissionGuard } from '@auth/guards';
+import { GlobalAuthGuard } from '@auth/guards';
+import { PermissionModule } from './permissions/permissions.module';
+import { RolesModule } from './roles/roles.module';
+
 import { AccessTokenStrategy, RefreshTokenStrategy } from '@auth/strategies';
 import { UsersModule } from './users/users.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, JwtModule, UsersModule],
+  imports: [PrismaModule, PermissionModule, RolesModule, AuthModule],
   controllers: [AppController],
   providers: [
     AppService,
