@@ -17,6 +17,7 @@
     "paths": {
       "@/*": ["src/*"],
       "@auth/*": ["src/auth/*"],
+      "@users/*": ["src/users/*"]
     },
     "incremental": true,
     "skipLibCheck": true,
