@@ -8,10 +8,10 @@ import { RolesModule } from './roles/roles.module';
 import { CompaniesModule } from './companies/companies.module';
 import { ProjectsModule } from './projects/projects.module';
 import { AuthModule } from '@auth/auth.module';
-import { GlobalAuthGuard } from '@auth/guards';
-import { PermissionGuard } from '@auth/guards/permission.guard';
+import { GlobalAuthGuard, PermissionGuard } from '@auth/guards';
 import { AccessTokenStrategy, RefreshTokenStrategy } from '@auth/strategies';
 import { UsersModule } from '@users/users.module';
+import { RolesModule } from '@roles/roles.module';
 import { PermissionsModule } from '@permissions/permissions.module';
 
 @Module({
