@@ -1,10 +1,185 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { SCOPE } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
+import { CreateRoleDto } from './dto/create-role.dto';
+import { UpdateRoleDto } from './dto/update-role.dto';
+import { ROLE_MESSAGES } from './constants/role-messages';
+import { serializeRole } from './utils/role-serializer';
 
 @Injectable()
 export class RolesService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async findRoles(scope?: SCOPE) {
+    const roles = await this.prisma.role.findMany({
+      where: {
+        ...(scope ? { scope } : {}),
+      },
+    });
+
+    return {
+      message: ROLE_MESSAGES.ROLES_FOUND,
+      data: roles.map((role) => serializeRole(role)),
+    };
+  }
+
+  async findCompanyRoles(companyId: bigint) {
+    const roles = await this.prisma.role.findMany({
+      where: {
+        scope: SCOPE.CO,
+        companyId,
+      },
+    });
+
+    return {
+      message: ROLE_MESSAGES.COMPANY_ROLES_FOUND,
+      data: roles.map((role) => serializeRole(role)),
+    };
+  }
+
+  async findProjectRoles(projectId: bigint) {
+    const roles = await this.prisma.role.findMany({
+      where: {
+        scope: SCOPE.PRJ,
+        projectId,
+      },
+    });
+
+    return {
+      message: ROLE_MESSAGES.PROJECT_ROLES_FOUND,
+      data: roles.map((role) => serializeRole(role)),
+    };
+  }
+
+  async findOne(roleId: bigint) {
+    const role = await this.prisma.role.findFirst({
+      where: {
+        id: roleId,
+      },
+    });
+
+    if (!role) {
+      throw new NotFoundException(ROLE_MESSAGES.ROLE_NOT_FOUND);
+    }
+
+    return {
+      message: ROLE_MESSAGES.ROLE_FOUND,
+      data: serializeRole(role),
+    };
+  }
+
+  async createRole(currentUserId: bigint, dto: CreateRoleDto) {
+    const role = await this.prisma.role.create({
+      data: {
+        name: dto.name,
+        scope: dto.scope,
+        createdBy: currentUserId,
+        updatedBy: currentUserId,
+      },
+    });
+
+    return {
+      message: ROLE_MESSAGES.ROLE_CREATED,
+      data: serializeRole(role),
+    };
+  }
+
+  async createCompanyRole(currentUserId: bigint, companyId: bigint, dto: CreateRoleDto) {
+    const role = await this.prisma.role.create({
+      data: {
+        name: dto.name,
+        scope: SCOPE.CO,
+        companyId,
+        projectId: null,
+        createdBy: currentUserId,
+        updatedBy: currentUserId,
+      },
+    });
+
+    return {
+      message: ROLE_MESSAGES.COMPANY_ROLE_CREATED,
+      data: serializeRole(role),
+    };
+  }
+
+  async createProjectRole(currentUserId: bigint, projectId: bigint, dto: CreateRoleDto) {
+    const role = await this.prisma.role.create({
+      data: {
+        name: dto.name,
+        scope: SCOPE.PRJ,
+        companyId: null,
+        projectId,
+        createdBy: currentUserId,
+        updatedBy: currentUserId,
+      },
+    });
+
+    return {
+      message: ROLE_MESSAGES.PROJECT_ROLE_CREATED,
+      data: serializeRole(role),
+    };
+  }
+
+  async updateRole(roleId: bigint, dto: UpdateRoleDto) {
+    const role = await this.prisma.role.findUnique({
+      where: {
+        id: roleId,
+      },
+    });
+
+    if (!role) {
+      throw new NotFoundException(ROLE_MESSAGES.ROLE_NOT_FOUND);
+    }
+
+    const updatedRole = await this.prisma.role.update({
+      where: { id: roleId },
+      data: {
+        name: dto.name,
+        scope: dto.scope,
+      },
+    });
+
+    return {
+      message: ROLE_MESSAGES.ROLE_UPDATED,
+      data: serializeRole(updatedRole),
+    };
+  }
+
+  async deleteRole(roleId: bigint) {
+    const role = await this.prisma.role.findUnique({
+      where: {
+        id: roleId,
+      },
+    });
+
+    if (!role) {
+      throw new NotFoundException(ROLE_MESSAGES.ROLE_NOT_FOUND);
+    }
+
+    const assignedCount = await this.prisma.userRole.count({
+      where: { roleId },
+    });
+
+    if (assignedCount > 0) {
+      throw new ConflictException(ROLE_MESSAGES.ASSIGNED_ROLE_DELETE_CONFLICT);
+    }
+
+    await this.prisma.role.delete({
+      where: { id: roleId },
+    });
+
+    return {
+      message: ROLE_MESSAGES.ROLE_DELETED,
+      data: {
+        success: true,
+      },
+    };
+  }
 
   private async validateRoleAndPermissions(roleId: bigint, permissionIds: bigint[]): Promise<void> {
     const role = await this.prisma.role.findUnique({
@@ -13,7 +188,6 @@ export class RolesService {
       },
     });
 
-    // Role phải tồn tại
     if (!role) {
       throw new BadRequestException('Invalid permissions');
     }
@@ -26,12 +200,10 @@ export class RolesService {
       },
     });
 
-    // Tất cả permission phải tồn tại trong hệ thống
     if (permissions.length !== permissionIds.length) {
       throw new BadRequestException('Invalid permissions');
     }
 
-    // Permission phải cùng scope với role
     const hasInvalidScope = permissions.some((permission) => permission.scope !== role.scope);
 
     if (hasInvalidScope) {
@@ -62,7 +234,6 @@ export class RolesService {
     };
   }
 
-  // clone permission từ role cũ sang role mới
   async clonePermissions(sourceRoleId: bigint, targetRoleId: bigint) {
     const sourceRole = await this.prisma.role.findUnique({
       where: {
@@ -84,7 +255,6 @@ export class RolesService {
       throw new NotFoundException('Target role not found');
     }
 
-    // Không cho phép clone permission giữa các scope khác nhau
     if (sourceRole.scope !== targetRole.scope) {
       throw new BadRequestException('Invalid role scope');
     }
