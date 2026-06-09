@@ -12,6 +12,7 @@ import {
   SlidersHorizontal,
   UserCog,
 } from 'lucide-react';
+import type { ApiRole } from '@/lib/roles-api';
 
 export type RoleManagementIcon = ComponentType<{ className?: string }>;
 
@@ -44,56 +45,40 @@ export const stats = [
 
 export const tableHeadings = [
   'Role Name',
-  'Role Code',
+  'Role ID',
   'Scope',
   'Members',
   'Created At',
   'Actions',
 ];
 
-export const roles = [
-  {
-    name: 'Lead Editor',
-    code: 'LEAD_ED',
-    scope: 'SYS',
-    members: 'avatars',
-    createdAt: 'Oct 24, 2023',
-    icon: ShieldCheck,
-    highlighted: true,
-  },
-  {
-    name: 'Assistant B',
-    code: 'ASST_B',
-    scope: 'PRJ',
-    members: '14',
-    createdAt: 'Nov 12, 2023',
-    icon: PenTool,
-  },
-  {
-    name: 'Localization Lead',
-    code: 'LOC_LD',
-    scope: 'CO',
-    members: '3',
-    createdAt: 'Jan 05, 2024',
-    icon: Languages,
-  },
-  {
-    name: 'Quality Control',
-    code: 'QC_SPEC',
-    scope: 'PRJ',
-    members: '8',
-    createdAt: 'Feb 28, 2024',
-    icon: SlidersHorizontal,
-  },
-  {
-    name: 'Archive Manager',
-    code: 'ARCH_MGR',
-    scope: 'CO',
-    members: '2',
-    createdAt: 'Mar 15, 2024',
-    icon: Archive,
-  },
-];
+export const roleIcons = {
+  SYS: ShieldCheck,
+  CO: Languages,
+  PRJ: PenTool,
+};
+
+export const roleMemberFallbacks = ['avatars', '14', '3', '8', '2'];
+
+export function formatRoleDate(value: string) {
+  return new Intl.DateTimeFormat('en', {
+    month: 'short',
+    day: '2-digit',
+    year: 'numeric',
+  }).format(new Date(value));
+}
+
+export function toRoleRow(role: ApiRole, index: number) {
+  return {
+    id: role.id,
+    name: role.name,
+    scope: role.scope,
+    members: roleMemberFallbacks[index % roleMemberFallbacks.length],
+    createdAt: formatRoleDate(role.createdAt),
+    icon: roleIcons[role.scope] ?? SlidersHorizontal,
+    highlighted: role.scope === 'SYS',
+  };
+}
 
 export const toolbarItems = [
   { label: 'Bulk Import', icon: CloudUpload },

@@ -1,3 +1,6 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
 import {
   Bell,
   ChevronLeft,
@@ -8,6 +11,7 @@ import {
   Plus,
   Search,
 } from 'lucide-react';
+import Link from 'next/link';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -15,21 +19,72 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { getRoles, type ApiRole } from '@/lib/roles-api';
 import { PaginationButton } from './components/pagination-button';
 import { RoleRow } from './components/role-row';
 import { SidebarUtility } from './components/sidebar-utility';
 import {
   navItems,
-  roles,
   sidebarUtilityItems,
   stats,
   studioAvatar,
   tableHeadings,
   toolbarItems,
+  toRoleRow,
   topNavItems,
 } from './const';
 
 export default function RoleManagementPage() {
+  const [roles, setRoles] = useState<ApiRole[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+
+    getRoles()
+      .then((data) => {
+        if (mounted) {
+          setRoles(data);
+          setError('');
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setError('Unable to load roles from local API.');
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const roleRows = useMemo(() => roles.map((role, index) => toRoleRow(role, index)), [roles]);
+  const dynamicStats = useMemo(
+    () =>
+      stats.map((stat) => {
+        if (stat.label === 'Total Roles') {
+          return { ...stat, value: roles.length.toString() };
+        }
+
+        if (stat.label === 'System Scoped') {
+          return {
+            ...stat,
+            value: roles.filter((role) => role.scope === 'SYS').length.toString(),
+          };
+        }
+
+        return stat;
+      }),
+    [roles],
+  );
+
   return (
     <div className="dark min-h-screen bg-[#0f0f0f] text-[#ecdfe2]">
       <aside className="fixed left-0 top-0 z-50 flex h-full w-[260px] flex-col border-r border-[#444748] bg-[#241e20] px-4 py-6">
@@ -148,15 +203,20 @@ export default function RoleManagementPage() {
                 <Filter className="absolute left-3 size-[18px] text-[#c4c7c7]" />
                 Filter
               </Button>
-              <Button className="h-[38px] rounded bg-[#e2e2e2] px-5 text-[14px] font-bold text-[#2f3131] hover:bg-[#e2e2e2]/90">
-                <Plus className="size-5" />
-                Create Role
+              <Button
+                asChild
+                className="h-[38px] rounded bg-[#e2e2e2] px-5 text-[14px] font-bold text-[#2f3131] hover:bg-[#e2e2e2]/90"
+              >
+                <Link href="/role-management/create">
+                  <Plus className="size-5" />
+                  Create Role
+                </Link>
               </Button>
             </div>
           </section>
 
           <section className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-4">
-            {stats.map((stat) => (
+            {dynamicStats.map((stat) => (
               <Card
                 className="gap-1 rounded-lg border border-[#444748] bg-[#241e20] p-5 py-5 text-[#ecdfe2] ring-0"
                 key={stat.label}
@@ -190,15 +250,17 @@ export default function RoleManagementPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {roles.map((role) => (
-                  <RoleRow key={role.code} role={role} />
+                {roleRows.map((role) => (
+                  <RoleRow key={role.id} role={role} />
                 ))}
               </TableBody>
             </Table>
 
             <div className="flex h-[65px] items-center justify-between border-t border-[#444748] bg-[#241e20] px-6 py-4">
               <span className="text-[12px] leading-4 text-[#c4c7c7]">
-                Showing 1 to 5 of 12 roles
+                {isLoading
+                  ? 'Loading roles from local API...'
+                  : error || `Showing ${roleRows.length ? 1 : 0} to ${roleRows.length} of ${roleRows.length} roles`}
               </span>
               <div className="flex items-center gap-2">
                 <PaginationButton disabled>

@@ -12,10 +12,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { memberAvatars, roles } from '../const';
+import { memberAvatars, toRoleRow } from '../const';
 
 type RoleRowProps = {
-  role: (typeof roles)[number];
+  role: ReturnType<typeof toRoleRow>;
 };
 
 export function RoleRow({ role }: RoleRowProps) {
@@ -30,7 +30,7 @@ export function RoleRow({ role }: RoleRowProps) {
         </div>
       </TableCell>
       <TableCell className="px-6 py-4 font-mono text-[11px] leading-[14px] text-[#c4c7c7]">
-        {role.code}
+        #{role.id}
       </TableCell>
       <TableCell className="px-6 py-4 text-center">
         <Badge
@@ -72,7 +72,7 @@ export function RoleRow({ role }: RoleRowProps) {
           size="sm"
           variant="ghost"
         >
-          <Link href="/role-management/detail">
+          <Link href={`/role-management/detail?roleId=${role.id}`}>
             <Edit className="size-[18px]" />
             <span className="text-[12px] font-medium">Edit</span>
           </Link>
