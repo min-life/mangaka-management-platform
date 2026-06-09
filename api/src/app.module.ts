@@ -5,7 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from '@auth/auth.module';
 import { GlobalAuthGuard } from '@auth/guards';
-import { AccessTokenStrategy, RefreshTokenStrategy } from '@auth/strategies';
+import { AccessTokenStrategy, GoogleStrategy, RefreshTokenStrategy } from '@auth/strategies';
 
 @Module({
   imports: [PrismaModule, AuthModule],
@@ -18,6 +18,7 @@ import { AccessTokenStrategy, RefreshTokenStrategy } from '@auth/strategies';
     },
     AccessTokenStrategy,
     RefreshTokenStrategy,
+    GoogleStrategy,
   ],
 })
 export class AppModule {}

@@ -25,18 +25,22 @@ enum SCOPE {
 }
 
 model User {
-  id          BigInt    @id @default(autoincrement())
-  email       String    @unique
-  password    String
-  displayName String    @map("display_name")
-  avatarUrl   String?   @map("avatar_url")
-  isDeleted   Boolean   @default(false) @map("is_deleted")
-  createdBy   BigInt?   @map("created_by")
-  updatedBy   BigInt?   @map("updated_by")
-  deletedBy   BigInt?   @map("deleted_by")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
-  deletedAt   DateTime? @map("deleted_at")
+  id                              BigInt    @id @default(autoincrement())
+  email                           String    @unique
+  googleId                        String?   @unique @map("google_id")
+  password                        String?
+  displayName                     String    @map("display_name")
+  avatarUrl                       String?   @map("avatar_url")
+  emailVerifiedAt                 DateTime? @map("email_verified_at")
+  emailVerificationTokenHash      String?   @unique @map("email_verification_token_hash")
+  emailVerificationTokenExpiresAt DateTime? @map("email_verification_token_expires_at")
+  isDeleted                       Boolean   @default(false) @map("is_deleted")
+  createdBy                       BigInt?   @map("created_by")
+  updatedBy                       BigInt?   @map("updated_by")
+  deletedBy                       BigInt?   @map("deleted_by")
+  createdAt                       DateTime  @default(now()) @map("created_at")
+  updatedAt                       DateTime  @default(now()) @updatedAt @map("updated_at")
+  deletedAt                       DateTime? @map("deleted_at")
 
   // Relations with itself for createdBy, updatedBy, deletedBy
   createdByUser User?  @relation("createdByUser", fields: [createdBy], references: [id])
@@ -364,6 +368,7 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
+// KietDM #001
 model BlacklistToken {
   token     String   @id
   expiresAt DateTime @map("expires_at")

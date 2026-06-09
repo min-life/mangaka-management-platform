@@ -23,6 +23,12 @@ async function bootstrap() {
     .build();
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, documentFactory);
+  // KietDM #001 start
+  app.enableCors({
+    origin: `${process.env.FRONTEND_URL}`,
+    credentials: true,
+  });
+  // KietDM #001 end
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();
