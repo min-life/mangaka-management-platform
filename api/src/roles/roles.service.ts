@@ -15,46 +15,29 @@ import { serializeRole } from './utils/role-serializer';
 export class RolesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findPlatformRoles() {
+  async findRoles(scope?: SCOPE) {
     const roles = await this.prisma.role.findMany({
       where: {
-        OR: [
-          {
-            scope: SCOPE.SYS,
-          },
-          {
-            scope: SCOPE.CO,
-            companyId: null,
-            projectId: null,
-          },
-          {
-            scope: SCOPE.PRJ,
-            companyId: null,
-            projectId: null,
-          },
-        ],
+        ...(scope ? { scope } : {}),
+        companyId: null,
+        projectId: null,
       },
     });
 
     return {
-      message: ROLE_MESSAGES.PLATFORM_ROLES_FOUND,
+      message: ROLE_MESSAGES.ROLES_FOUND,
       data: roles.map((role) => serializeRole(role)),
     };
   }
 
   async findOne(roleId: bigint) {
-    const role = await this.prisma.role.findFirst({
+    return this.getRoleById(roleId);
+  }
+
+  async getRoleById(roleId: bigint) {
+    const role = await this.prisma.role.findUnique({
       where: {
         id: roleId,
-        OR: [
-          {
-            scope: SCOPE.SYS,
-          },
-          {
-            companyId: null,
-            projectId: null,
-          },
-        ],
       },
     });
 
@@ -68,12 +51,11 @@ export class RolesService {
     };
   }
 
-  async createPlatformRole(currentUserId: bigint, dto: CreateRoleDto) {
+  async createRole(currentUserId: bigint, dto: CreateRoleDto) {
     const role = await this.prisma.role.create({
       data: {
         name: dto.name,
-        code: dto.code,
-        scope: dto.scope ?? SCOPE.SYS,
+        scope: dto.scope,
         companyId: null,
         projectId: null,
         createdBy: currentUserId,
@@ -82,24 +64,15 @@ export class RolesService {
     });
 
     return {
-      message: ROLE_MESSAGES.PLATFORM_ROLE_CREATED,
+      message: ROLE_MESSAGES.ROLE_CREATED,
       data: serializeRole(role),
     };
   }
 
-  async updateRole(currentUserId: bigint, roleId: bigint, dto: UpdateRoleDto) {
-    const role = await this.prisma.role.findFirst({
+  async updateRole(roleId: bigint, dto: UpdateRoleDto) {
+    const role = await this.prisma.role.findUnique({
       where: {
         id: roleId,
-        OR: [
-          {
-            scope: SCOPE.SYS,
-          },
-          {
-            companyId: null,
-            projectId: null,
-          },
-        ],
       },
     });
 
@@ -111,8 +84,7 @@ export class RolesService {
       where: { id: roleId },
       data: {
         name: dto.name,
-        code: dto.code,
-        updatedBy: currentUserId,
+        scope: dto.scope,
       },
     });
 
@@ -123,18 +95,9 @@ export class RolesService {
   }
 
   async deleteRole(roleId: bigint) {
-    const role = await this.prisma.role.findFirst({
+    const role = await this.prisma.role.findUnique({
       where: {
         id: roleId,
-        OR: [
-          {
-            scope: SCOPE.SYS,
-          },
-          {
-            companyId: null,
-            projectId: null,
-          },
-        ],
       },
     });
 

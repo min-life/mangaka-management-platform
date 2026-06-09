@@ -1,9 +1,9 @@
 export const ROLE_MESSAGES = {
-  PLATFORM_ROLES_FOUND: 'Platform roles retrieved successfully.',
+  ROLES_FOUND: 'Roles retrieved successfully.',
   COMPANY_ROLES_FOUND: 'Company roles retrieved successfully.',
   PROJECT_ROLES_FOUND: 'Project roles retrieved successfully.',
   ROLE_FOUND: 'Role detail retrieved successfully.',
-  PLATFORM_ROLE_CREATED: 'Platform role created successfully.',
+  ROLE_CREATED: 'Role created successfully.',
   COMPANY_ROLE_CREATED: 'Company role created successfully.',
   PROJECT_ROLE_CREATED: 'Project role created successfully.',
   ROLE_UPDATED: 'Role updated successfully.',

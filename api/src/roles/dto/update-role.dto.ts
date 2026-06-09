@@ -6,10 +6,6 @@ export class UpdateRoleDto {
   @IsOptional()
   name?: string;
 
-  @IsString()
-  @IsOptional()
-  code?: string;
-
   @IsEnum(SCOPE)
   @IsOptional()
   scope?: SCOPE;

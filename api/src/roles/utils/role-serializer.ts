@@ -3,7 +3,6 @@ import { SCOPE } from '@prisma/client';
 export function serializeRole(role: {
   id: bigint;
   name: string;
-  code: string | null;
   scope: SCOPE;
   companyId: bigint | null;
   projectId: bigint | null;
@@ -13,7 +12,6 @@ export function serializeRole(role: {
   return {
     id: role.id.toString(),
     name: role.name,
-    code: role.code,
     scope: role.scope,
     companyId: role.companyId?.toString() ?? null,
     projectId: role.projectId?.toString() ?? null,
