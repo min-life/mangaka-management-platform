@@ -13,7 +13,7 @@ import { Permissions } from '../auth/decorators/permission.decorator';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { CreateRoleDto } from '../roles/dto/create-role.dto';
 import { UpdateRoleDto } from '../roles/dto/update-role.dto';
-import { ROLE_PERMISSIONS } from '../roles/role-permissions';
+import { ROLE_PERMISSIONS } from '../roles/constants/role-permissions';
 import { ProjectRolesService } from './project-roles.service';
 
 @Controller('projects/:projectId/roles')

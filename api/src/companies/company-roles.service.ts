@@ -8,8 +8,8 @@ import { SCOPE } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CreateRoleDto } from '../roles/dto/create-role.dto';
 import { UpdateRoleDto } from '../roles/dto/update-role.dto';
-import { ROLE_MESSAGES } from '../roles/role-messages';
-import { serializeRole } from '../roles/role-serializer';
+import { ROLE_MESSAGES } from '../roles/constants/role-messages';
+import { serializeRole } from '../roles/utils/role-serializer';
 
 @Injectable()
 export class CompanyRolesService {
