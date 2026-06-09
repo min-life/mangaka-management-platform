@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { BadgeCheck } from 'lucide-react';
 
 import { AuthForm } from './components/AuthForm';
@@ -7,34 +8,36 @@ import { images } from './const/studio-data';
 export default function Page() {
   return (
     <main className="flex min-h-screen overflow-hidden bg-[#131313] text-[#e2e2e2]">
-      <AuthForm
-        description="Access your production dashboard and creative tools."
-        fields={[
-          {
-            id: 'email',
-            label: 'Email Address',
-            placeholder: 'name@studio.com',
-            type: 'email',
-          },
-          {
-            action: {
-              href: '#',
-              label: 'Forgot password?',
+      <Suspense>
+        <AuthForm
+          description="Access your production dashboard and creative tools."
+          fields={[
+            {
+              id: 'email',
+              label: 'Email Address',
+              placeholder: 'name@studio.com',
+              type: 'email',
             },
-            id: 'password',
-            label: 'Password',
-            placeholder: '••••••••',
-            type: 'password',
-          },
-        ]}
-        footerLinkHref="/register"
-        footerLinkLabel="Sign Up"
-        footerText="Don't have an account?"
-        showSocialLogin
-        submitHref="/studio"
-        submitLabel="Sign In"
-        title="Welcome Back"
-      />
+            {
+              action: {
+                href: '#',
+                label: 'Forgot password?',
+              },
+              id: 'password',
+              label: 'Password',
+              placeholder: '••••••••',
+              type: 'password',
+            },
+          ]}
+          footerLinkHref="/register"
+          footerLinkLabel="Sign Up"
+          footerText="Don't have an account?"
+          showSocialLogin
+          submitHref="/studio"
+          submitLabel="Sign In"
+          title="Welcome Back"
+        />
+      </Suspense>
 
       <section className="relative hidden flex-1 overflow-hidden bg-[#0e0e0e] lg:block">
         <img

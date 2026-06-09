@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { FormEvent, useState } from 'react';
 import { AxiosError } from 'axios';
 import { BookOpen, Loader2, MessageSquare } from 'lucide-react';
@@ -66,10 +66,19 @@ export function AuthForm({
   showSocialLogin = false,
 }: AuthFormProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<LoginErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const apiBaseUrl = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api').replace(
+    /\/$/,
+    '',
+  );
+  const oauthError =
+    searchParams.get('error') === 'oauth_failed'
+      ? 'Unable to sign in with Google. Please try again.'
+      : null;
 
   const validate = () => {
     const nextErrors: LoginErrors = {};
@@ -174,9 +183,9 @@ export function AuthForm({
           </div>
         ))}
 
-        {errors.form ? (
+        {errors.form || oauthError ? (
           <div className="rounded border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm text-red-200">
-            {errors.form}
+            {errors.form ?? oauthError}
           </div>
         ) : null}
 
@@ -202,6 +211,10 @@ export function AuthForm({
             <div className="grid grid-cols-2 gap-4">
               <Button
                 className="h-14 rounded border-[#4c4546] bg-transparent text-[#e2e2e2] hover:bg-[#1f1f1f]"
+                onClick={() => {
+                  window.location.href = `${apiBaseUrl}/auth/google`;
+                }}
+                type="button"
                 variant="outline"
               >
                 <span className="size-4 rounded-full border border-[#4c4546] bg-[#c6c6c6]" />

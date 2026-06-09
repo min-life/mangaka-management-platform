@@ -12,7 +12,7 @@ import { images } from '../register/const/studio-data';
 type VerifyStatus = 'verifying' | 'success' | 'error';
 
 // KietDM #001
-export default function Page() {
+function VerifyEmailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
@@ -59,8 +59,7 @@ export default function Page() {
     );
 
   return (
-    <Suspense fallback={null}>
-      <main className="flex min-h-screen overflow-hidden bg-[#131313] text-[#e2e2e2]">
+    <main className="flex min-h-screen overflow-hidden bg-[#131313] text-[#e2e2e2]">
         <section className="relative z-10 flex w-full flex-col justify-center border-r border-[#4c4546] bg-[#131313] px-6 py-12 lg:w-[480px] lg:px-12">
           <div className="mb-12">
             <div className="mb-8 flex items-center gap-3">
@@ -133,7 +132,14 @@ export default function Page() {
             </div>
           </div>
         </section>
-      </main>
+    </main>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={null}>
+      <VerifyEmailContent />
     </Suspense>
   );
 }
