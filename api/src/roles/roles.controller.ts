@@ -1,14 +1,4 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Patch,
-  Post,
-  Param,
-  Put,
-  Query,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, Patch, Post, Param, Put, Query } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Permissions } from '../auth/decorators/permission.decorator';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
@@ -31,7 +21,7 @@ export class RolesController {
   }
 
   @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.PLATFORM_ROLE_CREATE] })
-  @Post('/system')
+  @Post('')
   createRole(@CurrentUser() currentUser: JwtPayload, @Body() dto: CreateRoleDto) {
     return this.rolesService.createRole(BigInt(currentUser.userId), dto);
   }

@@ -7,26 +7,22 @@ import { CreateRoleDto } from '../roles/dto/create-role.dto';
 import { UpdateRoleDto } from '../roles/dto/update-role.dto';
 import { RolesService } from '../roles/roles.service';
 import { parseBigIntParam } from '../utils';
-import { ProjectsService } from './projects.service';
 
 @Controller('projects')
 export class ProjectsController {
-  constructor(
-    private readonly projectsService: ProjectsService,
-    private readonly rolesService: RolesService,
-  ) {}
+  constructor(private readonly rolesService: RolesService) {}
 
   @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.PROJECT_ROLE_READ] })
   @Get(':projectId/roles')
   findProjectRoles(@Param('projectId') projectId: string) {
-    return this.projectsService.findProjectRoles(parseBigIntParam(projectId, 'projectId'));
+    return this.rolesService.findProjectRoles(parseBigIntParam(projectId, 'projectId'));
   }
 
   @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.PROJECT_ROLE_READ] })
   @Get(':projectId/roles/:roleId')
   findProjectRoleDetail(@Param('projectId') projectId: string, @Param('roleId') roleId: string) {
     parseBigIntParam(projectId, 'projectId');
-    return this.rolesService.getRoleById(parseBigIntParam(roleId, 'roleId'));
+    return this.rolesService.findOne(parseBigIntParam(roleId, 'roleId'));
   }
 
   @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.PROJECT_ROLE_CREATE] })
@@ -36,7 +32,7 @@ export class ProjectsController {
     @Param('projectId') projectId: string,
     @Body() dto: CreateRoleDto,
   ) {
-    return this.projectsService.createProjectRole(
+    return this.rolesService.createProjectRole(
       BigInt(currentUser.userId),
       parseBigIntParam(projectId, 'projectId'),
       dto,

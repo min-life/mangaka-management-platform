@@ -19,8 +19,6 @@ export class RolesService {
     const roles = await this.prisma.role.findMany({
       where: {
         ...(scope ? { scope } : {}),
-        companyId: null,
-        projectId: null,
       },
     });
 
@@ -30,12 +28,36 @@ export class RolesService {
     };
   }
 
-  async findOne(roleId: bigint) {
-    return this.getRoleById(roleId);
+  async findCompanyRoles(companyId: bigint) {
+    const roles = await this.prisma.role.findMany({
+      where: {
+        scope: SCOPE.CO,
+        companyId,
+      },
+    });
+
+    return {
+      message: ROLE_MESSAGES.COMPANY_ROLES_FOUND,
+      data: roles.map((role) => serializeRole(role)),
+    };
   }
 
-  async getRoleById(roleId: bigint) {
-    const role = await this.prisma.role.findUnique({
+  async findProjectRoles(projectId: bigint) {
+    const roles = await this.prisma.role.findMany({
+      where: {
+        scope: SCOPE.PRJ,
+        projectId,
+      },
+    });
+
+    return {
+      message: ROLE_MESSAGES.PROJECT_ROLES_FOUND,
+      data: roles.map((role) => serializeRole(role)),
+    };
+  }
+
+  async findOne(roleId: bigint) {
+    const role = await this.prisma.role.findFirst({
       where: {
         id: roleId,
       },
@@ -56,8 +78,6 @@ export class RolesService {
       data: {
         name: dto.name,
         scope: dto.scope,
-        companyId: null,
-        projectId: null,
         createdBy: currentUserId,
         updatedBy: currentUserId,
       },
@@ -65,6 +85,42 @@ export class RolesService {
 
     return {
       message: ROLE_MESSAGES.ROLE_CREATED,
+      data: serializeRole(role),
+    };
+  }
+
+  async createCompanyRole(currentUserId: bigint, companyId: bigint, dto: CreateRoleDto) {
+    const role = await this.prisma.role.create({
+      data: {
+        name: dto.name,
+        scope: SCOPE.CO,
+        companyId,
+        projectId: null,
+        createdBy: currentUserId,
+        updatedBy: currentUserId,
+      },
+    });
+
+    return {
+      message: ROLE_MESSAGES.COMPANY_ROLE_CREATED,
+      data: serializeRole(role),
+    };
+  }
+
+  async createProjectRole(currentUserId: bigint, projectId: bigint, dto: CreateRoleDto) {
+    const role = await this.prisma.role.create({
+      data: {
+        name: dto.name,
+        scope: SCOPE.PRJ,
+        companyId: null,
+        projectId,
+        createdBy: currentUserId,
+        updatedBy: currentUserId,
+      },
+    });
+
+    return {
+      message: ROLE_MESSAGES.PROJECT_ROLE_CREATED,
       data: serializeRole(role),
     };
   }
