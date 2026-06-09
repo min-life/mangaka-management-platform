@@ -1,20 +1,12 @@
-<<<<<<< Updated upstream
-import { Body, Controller, Param, Put } from '@nestjs/common';
-
-=======
 import { Body, Controller, Delete, Get, Patch, Post, Param, Put, Query } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Permissions } from '../auth/decorators/permission.decorator';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
->>>>>>> Stashed changes
 import { RolesService } from './roles.service';
 import { RolePermissionDto } from './dto/roles.dto';
-<<<<<<< Updated upstream
-=======
 import { FindRolesQueryDto } from './dto/find-roles-query.dto';
 import { ROLE_PERMISSIONS } from '../constants/role-permissions';
 import { parseBigIntParam } from '../utils';
->>>>>>> Stashed changes
 
 @Controller('roles')
 export class RolesController {
