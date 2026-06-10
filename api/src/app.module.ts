@@ -14,7 +14,16 @@ import { ProjectsModule } from './projects/projects.module';
 import { CompaniesModule } from './companies/companies.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, JwtModule, UsersModule, RolesModule, PermissionsModule, ProjectsModule, CompaniesModule],
+  imports: [
+    PrismaModule,
+    AuthModule,
+    JwtModule,
+    UsersModule,
+    RolesModule,
+    PermissionsModule,
+    CompaniesModule,
+    ProjectsModule,
+  ],
   controllers: [AppController],
   providers: [
     AppService,
