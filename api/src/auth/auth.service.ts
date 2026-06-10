@@ -14,12 +14,15 @@ import { RegisterDto } from './dto/register.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { GoogleOAuthProfile } from './interfaces';
 
-const REFRESH_TOKEN_EXPIRES_IN_DAYS = 7;
+const REFRESH_TOKEN_EXPIRES_IN_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRES_IN_DAYS ?? 7);
 const REFRESH_TOKEN_EXPIRES_IN_MS = REFRESH_TOKEN_EXPIRES_IN_DAYS * 24 * 60 * 60 * 1000;
-const EMAIL_VERIFICATION_TOKEN_EXPIRES_IN_HOURS = 24;
+const EMAIL_VERIFICATION_TOKEN_EXPIRES_IN_HOURS = Number(
+  process.env.EMAIL_VERIFICATION_TOKEN_EXPIRES_IN_HOURS ?? 24,
+);
 const EMAIL_VERIFICATION_TOKEN_EXPIRES_IN_MS =
   EMAIL_VERIFICATION_TOKEN_EXPIRES_IN_HOURS * 60 * 60 * 1000;
-const BCRYPT_SALT_ROUNDS = 10;
+const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS ?? 10);
+const DEFAULT_USER_ROLE_CODE = process.env.DEFAULT_USER_ROLE_CODE ?? 'USER';
 
 @Injectable()
 export class AuthService {
@@ -56,7 +59,32 @@ export class AuthService {
       throw new UnauthorizedException('Please verify your email before logging in');
     }
 
-    return this.createSession(user);
+    const accessToken = this.jwtService.sign({
+      userId: user.id.toString(),
+      email: user.email,
+    });
+
+    const refreshToken = this.generateRefreshToken(user.id, user.email);
+    const refreshTokenExpiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_IN_MS);
+
+    await this.prisma.refreshToken.create({
+      data: {
+        token: refreshToken,
+        userId: user.id,
+        expiresAt: refreshTokenExpiresAt,
+      },
+    });
+
+    return {
+      accessToken,
+      refreshToken,
+      refreshTokenExpiresAt,
+      user: {
+        id: user.id.toString(),
+        email: user.email,
+        name: user.displayName,
+      },
+    };
   }
 
   // KietDM #001
@@ -129,7 +157,27 @@ export class AuthService {
       });
     });
 
-    return this.createSession(user);
+    const accessToken = this.jwtService.sign({
+      userId: user.id.toString(),
+      email: user.email,
+    });
+
+    const refreshToken = this.generateRefreshToken(user.id, user.email);
+    const refreshTokenExpiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_IN_MS);
+
+    await this.prisma.refreshToken.create({
+      data: {
+        token: refreshToken,
+        userId: user.id,
+        expiresAt: refreshTokenExpiresAt,
+      },
+    });
+
+    return {
+      accessToken,
+      refreshToken,
+      refreshTokenExpiresAt,
+    };
   }
 
   // KietDM #001
@@ -161,31 +209,55 @@ export class AuthService {
   // KietDM #001
   async register(body: RegisterDto) {
     const email = body.email.trim().toLowerCase();
-    const existingUser = await this.prisma.user.findUnique({
-      where: {
-        email,
-      },
-    });
-
-    if (existingUser) {
-      throw new ConflictException('Email already exists');
-    }
-
     const hashedPassword = await bcrypt.hash(body.password, BCRYPT_SALT_ROUNDS);
     const verificationToken = randomBytes(64).toString('hex');
     const verificationTokenExpiresAt = new Date(
       Date.now() + EMAIL_VERIFICATION_TOKEN_EXPIRES_IN_MS,
     );
 
-    const user = await this.prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        displayName: body.display_name.trim(),
-        emailVerifiedAt: null,
-        emailVerificationTokenHash: this.hashEmailVerificationToken(verificationToken),
-        emailVerificationTokenExpiresAt: verificationTokenExpiresAt,
-      },
+    const user = await this.prisma.$transaction(async (prisma) => {
+      const existingUser = await prisma.user.findUnique({
+        where: {
+          email,
+        },
+      });
+
+      if (existingUser) {
+        throw new ConflictException('Email already exists');
+      }
+
+      const defaultRole = await prisma.role.findFirst({
+        where: {
+          code: DEFAULT_USER_ROLE_CODE,
+          scope: 'SYS',
+          companyId: null,
+          projectId: null,
+        },
+      });
+
+      if (!defaultRole) {
+        throw new BadRequestException('Default user role is not configured');
+      }
+
+      const createdUser = await prisma.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          displayName: body.displayName.trim(),
+          emailVerifiedAt: null,
+          emailVerificationTokenHash: this.hashEmailVerificationToken(verificationToken),
+          emailVerificationTokenExpiresAt: verificationTokenExpiresAt,
+        },
+      });
+
+      await prisma.userRole.create({
+        data: {
+          userId: createdUser.id,
+          roleId: defaultRole.id,
+        },
+      });
+
+      return createdUser;
     });
 
     const frontendUrl = (process.env.FRONTEND_URL ?? 'http://localhost:3001').replace(/\/$/, '');
@@ -193,6 +265,7 @@ export class AuthService {
     await this.mailService.sendVerificationEmail(email, verificationUrl);
 
     return {
+      user,
       message: 'Please verify your email before logging in',
     };
   }
@@ -208,19 +281,6 @@ export class AuthService {
     });
 
     if (!user || !user.emailVerificationTokenExpiresAt) {
-      throw new BadRequestException('Invalid or expired verification token');
-    }
-
-    if (user.emailVerificationTokenExpiresAt <= new Date()) {
-      await this.prisma.user.update({
-        where: {
-          id: user.id,
-        },
-        data: {
-          emailVerificationTokenHash: null,
-          emailVerificationTokenExpiresAt: null,
-        },
-      });
       throw new BadRequestException('Invalid or expired verification token');
     }
 
@@ -244,33 +304,16 @@ export class AuthService {
     return createHash('sha256').update(token).digest('hex');
   }
 
-  // KietDM #001
-  private async createSession(user: { id: bigint; email: string; displayName: string | null }) {
-    const accessToken = this.jwtService.sign({
-      userId: user.id.toString(),
-      email: user.email,
-    });
-
-    const refreshToken = randomBytes(64).toString('hex');
-    const refreshTokenExpiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_IN_MS);
-
-    await this.prisma.refreshToken.create({
-      data: {
-        token: refreshToken,
-        userId: user.id,
-        expiresAt: refreshTokenExpiresAt,
+  private generateRefreshToken(userId: bigint, email: string): string {
+    return this.jwtService.sign(
+      {
+        userId: userId.toString(),
+        email,
       },
-    });
-
-    return {
-      accessToken,
-      refreshToken,
-      refreshTokenExpiresAt,
-      user: {
-        id: user.id.toString(),
-        email: user.email,
-        name: user.displayName,
+      {
+        secret: process.env.REFRESH_TOKEN_SECRET ?? 'default',
+        expiresIn: `${REFRESH_TOKEN_EXPIRES_IN_DAYS}d`,
       },
-    };
+    );
   }
 }

@@ -21,7 +21,13 @@ export class AuthController {
       await this.authService.login(body);
 
     //Lưu refresh token vào cookie Start
-    this.setRefreshTokenCookie(response, refreshToken, refreshTokenExpiresAt);
+    response.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      sameSite: 'none',
+      secure: process.env.NODE_ENV === 'production',
+      expires: refreshTokenExpiresAt,
+      path: '/api/auth',
+    });
     //Lưu refresh token vào cookie End
 
     return loginResponse;
@@ -47,7 +53,13 @@ export class AuthController {
       const { accessToken, refreshToken, refreshTokenExpiresAt } =
         await this.authService.loginWithGoogle(request.user);
 
-      this.setRefreshTokenCookie(response, refreshToken, refreshTokenExpiresAt);
+      response.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        sameSite: 'none',
+        secure: process.env.NODE_ENV === 'production',
+        expires: refreshTokenExpiresAt,
+        path: '/api/auth',
+      });
 
       const redirectUrl = new URL('/auth/oauth-success', frontendUrl);
       redirectUrl.searchParams.set('access_token', accessToken);
@@ -68,9 +80,10 @@ export class AuthController {
   @HttpCode(204)
   async logout(
     @Cookie('refreshToken') refreshToken: string | undefined,
+    @Cookie('accessToken') accessToken: string | undefined,
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
-    await this.authService.logout(refreshToken);
+    await this.authService.logout(refreshToken, accessToken);
 
     response.clearCookie('refreshToken', {
       httpOnly: true,
@@ -95,17 +108,4 @@ export class AuthController {
   }
 
   // KietDM #001
-  private setRefreshTokenCookie(
-    response: Response,
-    refreshToken: string,
-    refreshTokenExpiresAt: Date,
-  ) {
-    response.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      sameSite: 'none',
-      secure: process.env.NODE_ENV === 'production',
-      expires: refreshTokenExpiresAt,
-      path: '/api/auth', //!!!
-    });
-  }
 }

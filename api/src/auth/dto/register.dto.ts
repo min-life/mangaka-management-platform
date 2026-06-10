@@ -15,5 +15,5 @@ export class RegisterDto {
   @ApiProperty({ example: 'username' })
   @IsString()
   @MinLength(5)
-  display_name!: string;
+  displayName!: string;
 }

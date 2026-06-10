@@ -15,7 +15,7 @@ export class MailService {
 
     if (!host || !user || !pass || !from) {
       this.logger.warn(`SMTP is not configured. Verification link: ${verificationUrl}`);
-      return;
+      throw new InternalServerErrorException('SMTP is not configured');
     }
 
     const transporter = nodemailer.createTransport({

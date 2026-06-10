@@ -11,7 +11,7 @@ import { AuthService } from './auth.service';
     PrismaModule,
     PassportModule,
     JwtModule.register({
-      secret: process.env.JWT_ACCESS_SECRET,
+      secret: process.env.ACCESS_TOKEN_SECRET,
       signOptions: {
         expiresIn: '1h',
       },
