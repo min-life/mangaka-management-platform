@@ -48,13 +48,13 @@ export class ProjectsService {
 
   async deleteProject(projectId: bigint) {
     try {
-      return await this.prisma.project.delete({
+      const project = await this.prisma.project.delete({
         where: { id: projectId },
       });
+      return serializeBigInt(project);
     } catch (error) {
       throw new InternalServerErrorException({
         message: 'Failed to delete project',
-        error: error instanceof Error ? error.message : error,
       });
     }
   }
