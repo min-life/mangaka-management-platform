@@ -1,17 +1,50 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { Permissions } from '../auth/decorators/permission.decorator';
-import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { PERMISSIONS } from '@/constants/permissions.constant';
+import { CurrentUser, Permissions } from '@auth/decorators';
+import type { JwtPayload } from '@auth/interfaces';
+import { ProjectDataRequestDto } from '@projects/dto';
+import { ProjectsService } from '@projects/projects.service';
 import { ROLE_PERMISSIONS } from '../roles/constants/role-permissions';
 import { CreateRoleDto } from '../roles/dto/create-role.dto';
 import { UpdateRoleDto } from '../roles/dto/update-role.dto';
 import { RolesService } from '../roles/roles.service';
 import { parseBigIntParam } from '../utils';
-
 @Controller('companies')
 export class CompaniesController {
-  constructor(private readonly rolesService: RolesService) {}
+  constructor(
+    private readonly projectsService: ProjectsService,
+    private readonly rolesService: RolesService,
+  ) {}
 
+  // ChuongTV #007 start
+  @Post('/:companyId/projects')
+  @Permissions({
+    mode: 'ALL',
+    permissions: [PERMISSIONS.CREATE_PROJECT],
+  })
+  async createProject(
+    @CurrentUser() user: JwtPayload,
+    @Param('companyId') companyId: bigint,
+    @Body() projectDataDto: ProjectDataRequestDto,
+  ) {
+    return await this.projectsService.createProject({
+      companyId,
+      createdBy: user?.userId,
+      name: projectDataDto.name,
+    });
+  }
+
+  @Get('/:companyId/projects')
+  @Permissions({
+    mode: 'ALL',
+    permissions: [PERMISSIONS.READ_PROJECT],
+  })
+  async getProjects(@Param('companyId') companyId: bigint) {
+    return await this.projectsService.getProjects({ companyId });
+  }
+  // ChuongTV #007 end
+
+  // DongNNP #002 start
   @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.COMPANY_ROLE_READ] })
   @Get(':companyId/roles')
   findCompanyRoles(@Param('companyId') companyId: string) {
@@ -56,4 +89,5 @@ export class CompaniesController {
     parseBigIntParam(companyId, 'companyId');
     return this.rolesService.deleteRole(parseBigIntParam(roleId, 'roleId'));
   }
+  // DongNNP #002 end
 }

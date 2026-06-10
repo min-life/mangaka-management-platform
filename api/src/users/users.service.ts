@@ -7,7 +7,7 @@ export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
   // ChuongTV #005
-  async getUserPermissions(userId: number, companyId?: number, projectId?: number) {
+  async getUserPermissions(userId: bigint, companyId?: bigint, projectId?: bigint) {
     // get only permission name by userId, companyId and projectId auto select scope
     const rows = await this.prisma.$queryRaw<{ name: string }[]>`
         SELECT DISTINCT p.name
