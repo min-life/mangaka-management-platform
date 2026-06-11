@@ -4,7 +4,6 @@ import { JwtModule } from '@nestjs/jwt';
 import { PrismaModule } from './prisma/prisma.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { RolesModule } from './roles/roles.module';
 import { CompaniesModule } from './companies/companies.module';
 import { ProjectsModule } from './projects/projects.module';
 import { AuthModule } from '@auth/auth.module';

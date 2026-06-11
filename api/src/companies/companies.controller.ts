@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/commo
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Permissions } from '../auth/decorators/permission.decorator';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
-import { ROLE_PERMISSIONS } from '../roles/constants/role-permissions';
+import { ROLE_PERMISSIONS } from '../constants/role-permissions';
 import { CreateRoleDto } from '../roles/dto/create-role.dto';
 import { UpdateRoleDto } from '../roles/dto/update-role.dto';
 import { RolesService } from '../roles/roles.service';

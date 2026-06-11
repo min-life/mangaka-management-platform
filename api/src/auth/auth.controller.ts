@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Headers, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  HttpCode,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request, Response } from 'express';
 import { LoginDto } from './dto/login.dto';
@@ -98,8 +108,15 @@ export class AuthController {
   // KietDM #001
   @Public()
   @Post('register')
-  register(@Body() body: RegisterDto) {
-    return this.authService.register(body);
+  async register(@Body() body: RegisterDto) {
+    const { user, message } = await this.authService.register(body);
+    return {
+      user: {
+        ...user,
+        id: user.id.toString(),
+      },
+      message,
+    };
   }
 
   // KietDM #001
