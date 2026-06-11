@@ -14,6 +14,8 @@ import { parseBigIntParam } from '../utils';
 export class RolesController {
   constructor(private readonly rolesService: RolesService) {}
 
+  //DongNNP #002 start
+
   @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.PLATFORM_ROLE_READ] })
   @Get('')
   findRoles(@Query() query: FindRolesQueryDto) {
@@ -43,6 +45,8 @@ export class RolesController {
   deleteRole(@Param('id') id: string) {
     return this.rolesService.deleteRole(parseBigIntParam(id, 'id'));
   }
+
+  //DongNNP #002 end
 
   @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.ROLE_PERMISSION_UPDATE] })
   @Put(':roleId/permissions')
