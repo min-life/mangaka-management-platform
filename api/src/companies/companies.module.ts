@@ -3,9 +3,10 @@ import { RolesModule } from '../roles/roles.module';
 import { CompaniesController } from '@companies/companies.controller';
 import { CompaniesService } from '@companies/companies.service';
 import { ProjectsModule } from '@projects/projects.module';
+import { PermissionsModule } from '@/permissions/permissions.module';
 
 @Module({
-  imports: [ProjectsModule, RolesModule],
+  imports: [ProjectsModule, RolesModule, PermissionsModule],
   providers: [CompaniesService],
   controllers: [CompaniesController],
   exports: [CompaniesService],
