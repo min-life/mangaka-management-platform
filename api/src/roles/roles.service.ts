@@ -25,7 +25,6 @@ export class RolesService {
     });
 
     return {
-      message: ROLE_MESSAGES.ROLES_FOUND,
       data: roles.map((role) => serializeRole(role)),
     };
   }
@@ -39,7 +38,6 @@ export class RolesService {
     });
 
     return {
-      message: ROLE_MESSAGES.COMPANY_ROLES_FOUND,
       data: roles.map((role) => serializeRole(role)),
     };
   }
@@ -53,7 +51,6 @@ export class RolesService {
     });
 
     return {
-      message: ROLE_MESSAGES.PROJECT_ROLES_FOUND,
       data: roles.map((role) => serializeRole(role)),
     };
   }
@@ -70,7 +67,6 @@ export class RolesService {
     }
 
     return {
-      message: ROLE_MESSAGES.ROLE_FOUND,
       data: serializeRole(role),
     };
   }
@@ -86,7 +82,6 @@ export class RolesService {
     });
 
     return {
-      message: ROLE_MESSAGES.ROLE_CREATED,
       data: serializeRole(role),
     };
   }
@@ -104,7 +99,6 @@ export class RolesService {
     });
 
     return {
-      message: ROLE_MESSAGES.COMPANY_ROLE_CREATED,
       data: serializeRole(role),
     };
   }
@@ -122,7 +116,6 @@ export class RolesService {
     });
 
     return {
-      message: ROLE_MESSAGES.PROJECT_ROLE_CREATED,
       data: serializeRole(role),
     };
   }
@@ -154,7 +147,6 @@ export class RolesService {
     }
 
     return {
-      message: ROLE_MESSAGES.ROLE_UPDATED,
       data: serializeRole(updatedRole),
     };
   }
@@ -183,7 +175,6 @@ export class RolesService {
     });
 
     return {
-      message: ROLE_MESSAGES.ROLE_DELETED,
       data: {
         success: true,
       },
@@ -239,9 +230,7 @@ export class RolesService {
       }),
     ]);
 
-    return {
-      message: 'Permissions updated successfully',
-    };
+    return;
   }
 
   async clonePermissions(sourceRoleId: bigint, targetRoleId: bigint) {
@@ -289,8 +278,6 @@ export class RolesService {
       skipDuplicates: true,
     });
 
-    return {
-      message: 'Permissions cloned successfully',
-    };
+    return;
   }
 }
