@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request, Response } from 'express';
 import { LoginDto } from './dto/login.dto';
@@ -80,9 +80,11 @@ export class AuthController {
   @HttpCode(204)
   async logout(
     @Cookie('refreshToken') refreshToken: string | undefined,
-    @Cookie('accessToken') accessToken: string | undefined,
+    @Headers('authorization') authorization: string | undefined,
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
+    const accessToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+
     await this.authService.logout(refreshToken, accessToken);
 
     response.clearCookie('refreshToken', {
