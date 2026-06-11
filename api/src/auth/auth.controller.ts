@@ -1,5 +1,6 @@
 import {
   Body,
+  ConflictException,
   Controller,
   Get,
   Headers,
@@ -60,7 +61,7 @@ export class AuthController {
     const frontendUrl = (process.env.FRONTEND_URL ?? 'http://localhost:3001').replace(/\/$/, '');
 
     try {
-      const { accessToken, refreshToken, refreshTokenExpiresAt } =
+      const { accessToken, refreshToken, refreshTokenExpiresAt, requiresProfileCompletion } =
         await this.authService.loginWithGoogle(request.user);
 
       response.cookie('refreshToken', refreshToken, {
@@ -73,12 +74,18 @@ export class AuthController {
 
       const redirectUrl = new URL('/auth/oauth-success', frontendUrl);
       redirectUrl.searchParams.set('access_token', accessToken);
-      redirectUrl.searchParams.set('next', '/studio');
+      redirectUrl.searchParams.set(
+        'next',
+        requiresProfileCompletion ? '/complete-profile' : '/studio',
+      );
 
       return response.redirect(redirectUrl.toString());
-    } catch {
+    } catch (error) {
       const redirectUrl = new URL('/login', frontendUrl);
-      redirectUrl.searchParams.set('error', 'oauth_failed');
+      redirectUrl.searchParams.set(
+        'error',
+        error instanceof ConflictException ? 'oauth_email_exists' : 'oauth_failed',
+      );
 
       return response.redirect(redirectUrl.toString());
     }
@@ -93,9 +100,7 @@ export class AuthController {
     @Headers('authorization') authorization: string | undefined,
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
-    const accessToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
-
-    await this.authService.logout(refreshToken, accessToken);
+    await this.authService.logout(refreshToken, authorization);
 
     response.clearCookie('refreshToken', {
       httpOnly: true,

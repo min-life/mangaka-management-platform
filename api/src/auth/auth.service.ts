@@ -22,7 +22,9 @@ const EMAIL_VERIFICATION_TOKEN_EXPIRES_IN_HOURS = Number(
 const EMAIL_VERIFICATION_TOKEN_EXPIRES_IN_MS =
   EMAIL_VERIFICATION_TOKEN_EXPIRES_IN_HOURS * 60 * 60 * 1000;
 const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS ?? 10);
-const DEFAULT_USER_ROLE_CODE = process.env.DEFAULT_USER_ROLE_CODE ?? 'USER';
+const DEFAULT_USER_ROLE_NAME =
+  process.env.DEFAULT_USER_ROLE_NAME ?? process.env.DEFAULT_USER_ROLE_CODE ?? 'USER';
+const GOOGLE_EMAIL_EXISTS_ERROR = 'GOOGLE_EMAIL_EXISTS';
 
 @Injectable()
 export class AuthService {
@@ -59,10 +61,15 @@ export class AuthService {
       throw new UnauthorizedException('Please verify your email before logging in');
     }
 
-    const accessToken = this.jwtService.sign({
-      userId: user.id.toString(),
-      email: user.email,
-    });
+    const accessToken = await this.jwtService.signAsync(
+      {
+        userId: user.id.toString(),
+        email: user.email,
+      },
+      {
+        //Bổ sung config ở đây
+      },
+    );
 
     const refreshToken = this.generateRefreshToken(user.id, user.email);
     const refreshTokenExpiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_IN_MS);
@@ -79,11 +86,6 @@ export class AuthService {
       accessToken,
       refreshToken,
       refreshTokenExpiresAt,
-      user: {
-        id: user.id.toString(),
-        email: user.email,
-        name: user.displayName,
-      },
     };
   }
 
@@ -93,7 +95,7 @@ export class AuthService {
       throw new UnauthorizedException('Google account must have a verified email');
     }
 
-    const user = await this.prisma.$transaction(async (prisma) => {
+    const { user, isNewUser } = await this.prisma.$transaction(async (prisma) => {
       const googleUser = await prisma.user.findUnique({
         where: {
           googleId: profile.providerAccountId,
@@ -105,7 +107,7 @@ export class AuthService {
           throw new UnauthorizedException('Account is not available');
         }
 
-        return prisma.user.update({
+        const updatedUser = await prisma.user.update({
           where: {
             id: googleUser.id,
           },
@@ -116,6 +118,11 @@ export class AuthService {
             emailVerificationTokenExpiresAt: null,
           },
         });
+
+        return {
+          user: updatedUser,
+          isNewUser: false,
+        };
       }
 
       const existingUser = await prisma.user.findUnique({
@@ -129,32 +136,24 @@ export class AuthService {
           throw new UnauthorizedException('Account is not available');
         }
 
-        const linkedUser = await prisma.user.update({
-          where: {
-            id: existingUser.id,
-          },
-          data: {
-            googleId: profile.providerAccountId,
-            avatarUrl: profile.avatarUrl ?? existingUser.avatarUrl,
-            emailVerifiedAt: existingUser.emailVerifiedAt ?? new Date(),
-            emailVerificationTokenHash: null,
-            emailVerificationTokenExpiresAt: null,
-          },
-        });
-
-        return linkedUser;
+        throw new ConflictException(GOOGLE_EMAIL_EXISTS_ERROR);
       }
 
-      return prisma.user.create({
+      const createdUser = await prisma.user.create({
         data: {
           email: profile.email,
           googleId: profile.providerAccountId,
           password: null,
-          displayName: profile.displayName.trim() || profile.email,
+          displayName: null,
           avatarUrl: profile.avatarUrl,
           emailVerifiedAt: new Date(),
         },
       });
+
+      return {
+        user: createdUser,
+        isNewUser: true,
+      };
     });
 
     const accessToken = this.jwtService.sign({
@@ -177,11 +176,14 @@ export class AuthService {
       accessToken,
       refreshToken,
       refreshTokenExpiresAt,
+      requiresProfileCompletion: isNewUser || !user.displayName,
     };
   }
 
   // KietDM #001
-  async logout(refreshToken?: string, accessToken?: string): Promise<void> {
+  async logout(refreshToken?: string, authorization?: string): Promise<void> {
+    const accessToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+
     if (accessToken) {
       const payload = this.jwtService.decode(accessToken) as { exp?: number } | null;
 
@@ -226,19 +228,6 @@ export class AuthService {
         throw new ConflictException('Email already exists');
       }
 
-      const defaultRole = await prisma.role.findFirst({
-        where: {
-          code: DEFAULT_USER_ROLE_CODE,
-          scope: 'SYS',
-          companyId: null,
-          projectId: null,
-        },
-      });
-
-      if (!defaultRole) {
-        throw new BadRequestException('Default user role is not configured');
-      }
-
       const createdUser = await prisma.user.create({
         data: {
           email,
@@ -250,19 +239,10 @@ export class AuthService {
         },
       });
 
-      await prisma.userRole.create({
-        data: {
-          userId: createdUser.id,
-          roleId: defaultRole.id,
-        },
-      });
-
       return createdUser;
     });
 
-    const frontendUrl = (process.env.FRONTEND_URL ?? 'http://localhost:3001').replace(/\/$/, '');
-    const verificationUrl = `${frontendUrl}/verify-email?token=${verificationToken}`;
-    await this.mailService.sendVerificationEmail(email, verificationUrl);
+    await this.mailService.sendVerificationEmail(email, verificationToken);
 
     return {
       user,
@@ -273,10 +253,9 @@ export class AuthService {
   // KietDM #001
   async verifyEmail(body: VerifyEmailDto) {
     const token = body.token.trim();
-    const tokenHash = this.hashEmailVerificationToken(token);
     const user = await this.prisma.user.findUnique({
       where: {
-        emailVerificationTokenHash: tokenHash,
+        emailVerificationTokenHash: token,
       },
     });
 
@@ -295,9 +274,7 @@ export class AuthService {
       },
     });
 
-    return {
-      message: 'Email verified successfully',
-    };
+    return {};
   }
 
   private hashEmailVerificationToken(token: string): string {
