@@ -10,9 +10,20 @@ import { AccessTokenStrategy, RefreshTokenStrategy } from '@auth/strategies';
 import { UsersModule } from '@users/users.module';
 import { RolesModule } from '@roles/roles.module';
 import { PermissionsModule } from '@permissions/permissions.module';
+import { ProjectsModule } from './projects/projects.module';
+import { CompaniesModule } from './companies/companies.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, JwtModule, UsersModule, RolesModule, PermissionsModule],
+  imports: [
+    PrismaModule,
+    AuthModule,
+    JwtModule,
+    UsersModule,
+    RolesModule,
+    PermissionsModule,
+    CompaniesModule,
+    ProjectsModule,
+  ],
   controllers: [AppController],
   providers: [
     AppService,

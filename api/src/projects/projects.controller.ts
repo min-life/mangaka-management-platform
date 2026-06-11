@@ -1,13 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { Permissions } from '../auth/decorators/permission.decorator';
-import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
+import { Body, Controller, Delete, Get, Param, Put, Patch, Post } from '@nestjs/common';
+import { PERMISSIONS } from '@/constants/permissions.constant';
+import { CurrentUser, Permissions } from '@auth/decorators';
+import type { JwtPayload } from '@auth/interfaces';
+import { ProjectsService } from '@projects/projects.service';
+import { ProjectDataRequestDto } from './dto';
 import { ROLE_PERMISSIONS } from '../constants/role-permissions';
 import { CreateRoleDto } from '../roles/dto/create-role.dto';
 import { UpdateRoleDto } from '../roles/dto/update-role.dto';
 import { RolesService } from '../roles/roles.service';
 import { parseBigIntParam } from '../utils';
-import { ProjectsService } from './projects.service';
 
 @Controller('projects')
 export class ProjectsController {
@@ -16,17 +17,54 @@ export class ProjectsController {
     private readonly rolesService: RolesService,
   ) {}
 
+  // ChuongTV #007 start
+  @Get('/:projectId')
+  @Permissions({
+    mode: 'ALL',
+    permissions: [PERMISSIONS.READ_PROJECT],
+  })
+  async getProjectById(@Param('projectId') projectId: bigint) {
+    return await this.projectsService.getProjectById(projectId);
+  }
+
+  @Delete('/:projectId')
+  @Permissions({
+    mode: 'ALL',
+    permissions: [PERMISSIONS.DELETE_PROJECT],
+  })
+  async deleteProject(@Param('projectId') projectId: bigint) {
+    return await this.projectsService.deleteProject(projectId);
+  }
+
+  @Put('/:projectId')
+  @Permissions({
+    mode: 'ALL',
+    permissions: [PERMISSIONS.UPDATE_PROJECT],
+  })
+  async updateProject(
+    @CurrentUser() user: JwtPayload,
+    @Param('projectId') projectId: bigint,
+    @Body() updateProjectDto: ProjectDataRequestDto,
+  ) {
+    return await this.projectsService.updateProject(projectId, {
+      name: updateProjectDto.name,
+      updatedBy: user?.userId,
+    });
+  }
+  // ChuongTV #007 end
+
+  // DongNNP #002 start
   @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.PROJECT_ROLE_READ] })
   @Get(':projectId/roles')
   findProjectRoles(@Param('projectId') projectId: string) {
-    return this.projectsService.findProjectRoles(parseBigIntParam(projectId, 'projectId'));
+    return this.rolesService.findProjectRoles(parseBigIntParam(projectId, 'projectId'));
   }
 
   @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.PROJECT_ROLE_READ] })
   @Get(':projectId/roles/:roleId')
   findProjectRoleDetail(@Param('projectId') projectId: string, @Param('roleId') roleId: string) {
     parseBigIntParam(projectId, 'projectId');
-    return this.rolesService.getRoleById(parseBigIntParam(roleId, 'roleId'));
+    return this.rolesService.findOne(parseBigIntParam(roleId, 'roleId'));
   }
 
   @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.PROJECT_ROLE_CREATE] })
@@ -36,7 +74,7 @@ export class ProjectsController {
     @Param('projectId') projectId: string,
     @Body() dto: CreateRoleDto,
   ) {
-    return this.projectsService.createProjectRole(
+    return this.rolesService.createProjectRole(
       BigInt(currentUser.userId),
       parseBigIntParam(projectId, 'projectId'),
       dto,
@@ -60,4 +98,5 @@ export class ProjectsController {
     parseBigIntParam(projectId, 'projectId');
     return this.rolesService.deleteRole(parseBigIntParam(roleId, 'roleId'));
   }
+  // DongNNP #002 end
 }
