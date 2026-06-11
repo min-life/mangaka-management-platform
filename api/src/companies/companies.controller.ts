@@ -12,14 +12,51 @@ import { PermissionsService } from '../permissions/permissions.service';
 import { SCOPE } from '@prisma/client';
 import { PermissionFilterDto } from '../permissions/dto/permission-filter.dto';
 import { parseBigIntParam } from '../utils';
+import { CompaniesService } from './companies.service';
+import { CreateCompanyDto } from './dto/create-company.dto';
+import { UpdateCompanyDto } from './dto/update-company.dto';
+
 @Controller('companies')
 export class CompaniesController {
   constructor(
+    private readonly companiesService: CompaniesService,
     private readonly projectsService: ProjectsService,
     private readonly rolesService: RolesService,
     private readonly permissionsService: PermissionsService,
   ) {}
 
+  @Get()
+  findCompanies() {
+    return this.companiesService.findCompanies();
+  }
+
+  @Post()
+  createCompany(@CurrentUser() currentUser: JwtPayload, @Body() dto: CreateCompanyDto) {
+    return this.companiesService.createCompany(BigInt(currentUser.userId), dto);
+  }
+
+  @Get(':companyId')
+  findCompany(@Param('companyId') companyId: string) {
+    return this.companiesService.getCompanyById(parseBigIntParam(companyId, 'companyId'));
+  }
+
+  @Patch(':companyId')
+  updateCompany(
+    @CurrentUser() currentUser: JwtPayload,
+    @Param('companyId') companyId: string,
+    @Body() dto: UpdateCompanyDto,
+  ) {
+    return this.companiesService.updateCompany(
+      BigInt(currentUser.userId),
+      parseBigIntParam(companyId, 'companyId'),
+      dto,
+    );
+  }
+
+  @Delete(':companyId')
+  deleteCompany(@Param('companyId') companyId: string) {
+    return this.companiesService.deleteCompany(parseBigIntParam(companyId, 'companyId'));
+  }
   // ChuongTV #007 start
   @Post('/:companyId/projects')
   @Permissions({
