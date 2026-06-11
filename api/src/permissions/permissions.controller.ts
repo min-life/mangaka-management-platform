@@ -6,6 +6,7 @@ import { PermissionFilterDto } from './dto/permission-filter.dto';
 @Controller('permissions')
 export class PermissionsController {
   constructor(private readonly permissionsService: PermissionsService) {}
+  //AnhNTT #003 start
 
   @Get()
   findAll(@Query() query: PermissionFilterDto) {
@@ -16,4 +17,5 @@ export class PermissionsController {
   findOne(@Param('id') id: string) {
     return this.permissionsService.findOne(BigInt(id));
   }
+  //AnhNTT #003 end
 }
