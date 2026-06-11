@@ -1,19 +1,23 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { PERMISSIONS } from '@/constants/permissions.constant';
 import { CurrentUser, Permissions } from '@auth/decorators';
 import type { JwtPayload } from '@auth/interfaces';
 import { ProjectDataRequestDto } from '@projects/dto';
 import { ProjectsService } from '@projects/projects.service';
-import { ROLE_PERMISSIONS } from '../roles/constants/role-permissions';
+import { ROLE_PERMISSIONS } from '../constants/role-permissions';
 import { CreateRoleDto } from '../roles/dto/create-role.dto';
 import { UpdateRoleDto } from '../roles/dto/update-role.dto';
 import { RolesService } from '../roles/roles.service';
+import { PermissionsService } from '../permissions/permissions.service';
+import { SCOPE } from '@prisma/client';
+import { PermissionFilterDto } from '../permissions/dto/permission-filter.dto';
 import { parseBigIntParam } from '../utils';
 @Controller('companies')
 export class CompaniesController {
   constructor(
     private readonly projectsService: ProjectsService,
     private readonly rolesService: RolesService,
+    private readonly permissionsService: PermissionsService,
   ) {}
 
   // ChuongTV #007 start
@@ -90,4 +94,20 @@ export class CompaniesController {
     return this.rolesService.deleteRole(parseBigIntParam(roleId, 'roleId'));
   }
   // DongNNP #002 end
+  // AnhNTT #003 start
+  
+  @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.COMPANY_PERMISSION_READ] })
+  @Get(':companyId/permissions')
+  getCompanyPermissions(
+    @Param('companyId') companyId: string,
+    @Query() query: PermissionFilterDto,
+  ) {
+    parseBigIntParam(companyId, 'companyId');
+
+    return this.permissionsService.findAll({
+      ...query,
+      scope: SCOPE.CO,
+    });
+  }
+  // AnhNTT #003 end
 }

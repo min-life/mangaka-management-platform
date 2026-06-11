@@ -211,29 +211,6 @@ export class RolesService {
     }
   }
 
-  async replacePermissions(roleId: bigint, permissionIds: bigint[]) {
-    await this.validateRoleAndPermissions(roleId, permissionIds);
-
-    await this.prisma.$transaction([
-      this.prisma.rolePermission.deleteMany({
-        where: {
-          roleId,
-        },
-      }),
-
-      this.prisma.rolePermission.createMany({
-        data: permissionIds.map((permissionId) => ({
-          roleId,
-          permissionId,
-        })),
-      }),
-    ]);
-
-    return {
-      message: 'Permissions updated successfully',
-    };
-  }
-
   async clonePermissions(sourceRoleId: bigint, targetRoleId: bigint) {
     const sourceRole = await this.prisma.role.findUnique({
       where: {

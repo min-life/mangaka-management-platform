@@ -15,4 +15,8 @@ export const ROLE_PERMISSIONS = {
   PROJECT_ROLE_CREATE: 'project.role.create',
   PROJECT_ROLE_UPDATE: 'project.role.update',
   PROJECT_ROLE_DELETE: 'project.role.delete',
+  COMPANY_PERMISSION_READ: 'company.permission.read',
+  COMPANY_ROLE_PERMISSIONS_UPDATE: 'company.role.permissions.update',
+  PROJECT_PERMISSION_READ: 'project.permission.read',
+  PROJECT_ROLE_PERMISSIONS_UPDATE: 'project.role.permissions.update',
 } as const;

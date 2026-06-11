@@ -44,12 +44,4 @@ export class RolesController {
     return this.rolesService.deleteRole(parseBigIntParam(id, 'id'));
   }
 
-  @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.ROLE_PERMISSION_UPDATE] })
-  @Put(':roleId/permissions')
-  replacePermissions(@Param('roleId') roleId: string, @Body() dto: RolePermissionDto) {
-    return this.rolesService.replacePermissions(
-      parseBigIntParam(roleId, 'roleId'),
-      dto.permissionIds.map((id) => parseBigIntParam(id, 'permissionId')),
-    );
-  }
 }
