@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { PERMISSIONS } from '@/constants/permissions.constant';
 import { CurrentUser, Permissions } from '@auth/decorators';
 import type { JwtPayload } from '@auth/interfaces';
@@ -8,14 +8,55 @@ import { ROLE_PERMISSIONS } from '../constants/role-permissions';
 import { CreateRoleDto } from '../roles/dto/create-role.dto';
 import { UpdateRoleDto } from '../roles/dto/update-role.dto';
 import { RolesService } from '../roles/roles.service';
+import { PermissionsService } from '../permissions/permissions.service';
+import { SCOPE } from '@prisma/client';
+import { PermissionFilterDto } from '../permissions/dto/permission-filter.dto';
 import { parseBigIntParam } from '../utils';
+import { CompaniesService } from './companies.service';
+import { CreateCompanyDto } from './dto/create-company.dto';
+import { UpdateCompanyDto } from './dto/update-company.dto';
+
 @Controller('companies')
 export class CompaniesController {
   constructor(
+    private readonly companiesService: CompaniesService,
     private readonly projectsService: ProjectsService,
     private readonly rolesService: RolesService,
+    private readonly permissionsService: PermissionsService,
   ) {}
 
+  @Get()
+  findCompanies() {
+    return this.companiesService.findCompanies();
+  }
+
+  @Post()
+  createCompany(@CurrentUser() currentUser: JwtPayload, @Body() dto: CreateCompanyDto) {
+    return this.companiesService.createCompany(BigInt(currentUser.userId), dto);
+  }
+
+  @Get(':companyId')
+  findCompany(@Param('companyId') companyId: string) {
+    return this.companiesService.getCompanyById(parseBigIntParam(companyId, 'companyId'));
+  }
+
+  @Patch(':companyId')
+  updateCompany(
+    @CurrentUser() currentUser: JwtPayload,
+    @Param('companyId') companyId: string,
+    @Body() dto: UpdateCompanyDto,
+  ) {
+    return this.companiesService.updateCompany(
+      BigInt(currentUser.userId),
+      parseBigIntParam(companyId, 'companyId'),
+      dto,
+    );
+  }
+
+  @Delete(':companyId')
+  deleteCompany(@Param('companyId') companyId: string) {
+    return this.companiesService.deleteCompany(parseBigIntParam(companyId, 'companyId'));
+  }
   // ChuongTV #007 start
   @Post('/:companyId/projects')
   @Permissions({
@@ -90,4 +131,20 @@ export class CompaniesController {
     return this.rolesService.deleteRole(parseBigIntParam(roleId, 'roleId'));
   }
   // DongNNP #002 end
+  // AnhNTT #003 start
+  
+  @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.COMPANY_PERMISSION_READ] })
+  @Get(':companyId/permissions')
+  getCompanyPermissions(
+    @Param('companyId') companyId: string,
+    @Query() query: PermissionFilterDto,
+  ) {
+    parseBigIntParam(companyId, 'companyId');
+
+    return this.permissionsService.findAll({
+      ...query,
+      scope: SCOPE.CO,
+    });
+  }
+  // AnhNTT #003 end
 }

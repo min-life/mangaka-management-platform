@@ -10,11 +10,13 @@ import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { ROLE_MESSAGES } from './constants/role-messages';
 import { serializeRole } from './utils/role-serializer';
+import { parseBigIntParam } from '@/utils';
 
 @Injectable()
 export class RolesService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // DongNNP #002 start
   async findRoles(scope?: SCOPE) {
     const roles = await this.prisma.role.findMany({
       where: {
@@ -23,7 +25,6 @@ export class RolesService {
     });
 
     return {
-      message: ROLE_MESSAGES.ROLES_FOUND,
       data: roles.map((role) => serializeRole(role)),
     };
   }
@@ -37,7 +38,6 @@ export class RolesService {
     });
 
     return {
-      message: ROLE_MESSAGES.COMPANY_ROLES_FOUND,
       data: roles.map((role) => serializeRole(role)),
     };
   }
@@ -51,7 +51,6 @@ export class RolesService {
     });
 
     return {
-      message: ROLE_MESSAGES.PROJECT_ROLES_FOUND,
       data: roles.map((role) => serializeRole(role)),
     };
   }
@@ -68,7 +67,6 @@ export class RolesService {
     }
 
     return {
-      message: ROLE_MESSAGES.ROLE_FOUND,
       data: serializeRole(role),
     };
   }
@@ -84,7 +82,6 @@ export class RolesService {
     });
 
     return {
-      message: ROLE_MESSAGES.ROLE_CREATED,
       data: serializeRole(role),
     };
   }
@@ -102,7 +99,6 @@ export class RolesService {
     });
 
     return {
-      message: ROLE_MESSAGES.COMPANY_ROLE_CREATED,
       data: serializeRole(role),
     };
   }
@@ -120,7 +116,6 @@ export class RolesService {
     });
 
     return {
-      message: ROLE_MESSAGES.PROJECT_ROLE_CREATED,
       data: serializeRole(role),
     };
   }
@@ -144,8 +139,14 @@ export class RolesService {
       },
     });
 
+    if (dto.permissionIds !== undefined) {
+      await this.replacePermissions(
+        roleId,
+        dto.permissionIds.map((id) => parseBigIntParam(id, 'permissionId')),
+      );
+    }
+
     return {
-      message: ROLE_MESSAGES.ROLE_UPDATED,
       data: serializeRole(updatedRole),
     };
   }
@@ -174,12 +175,12 @@ export class RolesService {
     });
 
     return {
-      message: ROLE_MESSAGES.ROLE_DELETED,
       data: {
         success: true,
       },
     };
   }
+  //DongNNP #002 end
 
   private async validateRoleAndPermissions(roleId: bigint, permissionIds: bigint[]): Promise<void> {
     const role = await this.prisma.role.findUnique({
@@ -229,9 +230,7 @@ export class RolesService {
       }),
     ]);
 
-    return {
-      message: 'Permissions updated successfully',
-    };
+    return;
   }
 
   async clonePermissions(sourceRoleId: bigint, targetRoleId: bigint) {
@@ -279,8 +278,6 @@ export class RolesService {
       skipDuplicates: true,
     });
 
-    return {
-      message: 'Permissions cloned successfully',
-    };
+    return;
   }
 }

@@ -1,11 +1,10 @@
-import { Body, Controller, Delete, Get, Patch, Post, Param, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Patch, Post, Param, Query } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Permissions } from '../auth/decorators/permission.decorator';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { RolesService } from './roles.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
-import { RolePermissionDto } from './dto/roles.dto';
 import { FindRolesQueryDto } from './dto/find-roles-query.dto';
 import { ROLE_PERMISSIONS } from '../constants/role-permissions';
 import { parseBigIntParam } from '../utils';
@@ -13,6 +12,8 @@ import { parseBigIntParam } from '../utils';
 @Controller('roles')
 export class RolesController {
   constructor(private readonly rolesService: RolesService) {}
+
+  //DongNNP #002 start
 
   @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.PLATFORM_ROLE_READ] })
   @Get('')
@@ -33,9 +34,9 @@ export class RolesController {
   }
 
   @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.PLATFORM_ROLE_UPDATE] })
-  @Patch('/:id')
-  updateRole(@Param('id') id: string, @Body() dto: UpdateRoleDto) {
-    return this.rolesService.updateRole(parseBigIntParam(id, 'id'), dto);
+  @Patch('/:roleId')
+  updateRole(@Param('roleId') roleId: string, @Body() dto: UpdateRoleDto) {
+    return this.rolesService.updateRole(parseBigIntParam(roleId, 'roleId'), dto);
   }
 
   @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.PLATFORM_ROLE_DELETE] })
@@ -44,12 +45,5 @@ export class RolesController {
     return this.rolesService.deleteRole(parseBigIntParam(id, 'id'));
   }
 
-  @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.ROLE_PERMISSION_UPDATE] })
-  @Put(':roleId/permissions')
-  replacePermissions(@Param('roleId') roleId: string, @Body() dto: RolePermissionDto) {
-    return this.rolesService.replacePermissions(
-      parseBigIntParam(roleId, 'roleId'),
-      dto.permissionIds.map((id) => parseBigIntParam(id, 'permissionId')),
-    );
-  }
+  //DongNNP #002 end
 }
