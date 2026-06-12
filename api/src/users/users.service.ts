@@ -1,5 +1,5 @@
 import { PrismaService } from '@/prisma/prisma.service';
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
 @Injectable()
@@ -26,5 +26,34 @@ export class UsersService {
         `;
 
     return rows.map((r) => r.name);
+  }
+
+  async updateCurrentUserDisplayName(userId: number, displayName: string) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: BigInt(userId),
+        isDeleted: false,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: {
+        id: user.id,
+      },
+      data: {
+        displayName: displayName.trim(),
+      },
+    });
+
+    return {
+      id: updatedUser.id.toString(),
+      email: updatedUser.email,
+      displayName: updatedUser.displayName,
+      avatarUrl: updatedUser.avatarUrl,
+    };
   }
 }
