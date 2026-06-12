@@ -141,8 +141,8 @@ model RolePermission {
   permissionId BigInt @map("permission_id")
 
   // Relations with role and permission models
-  role       Role       @relation(fields: [roleId], references: [id])
-  permission Permission @relation(fields: [permissionId], references: [id])
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@id([roleId, permissionId])
   @@index([roleId])
@@ -157,7 +157,7 @@ model UserRole {
 
   // Relations with user and role models
   user User @relation(fields: [userId], references: [id])
-  role Role @relation(fields: [roleId], references: [id])
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@id([userId, roleId])
   @@index([userId])
