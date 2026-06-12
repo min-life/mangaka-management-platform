@@ -8,7 +8,7 @@ import { UsersService } from './users.service';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Patch('me/display-name')
+  @Patch('me')
   updateDisplayName(@CurrentUser() currentUser: JwtPayload, @Body() body: UpdateDisplayNameDto) {
     return this.usersService.updateCurrentUserDisplayName(
       Number(currentUser.userId),

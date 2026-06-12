@@ -71,7 +71,7 @@ export class AuthService {
     );
 
     const refreshToken = this.generateRefreshToken(user.id, user.email);
-    const refreshTokenExpiresAt = new Date(Date.now());
+    const refreshTokenExpiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_IN_MS);
 
     await this.prisma.refreshToken.create({
       data: {
@@ -245,7 +245,6 @@ export class AuthService {
 
     return {
       user,
-      message: 'Please verify your email before logging in',
     };
   }
 
@@ -272,8 +271,6 @@ export class AuthService {
         emailVerificationTokenExpiresAt: null,
       },
     });
-
-    return {};
   }
 
   private hashEmailVerificationToken(token: string): string {

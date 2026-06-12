@@ -114,13 +114,12 @@ export class AuthController {
   @Public()
   @Post('register')
   async register(@Body() body: RegisterDto) {
-    const { user, message } = await this.authService.register(body);
+    const { user } = await this.authService.register(body);
     return {
       user: {
         ...user,
         id: user.id.toString(),
       },
-      message,
     };
   }
 

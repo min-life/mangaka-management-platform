@@ -4,7 +4,7 @@ import { CurrentUser, Permissions } from '@auth/decorators';
 import type { JwtPayload } from '@auth/interfaces';
 import { ProjectDataRequestDto } from '@projects/dto';
 import { ProjectsService } from '@projects/projects.service';
-import { ROLE_PERMISSIONS } from '../roles/constants/role-permissions';
+import { ROLE_PERMISSIONS } from '../constants/role-permissions';
 import { CreateRoleDto } from '../roles/dto/create-role.dto';
 import { UpdateRoleDto } from '../roles/dto/update-role.dto';
 import { RolesService } from '../roles/roles.service';

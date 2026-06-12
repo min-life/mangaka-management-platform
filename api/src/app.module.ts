@@ -5,7 +5,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from '@auth/auth.module';
-import { AccessTokenStrategy, GoogleStrategy, RefreshTokenStrategy } from '@auth/strategies';
+import { AccessTokenStrategy, RefreshTokenStrategy } from '@auth/strategies';
 import { GlobalAuthGuard, PermissionGuard } from '@auth/guards';
 import { UsersModule } from '@users/users.module';
 import { RolesModule } from '@roles/roles.module';
@@ -17,7 +17,9 @@ import { CompaniesModule } from './companies/companies.module';
   imports: [
     PrismaModule,
     AuthModule,
-    JwtModule,
+    JwtModule.register({
+      global: true,
+    }),
     UsersModule,
     RolesModule,
     PermissionsModule,
@@ -37,7 +39,6 @@ import { CompaniesModule } from './companies/companies.module';
     },
     AccessTokenStrategy,
     RefreshTokenStrategy,
-    GoogleStrategy,
   ],
 })
 export class AppModule {}

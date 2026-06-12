@@ -76,9 +76,11 @@ export function AuthForm({
     '',
   );
   const oauthError =
-    searchParams.get('error') === 'oauth_failed'
-      ? 'Unable to sign in with Google. Please try again.'
-      : null;
+    searchParams.get('error') === 'oauth_email_exists'
+      ? 'This email is already registered. Please sign in with your email and password.'
+      : searchParams.get('error') === 'oauth_failed'
+        ? 'Unable to sign in with Google. Please try again.'
+        : null;
 
   const validate = () => {
     const nextErrors: LoginErrors = {};

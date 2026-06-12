@@ -29,7 +29,7 @@ model User {
   email                           String    @unique
   googleId                        String?   @unique @map("google_id")
   password                        String?
-  displayName                     String    @map("display_name")
+  displayName                     String?   @map("display_name")
   avatarUrl                       String?   @map("avatar_url")
   emailVerifiedAt                 DateTime? @map("email_verified_at")
   emailVerificationTokenHash      String?   @unique @map("email_verification_token_hash")

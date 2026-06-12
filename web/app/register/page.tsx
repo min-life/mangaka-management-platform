@@ -1,33 +1,21 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
-import { AxiosError } from 'axios';
 import { BadgeCheck, BookOpen, Loader2 } from 'lucide-react';
 
-import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useRegister, type RegisterErrors } from '@/hooks/use-register';
 import { images } from './const/studio-data';
-
-type RegisterErrors = Partial<{
-  displayName: string;
-  email: string;
-  password: string;
-  confirmPassword: string;
-  form: string;
-}>;
 
 // KietDM #001
 export default function Page() {
-  const router = useRouter();
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [errors, setErrors] = useState<RegisterErrors>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { errors, isSubmitting, register, setErrors } = useRegister();
 
   const validate = () => {
     const nextErrors: RegisterErrors = {};
@@ -60,32 +48,7 @@ export default function Page() {
       return;
     }
 
-    setIsSubmitting(true);
-    setErrors({});
-
-    try {
-      const normalizedEmail = email.trim().toLowerCase();
-
-      await api.post('/auth/register', {
-        display_name: displayName.trim(),
-        email: normalizedEmail,
-        password,
-      });
-
-      router.push(`/check-email?email=${encodeURIComponent(normalizedEmail)}`);
-    } catch (error) {
-      const axiosError = error as AxiosError<{ message?: string }>;
-      const message = axiosError.response?.data?.message;
-
-      setErrors({
-        form:
-          axiosError.response?.status === 409
-            ? 'Email already exists.'
-            : (message ?? 'Unable to create your account. Please try again.'),
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+    await register({ displayName, email, password });
   };
 
   return (

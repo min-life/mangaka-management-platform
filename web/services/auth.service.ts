@@ -15,5 +15,5 @@ export async function register(payload: RegisterPayload) {
 }
 
 export async function updateDisplayName(payload: UpdateDisplayNamePayload) {
-  return await api.patch('/users/me/display-name', payload);
+  return await api.patch('/users/me', payload);
 }
