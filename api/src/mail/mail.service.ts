@@ -6,7 +6,9 @@ export class MailService {
   private readonly logger = new Logger(MailService.name);
 
   // KietDM #001
-  async sendVerificationEmail(to: string, verificationUrl: string): Promise<void> {
+  async sendVerificationEmail(to: string, verificationToken: string): Promise<void> {
+    const frontendUrl = (process.env.FRONTEND_URL ?? 'http://localhost:3001').replace(/\/$/, '');
+    const verificationUrl = `${frontendUrl}/verify-email?token=${verificationToken}`;
     const host = process.env.SMTP_HOST;
     const port = Number(process.env.SMTP_PORT ?? 587);
     const user = process.env.SMTP_USER;

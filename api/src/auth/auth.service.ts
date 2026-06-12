@@ -22,8 +22,7 @@ const EMAIL_VERIFICATION_TOKEN_EXPIRES_IN_HOURS = Number(
 const EMAIL_VERIFICATION_TOKEN_EXPIRES_IN_MS =
   EMAIL_VERIFICATION_TOKEN_EXPIRES_IN_HOURS * 60 * 60 * 1000;
 const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS ?? 10);
-const DEFAULT_USER_ROLE_NAME =
-  process.env.DEFAULT_USER_ROLE_NAME ?? process.env.DEFAULT_USER_ROLE_CODE ?? 'USER';
+
 const GOOGLE_EMAIL_EXISTS_ERROR = 'GOOGLE_EMAIL_EXISTS';
 
 @Injectable()
@@ -72,7 +71,7 @@ export class AuthService {
     );
 
     const refreshToken = this.generateRefreshToken(user.id, user.email);
-    const refreshTokenExpiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_IN_MS);
+    const refreshTokenExpiresAt = new Date(Date.now());
 
     await this.prisma.refreshToken.create({
       data: {
