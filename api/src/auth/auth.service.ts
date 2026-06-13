@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -12,7 +13,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
-import { GoogleOAuthProfile } from './interfaces';
+import { GoogleOAuthProfile, Resource } from './interfaces';
+import { ERROR } from '@/constants/message-error';
+import { ResourceScope } from './interfaces/resource-scope.interface';
 
 const REFRESH_TOKEN_EXPIRES_IN_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRES_IN_DAYS ?? 7);
 const REFRESH_TOKEN_EXPIRES_IN_MS = REFRESH_TOKEN_EXPIRES_IN_DAYS * 24 * 60 * 60 * 1000;
@@ -66,7 +69,8 @@ export class AuthService {
         email: user.email,
       },
       {
-        //Bổ sung config ở đây
+        secret: process.env.ACCESS_TOKEN_SECRET || 'vungoimora',
+        expiresIn: REFRESH_TOKEN_EXPIRES_IN_MS,
       },
     );
 
@@ -288,5 +292,200 @@ export class AuthService {
         expiresIn: `${REFRESH_TOKEN_EXPIRES_IN_DAYS}d`,
       },
     );
+  }
+
+  async resourceResolver(resource: Resource, resourceId: bigint) {
+    let resourceScope: ResourceScope | null | NotFoundException = null;
+    switch (resource) {
+      case 'FOLDER':
+        resourceScope = await this.folderResolver(resourceId);
+        break;
+      case 'FILE':
+        resourceScope = await this.fileResolver(resourceId);
+        break;
+      case 'TASK':
+        resourceScope = await this.taskResolver(resourceId);
+        break;
+      case 'FRAME':
+        resourceScope = await this.frameResolver(resourceId);
+        break;
+      case 'COMMENT':
+        resourceScope = await this.commentResolver(resourceId);
+        break;
+      case 'ROLE':
+        resourceScope = await this.roleResolver(resourceId);
+        break;
+      case 'PROJECT':
+        resourceScope = await this.projectResolver(resourceId);
+        break;
+    }
+    return resourceScope;
+  }
+
+  private async folderResolver(resourceId: bigint) {
+    const resource = await this.prisma.folder.findUnique({
+      where: {
+        id: resourceId,
+      },
+      select: {
+        projectId: true,
+      },
+    });
+    if (!resource) {
+      return new NotFoundException(ERROR.NFFOLDER);
+    }
+    return {
+      companyId: undefined,
+      projectId: resource.projectId,
+    } as ResourceScope | null;
+  }
+
+  private async fileResolver(resourceId: bigint) {
+    const resource = await this.prisma.file.findUnique({
+      where: {
+        id: resourceId,
+      },
+      select: {
+        folder: {
+          select: {
+            projectId: true,
+          },
+        },
+      },
+    });
+    if (!resource) {
+      return new NotFoundException(ERROR.NFFILE);
+    }
+    return {
+      companyId: undefined,
+      projectId: resource.folder.projectId,
+    } as ResourceScope | null;
+  }
+
+  private async taskResolver(resourceId: bigint) {
+    const resource = await this.prisma.task.findUnique({
+      where: {
+        id: resourceId,
+      },
+      select: {
+        file: {
+          select: {
+            folder: {
+              select: {
+                projectId: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!resource) {
+      return new NotFoundException(ERROR.NFTASK);
+    }
+    return {
+      companyId: undefined,
+      projectId: resource.file.folder.projectId,
+    } as ResourceScope | null;
+  }
+
+  private async frameResolver(resourceId: bigint) {
+    const resource = await this.prisma.taskCommentFrame.findUnique({
+      where: {
+        id: resourceId,
+      },
+      select: {
+        task: {
+          select: {
+            file: {
+              select: {
+                folder: {
+                  select: {
+                    projectId: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!resource) {
+      return new NotFoundException(ERROR.NFFRAME);
+    }
+    return {
+      companyId: undefined,
+      projectId: resource.task.file.folder.projectId,
+    } as ResourceScope | null;
+  }
+
+  private async commentResolver(resourceId: bigint) {
+    const resource = await this.prisma.taskComment.findUnique({
+      where: {
+        id: resourceId,
+      },
+      select: {
+        frame: {
+          select: {
+            task: {
+              select: {
+                file: {
+                  select: {
+                    folder: {
+                      select: {
+                        projectId: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!resource) {
+      return new NotFoundException(ERROR.NFCOMMENT);
+    }
+    return {
+      companyId: undefined,
+      projectId: resource.frame.task.file.folder.projectId,
+    } as ResourceScope | null;
+  }
+
+  private async roleResolver(resourceId: bigint) {
+    const resource = await this.prisma.role.findUnique({
+      where: {
+        id: resourceId,
+      },
+      select: {
+        projectId: true,
+        companyId: true,
+      },
+    });
+    if (!resource) {
+      return new NotFoundException(ERROR.NFROLE);
+    }
+    return {
+      companyId: resource.companyId,
+      projectId: resource.projectId,
+    } as ResourceScope | null;
+  }
+
+  private async projectResolver(resourceId: bigint) {
+    const resource = await this.prisma.project.findUnique({
+      where: {
+        id: resourceId,
+      },
+      select: {
+        companyId: true,
+      },
+    });
+    if (!resource) {
+      return new NotFoundException(ERROR.NFPROJECT);
+    }
+    return {
+      companyId: resource.companyId,
+      projectId: undefined,
+    } as ResourceScope | null;
   }
 }

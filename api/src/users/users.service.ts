@@ -21,8 +21,8 @@ export class UsersService {
             JOIN permissions p
                 ON p.id = rp.permission_id
         WHERE u.id = ${userId}
-            ${companyId ? Prisma.sql`AND r.company_id = ${companyId}` : Prisma.empty}
-            ${projectId ? Prisma.sql`AND r.project_id = ${projectId}` : Prisma.empty}
+            ${companyId ? Prisma.sql`AND r.company_id = ${companyId}` : Prisma.sql`AND r.company_id is null`}
+            ${projectId ? Prisma.sql`AND r.project_id = ${projectId}` : Prisma.sql`AND r.project_id is null`}
         `;
 
     return rows.map((r) => r.name);
