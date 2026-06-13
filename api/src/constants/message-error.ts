@@ -5,4 +5,12 @@ export const ERROR = {
   SVLOGOUT: 'Server is not available to logout.',
   SVREGISTER: 'Server is not available to register.',
   SVENV: 'Can not get environment variable.',
+  EXPTOKEN: 'Token is expired',
+  NFFOLDER: 'Folder is not exist',
+  NFFILE: 'File is not exist',
+  NFTASK: 'Task is not exist',
+  NFFRAME: 'Frame is not exist',
+  NFCOMMENT: 'Comment is not exist',
+  NFROLE: 'Role is not exist',
+  NFPROJECT: 'Project is not exist',
 };

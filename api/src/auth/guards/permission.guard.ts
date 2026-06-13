@@ -5,6 +5,7 @@ import { Reflector } from '@nestjs/core';
 import { PERMISSIONS_KEY, IS_PUBLIC_KEY } from '@auth/decorators';
 import { PermissionMetadata, JwtPayload } from '@auth/interfaces';
 import { UsersService } from '@users/users.service';
+import { AuthService } from '../auth.service';
 
 // ChuongTV #005
 @Injectable()
@@ -12,6 +13,7 @@ export class PermissionGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly usersService: UsersService,
+    private readonly authService: AuthService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -34,14 +36,36 @@ export class PermissionGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest();
-    let { companyId, projectId } = request?.params;
+    const { id } = request?.params;
     const { userId } = request?.user as JwtPayload;
+    let companyId: bigint | undefined;
+    let projectId: bigint | undefined;
+
+    if (permissionMetadata.resource) {
+      if (!id) {
+        return false;
+      }
+
+      const resourceScope = await this.authService.resourceResolver(
+        permissionMetadata.resource,
+        BigInt(id),
+      );
+
+      if (resourceScope instanceof Error) {
+        throw resourceScope;
+      }
+
+      companyId = resourceScope?.companyId;
+      projectId = resourceScope?.projectId;
+    }
 
     const userPermissions = await this.usersService.getUserPermissions(
       userId,
       companyId,
       projectId,
     );
+
+    console.log({ companyId, projectId });
 
     if (permissionMetadata.mode === 'ANY') {
       return permissionMetadata.permissions.some((permission) =>

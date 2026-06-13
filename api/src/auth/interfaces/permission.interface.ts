@@ -2,7 +2,9 @@
 export interface PermissionMetadata {
   mode: PermissionMode;
   permissions: string[];
+  resource?: Resource;
 }
 
 export type PermissionMode = 'ANY' | 'ALL';
+export type Resource = 'FOLDER' | 'FILE' | 'TASK' | 'FRAME' | 'COMMENT' | 'ROLE' | 'PROJECT';
 // ChuongTV #005 end
