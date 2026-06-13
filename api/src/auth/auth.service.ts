@@ -70,7 +70,7 @@ export class AuthService {
       },
       {
         secret: process.env.ACCESS_TOKEN_SECRET || 'vungoimora',
-        expiresIn: '1h',
+        expiresIn: REFRESH_TOKEN_EXPIRES_IN_MS,
       },
     );
 
