@@ -318,6 +318,9 @@ export class AuthService {
       case 'PROJECT':
         resourceScope = await this.projectResolver(resourceId);
         break;
+      case 'COMPANY':
+        resourceScope = await this.companyResolver(resourceId);
+        break;
     }
     return resourceScope;
   }
@@ -482,6 +485,24 @@ export class AuthService {
     });
     if (!resource) {
       return new NotFoundException(ERROR.NFPROJECT);
+    }
+    return {
+      companyId: resource.companyId,
+      projectId: undefined,
+    } as ResourceScope | null;
+  }
+
+  private async companyResolver(resourceId: bigint) {
+    const resource = await this.prisma.project.findUnique({
+      where: {
+        id: resourceId,
+      },
+      select: {
+        companyId: true,
+      },
+    });
+    if (!resource) {
+      return new NotFoundException(ERROR.NFCOMPANY);
     }
     return {
       companyId: resource.companyId,

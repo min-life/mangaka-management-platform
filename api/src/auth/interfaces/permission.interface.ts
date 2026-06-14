@@ -6,5 +6,13 @@ export interface PermissionMetadata {
 }
 
 export type PermissionMode = 'ANY' | 'ALL';
-export type Resource = 'FOLDER' | 'FILE' | 'TASK' | 'FRAME' | 'COMMENT' | 'ROLE' | 'PROJECT';
+export type Resource =
+  | 'FOLDER'
+  | 'FILE'
+  | 'TASK'
+  | 'FRAME'
+  | 'COMMENT'
+  | 'ROLE'
+  | 'PROJECT'
+  | 'COMPANY';
 // ChuongTV #005 end

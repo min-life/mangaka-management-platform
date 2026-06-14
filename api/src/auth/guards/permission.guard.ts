@@ -59,13 +59,15 @@ export class PermissionGuard implements CanActivate {
       projectId = resourceScope?.projectId;
     }
 
-    const userPermissions = await this.usersService.getUserPermissions(
+    let userPermissions = await this.usersService.getUserPermissions(userId, companyId, projectId);
+
+    const adminPermission = await this.usersService.getAdminPermission(
       userId,
       companyId,
       projectId,
     );
 
-    console.log({ companyId, projectId });
+    userPermissions = [...userPermissions, ...adminPermission];
 
     if (permissionMetadata.mode === 'ANY') {
       return permissionMetadata.permissions.some((permission) =>

@@ -13,4 +13,5 @@ export const ERROR = {
   NFCOMMENT: 'Comment is not exist',
   NFROLE: 'Role is not exist',
   NFPROJECT: 'Project is not exist',
+  NFCOMPANY: 'Company is not exist',
 };
