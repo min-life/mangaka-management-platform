@@ -56,4 +56,28 @@ export class UsersService {
       avatarUrl: updatedUser.avatarUrl,
     };
   }
+
+  async getAdminPermission(userId: bigint, companyId?: bigint, projectId?: bigint) {
+    const countCompany = await this.prisma.company.count({
+      where: {
+        id: companyId,
+        createdBy: userId,
+      },
+    });
+    const countProject = await this.prisma.project.count({
+      where: {
+        id: projectId,
+        createdBy: userId,
+      },
+    });
+
+    const adminPermission = [] as string[];
+    if (countCompany > 0) {
+      adminPermission.push('co.admin');
+    }
+    if (countProject > 0) {
+      adminPermission.push('prj.admin');
+    }
+    return adminPermission;
+  }
 }
