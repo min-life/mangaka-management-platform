@@ -58,19 +58,24 @@ export class UsersService {
   }
 
   async getAdminPermission(userId: bigint, companyId?: bigint, projectId?: bigint) {
-    const countCompany = await this.prisma.company.count({
-      where: {
-        id: companyId,
-        createdBy: userId,
-      },
-    });
-    const countProject = await this.prisma.project.count({
-      where: {
-        id: projectId,
-        createdBy: userId,
-      },
-    });
-
+    let countCompany = 0;
+    if (companyId) {
+      countCompany = await this.prisma.company.count({
+        where: {
+          id: companyId,
+          createdBy: userId,
+        },
+      });
+    }
+    let countProject = 0;
+    if (projectId) {
+      countProject = await this.prisma.project.count({
+        where: {
+          id: projectId,
+          createdBy: userId,
+        },
+      });
+    }
     const adminPermission = [] as string[];
     if (countCompany > 0) {
       adminPermission.push('co.admin');
