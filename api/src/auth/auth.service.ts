@@ -5,7 +5,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'crypto';
 import { MailService } from '../mail/mail.service';
@@ -19,6 +19,8 @@ import { ResourceScope } from './interfaces/resource-scope.interface';
 
 const REFRESH_TOKEN_EXPIRES_IN_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRES_IN_DAYS ?? 7);
 const REFRESH_TOKEN_EXPIRES_IN_MS = REFRESH_TOKEN_EXPIRES_IN_DAYS * 24 * 60 * 60 * 1000;
+const DEFAULT_ACCESS_TOKEN_TTL = '15m';
+const DEFAULT_REFRESH_TOKEN_TTL = '7d';
 const EMAIL_VERIFICATION_TOKEN_EXPIRES_IN_HOURS = Number(
   process.env.EMAIL_VERIFICATION_TOKEN_EXPIRES_IN_HOURS ?? 24,
 );
@@ -27,6 +29,11 @@ const EMAIL_VERIFICATION_TOKEN_EXPIRES_IN_MS =
 const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS ?? 10);
 
 const GOOGLE_EMAIL_EXISTS_ERROR = 'GOOGLE_EMAIL_EXISTS';
+
+type RefreshRequestUser = {
+  userId: string | bigint;
+  email: string;
+};
 
 @Injectable()
 export class AuthService {
@@ -277,11 +284,59 @@ export class AuthService {
     });
   }
 
+  // KietDM #001
+  async refresh(oldRefreshToken: string, user: RefreshRequestUser) {
+    const userId = user.userId.toString();
+    const accessToken = this.generateAccessToken(userId, user.email);
+    const refreshToken = this.generateRefreshToken(userId, user.email);
+    const refreshTokenExpiresAt = this.getRefreshTokenExpiresAt();
+
+    await this.prisma.$transaction(async (prisma) => {
+      const deletedRefreshToken = await prisma.refreshToken.deleteMany({
+        where: {
+          token: oldRefreshToken,
+          userId: BigInt(userId),
+        },
+      });
+
+      if (deletedRefreshToken.count === 0) {
+        throw new UnauthorizedException('Invalid refresh token');
+      }
+
+      await prisma.refreshToken.create({
+        data: {
+          token: refreshToken,
+          userId: BigInt(userId),
+          expiresAt: refreshTokenExpiresAt,
+        },
+      });
+    });
+
+    return {
+      accessToken,
+      refreshToken,
+      refreshTokenExpiresAt,
+    };
+  }
+
   private hashEmailVerificationToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
   }
 
-  private generateRefreshToken(userId: bigint, email: string): string {
+  private generateAccessToken(userId: string, email: string): string {
+    return this.jwtService.sign(
+      {
+        userId,
+        email,
+      },
+      {
+        secret: process.env.ACCESS_TOKEN_SECRET ?? 'default',
+        expiresIn: this.getJwtExpiresIn(process.env.ACCESS_TOKEN_TTL ?? DEFAULT_ACCESS_TOKEN_TTL),
+      },
+    );
+  }
+
+  private generateRefreshToken(userId: bigint | string, email: string): string {
     return this.jwtService.sign(
       {
         userId: userId.toString(),
@@ -289,9 +344,47 @@ export class AuthService {
       },
       {
         secret: process.env.REFRESH_TOKEN_SECRET ?? 'default',
-        expiresIn: `${REFRESH_TOKEN_EXPIRES_IN_DAYS}d`,
+        expiresIn: this.getJwtExpiresIn(
+          process.env.REFRESH_TOKEN_TTL ?? `${REFRESH_TOKEN_EXPIRES_IN_DAYS}d`,
+        ),
       },
     );
+  }
+
+  private getRefreshTokenExpiresAt(): Date {
+    return new Date(
+      Date.now() + this.parseJwtTtlToMs(process.env.REFRESH_TOKEN_TTL ?? DEFAULT_REFRESH_TOKEN_TTL),
+    );
+  }
+
+  private getJwtExpiresIn(ttl: string): JwtSignOptions['expiresIn'] {
+    return ttl as JwtSignOptions['expiresIn'];
+  }
+
+  private parseJwtTtlToMs(ttl: string): number {
+    const match = ttl.trim().match(/^(\d+)(ms|s|m|h|d)?$/);
+
+    if (!match) {
+      return REFRESH_TOKEN_EXPIRES_IN_MS;
+    }
+
+    const value = Number(match[1]);
+    const unit = match[2] ?? 's';
+
+    switch (unit) {
+      case 'ms':
+        return value;
+      case 's':
+        return value * 1000;
+      case 'm':
+        return value * 60 * 1000;
+      case 'h':
+        return value * 60 * 60 * 1000;
+      case 'd':
+        return value * 24 * 60 * 60 * 1000;
+      default:
+        return REFRESH_TOKEN_EXPIRES_IN_MS;
+    }
   }
 
   async resourceResolver(resource: Resource, resourceId: bigint) {

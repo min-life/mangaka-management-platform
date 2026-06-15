@@ -5,6 +5,7 @@ import {
   Get,
   Headers,
   HttpCode,
+  InternalServerErrorException,
   Post,
   Req,
   Res,
@@ -19,12 +20,19 @@ import { AuthService } from './auth.service';
 import { Cookie } from '../common/decorators/cookie.decorator';
 import { Public } from './decorators';
 import { GoogleOAuthProfile } from './interfaces';
+import { RefreshTokenGuard } from './guards';
+
+type RefreshRequest = Request & {
+  user: {
+    userId: string | bigint;
+    email: string;
+  };
+};
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  // KietDM #001
   @Public()
   @Post('login')
   async login(@Body() body: LoginDto, @Res({ passthrough: true }) response: Response) {
@@ -91,7 +99,6 @@ export class AuthController {
     }
   }
 
-  // KietDM #001
   @Public()
   @Post('logout')
   @HttpCode(204)
@@ -110,7 +117,6 @@ export class AuthController {
     });
   }
 
-  // KietDM #001
   @Public()
   @Post('register')
   async register(@Body() body: RegisterDto) {
@@ -123,12 +129,35 @@ export class AuthController {
     };
   }
 
-  // KietDM #001
   @Public()
   @Post('verify-email')
   verifyEmail(@Body() body: VerifyEmailDto) {
     return this.authService.verifyEmail(body);
   }
 
-  // KietDM #001
+  @Public()
+  @Post('refresh')
+  @UseGuards(RefreshTokenGuard)
+  async refresh(
+    @Req() request: RefreshRequest,
+    @Cookie('refreshToken') refreshToken: string,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<string> {
+    try {
+      const refreshResponse = await this.authService.refresh(refreshToken, request.user);
+
+      response.cookie('refreshToken', refreshResponse.refreshToken, {
+        httpOnly: true,
+        sameSite: 'none' as const,
+        secure: process.env.NODE_ENV === 'production',
+        expires: refreshResponse.refreshTokenExpiresAt,
+        path: '/api/auth',
+      });
+
+      return refreshResponse.accessToken;
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : error);
+      throw new InternalServerErrorException('SVREFRESH');
+    }
+  }
 }

@@ -4,6 +4,7 @@ export const ERROR = {
   SVLOGIN: 'Server is not available to login.',
   SVLOGOUT: 'Server is not available to logout.',
   SVREGISTER: 'Server is not available to register.',
+  SVREFRESH: 'Server is not available to refresh token.',
   SVENV: 'Can not get environment variable.',
   EXPTOKEN: 'Token is expired',
   NFFOLDER: 'Folder is not exist',
