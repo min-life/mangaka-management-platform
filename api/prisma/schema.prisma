@@ -13,7 +13,6 @@ datasource db {
 
 enum SCOPE {
   SYS
-  CO
   PRJ
 }
 
