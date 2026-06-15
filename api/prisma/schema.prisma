@@ -11,6 +11,12 @@ datasource db {
   provider = "postgresql"
 }
 
+enum SCOPE {
+  SYS
+  CO
+  PRJ
+}
+
 enum PROGRESS_STATUS {
   PENDING
   INPROGRESS
@@ -18,73 +24,79 @@ enum PROGRESS_STATUS {
   DONE
 }
 
-enum SCOPE {
-  SYS
-  CO
-  PRJ
+enum APPLICATION_STATUS {
+  PENDING
+  APPROVE
+  REJECT
+  CANCELD
+}
+
+enum APPLICATION_TYPE {
+  MANUSCRIPT_REVIEW
+  PUBLISH_REQUEST
 }
 
 model User {
-  id                              BigInt    @id @default(autoincrement())
-  email                           String    @unique
-  googleId                        String?   @unique @map("google_id")
-  password                        String?
-  displayName                     String?   @map("display_name")
-  avatarUrl                       String?   @map("avatar_url")
-  emailVerifiedAt                 DateTime? @map("email_verified_at")
-  emailVerificationTokenHash      String?   @unique @map("email_verification_token_hash")
-  emailVerificationTokenExpiresAt DateTime? @map("email_verification_token_expires_at")
-  isDeleted                       Boolean   @default(false) @map("is_deleted")
-  createdBy                       BigInt?   @map("created_by")
-  updatedBy                       BigInt?   @map("updated_by")
-  deletedBy                       BigInt?   @map("deleted_by")
-  createdAt                       DateTime  @default(now()) @map("created_at")
-  updatedAt                       DateTime  @default(now()) @updatedAt @map("updated_at")
-  deletedAt                       DateTime? @map("deleted_at")
+  id          BigInt   @id @default(autoincrement())
+  displayName String?  @map("display_name")
+  avatarUrl   String?  @map("avatar_url")
+  email       String   @unique
+  password    String?
+  createdBy   BigInt?  @map("created_by")
+  updatedBy   BigInt?  @map("updated_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
 
-  // Relations with itself for createdBy, updatedBy, deletedBy
-  createdByUser User?  @relation("createdByUser", fields: [createdBy], references: [id])
-  updatedByUser User?  @relation("updatedByUser", fields: [updatedBy], references: [id])
-  deletedByUser User?  @relation("deletedByUser", fields: [deletedBy], references: [id])
-  createdUsers  User[] @relation("createdByUser")
-  updatedUsers  User[] @relation("updatedByUser")
-  deletedUsers  User[] @relation("deletedByUser")
+  // Relations with itself
+  createdByUser User?  @relation("UserCreatedByUser", fields: [createdBy], references: [id])
+  updatedByUser User?  @relation("UserUpdatedByUser", fields: [updatedBy], references: [id])
+  createdUsers  User[] @relation("UserCreatedByUser")
+  updatedUsers  User[] @relation("UserUpdatedByUser")
 
   // Relations with role model
-  createdRoles Role[] @relation("createdByUser")
-  updatedRoles Role[] @relation("updatedByUser")
+  createdRoles Role[] @relation("RoleCreatedByUser")
+  updatedRoles Role[] @relation("RoleUpdatedByUser")
 
   // Relations with userRole model
   userRoles UserRole[]
 
-  // Relations with company model
-  createdCompanies Company[] @relation("createdByUser")
-  updatedCompanies Company[] @relation("updatedByUser")
-
   // Relations with project model
-  createdProjects Project[] @relation("createdByUser")
-  updatedProjects Project[] @relation("updatedByUser")
+  createdProjects Project[] @relation("ProjectCreatedByUser")
+  updatedProjects Project[] @relation("ProjectUpdatedByUser")
+
+  // Relations with editorBoard model
+  createdEditorBoards EditorBoard[] @relation("EditorBoardCreatedByUser")
+  updatedEditorBoards EditorBoard[] @relation("EditorBoardUpdatedByUser")
+  userEditorBoards    UserEditorBoard[]
 
   // Relations with folder model
-  createdFolders Folder[] @relation("createdByUser")
-  updatedFolders Folder[] @relation("updatedByUser")
+  createdFolders Folder[] @relation("FolderCreatedByUser")
+  updatedFolders Folder[] @relation("FolderUpdatedByUser")
 
   // Relations with file model
-  createdFiles File[] @relation("createdByUser")
-  updatedFiles File[] @relation("updatedByUser")
+  createdFiles File[] @relation("FileCreatedByUser")
+  updatedFiles File[] @relation("FileUpdatedByUser")
+
+  // Relations with fileMaterial model
+  createdFileMaterials FileMaterial[] @relation("FileMaterialCreatedByUser")
+  updatedFileMaterials FileMaterial[] @relation("FileMaterialUpdatedByUser")
 
   // Relations with task model
-  createdTasks  Task[] @relation("createdByUser")
-  updatedTasks  Task[] @relation("updatedByUser")
-  assignedTasks Task[] @relation("assignedByUser")
+  createdTasks  Task[] @relation("TaskCreatedByUser")
+  updatedTasks  Task[] @relation("TaskUpdatedByUser")
+  assignedTasks Task[] @relation("TaskAssignedByUser")
 
   // Relations with taskCommentFrame model
-  createdTaskCommentFrames TaskCommentFrame[] @relation("createdByUser")
-  updatedTaskCommentFrames TaskCommentFrame[] @relation("updatedByUser")
+  createdTaskCommentFrames TaskCommentFrame[] @relation("TaskCommentFrameCreatedByUser")
+  updatedTaskCommentFrames TaskCommentFrame[] @relation("TaskCommentFrameUpdatedByUser")
 
   // Relations with taskComment model
-  createdTaskComments TaskComment[] @relation("createdByUser")
-  updatedTaskComments TaskComment[] @relation("updatedByUser")
+  createdTaskComments TaskComment[] @relation("TaskCommentCreatedByUser")
+
+  // Relations with application model
+  createdApplications  Application[] @relation("ApplicationCreatedByUser")
+  updatedApplications  Application[] @relation("ApplicationUpdatedByUser")
+  verifiedApplications Application[] @relation("ApplicationVerifiedByUser")
 
   // Relations with refreshToken model
   refreshTokens RefreshToken[]
@@ -95,33 +107,77 @@ model User {
 
 model Role {
   id        BigInt   @id @default(autoincrement())
-  name      String
+  code      String   @unique
   scope     SCOPE    @default(SYS)
-  companyId BigInt?  @map("company_id")
-  projectId BigInt?  @map("project_id")
+  name      String
   createdBy BigInt?  @map("created_by")
   updatedBy BigInt?  @map("updated_by")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   // Relations with user model
-  createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
-  updatedByUser User? @relation("updatedByUser", fields: [updatedBy], references: [id])
-
-  // Relations with rolePermission model
-  rolePermissions RolePermission[]
+  createdByUser User? @relation("RoleCreatedByUser", fields: [createdBy], references: [id])
+  updatedByUser User? @relation("RoleUpdatedByUser", fields: [updatedBy], references: [id])
 
   // Relations with userRole model
   userRoles UserRole[]
 
-  // Relations with company model
-  company Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  // Relations with project model
-  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // Relations with rolePermission model
+  rolePermissions RolePermission[]
 
   // Configs
   @@map("roles")
+}
+
+model UserRole {
+  userId    BigInt  @map("user_id")
+  roleId    BigInt  @map("role_id")
+  projectId BigInt? @map("project_id")
+
+  // Relations with user, role and project models
+  user    User     @relation(fields: [userId], references: [id])
+  role    Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+  @@index([projectId])
+  // Configs
+  @@map("user_roles")
+}
+
+model Project {
+  id            BigInt   @id @default(autoincrement())
+  name          String
+  editorBoardId BigInt?  @map("editor_board_id")
+  createdBy     BigInt?  @map("created_by")
+  updatedBy     BigInt?  @map("updated_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations with editorBoard model
+  editorBoard EditorBoard? @relation(fields: [editorBoardId], references: [id])
+
+  // Relations with user model
+  createdByUser User? @relation("ProjectCreatedByUser", fields: [createdBy], references: [id])
+  updatedByUser User? @relation("ProjectUpdatedByUser", fields: [updatedBy], references: [id])
+
+  // Relations with userRole model
+  userRoles UserRole[]
+
+  // Relations with folder model
+  folders Folder[]
+
+  // Relations with application model
+  applications Application[]
+
+  // Relations with projectStat model
+  projectStats ProjectStat[]
+
+  @@index([editorBoardId])
+  // Configs
+  @@map("projects")
 }
 
 model Permission {
@@ -151,22 +207,7 @@ model RolePermission {
   @@map("role_permissions")
 }
 
-model UserRole {
-  userId BigInt @map("user_id")
-  roleId BigInt @map("role_id")
-
-  // Relations with user and role models
-  user User @relation(fields: [userId], references: [id])
-  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
-
-  @@id([userId, roleId])
-  @@index([userId])
-  @@index([roleId])
-  // Configs
-  @@map("user_roles")
-}
-
-model Company {
+model EditorBoard {
   id        BigInt   @id @default(autoincrement())
   name      String
   createdBy BigInt?  @map("created_by")
@@ -175,51 +216,39 @@ model Company {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   // Relations with user model
-  createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
-  updatedByUser User? @relation("updatedByUser", fields: [updatedBy], references: [id])
+  createdByUser User? @relation("EditorBoardCreatedByUser", fields: [createdBy], references: [id])
+  updatedByUser User? @relation("EditorBoardUpdatedByUser", fields: [updatedBy], references: [id])
 
   // Relations with project model
   projects Project[]
 
-  // Relations with role model
-  roles Role[]
+  // Relations with userEditorBoard model
+  userEditorBoards UserEditorBoard[]
 
   // Configs
-  @@map("companies")
+  @@map("editor_boards")
 }
 
-model Project {
-  id        BigInt   @id @default(autoincrement())
-  name      String
-  companyId BigInt   @map("company_id")
-  createdBy BigInt?  @map("created_by")
-  updatedBy BigInt?  @map("updated_by")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+model UserEditorBoard {
+  userId        BigInt  @map("user_id")
+  editorBoardId BigInt  @map("editor_board_id")
+  isLead        Boolean @default(false) @map("is_lead")
 
-  // Relations with company model
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  // Relations with user and editorBoard models
+  user        User        @relation(fields: [userId], references: [id])
+  editorBoard EditorBoard @relation(fields: [editorBoardId], references: [id], onDelete: Cascade)
 
-  // Relations with user model
-  createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
-  updatedByUser User? @relation("updatedByUser", fields: [updatedBy], references: [id])
-
-  // Relations with role model
-  roles Role[]
-
-  // Relations with folder model
-  folders Folder[]
-
-  @@index([companyId])
+  @@id([userId, editorBoardId])
+  @@index([userId])
+  @@index([editorBoardId])
   // Configs
-  @@map("projects")
+  @@map("user_editor_boards")
 }
 
 model Folder {
   id          BigInt   @id @default(autoincrement())
-  name        String
+  title       String
   description String?
-  index       Int      @default(autoincrement())
   parentId    BigInt?  @map("parent_id")
   projectId   BigInt   @map("project_id")
   createdBy   BigInt?  @map("created_by")
@@ -231,8 +260,8 @@ model Folder {
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   // Relations with user model
-  createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
-  updatedByUser User? @relation("updatedByUser", fields: [updatedBy], references: [id])
+  createdByUser User? @relation("FolderCreatedByUser", fields: [createdBy], references: [id])
+  updatedByUser User? @relation("FolderUpdatedByUser", fields: [updatedBy], references: [id])
 
   // Relations with itself for parent-child relationship
   parent   Folder?  @relation("FolderToFolder", fields: [parentId], references: [id], onDelete: Cascade)
@@ -248,21 +277,24 @@ model Folder {
 }
 
 model File {
-  id        BigInt   @id @default(autoincrement())
-  name      String
-  index     Int      @default(autoincrement())
-  folderId  BigInt   @map("folder_id")
-  createdBy BigInt?  @map("created_by")
-  updatedBy BigInt?  @map("updated_by")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  id          BigInt   @id @default(autoincrement())
+  title       String
+  description String?
+  folderId    BigInt   @map("folder_id")
+  createdBy   BigInt?  @map("created_by")
+  updatedBy   BigInt?  @map("updated_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
 
   // Relations with folder model
   folder Folder @relation(fields: [folderId], references: [id], onDelete: Cascade)
 
   // Relations with user model
-  createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
-  updatedByUser User? @relation("updatedByUser", fields: [updatedBy], references: [id])
+  createdByUser User? @relation("FileCreatedByUser", fields: [createdBy], references: [id])
+  updatedByUser User? @relation("FileUpdatedByUser", fields: [updatedBy], references: [id])
+
+  // Relations with fileMaterial model
+  fileMaterials FileMaterial[]
 
   // Relations with task model
   tasks Task[]
@@ -272,12 +304,32 @@ model File {
   @@map("files")
 }
 
+model FileMaterial {
+  id        BigInt   @id @default(autoincrement())
+  fileId    BigInt   @map("file_id")
+  materials Json
+  createdBy BigInt?  @map("created_by")
+  updatedBy BigInt?  @map("updated_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations with file model
+  file File @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  // Relations with user model
+  createdByUser User? @relation("FileMaterialCreatedByUser", fields: [createdBy], references: [id])
+  updatedByUser User? @relation("FileMaterialUpdatedByUser", fields: [updatedBy], references: [id])
+
+  @@index([fileId])
+  // Configs
+  @@map("file_materials")
+}
+
 model Task {
   id          BigInt          @id @default(autoincrement())
   title       String
   description String?
   status      PROGRESS_STATUS @default(PENDING)
-  index       Int             @default(autoincrement())
   parentId    BigInt?         @map("parent_id")
   fileId      BigInt          @map("file_id")
   assignedBy  BigInt?         @map("assigned_by")
@@ -294,15 +346,16 @@ model Task {
   file File @relation(fields: [fileId], references: [id], onDelete: Cascade)
 
   // Relations with user model
-  createdByUser  User? @relation("createdByUser", fields: [createdBy], references: [id])
-  updatedByUser  User? @relation("updatedByUser", fields: [updatedBy], references: [id])
-  assignedByUser User? @relation("assignedByUser", fields: [assignedBy], references: [id])
+  createdByUser  User? @relation("TaskCreatedByUser", fields: [createdBy], references: [id])
+  updatedByUser  User? @relation("TaskUpdatedByUser", fields: [updatedBy], references: [id])
+  assignedByUser User? @relation("TaskAssignedByUser", fields: [assignedBy], references: [id])
 
   // Relations with taskCommentFrame model
   commentFrames TaskCommentFrame[]
 
   @@index([fileId])
   @@index([parentId])
+  @@index([assignedBy])
   // Configs
   @@map("tasks")
 }
@@ -323,8 +376,8 @@ model TaskCommentFrame {
   task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   // Relations with user model
-  createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
-  updatedByUser User? @relation("updatedByUser", fields: [updatedBy], references: [id])
+  createdByUser User? @relation("TaskCommentFrameCreatedByUser", fields: [createdBy], references: [id])
+  updatedByUser User? @relation("TaskCommentFrameUpdatedByUser", fields: [updatedBy], references: [id])
 
   // Relations with taskComment model
   comments TaskComment[]
@@ -336,10 +389,9 @@ model TaskCommentFrame {
 
 model TaskComment {
   id        BigInt   @id @default(autoincrement())
-  content   String
+  content   Json
   frameId   BigInt   @map("frame_id")
   createdBy BigInt?  @map("created_by")
-  updatedBy BigInt?  @map("updated_by")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
@@ -347,12 +399,53 @@ model TaskComment {
   frame TaskCommentFrame @relation(fields: [frameId], references: [id], onDelete: Cascade)
 
   // Relations with user model
-  createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
-  updatedByUser User? @relation("updatedByUser", fields: [updatedBy], references: [id])
+  createdByUser User? @relation("TaskCommentCreatedByUser", fields: [createdBy], references: [id])
 
   @@index([frameId])
   // Configs
   @@map("task_comments")
+}
+
+model Application {
+  id          BigInt             @id @default(autoincrement())
+  projectId   BigInt             @map("project_id")
+  title       String
+  description String?
+  materials   Json
+  type        APPLICATION_TYPE
+  status      APPLICATION_STATUS  @default(PENDING)
+  verifyBy    BigInt?            @map("verify_by")
+  createdBy   BigInt?            @map("created_by")
+  updatedBy   BigInt?            @map("updated_by")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @default(now()) @updatedAt @map("updated_at")
+
+  // Relations with project model
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Relations with user model
+  verifiedByUser User? @relation("ApplicationVerifiedByUser", fields: [verifyBy], references: [id])
+  createdByUser  User? @relation("ApplicationCreatedByUser", fields: [createdBy], references: [id])
+  updatedByUser  User? @relation("ApplicationUpdatedByUser", fields: [updatedBy], references: [id])
+
+  @@index([projectId])
+  @@index([verifyBy])
+  // Configs
+  @@map("applications")
+}
+
+model ProjectStat {
+  id        BigInt   @id @default(autoincrement())
+  projectId BigInt   @map("project_id")
+  metrics   Json
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  // Relations with project model
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  // Configs
+  @@map("project_stats")
 }
 
 model RefreshToken {
@@ -361,13 +454,13 @@ model RefreshToken {
   expiresAt DateTime @map("expires_at")
 
   // Relations with user model
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
   // Configs
   @@map("refresh_tokens")
 }
 
-// KietDM #001
 model BlacklistToken {
   token     String   @id
   expiresAt DateTime @map("expires_at")
