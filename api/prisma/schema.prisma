@@ -53,12 +53,11 @@ model User {
   createdUsers  User[] @relation("UserCreatedByUser")
   updatedUsers  User[] @relation("UserUpdatedByUser")
 
-  // Relations with role model
-  createdRoles Role[] @relation("RoleCreatedByUser")
-  updatedRoles Role[] @relation("RoleUpdatedByUser")
-
-  // Relations with userRole model
-  userRoles UserRole[]
+  // Relations with role system
+  userRoles    UserRole[]
+  userProjects UserProject[]
+  createdRoles Role[]        @relation("RoleCreatedByUser")
+  updatedRoles Role[]        @relation("RoleUpdatedByUser")
 
   // Relations with project model
   createdProjects Project[] @relation("ProjectCreatedByUser")
@@ -122,6 +121,9 @@ model Role {
   // Relations with userRole model
   userRoles UserRole[]
 
+  // Relations with userProject model
+  userProjects UserProject[]
+
   // Relations with rolePermission model
   rolePermissions RolePermission[]
 
@@ -130,21 +132,40 @@ model Role {
 }
 
 model UserRole {
-  userId    BigInt  @map("user_id")
-  roleId    BigInt  @map("role_id")
-  projectId BigInt? @map("project_id")
+  userId BigInt @map("user_id")
+  roleId BigInt @map("role_id")
 
-  // Relations with user, role and project models
-  user    User     @relation(fields: [userId], references: [id])
-  role    Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // Relations with user and role models
+  user User @relation(fields: [userId], references: [id])
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@id([userId, roleId])
   @@index([userId])
   @@index([roleId])
-  @@index([projectId])
   // Configs
   @@map("user_roles")
+}
+
+model UserProject {
+  userId    BigInt   @map("user_id")
+  projectId BigInt   @map("project_id")
+  roleId    BigInt   @map("role_id")
+  createdBy BigInt?  @map("created_by")
+  updatedBy BigInt?  @map("updated_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations with user, project and role models
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  role    Role    @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, projectId, roleId])
+  @@index([userId])
+  @@index([projectId])
+  @@index([roleId])
+  // Configs
+  @@map("user_projects")
 }
 
 model Project {
@@ -163,8 +184,8 @@ model Project {
   createdByUser User? @relation("ProjectCreatedByUser", fields: [createdBy], references: [id])
   updatedByUser User? @relation("ProjectUpdatedByUser", fields: [updatedBy], references: [id])
 
-  // Relations with userRole model
-  userRoles UserRole[]
+  // Relations with userProject model
+  userProjects UserProject[]
 
   // Relations with folder model
   folders Folder[]
