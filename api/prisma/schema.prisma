@@ -36,13 +36,13 @@ enum APPLICATION_TYPE {
 }
 
 model User {
-  id          BigInt   @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   displayName String?  @map("display_name")
   avatarUrl   String?  @map("avatar_url")
   email       String   @unique
   password    String?
-  createdBy   BigInt?  @map("created_by")
-  updatedBy   BigInt?  @map("updated_by")
+  createdBy   Int?     @map("created_by")
+  updatedBy   Int?     @map("updated_by")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
 
@@ -104,12 +104,12 @@ model User {
 }
 
 model Role {
-  id        BigInt   @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   code      String   @unique
   scope     SCOPE    @default(SYS)
   name      String
-  createdBy BigInt?  @map("created_by")
-  updatedBy BigInt?  @map("updated_by")
+  createdBy Int?     @map("created_by")
+  updatedBy Int?     @map("updated_by")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
@@ -131,8 +131,8 @@ model Role {
 }
 
 model UserRole {
-  userId BigInt @map("user_id")
-  roleId BigInt @map("role_id")
+  userId Int @map("user_id")
+  roleId Int @map("role_id")
 
   // Relations with user and role models
   user User @relation(fields: [userId], references: [id])
@@ -146,11 +146,11 @@ model UserRole {
 }
 
 model UserProject {
-  userId    BigInt   @map("user_id")
-  projectId BigInt   @map("project_id")
-  roleId    BigInt   @map("role_id")
-  createdBy BigInt?  @map("created_by")
-  updatedBy BigInt?  @map("updated_by")
+  userId    Int      @map("user_id")
+  projectId Int      @map("project_id")
+  roleId    Int      @map("role_id")
+  createdBy Int?     @map("created_by")
+  updatedBy Int?     @map("updated_by")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
@@ -168,11 +168,11 @@ model UserProject {
 }
 
 model Project {
-  id            BigInt   @id @default(autoincrement())
+  id            Int      @id @default(autoincrement())
   name          String
-  editorBoardId BigInt?  @map("editor_board_id")
-  createdBy     BigInt?  @map("created_by")
-  updatedBy     BigInt?  @map("updated_by")
+  editorBoardId Int?     @map("editor_board_id")
+  createdBy     Int?     @map("created_by")
+  updatedBy     Int?     @map("updated_by")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
 
@@ -201,7 +201,7 @@ model Project {
 }
 
 model Permission {
-  id    BigInt @id @default(autoincrement())
+  id    Int    @id @default(autoincrement())
   name  String @unique
   scope SCOPE  @default(SYS)
 
@@ -213,8 +213,8 @@ model Permission {
 }
 
 model RolePermission {
-  roleId       BigInt @map("role_id")
-  permissionId BigInt @map("permission_id")
+  roleId       Int @map("role_id")
+  permissionId Int @map("permission_id")
 
   // Relations with role and permission models
   role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
@@ -228,10 +228,10 @@ model RolePermission {
 }
 
 model EditorBoard {
-  id        BigInt   @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   name      String
-  createdBy BigInt?  @map("created_by")
-  updatedBy BigInt?  @map("updated_by")
+  createdBy Int?     @map("created_by")
+  updatedBy Int?     @map("updated_by")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
@@ -250,8 +250,8 @@ model EditorBoard {
 }
 
 model UserEditorBoard {
-  userId        BigInt  @map("user_id")
-  editorBoardId BigInt  @map("editor_board_id")
+  userId        Int     @map("user_id")
+  editorBoardId Int     @map("editor_board_id")
   isLead        Boolean @default(false) @map("is_lead")
 
   // Relations with user and editorBoard models
@@ -266,13 +266,13 @@ model UserEditorBoard {
 }
 
 model Folder {
-  id          BigInt   @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   title       String
   description String?
-  parentId    BigInt?  @map("parent_id")
-  projectId   BigInt   @map("project_id")
-  createdBy   BigInt?  @map("created_by")
-  updatedBy   BigInt?  @map("updated_by")
+  parentId    Int?     @map("parent_id")
+  projectId   Int      @map("project_id")
+  createdBy   Int?     @map("created_by")
+  updatedBy   Int?     @map("updated_by")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
 
@@ -297,12 +297,12 @@ model Folder {
 }
 
 model File {
-  id          BigInt   @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   title       String
   description String?
-  folderId    BigInt   @map("folder_id")
-  createdBy   BigInt?  @map("created_by")
-  updatedBy   BigInt?  @map("updated_by")
+  folderId    Int      @map("folder_id")
+  createdBy   Int?     @map("created_by")
+  updatedBy   Int?     @map("updated_by")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
 
@@ -325,11 +325,11 @@ model File {
 }
 
 model FileMaterial {
-  id        BigInt   @id @default(autoincrement())
-  fileId    BigInt   @map("file_id")
+  id        Int      @id @default(autoincrement())
+  fileId    Int      @map("file_id")
   materials Json
-  createdBy BigInt?  @map("created_by")
-  updatedBy BigInt?  @map("updated_by")
+  createdBy Int?     @map("created_by")
+  updatedBy Int?     @map("updated_by")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
@@ -346,15 +346,15 @@ model FileMaterial {
 }
 
 model Task {
-  id          BigInt          @id @default(autoincrement())
+  id          Int             @id @default(autoincrement())
   title       String
   description String?
   status      PROGRESS_STATUS @default(PENDING)
-  parentId    BigInt?         @map("parent_id")
-  fileId      BigInt          @map("file_id")
-  assignedBy  BigInt?         @map("assigned_by")
-  createdBy   BigInt?         @map("created_by")
-  updatedBy   BigInt?         @map("updated_by")
+  parentId    Int?            @map("parent_id")
+  fileId      Int             @map("file_id")
+  assignedBy  Int?            @map("assigned_by")
+  createdBy   Int?            @map("created_by")
+  updatedBy   Int?            @map("updated_by")
   createdAt   DateTime        @default(now()) @map("created_at")
   updatedAt   DateTime        @default(now()) @updatedAt @map("updated_at")
 
@@ -381,14 +381,14 @@ model Task {
 }
 
 model TaskCommentFrame {
-  id        BigInt   @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   startX    Decimal  @map("start_x") @db.Decimal(10, 4)
   startY    Decimal  @map("start_y") @db.Decimal(10, 4)
   endX      Decimal  @map("end_x") @db.Decimal(10, 4)
   endY      Decimal  @map("end_y") @db.Decimal(10, 4)
-  taskId    BigInt   @map("task_id")
-  createdBy BigInt?  @map("created_by")
-  updatedBy BigInt?  @map("updated_by")
+  taskId    Int      @map("task_id")
+  createdBy Int?     @map("created_by")
+  updatedBy Int?     @map("updated_by")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
@@ -408,10 +408,10 @@ model TaskCommentFrame {
 }
 
 model TaskComment {
-  id        BigInt   @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   content   Json
-  frameId   BigInt   @map("frame_id")
-  createdBy BigInt?  @map("created_by")
+  frameId   Int      @map("frame_id")
+  createdBy Int?     @map("created_by")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
@@ -427,16 +427,16 @@ model TaskComment {
 }
 
 model Application {
-  id          BigInt             @id @default(autoincrement())
-  projectId   BigInt             @map("project_id")
+  id          Int                @id @default(autoincrement())
+  projectId   Int                @map("project_id")
   title       String
   description String?
   materials   Json
   type        APPLICATION_TYPE
   status      APPLICATION_STATUS  @default(PENDING)
-  verifyBy    BigInt?            @map("verify_by")
-  createdBy   BigInt?            @map("created_by")
-  updatedBy   BigInt?            @map("updated_by")
+  verifyBy    Int?               @map("verify_by")
+  createdBy   Int?               @map("created_by")
+  updatedBy   Int?               @map("updated_by")
   createdAt   DateTime           @default(now()) @map("created_at")
   updatedAt   DateTime           @default(now()) @updatedAt @map("updated_at")
 
@@ -455,8 +455,8 @@ model Application {
 }
 
 model ProjectStat {
-  id        BigInt   @id @default(autoincrement())
-  projectId BigInt   @map("project_id")
+  id        Int      @id @default(autoincrement())
+  projectId Int      @map("project_id")
   metrics   Json
   updatedAt DateTime @default(now()) @map("updated_at")
 
@@ -470,7 +470,7 @@ model ProjectStat {
 
 model RefreshToken {
   token     String   @id
-  userId    BigInt   @map("user_id")
+  userId    Int      @map("user_id")
   expiresAt DateTime @map("expires_at")
 
   // Relations with user model
