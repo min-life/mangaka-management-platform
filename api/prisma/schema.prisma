@@ -108,6 +108,7 @@ model Role {
   code      String   @unique
   scope     SCOPE    @default(SYS)
   name      String
+  isDefault Boolean @default(false)
   createdBy Int?     @map("created_by")
   updatedBy Int?     @map("updated_by")
   createdAt DateTime @default(now()) @map("created_at")
