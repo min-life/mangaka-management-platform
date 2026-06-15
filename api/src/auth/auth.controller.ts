@@ -21,13 +21,7 @@ import { Cookie } from '../common/decorators/cookie.decorator';
 import { Public } from './decorators';
 import { GoogleOAuthProfile } from './interfaces';
 import { RefreshTokenGuard } from './guards';
-
-type RefreshRequest = Request & {
-  user: {
-    userId: string | bigint;
-    email: string;
-  };
-};
+import type { RefreshRequest } from './interfaces/refreshToken';
 
 @Controller('auth')
 export class AuthController {
