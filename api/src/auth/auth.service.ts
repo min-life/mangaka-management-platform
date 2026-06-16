@@ -1,22 +1,48 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
+import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { ERROR } from '../share/constants/message-error';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
-import { ERROR } from '../share/constants/message-error';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import {
+  requireDurationEnv,
+  requireDurationStringEnv,
+  requireEnv,
+  requireNumberEnv,
+} from '../share/helpers/env';
+import type { GoogleUser } from './interfaces';
 
-const ACCESS_TOKEN_EXPIRES_IN = process.env.ACCESS_TOKEN_EXPIRES_IN ?? '15m';
-const REFRESH_TOKEN_EXPIRES_IN_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRES_IN_DAYS ?? 7);
-const REFRESH_TOKEN_EXPIRES_IN_MS = REFRESH_TOKEN_EXPIRES_IN_DAYS * 24 * 60 * 60 * 1000;
-const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS ?? 10);
+const ACCESS_TOKEN_EXPIRES_IN = requireDurationStringEnv('ACCESS_TOKEN_EXPIRES_IN');
+const REFRESH_TOKEN_EXPIRES_IN = requireDurationStringEnv('REFRESH_TOKEN_EXPIRES_IN');
+const REFRESH_TOKEN_EXPIRES_IN_MS = requireDurationEnv('REFRESH_TOKEN_EXPIRES_IN');
+const BCRYPT_SALT_ROUNDS = requireNumberEnv('BCRYPT_SALT_ROUNDS');
+const EMAIL_VERIFY_EXPIRES_IN_MS = requireDurationEnv('EMAIL_VERIFY_EXPIRES_IN');
+const PASSWORD_RESET_EXPIRES_IN_MS = requireDurationEnv('PASSWORD_RESET_EXPIRES_IN');
+
+type GoogleCallbackResult = {
+  redirectUrl: string;
+  refreshToken?: string;
+  refreshTokenExpiresAt?: Date;
+};
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly mailService: MailService,
   ) {}
 
   async register(body: RegisterDto) {
@@ -28,22 +54,165 @@ export class AuthService {
     }
 
     const hashedPassword = await bcrypt.hash(body.password, BCRYPT_SALT_ROUNDS);
-    const user = await this.prisma.user.create({
+    const emailVerifyToken = randomUUID();
+    const emailVerifyExpiresAt = new Date(Date.now() + EMAIL_VERIFY_EXPIRES_IN_MS);
+
+    await this.prisma.user.create({
       data: {
         email,
         password: hashedPassword,
         displayName: body.displayName.trim(),
-      },
-      select: {
-        id: true,
-        email: true,
-        displayName: true,
+        isActive: false,
+        emailVerifyToken,
+        emailVerifyExpiresAt,
       },
     });
 
+    await this.mailService.sendVerifyEmail(email, this.buildVerifyEmailUrl(emailVerifyToken));
+
+    return;
+  }
+
+  async verifyEmail(token?: string) {
+    if (!token) {
+      throw new BadRequestException(ERROR.EVLVERIFYEMAIL);
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { emailVerifyToken: token },
+    });
+
+    if (!user || !user.emailVerifyExpiresAt || user.emailVerifyExpiresAt <= new Date()) {
+      throw new BadRequestException(ERROR.EVLVERIFYEMAIL);
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        isActive: true,
+        emailVerifyToken: null,
+        emailVerifyExpiresAt: null,
+      },
+    });
+
+    return;
+  }
+
+  async forgotPassword(body: ForgotPasswordDto) {
+    const email = body.email.trim().toLowerCase();
+    const user = await this.prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+      throw new NotFoundException(ERROR.NFUSER);
+    }
+
+    const passwordResetToken = randomUUID();
+    const passwordResetExpiresAt = new Date(Date.now() + PASSWORD_RESET_EXPIRES_IN_MS);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetToken,
+        passwordResetExpiresAt,
+      },
+    });
+
+    await this.mailService.sendResetPasswordEmail(
+      email,
+      this.buildResetPasswordUrl(passwordResetToken),
+    );
+
+    return { data: { success: true } };
+  }
+
+  async resetPassword(body: ResetPasswordDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { passwordResetToken: body.token },
+    });
+
+    if (!user || !user.passwordResetExpiresAt || user.passwordResetExpiresAt <= new Date()) {
+      throw new BadRequestException(ERROR.EVLRESETPASSWORD);
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          password: await bcrypt.hash(body.password, BCRYPT_SALT_ROUNDS),
+          passwordResetToken: null,
+          passwordResetExpiresAt: null,
+        },
+      }),
+      this.prisma.refreshToken.deleteMany({ where: { userId: user.id } }),
+    ]);
+
+    return { data: { success: true } };
+  }
+
+  async googleLogin(googleUser: GoogleUser) {
+    const email = googleUser.email.trim().toLowerCase();
+    let user = await this.prisma.user.findFirst({
+      where: {
+        OR: [{ googleId: googleUser.googleId }, { email }],
+      },
+    });
+
+    if (user && !user.googleId) {
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          googleId: googleUser.googleId,
+          isActive: true,
+          avatarUrl: googleUser.avatarUrl ?? user.avatarUrl,
+          displayName: user.displayName ?? googleUser.displayName,
+        },
+      });
+    }
+
+    if (!user) {
+      user = await this.prisma.user.create({
+        data: {
+          email,
+          displayName: googleUser.displayName,
+          avatarUrl: googleUser.avatarUrl,
+          googleId: googleUser.googleId,
+          password: null,
+          isActive: true,
+          emailVerifyToken: null,
+          emailVerifyExpiresAt: null,
+        },
+      });
+    }
+
+    const accessToken = await this.signAccessToken(user.id, user.email);
+    const { refreshToken, refreshTokenExpiresAt } = await this.createRefreshToken(
+      user.id,
+      user.email,
+    );
+
     return {
-      user,
+      accessToken,
+      refreshToken,
+      refreshTokenExpiresAt,
     };
+  }
+
+  async handleGoogleCallback(googleUser: GoogleUser): Promise<GoogleCallbackResult> {
+    try {
+      const { accessToken, refreshToken, refreshTokenExpiresAt } =
+        await this.googleLogin(googleUser);
+
+      return {
+        redirectUrl: this.buildFrontendUrl(
+          `/auth/oauth-success?access_token=${encodeURIComponent(accessToken)}`,
+        ),
+        refreshToken,
+        refreshTokenExpiresAt,
+      };
+    } catch (error) {
+      console.error('Error during Google OAuth callback:', error);
+      throw new InternalServerErrorException(ERROR.SVLOGIN);
+    }
   }
 
   async login(body: LoginDto) {
@@ -52,6 +221,10 @@ export class AuthService {
 
     if (!user?.password) {
       throw new UnauthorizedException(ERROR.EVLLOGIN);
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedException(ERROR.EVLACTIVE);
     }
 
     const isPasswordValid = await bcrypt.compare(body.password, user.password);
@@ -91,7 +264,7 @@ export class AuthService {
 
     try {
       await this.jwtService.verifyAsync(refreshToken, {
-        secret: process.env.REFRESH_TOKEN_SECRET ?? 'default',
+        secret: requireEnv('REFRESH_TOKEN_SECRET'),
       });
     } catch {
       await this.prisma.refreshToken.delete({ where: { token: refreshToken } });
@@ -136,7 +309,7 @@ export class AuthService {
     return this.jwtService.signAsync(
       { userId, email, jti: randomUUID() },
       {
-        secret: process.env.ACCESS_TOKEN_SECRET || 'default',
+        secret: requireEnv('ACCESS_TOKEN_SECRET'),
         expiresIn: ACCESS_TOKEN_EXPIRES_IN as any,
       },
     );
@@ -147,8 +320,8 @@ export class AuthService {
     const refreshToken = await this.jwtService.signAsync(
       { userId, email },
       {
-        secret: process.env.REFRESH_TOKEN_SECRET ?? 'default',
-        expiresIn: `${REFRESH_TOKEN_EXPIRES_IN_DAYS}d` as any,
+        secret: requireEnv('REFRESH_TOKEN_SECRET'),
+        expiresIn: REFRESH_TOKEN_EXPIRES_IN as any,
       },
     );
 
@@ -161,5 +334,20 @@ export class AuthService {
     });
 
     return { refreshToken, refreshTokenExpiresAt };
+  }
+
+  private buildVerifyEmailUrl(token: string): string {
+    const baseUrl = requireEnv('WEB_ORIGIN');
+    return `${baseUrl.replace(/\/$/, '')}/verify-email?token=${encodeURIComponent(token)}`;
+  }
+
+  private buildResetPasswordUrl(token: string): string {
+    const baseUrl = requireEnv('WEB_ORIGIN');
+    return `${baseUrl.replace(/\/$/, '')}/auth/forgot?token=${encodeURIComponent(token)}`;
+  }
+
+  private buildFrontendUrl(path: string): string {
+    const baseUrl = requireEnv('WEB_ORIGIN');
+    return `${baseUrl.replace(/\/$/, '')}${path}`;
   }
 }

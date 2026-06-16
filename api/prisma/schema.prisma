@@ -41,6 +41,12 @@ model User {
   avatarUrl   String?  @map("avatar_url")
   email       String   @unique
   password    String?
+  googleId    String?  @unique @map("google_id")
+  isActive    Boolean  @default(false) @map("is_active")
+  emailVerifyToken     String?   @unique @map("email_verify_token")
+  emailVerifyExpiresAt DateTime? @map("email_verify_expires_at")
+  passwordResetToken     String?   @unique @map("password_reset_token")
+  passwordResetExpiresAt DateTime? @map("password_reset_expires_at")
   createdBy   Int?     @map("created_by")
   updatedBy   Int?     @map("updated_by")
   createdAt   DateTime @default(now()) @map("created_at")

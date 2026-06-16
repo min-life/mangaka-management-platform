@@ -4,6 +4,7 @@ import { Strategy, ExtractJwt } from 'passport-jwt';
 import { JwtPayload } from '../interfaces/jwt-payload.interface';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ERROR } from '../../share/constants/message-error';
+import { requireEnv } from '../../share/helpers/env';
 
 // ChuongTV #005
 @Injectable()
@@ -12,7 +13,7 @@ export class AccessTokenStrategy extends PassportStrategy(Strategy, 'jwt') {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: process.env.ACCESS_TOKEN_SECRET || 'default',
+      secretOrKey: requireEnv('ACCESS_TOKEN_SECRET'),
       passReqToCallback: true,
     });
   }

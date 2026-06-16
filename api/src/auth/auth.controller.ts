@@ -1,16 +1,22 @@
-import { Body, Controller, Headers, HttpCode, Post, Res } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Post, Res, UseGuards } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import type { Response } from 'express';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
 import { AuthService } from './auth.service';
+import type { GoogleUser } from './interfaces';
 import { Cookie } from '../share/decorators/cookie.decorator';
-import { Public } from '../share/decorators';
+import { CurrentUser, Public } from '../share/decorators';
+import { requireEnv } from '../share/helpers/env';
 
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
   sameSite: 'none' as const,
-  secure: process.env.NODE_ENV === 'production',
+  secure: requireEnv('NODE_ENV') === 'production',
   path: '/api/auth',
 };
 
@@ -22,6 +28,51 @@ export class AuthController {
   @Post('register')
   register(@Body() body: RegisterDto) {
     return this.authService.register(body);
+  }
+
+  @Public()
+  @Post('verify-email')
+  verifyEmail(@Body() body: VerifyEmailDto) {
+    return this.authService.verifyEmail(body.token);
+  }
+
+  @Public()
+  @Post('forgot')
+  forgotPassword(@Body() body: ForgotPasswordDto) {
+    return this.authService.forgotPassword(body);
+  }
+
+  @Public()
+  @Post('reset')
+  resetPassword(@Body() body: ResetPasswordDto) {
+    return this.authService.resetPassword(body);
+  }
+
+  @Public()
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  googleAuth() {
+    return;
+  }
+
+  @Public()
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  async googleCallback(
+    @CurrentUser() googleUser: GoogleUser,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const { redirectUrl, refreshToken, refreshTokenExpiresAt } =
+      await this.authService.handleGoogleCallback(googleUser);
+
+    if (refreshToken && refreshTokenExpiresAt) {
+      response.cookie('refreshToken', refreshToken, {
+        ...REFRESH_COOKIE_OPTIONS,
+        expires: refreshTokenExpiresAt,
+      });
+    }
+
+    return response.redirect(redirectUrl);
   }
 
   @Public()

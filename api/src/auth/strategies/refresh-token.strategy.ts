@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-jwt';
 import { JwtPayload } from '../interfaces/jwt-payload.interface';
+import { requireEnv } from '../../share/helpers/env';
 
 // ChuongTV #005
 @Injectable()
@@ -12,7 +13,7 @@ export class RefreshTokenStrategy extends PassportStrategy(Strategy, 'jwt-refres
         return req.cookies?.['refreshToken'];
       },
       ignoreExpiration: false,
-      secretOrKey: process.env.REFRESH_TOKEN_SECRET || 'default',
+      secretOrKey: requireEnv('REFRESH_TOKEN_SECRET'),
     });
   }
 
