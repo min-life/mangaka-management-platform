@@ -1,88 +1,166 @@
-import { PrismaService } from '@/prisma/prisma.service';
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
+import { PrismaService } from '../prisma/prisma.service';
+
+const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS ?? 10);
 
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // ChuongTV #005
-  async getUserPermissions(userId: bigint, companyId?: bigint, projectId?: bigint) {
-    // get only permission name by userId, companyId and projectId auto select scope
-    const rows = await this.prisma.$queryRaw<{ name: string }[]>`
-        SELECT DISTINCT p.name
-        FROM users u
-            JOIN user_roles ur
-                ON ur.user_id = u.id
-            JOIN roles r
-                ON r.id = ur.role_id
-            JOIN role_permissions rp
-                ON rp.role_id = r.id
-            JOIN permissions p
-                ON p.id = rp.permission_id
-        WHERE u.id = ${userId}
-            ${companyId ? Prisma.sql`AND r.company_id = ${companyId}` : Prisma.sql`AND r.company_id is null`}
-            ${projectId ? Prisma.sql`AND r.project_id = ${projectId}` : Prisma.sql`AND r.project_id is null`}
-        `;
+  async findAll() {
+    const users = await this.prisma.user.findMany({ orderBy: { id: 'asc' } });
+    return { data: users.map(this.serializeUser) };
+  }
 
-    return rows.map((r) => r.name);
+  async findOne(userId: number) {
+    const user = await this.ensureUser(userId);
+    return { data: this.serializeUser(user) };
+  }
+
+  async getMe(userId: number) {
+    return this.findOne(userId);
+  }
+
+  async create(data: {
+    email: string;
+    password?: string;
+    displayName?: string;
+    avatarUrl?: string;
+    createdBy?: number;
+  }) {
+    const email = data.email.trim().toLowerCase();
+    const existingUser = await this.prisma.user.findUnique({ where: { email } });
+
+    if (existingUser) {
+      throw new ConflictException('Email already exists');
+    }
+
+    const user = await this.prisma.user.create({
+      data: {
+        email,
+        password: data.password
+          ? await bcrypt.hash(data.password, BCRYPT_SALT_ROUNDS)
+          : undefined,
+        displayName: data.displayName?.trim(),
+        avatarUrl: data.avatarUrl,
+        createdBy: data.createdBy,
+        updatedBy: data.createdBy,
+      },
+    });
+
+    return { data: this.serializeUser(user) };
+  }
+
+  async update(
+    userId: number,
+    data: {
+      email?: string;
+      password?: string;
+      displayName?: string;
+      avatarUrl?: string;
+      updatedBy?: number;
+    },
+  ) {
+    await this.ensureUser(userId);
+
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        email: data.email?.trim().toLowerCase(),
+        password: data.password
+          ? await bcrypt.hash(data.password, BCRYPT_SALT_ROUNDS)
+          : undefined,
+        displayName: data.displayName?.trim(),
+        avatarUrl: data.avatarUrl,
+        updatedBy: data.updatedBy,
+      },
+    });
+
+    return { data: this.serializeUser(user) };
   }
 
   async updateCurrentUserDisplayName(userId: number, displayName: string) {
-    const user = await this.prisma.user.findFirst({
-      where: {
-        id: BigInt(userId),
-        isDeleted: false,
-      },
+    const result = await this.update(userId, { displayName, updatedBy: userId });
+    return result.data;
+  }
+
+  async delete(userId: number) {
+    await this.ensureUser(userId);
+    await this.prisma.user.delete({ where: { id: userId } });
+    return { data: { success: true } };
+  }
+
+  async assignRole(userId: number, roleId: number) {
+    await this.ensureUser(userId);
+    await this.ensureRole(roleId);
+
+    await this.prisma.userRole.upsert({
+      where: { userId_roleId: { userId, roleId } },
+      update: {},
+      create: { userId, roleId },
     });
+
+    return { data: { success: true } };
+  }
+
+  async removeRole(userId: number, roleId: number) {
+    await this.prisma.userRole.deleteMany({ where: { userId, roleId } });
+    return { data: { success: true } };
+  }
+
+  async getUserPermissions(userId: number, projectId?: number) {
+    const userRoles = await this.prisma.userRole.findMany({
+      where: { userId },
+      include: { role: { include: { rolePermissions: { include: { permission: true } } } } },
+    });
+    const projectRoles = projectId
+      ? await this.prisma.userProject.findMany({
+          where: { userId, projectId },
+          include: { role: { include: { rolePermissions: { include: { permission: true } } } } },
+        })
+      : [];
+
+    return [...userRoles, ...projectRoles].flatMap((row) =>
+      row.role.rolePermissions.map((rolePermission) => rolePermission.permission.name),
+    );
+  }
+
+  private async ensureUser(userId: number) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
 
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    const updatedUser = await this.prisma.user.update({
-      where: {
-        id: user.id,
-      },
-      data: {
-        displayName: displayName.trim(),
-      },
-    });
-
-    return {
-      id: updatedUser.id.toString(),
-      email: updatedUser.email,
-      displayName: updatedUser.displayName,
-      avatarUrl: updatedUser.avatarUrl,
-    };
+    return user;
   }
 
-  async getAdminPermission(userId: bigint, companyId?: bigint, projectId?: bigint) {
-    let countCompany = 0;
-    if (companyId) {
-      countCompany = await this.prisma.company.count({
-        where: {
-          id: companyId,
-          createdBy: userId,
-        },
-      });
+  private async ensureRole(roleId: number) {
+    const role = await this.prisma.role.findUnique({ where: { id: roleId } });
+
+    if (!role) {
+      throw new NotFoundException('Role not found');
     }
-    let countProject = 0;
-    if (projectId) {
-      countProject = await this.prisma.project.count({
-        where: {
-          id: projectId,
-          createdBy: userId,
-        },
-      });
-    }
-    const adminPermission = [] as string[];
-    if (countCompany > 0) {
-      adminPermission.push('co.admin');
-    }
-    if (countProject > 0) {
-      adminPermission.push('prj.admin');
-    }
-    return adminPermission;
+
+    return role;
+  }
+
+  private serializeUser(user: {
+    id: number;
+    displayName: string | null;
+    avatarUrl: string | null;
+    email: string;
+    createdAt: Date;
+    updatedAt: Date;
+  }) {
+    return {
+      id: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      avatarUrl: user.avatarUrl,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
   }
 }

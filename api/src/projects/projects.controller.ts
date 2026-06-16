@@ -1,121 +1,65 @@
-import { Body, Controller, Delete, Get, Param, Put, Patch, Post, Query } from '@nestjs/common';
-import { PERMISSIONS } from '@/constants/permissions.constant';
-import { CurrentUser, Permissions } from '@auth/decorators';
-import type { JwtPayload } from '@auth/interfaces';
-import { ProjectsService } from '@projects/projects.service';
-import { ProjectDataRequestDto } from './dto';
-import { ROLE_PERMISSIONS } from '../constants/role-permissions';
-import { CreateRoleDto } from '../roles/dto/create-role.dto';
-import { UpdateRoleDto } from '../roles/dto/update-role.dto';
-import { RolesService } from '../roles/roles.service';
-import { PermissionsService } from '../permissions/permissions.service';
-import { parseBigIntParam } from '../utils';
-import { PermissionFilterDto } from '../permissions/dto/permission-filter.dto';
-import { SCOPE } from '@prisma/client';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put } from '@nestjs/common';
+import { CurrentUser } from '../share/decorators';
+import type { JwtPayload } from '../auth/interfaces';
+import { ProjectsService } from './projects.service';
 
 @Controller('projects')
 export class ProjectsController {
-  constructor(
-    private readonly projectsService: ProjectsService,
-    private readonly rolesService: RolesService,
-    private readonly permissionsService: PermissionsService,
-  ) {}
+  constructor(private readonly projectsService: ProjectsService) {}
 
-  // ChuongTV #007 start
-  @Get('/:projectId')
-  @Permissions({
-    mode: 'ALL',
-    permissions: [PERMISSIONS.READ_PROJECT],
-  })
-  async getProjectById(@Param('projectId') projectId: bigint) {
-    return await this.projectsService.getProjectById(projectId);
+  @Get()
+  async getProjects() {
+    return this.projectsService.getProjects();
   }
 
-  @Delete('/:projectId')
-  @Permissions({
-    mode: 'ALL',
-    permissions: [PERMISSIONS.DELETE_PROJECT],
-  })
-  async deleteProject(@Param('projectId') projectId: bigint) {
-    return await this.projectsService.deleteProject(projectId);
+  @Post()
+  async createProject(@CurrentUser() user: JwtPayload, @Body() body: any) {
+    return this.projectsService.createProject({ ...body, createdBy: user.userId });
   }
 
-  @Put('/:projectId')
-  @Permissions({
-    mode: 'ALL',
-    permissions: [PERMISSIONS.UPDATE_PROJECT],
-  })
+  @Get(':projectId')
+  async getProjectById(@Param('projectId') projectId: string) {
+    return this.projectsService.getProjectById(Number(projectId));
+  }
+
+  @Patch(':projectId')
   async updateProject(
     @CurrentUser() user: JwtPayload,
-    @Param('projectId') projectId: bigint,
-    @Body() updateProjectDto: ProjectDataRequestDto,
+    @Param('projectId') projectId: string,
+    @Body() body: any,
   ) {
-    return await this.projectsService.updateProject(projectId, {
-      name: updateProjectDto.name,
-      updatedBy: user?.userId,
+    return this.projectsService.updateProject(Number(projectId), {
+      ...body,
+      updatedBy: user.userId,
     });
   }
-  // ChuongTV #007 end
 
-  // DongNNP #002 start
-  @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.PROJECT_ROLE_READ] })
-  @Get(':projectId/roles')
-  findProjectRoles(@Param('projectId') projectId: string) {
-    return this.rolesService.findProjectRoles(parseBigIntParam(projectId, 'projectId'));
+  @Delete(':projectId')
+  async deleteProject(@Param('projectId') projectId: string) {
+    return this.projectsService.deleteProject(Number(projectId));
   }
 
-  @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.PROJECT_ROLE_READ] })
-  @Get(':projectId/roles/:roleId')
-  findProjectRoleDetail(@Param('projectId') projectId: string, @Param('roleId') roleId: string) {
-    parseBigIntParam(projectId, 'projectId');
-    return this.rolesService.findOne(parseBigIntParam(roleId, 'roleId'));
-  }
-
-  @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.PROJECT_ROLE_CREATE] })
-  @Post(':projectId/roles')
-  createProjectRole(
-    @CurrentUser() currentUser: JwtPayload,
+  @Put(':projectId/users/:userId/roles/:roleId')
+  assignUser(
+    @CurrentUser() user: JwtPayload,
     @Param('projectId') projectId: string,
-    @Body() dto: CreateRoleDto,
+    @Param('userId') userId: string,
+    @Param('roleId') roleId: string,
   ) {
-    return this.rolesService.createProjectRole(
-      BigInt(currentUser.userId),
-      parseBigIntParam(projectId, 'projectId'),
-      dto,
+    return this.projectsService.assignUser(
+      Number(projectId),
+      Number(userId),
+      Number(roleId),
+      user.userId,
     );
   }
 
-  @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.PROJECT_ROLE_UPDATE] })
-  @Patch(':projectId/roles/:roleId')
-  updateProjectRole(
+  @Delete(':projectId/users/:userId/roles/:roleId')
+  removeUser(
     @Param('projectId') projectId: string,
+    @Param('userId') userId: string,
     @Param('roleId') roleId: string,
-    @Body() dto: UpdateRoleDto,
   ) {
-    parseBigIntParam(projectId, 'projectId');
-    return this.rolesService.updateRole(parseBigIntParam(roleId, 'roleId'), dto);
+    return this.projectsService.removeUser(Number(projectId), Number(userId), Number(roleId));
   }
-
-  @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.PROJECT_ROLE_DELETE] })
-  @Delete(':projectId/roles/:roleId')
-  deleteProjectRole(@Param('projectId') projectId: string, @Param('roleId') roleId: string) {
-    parseBigIntParam(projectId, 'projectId');
-    return this.rolesService.deleteRole(parseBigIntParam(roleId, 'roleId'));
-  }
-  // DongNNP #002 end
-  // AnhNTT #003 start
-  @Permissions({ mode: 'ALL', permissions: [ROLE_PERMISSIONS.PROJECT_PERMISSION_READ] })
-  @Get(':projectId/permissions')
-  getProjectPermissions(
-    @Param('projectId') projectId: string,
-    @Query() query: PermissionFilterDto,
-  ) {
-    parseBigIntParam(projectId, 'projectId');
-
-    return this.permissionsService.findAll({
-      ...query,
-      scope: SCOPE.PRJ,
-    });
-  }
-  // AnhNTT #003 end
 }

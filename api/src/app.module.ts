@@ -4,14 +4,14 @@ import { JwtModule } from '@nestjs/jwt';
 import { PrismaModule } from './prisma/prisma.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { AuthModule } from '@auth/auth.module';
-import { AccessTokenStrategy, RefreshTokenStrategy } from '@auth/strategies';
-import { GlobalAuthGuard, PermissionGuard } from '@auth/guards';
-import { UsersModule } from '@users/users.module';
-import { RolesModule } from '@roles/roles.module';
-import { PermissionsModule } from '@permissions/permissions.module';
+import { AuthModule } from './auth/auth.module';
+import { AccessTokenStrategy, RefreshTokenStrategy } from './auth/strategies';
+import { GlobalAuthGuard, PermissionGuard } from './auth/guards';
+import { UsersModule } from './users/users.module';
+import { RolesModule } from './roles/roles.module';
+import { PermissionsModule } from './permissions/permissions.module';
 import { ProjectsModule } from './projects/projects.module';
-import { CompaniesModule } from './companies/companies.module';
+import { ResourcesModule } from './resources/resources.module';
 
 @Module({
   imports: [
@@ -23,8 +23,8 @@ import { CompaniesModule } from './companies/companies.module';
     UsersModule,
     RolesModule,
     PermissionsModule,
-    CompaniesModule,
     ProjectsModule,
+    ResourcesModule,
   ],
   controllers: [AppController],
   providers: [

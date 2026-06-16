@@ -1,5 +1,5 @@
 import { SetMetadata } from '@nestjs/common';
-import { PermissionMetadata } from '@auth/interfaces';
+import { PermissionMetadata } from '../../auth/interfaces';
 
 // ChuongTV #005 start
 export const PERMISSIONS_KEY = 'permissions';
