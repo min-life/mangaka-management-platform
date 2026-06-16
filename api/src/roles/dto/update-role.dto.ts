@@ -1,7 +1,18 @@
 import { SCOPE } from '@prisma/client';
-import { IsEnum, IsString, IsOptional, IsArray, ArrayUnique } from 'class-validator';
+import {
+  ArrayUnique,
+  IsArray,
+  IsBoolean,
+  IsEnum,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export class UpdateRoleDto {
+  @IsString()
+  @IsOptional()
+  code?: string;
+
   @IsString()
   @IsOptional()
   name?: string;
@@ -9,6 +20,10 @@ export class UpdateRoleDto {
   @IsEnum(SCOPE)
   @IsOptional()
   scope?: SCOPE;
+
+  @IsBoolean()
+  @IsOptional()
+  isDefault?: boolean;
 
   @IsArray()
   @ArrayUnique()

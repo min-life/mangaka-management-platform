@@ -1,20 +1,20 @@
 import { SCOPE } from '@prisma/client';
 
 export function serializeRole(role: {
-  id: bigint;
+  id: number;
+  code: string;
   name: string;
   scope: SCOPE;
-  companyId: bigint | null;
-  projectId: bigint | null;
+  isDefault: boolean;
   createdAt: Date;
   updatedAt: Date;
 }) {
   return {
-    id: role.id.toString(),
+    id: role.id,
+    code: role.code,
     name: role.name,
     scope: role.scope,
-    companyId: role.companyId?.toString() ?? null,
-    projectId: role.projectId?.toString() ?? null,
+    isDefault: role.isDefault,
     createdAt: role.createdAt,
     updatedAt: role.updatedAt,
   };

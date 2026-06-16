@@ -1,7 +1,7 @@
 import { ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { IS_PUBLIC_KEY } from '@auth/decorators';
-import { AccessTokenGuard } from '@auth/guards';
+import { IS_PUBLIC_KEY } from '../../share/decorators';
+import { AccessTokenGuard } from './access-token.guard';
 
 // ChuongTV #005
 @Injectable()

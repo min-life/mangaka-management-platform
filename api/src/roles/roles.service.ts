@@ -5,279 +5,118 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { SCOPE } from '@prisma/client';
-import { PrismaService } from '@/prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
-import { ROLE_MESSAGES } from './constants/role-messages';
-import { serializeRole } from './utils/role-serializer';
-import { parseBigIntParam } from '@/utils';
+import { serializeRole } from '../share/utils/role-serializer';
 
 @Injectable()
 export class RolesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // DongNNP #002 start
   async findRoles(scope?: SCOPE) {
     const roles = await this.prisma.role.findMany({
-      where: {
-        ...(scope ? { scope } : {}),
-      },
+      where: scope ? { scope } : undefined,
+      orderBy: { id: 'asc' },
     });
 
-    return {
-      data: roles.map((role) => serializeRole(role)),
-    };
+    return { data: roles.map(serializeRole) };
   }
 
-  async findCompanyRoles(companyId: bigint) {
-    const roles = await this.prisma.role.findMany({
-      where: {
-        scope: SCOPE.CO,
-        companyId,
-      },
-    });
-
-    return {
-      data: roles.map((role) => serializeRole(role)),
-    };
+  async findOne(roleId: number) {
+    const role = await this.ensureRole(roleId);
+    return { data: serializeRole(role) };
   }
 
-  async findProjectRoles(projectId: bigint) {
-    const roles = await this.prisma.role.findMany({
-      where: {
-        scope: SCOPE.PRJ,
-        projectId,
-      },
-    });
-
-    return {
-      data: roles.map((role) => serializeRole(role)),
-    };
-  }
-
-  async findOne(roleId: bigint) {
-    const role = await this.prisma.role.findFirst({
-      where: {
-        id: roleId,
-      },
-    });
-
-    if (!role) {
-      throw new NotFoundException(ROLE_MESSAGES.ROLE_NOT_FOUND);
-    }
-
-    return {
-      data: serializeRole(role),
-    };
-  }
-
-  async createRole(currentUserId: bigint, dto: CreateRoleDto) {
+  async createRole(currentUserId: number, dto: CreateRoleDto) {
     const role = await this.prisma.role.create({
       data: {
+        code: dto.code,
         name: dto.name,
-        scope: dto.scope,
+        scope: dto.scope ?? SCOPE.SYS,
+        isDefault: dto.isDefault ?? false,
         createdBy: currentUserId,
         updatedBy: currentUserId,
       },
     });
 
-    return {
-      data: serializeRole(role),
-    };
+    return { data: serializeRole(role) };
   }
 
-  async createCompanyRole(currentUserId: bigint, companyId: bigint, dto: CreateRoleDto) {
-    const role = await this.prisma.role.create({
-      data: {
-        name: dto.name,
-        scope: SCOPE.CO,
-        companyId,
-        projectId: null,
-        createdBy: currentUserId,
-        updatedBy: currentUserId,
-      },
-    });
+  async updateRole(roleId: number, dto: UpdateRoleDto) {
+    await this.ensureRole(roleId);
 
-    return {
-      data: serializeRole(role),
-    };
-  }
-
-  async createProjectRole(currentUserId: bigint, projectId: bigint, dto: CreateRoleDto) {
-    const role = await this.prisma.role.create({
-      data: {
-        name: dto.name,
-        scope: SCOPE.PRJ,
-        companyId: null,
-        projectId,
-        createdBy: currentUserId,
-        updatedBy: currentUserId,
-      },
-    });
-
-    return {
-      data: serializeRole(role),
-    };
-  }
-
-  async updateRole(roleId: bigint, dto: UpdateRoleDto) {
-    const role = await this.prisma.role.findUnique({
-      where: {
-        id: roleId,
-      },
-    });
-
-    if (!role) {
-      throw new NotFoundException(ROLE_MESSAGES.ROLE_NOT_FOUND);
-    }
-
-    const updatedRole = await this.prisma.role.update({
+    const role = await this.prisma.role.update({
       where: { id: roleId },
       data: {
+        code: dto.code,
         name: dto.name,
         scope: dto.scope,
+        isDefault: dto.isDefault,
       },
     });
 
     if (dto.permissionIds !== undefined) {
       await this.replacePermissions(
         roleId,
-        dto.permissionIds.map((id) => parseBigIntParam(id, 'permissionId')),
+        dto.permissionIds.map((id) => Number(id)),
       );
     }
 
-    return {
-      data: serializeRole(updatedRole),
-    };
+    return { data: serializeRole(role) };
   }
 
-  async deleteRole(roleId: bigint) {
-    const role = await this.prisma.role.findUnique({
-      where: {
-        id: roleId,
-      },
-    });
+  async deleteRole(roleId: number) {
+    await this.ensureRole(roleId);
 
-    if (!role) {
-      throw new NotFoundException(ROLE_MESSAGES.ROLE_NOT_FOUND);
+    const assignedCount = await this.prisma.userRole.count({ where: { roleId } });
+    const projectAssignedCount = await this.prisma.userProject.count({ where: { roleId } });
+
+    if (assignedCount > 0 || projectAssignedCount > 0) {
+      throw new ConflictException();
     }
 
-    const assignedCount = await this.prisma.userRole.count({
-      where: { roleId },
-    });
+    await this.prisma.role.delete({ where: { id: roleId } });
 
-    if (assignedCount > 0) {
-      throw new ConflictException(ROLE_MESSAGES.ASSIGNED_ROLE_DELETE_CONFLICT);
-    }
-
-    await this.prisma.role.delete({
-      where: { id: roleId },
-    });
-
-    return {
-      data: {
-        success: true,
-      },
-    };
+    return { data: { success: true } };
   }
-  //DongNNP #002 end
 
-  private async validateRoleAndPermissions(roleId: bigint, permissionIds: bigint[]): Promise<void> {
-    const role = await this.prisma.role.findUnique({
-      where: {
-        id: roleId,
-      },
-    });
-
-    if (!role) {
-      throw new BadRequestException('Invalid permissions');
-    }
+  async replacePermissions(roleId: number, permissionIds: number[]) {
+    const role = await this.ensureRole(roleId);
+    const uniquePermissionIds = [...new Set(permissionIds)];
 
     const permissions = await this.prisma.permission.findMany({
-      where: {
-        id: {
-          in: permissionIds,
-        },
-      },
+      where: { id: { in: uniquePermissionIds } },
     });
 
-    if (permissions.length !== permissionIds.length) {
+    if (permissions.length !== uniquePermissionIds.length) {
       throw new BadRequestException('Invalid permissions');
     }
 
-    const hasInvalidScope = permissions.some((permission) => permission.scope !== role.scope);
-
-    if (hasInvalidScope) {
+    if (permissions.some((permission) => permission.scope !== role.scope)) {
       throw new BadRequestException('Invalid permissions');
     }
-  }
-
-  async replacePermissions(roleId: bigint, permissionIds: bigint[]) {
-    await this.validateRoleAndPermissions(roleId, permissionIds);
 
     await this.prisma.$transaction([
-      this.prisma.rolePermission.deleteMany({
-        where: {
-          roleId,
-        },
-      }),
-
+      this.prisma.rolePermission.deleteMany({ where: { roleId } }),
       this.prisma.rolePermission.createMany({
-        data: permissionIds.map((permissionId) => ({
+        data: uniquePermissionIds.map((permissionId) => ({
           roleId,
           permissionId,
         })),
       }),
     ]);
 
-    return;
+    return { data: { success: true } };
   }
 
-  async clonePermissions(sourceRoleId: bigint, targetRoleId: bigint) {
-    const sourceRole = await this.prisma.role.findUnique({
-      where: {
-        id: sourceRoleId,
-      },
-    });
+  private async ensureRole(roleId: number) {
+    const role = await this.prisma.role.findUnique({ where: { id: roleId } });
 
-    if (!sourceRole) {
-      throw new NotFoundException('Source role not found');
+    if (!role) {
+      throw new NotFoundException();
     }
 
-    const targetRole = await this.prisma.role.findUnique({
-      where: {
-        id: targetRoleId,
-      },
-    });
-
-    if (!targetRole) {
-      throw new NotFoundException('Target role not found');
-    }
-
-    if (sourceRole.scope !== targetRole.scope) {
-      throw new BadRequestException('Invalid role scope');
-    }
-
-    const rolePermissions = await this.prisma.rolePermission.findMany({
-      where: {
-        roleId: sourceRoleId,
-      },
-    });
-
-    if (!rolePermissions.length) {
-      return {
-        message: 'Source role has no permissions',
-      };
-    }
-
-    await this.prisma.rolePermission.createMany({
-      data: rolePermissions.map((rolePermission) => ({
-        roleId: targetRoleId,
-        permissionId: rolePermission.permissionId,
-      })),
-      skipDuplicates: true,
-    });
-
-    return;
+    return role;
   }
 }

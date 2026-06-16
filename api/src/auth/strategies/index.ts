@@ -1,3 +1,2 @@
-export * from '@auth/strategies/access-token.strategy';
-export * from '@auth/strategies/refresh-token.strategy';
-export * from '@auth/strategies/google.strategy';
+export * from './access-token.strategy';
+export * from './refresh-token.strategy';
