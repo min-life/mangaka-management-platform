@@ -44,6 +44,7 @@ export class UsersService {
           : undefined,
         displayName: data.displayName?.trim(),
         avatarUrl: data.avatarUrl,
+        isActive: true,
         createdBy: data.createdBy,
         updatedBy: data.createdBy,
       },

@@ -11,7 +11,7 @@ import { UsersModule } from './users/users.module';
 import { RolesModule } from './roles/roles.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { ProjectsModule } from './projects/projects.module';
-import { ResourcesModule } from './resources/resources.module';
+// import { ResourcesModule } from './resources/resources.module';
 
 @Module({
   imports: [
@@ -24,7 +24,7 @@ import { ResourcesModule } from './resources/resources.module';
     RolesModule,
     PermissionsModule,
     ProjectsModule,
-    ResourcesModule,
+    // ResourcesModule,
   ],
   controllers: [AppController],
   providers: [

@@ -1,6 +1,9 @@
 export const ERROR = {
   CFLEMAIL: 'Email is exist.',
   EVLLOGIN: 'Invalid email or password.',
+  EVLACTIVE: 'Please verify your email before login.',
+  EVLVERIFYEMAIL: 'Invalid or expired verify email token.',
+  EVLRESETPASSWORD: 'Invalid or expired reset password token.',
   SVLOGIN: 'Server is not available to login.',
   SVLOGOUT: 'Server is not available to logout.',
   SVREGISTER: 'Server is not available to register.',
@@ -14,4 +17,5 @@ export const ERROR = {
   NFROLE: 'Role is not exist',
   NFPROJECT: 'Project is not exist',
   NFCOMPANY: 'Company is not exist',
+  NFUSER: 'User is not exist',
 };
