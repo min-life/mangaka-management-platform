@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-jwt';
 import { JwtPayload } from '../interfaces/jwt-payload.interface';
-import { requireEnv } from '../env';
+import { requireEnv } from '../../share/helpers/env';
 
 // ChuongTV #005
 @Injectable()

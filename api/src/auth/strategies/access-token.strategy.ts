@@ -4,7 +4,7 @@ import { Strategy, ExtractJwt } from 'passport-jwt';
 import { JwtPayload } from '../interfaces/jwt-payload.interface';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ERROR } from '../../share/constants/message-error';
-import { requireEnv } from '../env';
+import { requireEnv } from '../../share/helpers/env';
 
 // ChuongTV #005
 @Injectable()

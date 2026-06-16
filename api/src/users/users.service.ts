@@ -34,7 +34,7 @@ export class UsersService {
     const existingUser = await this.prisma.user.findUnique({ where: { email } });
 
     if (existingUser) {
-      throw new ConflictException(ERROR.CFLNAIL);
+      throw new ConflictException(ERROR.CFLEMAIL);
     }
 
     const user = await this.prisma.user.create({

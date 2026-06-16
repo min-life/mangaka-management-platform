@@ -11,7 +11,7 @@ import { AuthService } from './auth.service';
 import type { GoogleUser } from './interfaces';
 import { Cookie } from '../share/decorators/cookie.decorator';
 import { CurrentUser, Public } from '../share/decorators';
-import { requireEnv } from './env';
+import { requireEnv } from '../share/helpers/env';
 
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,

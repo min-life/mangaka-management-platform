@@ -16,7 +16,12 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
-import { requireDurationEnv, requireDurationStringEnv, requireEnv, requireNumberEnv } from './env';
+import {
+  requireDurationEnv,
+  requireDurationStringEnv,
+  requireEnv,
+  requireNumberEnv,
+} from '../share/helpers/env';
 import type { GoogleUser } from './interfaces';
 
 const ACCESS_TOKEN_EXPIRES_IN = requireDurationStringEnv('ACCESS_TOKEN_EXPIRES_IN');

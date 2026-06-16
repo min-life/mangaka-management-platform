@@ -18,5 +18,4 @@ export const ERROR = {
   NFPROJECT: 'Project is not exist',
   NFCOMPANY: 'Company is not exist',
   NFUSER: 'User is not exist',
-  CFLNAIL: 'Email is exist.',
 };

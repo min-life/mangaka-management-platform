@@ -1,6 +1,6 @@
 import { InternalServerErrorException } from '@nestjs/common';
 import ms from 'ms';
-import { ERROR } from '../share/constants/message-error';
+import { ERROR } from '../constants/message-error';
 
 export function requireEnv(key: string): string {
   const value = process.env[key];
