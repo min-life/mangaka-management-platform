@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
+import { ERROR } from '../share/constants/message-error';
 
 const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS ?? 10);
 
@@ -33,15 +34,13 @@ export class UsersService {
     const existingUser = await this.prisma.user.findUnique({ where: { email } });
 
     if (existingUser) {
-      throw new ConflictException('Email already exists');
+      throw new ConflictException(ERROR.CFLNAIL);
     }
 
     const user = await this.prisma.user.create({
       data: {
         email,
-        password: data.password
-          ? await bcrypt.hash(data.password, BCRYPT_SALT_ROUNDS)
-          : undefined,
+        password: data.password ? await bcrypt.hash(data.password, BCRYPT_SALT_ROUNDS) : undefined,
         displayName: data.displayName?.trim(),
         avatarUrl: data.avatarUrl,
         isActive: true,
@@ -69,9 +68,7 @@ export class UsersService {
       where: { id: userId },
       data: {
         email: data.email?.trim().toLowerCase(),
-        password: data.password
-          ? await bcrypt.hash(data.password, BCRYPT_SALT_ROUNDS)
-          : undefined,
+        password: data.password ? await bcrypt.hash(data.password, BCRYPT_SALT_ROUNDS) : undefined,
         displayName: data.displayName?.trim(),
         avatarUrl: data.avatarUrl,
         updatedBy: data.updatedBy,

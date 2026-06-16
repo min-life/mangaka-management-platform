@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -15,18 +16,21 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { requireDurationEnv, requireDurationStringEnv, requireEnv, requireNumberEnv } from './env';
 import type { GoogleUser } from './interfaces';
 
-const ACCESS_TOKEN_EXPIRES_IN = process.env.ACCESS_TOKEN_EXPIRES_IN ?? '15m';
-const REFRESH_TOKEN_EXPIRES_IN_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRES_IN_DAYS ?? 7);
-const REFRESH_TOKEN_EXPIRES_IN_MS = REFRESH_TOKEN_EXPIRES_IN_DAYS * 24 * 60 * 60 * 1000;
-const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS ?? 10);
-const EMAIL_VERIFY_EXPIRES_IN_HOURS = Number(process.env.EMAIL_VERIFY_EXPIRES_IN_HOURS ?? 24);
-const EMAIL_VERIFY_EXPIRES_IN_MS = EMAIL_VERIFY_EXPIRES_IN_HOURS * 60 * 60 * 1000;
-const PASSWORD_RESET_EXPIRES_IN_HOURS = Number(process.env.PASSWORD_RESET_EXPIRES_IN_HOURS ?? 24);
-const PASSWORD_RESET_EXPIRES_IN_MS = PASSWORD_RESET_EXPIRES_IN_HOURS * 60 * 60 * 1000;
+const ACCESS_TOKEN_EXPIRES_IN = requireDurationStringEnv('ACCESS_TOKEN_EXPIRES_IN');
+const REFRESH_TOKEN_EXPIRES_IN = requireDurationStringEnv('REFRESH_TOKEN_EXPIRES_IN');
+const REFRESH_TOKEN_EXPIRES_IN_MS = requireDurationEnv('REFRESH_TOKEN_EXPIRES_IN');
+const BCRYPT_SALT_ROUNDS = requireNumberEnv('BCRYPT_SALT_ROUNDS');
+const EMAIL_VERIFY_EXPIRES_IN_MS = requireDurationEnv('EMAIL_VERIFY_EXPIRES_IN');
+const PASSWORD_RESET_EXPIRES_IN_MS = requireDurationEnv('PASSWORD_RESET_EXPIRES_IN');
 
-export class OAuthEmailExistsError extends Error {}
+type GoogleCallbackResult = {
+  redirectUrl: string;
+  refreshToken?: string;
+  refreshTokenExpiresAt?: Date;
+};
 
 @Injectable()
 export class AuthService {
@@ -57,11 +61,6 @@ export class AuthService {
         emailVerifyToken,
         emailVerifyExpiresAt,
       },
-      select: {
-        id: true,
-        email: true,
-        displayName: true,
-      },
     });
 
     await this.mailService.sendVerifyEmail(email, this.buildVerifyEmailUrl(emailVerifyToken));
@@ -91,7 +90,7 @@ export class AuthService {
       },
     });
 
-    return { data: { success: true } };
+    return;
   }
 
   async forgotPassword(body: ForgotPasswordDto) {
@@ -100,10 +99,6 @@ export class AuthService {
 
     if (!user) {
       throw new NotFoundException(ERROR.NFUSER);
-    }
-
-    if (!user.isActive) {
-      throw new UnauthorizedException(ERROR.EVLACTIVE);
     }
 
     const passwordResetToken = randomUUID();
@@ -157,10 +152,6 @@ export class AuthService {
       },
     });
 
-    if (user?.password && !user.googleId) {
-      throw new OAuthEmailExistsError();
-    }
-
     if (user && !user.googleId) {
       user = await this.prisma.user.update({
         where: { id: user.id },
@@ -199,6 +190,24 @@ export class AuthService {
       refreshToken,
       refreshTokenExpiresAt,
     };
+  }
+
+  async handleGoogleCallback(googleUser: GoogleUser): Promise<GoogleCallbackResult> {
+    try {
+      const { accessToken, refreshToken, refreshTokenExpiresAt } =
+        await this.googleLogin(googleUser);
+
+      return {
+        redirectUrl: this.buildFrontendUrl(
+          `/auth/oauth-success?access_token=${encodeURIComponent(accessToken)}`,
+        ),
+        refreshToken,
+        refreshTokenExpiresAt,
+      };
+    } catch (error) {
+      console.error('Error during Google OAuth callback:', error);
+      throw new InternalServerErrorException(ERROR.SVLOGIN);
+    }
   }
 
   async login(body: LoginDto) {
@@ -250,7 +259,7 @@ export class AuthService {
 
     try {
       await this.jwtService.verifyAsync(refreshToken, {
-        secret: process.env.REFRESH_TOKEN_SECRET ?? 'default',
+        secret: requireEnv('REFRESH_TOKEN_SECRET'),
       });
     } catch {
       await this.prisma.refreshToken.delete({ where: { token: refreshToken } });
@@ -295,7 +304,7 @@ export class AuthService {
     return this.jwtService.signAsync(
       { userId, email, jti: randomUUID() },
       {
-        secret: process.env.ACCESS_TOKEN_SECRET || 'default',
+        secret: requireEnv('ACCESS_TOKEN_SECRET'),
         expiresIn: ACCESS_TOKEN_EXPIRES_IN as any,
       },
     );
@@ -306,8 +315,8 @@ export class AuthService {
     const refreshToken = await this.jwtService.signAsync(
       { userId, email },
       {
-        secret: process.env.REFRESH_TOKEN_SECRET ?? 'default',
-        expiresIn: `${REFRESH_TOKEN_EXPIRES_IN_DAYS}d` as any,
+        secret: requireEnv('REFRESH_TOKEN_SECRET'),
+        expiresIn: REFRESH_TOKEN_EXPIRES_IN as any,
       },
     );
 
@@ -323,13 +332,17 @@ export class AuthService {
   }
 
   private buildVerifyEmailUrl(token: string): string {
-    const baseUrl =
-      process.env.API_PUBLIC_URL ?? `http://localhost:${process.env.PORT ?? 3000}/api`;
-    return `${baseUrl.replace(/\/$/, '')}/auth/verify-email?token=${encodeURIComponent(token)}`;
+    const baseUrl = requireEnv('WEB_ORIGIN');
+    return `${baseUrl.replace(/\/$/, '')}/verify-email?token=${encodeURIComponent(token)}`;
   }
 
   private buildResetPasswordUrl(token: string): string {
-    const baseUrl = process.env.WEB_ORIGIN ?? 'http://localhost:3001';
+    const baseUrl = requireEnv('WEB_ORIGIN');
     return `${baseUrl.replace(/\/$/, '')}/auth/forgot?token=${encodeURIComponent(token)}`;
+  }
+
+  private buildFrontendUrl(path: string): string {
+    const baseUrl = requireEnv('WEB_ORIGIN');
+    return `${baseUrl.replace(/\/$/, '')}${path}`;
   }
 }
