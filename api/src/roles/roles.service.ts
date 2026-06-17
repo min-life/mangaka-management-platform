@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { serializeRole } from '../share/utils/role-serializer';
+import { ERROR } from '../share/constants/message-error';
 
 @Injectable()
 export class RolesService {
@@ -29,13 +30,11 @@ export class RolesService {
   }
 
   async createRole(currentUserId: number, dto: CreateRoleDto) {
-    const scope = dto.scope ?? SCOPE.SYS;
-
     try {
       const role = await this.prisma.$transaction(async (tx) => {
         if (dto.isDefault) {
           await tx.role.updateMany({
-            where: { scope, isDefault: true },
+            where: { scope: dto.scope, isDefault: true },
             data: { isDefault: false },
           });
         }
@@ -44,7 +43,7 @@ export class RolesService {
           data: {
             code: dto.code,
             name: dto.name,
-            scope,
+            scope: dto.scope,
             isDefault: dto.isDefault ?? false,
             createdBy: currentUserId,
             updatedBy: currentUserId,
@@ -109,7 +108,7 @@ export class RolesService {
     const projectAssignedCount = await this.prisma.userProject.count({ where: { roleId } });
 
     if (assignedCount > 0 || projectAssignedCount > 0) {
-      throw new ConflictException('Role is assigned to users or projects');
+      throw new ConflictException(ERROR.CFLROLEASSIGNED);
     }
 
     await this.prisma.role.delete({ where: { id: roleId } });
@@ -190,7 +189,7 @@ export class RolesService {
       Array.isArray(error.meta?.target) &&
       error.meta.target.includes('code')
     ) {
-      throw new ConflictException('Role code already exists');
+      throw new ConflictException(ERROR.CFROLECODE);
     }
   }
 }
