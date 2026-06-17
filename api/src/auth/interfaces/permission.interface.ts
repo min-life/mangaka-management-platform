@@ -1,18 +1,51 @@
 // ChuongTV #005 start
 export interface PermissionMetadata {
   mode: PermissionMode;
-  permissions: string[];
+  permissions: Permission[];
   resource?: Resource;
 }
 
 export type PermissionMode = 'ANY' | 'ALL';
-export type Resource =
-  | 'FOLDER'
-  | 'FILE'
-  | 'TASK'
-  | 'FRAME'
-  | 'COMMENT'
-  | 'ROLE'
-  | 'PROJECT'
-  | 'COMPANY';
+export type Resource = 'BOARD' | 'PROJECT' | 'FOLDER' | 'FILE' | 'MATERIAL' | 'TASK' | 'FRAME' | 'COMMENT';
+export type Permission =
+  | 'admin'
+  | 'user:read'
+  | 'user:update'
+  | 'user:delete'
+  | 'user:create'
+  | 'role:read'
+  | 'role:update'
+  | 'role:delete'
+  | 'role:create'
+  | 'permission:read'
+  | 'permission:update'
+  | 'board:owner'
+  | 'board:leader'
+  | 'board:member'
+  | 'project:owner'
+  | 'project:read'
+  | 'project:update'
+  | 'project:delete'
+  | 'project:member.read'
+  | 'project:member.update'
+  | 'project:member.add'
+  | 'project:member.remove'
+  | 'project:folder.create'
+  | 'project:folder.update'
+  | 'project:folder.delete'
+  | 'project:file.create'
+  | 'project:file.update'
+  | 'project:file.delete'
+  | 'project:material.create'
+  | 'project:material.update'
+  | 'project:material.delete'
+  | 'project:task.create'
+  | 'project:task.update'
+  | 'project:task.delete'
+  | 'project:frame.create'
+  | 'project:frame.update'
+  | 'project:frame.delete'
+  | 'project:comment.create'
+  | 'project:comment.update'
+  | 'project:comment.delete';
 // ChuongTV #005 end
