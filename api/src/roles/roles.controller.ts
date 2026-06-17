@@ -5,6 +5,7 @@ import { RolesService } from './roles.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { FindRolesQueryDto } from './dto/find-roles-query.dto';
+import { ReplaceRolePermissionsDto } from './dto/replace-role-permissions.dto';
 
 @Controller('roles')
 export class RolesController {
@@ -35,8 +36,13 @@ export class RolesController {
     return this.rolesService.deleteRole(Number(id));
   }
 
+  @Get(':id/permissions')
+  findPermissions(@Param('id') id: string) {
+    return this.rolesService.findPermissions(Number(id));
+  }
+
   @Put(':id/permissions')
-  replacePermissions(@Param('id') id: string, @Body('permissionIds') permissionIds: number[]) {
-    return this.rolesService.replacePermissions(Number(id), permissionIds ?? []);
+  replacePermissions(@Param('id') id: string, @Body() dto: ReplaceRolePermissionsDto) {
+    return this.rolesService.replacePermissions(Number(id), dto.permissionIds);
   }
 }

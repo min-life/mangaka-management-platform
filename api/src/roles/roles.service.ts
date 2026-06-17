@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { SCOPE } from '@prisma/client';
+import { Permission, Prisma, SCOPE } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
@@ -29,41 +29,77 @@ export class RolesService {
   }
 
   async createRole(currentUserId: number, dto: CreateRoleDto) {
-    const role = await this.prisma.role.create({
-      data: {
-        code: dto.code,
-        name: dto.name,
-        scope: dto.scope ?? SCOPE.SYS,
-        isDefault: dto.isDefault ?? false,
-        createdBy: currentUserId,
-        updatedBy: currentUserId,
-      },
-    });
+    const scope = dto.scope ?? SCOPE.SYS;
 
-    return { data: serializeRole(role) };
+    try {
+      const role = await this.prisma.$transaction(async (tx) => {
+        if (dto.isDefault) {
+          await tx.role.updateMany({
+            where: { scope, isDefault: true },
+            data: { isDefault: false },
+          });
+        }
+
+        return tx.role.create({
+          data: {
+            code: dto.code,
+            name: dto.name,
+            scope,
+            isDefault: dto.isDefault ?? false,
+            createdBy: currentUserId,
+            updatedBy: currentUserId,
+          },
+        });
+      });
+
+      return { data: serializeRole(role) };
+    } catch (error) {
+      this.handleUniqueCodeConflict(error);
+      throw error;
+    }
   }
 
   async updateRole(roleId: number, dto: UpdateRoleDto) {
-    await this.ensureRole(roleId);
+    const currentRole = await this.ensureRole(roleId);
+    const nextScope = dto.scope ?? currentRole.scope;
+    const nextIsDefault = dto.isDefault ?? currentRole.isDefault;
 
-    const role = await this.prisma.role.update({
-      where: { id: roleId },
-      data: {
-        code: dto.code,
-        name: dto.name,
-        scope: dto.scope,
-        isDefault: dto.isDefault,
-      },
-    });
+    try {
+      const role = await this.prisma.$transaction(async (tx) => {
+        if (nextIsDefault) {
+          await tx.role.updateMany({
+            where: {
+              id: { not: roleId },
+              scope: nextScope,
+              isDefault: true,
+            },
+            data: { isDefault: false },
+          });
+        }
 
-    if (dto.permissionIds !== undefined) {
-      await this.replacePermissions(
-        roleId,
-        dto.permissionIds.map((id) => Number(id)),
-      );
+        return tx.role.update({
+          where: { id: roleId },
+          data: {
+            code: dto.code,
+            name: dto.name,
+            scope: dto.scope,
+            isDefault: dto.isDefault,
+          },
+        });
+      });
+
+      if (dto.permissionIds !== undefined) {
+        await this.replacePermissions(
+          roleId,
+          dto.permissionIds.map((id) => Number(id)),
+        );
+      }
+
+      return { data: serializeRole(role) };
+    } catch (error) {
+      this.handleUniqueCodeConflict(error);
+      throw error;
     }
-
-    return { data: serializeRole(role) };
   }
 
   async deleteRole(roleId: number) {
@@ -73,12 +109,28 @@ export class RolesService {
     const projectAssignedCount = await this.prisma.userProject.count({ where: { roleId } });
 
     if (assignedCount > 0 || projectAssignedCount > 0) {
-      throw new ConflictException();
+      throw new ConflictException('Role is assigned to users or projects');
     }
 
     await this.prisma.role.delete({ where: { id: roleId } });
 
     return { data: { success: true } };
+  }
+
+  async findPermissions(roleId: number) {
+    await this.ensureRole(roleId);
+
+    const rolePermissions = await this.prisma.rolePermission.findMany({
+      where: { roleId },
+      include: { permission: true },
+      orderBy: { permissionId: 'asc' },
+    });
+
+    return {
+      data: rolePermissions.map((rolePermission) =>
+        this.serializePermission(rolePermission.permission),
+      ),
+    };
   }
 
   async replacePermissions(roleId: number, permissionIds: number[]) {
@@ -97,15 +149,18 @@ export class RolesService {
       throw new BadRequestException('Invalid permissions');
     }
 
-    await this.prisma.$transaction([
-      this.prisma.rolePermission.deleteMany({ where: { roleId } }),
-      this.prisma.rolePermission.createMany({
-        data: uniquePermissionIds.map((permissionId) => ({
-          roleId,
-          permissionId,
-        })),
-      }),
-    ]);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.rolePermission.deleteMany({ where: { roleId } });
+
+      if (uniquePermissionIds.length > 0) {
+        await tx.rolePermission.createMany({
+          data: uniquePermissionIds.map((permissionId) => ({
+            roleId,
+            permissionId,
+          })),
+        });
+      }
+    });
 
     return { data: { success: true } };
   }
@@ -118,5 +173,24 @@ export class RolesService {
     }
 
     return role;
+  }
+
+  private serializePermission(permission: Permission) {
+    return {
+      id: String(permission.id),
+      name: permission.name,
+      scope: permission.scope,
+    };
+  }
+
+  private handleUniqueCodeConflict(error: unknown) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002' &&
+      Array.isArray(error.meta?.target) &&
+      error.meta.target.includes('code')
+    ) {
+      throw new ConflictException('Role code already exists');
+    }
   }
 }
