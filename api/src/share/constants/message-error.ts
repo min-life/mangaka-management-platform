@@ -18,4 +18,6 @@ export const ERROR = {
   NFPROJECT: 'Project is not exist',
   NFCOMPANY: 'Company is not exist',
   NFUSER: 'User is not exist',
+  NFMATERIAL: 'Material is not exist',
+  SVPERMISSION: 'Server is not available to get user permissions.',
 };

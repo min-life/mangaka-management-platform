@@ -1,3 +1,4 @@
+import { UsersService } from './../../users/users.service';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy, ExtractJwt } from 'passport-jwt';
@@ -9,7 +10,10 @@ import { requireEnv } from '../../share/helpers/env';
 // ChuongTV #005
 @Injectable()
 export class AccessTokenStrategy extends PassportStrategy(Strategy, 'jwt') {
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly usersService: UsersService,
+  ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
@@ -28,6 +32,12 @@ export class AccessTokenStrategy extends PassportStrategy(Strategy, 'jwt') {
 
     if (count > 0) {
       throw new UnauthorizedException(ERROR.EXPTOKEN);
+    }
+
+    const user = await this.usersService.findOne(payload.userId);
+
+    if (!user) {
+      throw new UnauthorizedException(ERROR.NFUSER);
     }
 
     return payload;
