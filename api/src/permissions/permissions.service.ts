@@ -1,8 +1,9 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Permission, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PermissionResponseDto } from './dto/permission.dto';
 import { PermissionFilterDto } from './dto/permission-filter.dto';
+import { UpdatePermissionDto } from './dto/update-permission.dto';
 
 @Injectable()
 export class PermissionsService {
@@ -32,40 +33,18 @@ export class PermissionsService {
     return this.serializePermission(permission);
   }
 
-  async create(data: { name: string; scope?: any }) {
-    const existingPermission = await this.prisma.permission.findUnique({
-      where: { name: data.name },
-    });
-
-    if (existingPermission) {
-      throw new ConflictException('Permission already exists');
-    }
-
-    const permission = await this.prisma.permission.create({
-      data: {
-        name: data.name,
-        scope: data.scope,
-      },
-    });
-
-    return this.serializePermission(permission);
-  }
-
-  async update(id: number, data: { name?: string; scope?: any }) {
+  async update(id: number, data: UpdatePermissionDto): Promise<PermissionResponseDto> {
     await this.ensurePermission(id);
 
     const permission = await this.prisma.permission.update({
       where: { id },
-      data,
+      data: {
+        scope: data.scope,
+        description: data.description,
+      },
     });
 
     return this.serializePermission(permission);
-  }
-
-  async delete(id: number) {
-    await this.ensurePermission(id);
-    await this.prisma.permission.delete({ where: { id } });
-    return { data: { success: true } };
   }
 
   private async ensurePermission(id: number) {
@@ -83,6 +62,7 @@ export class PermissionsService {
       id: String(permission.id),
       name: permission.name,
       scope: permission.scope,
+      description: permission.description ?? undefined,
     };
   }
 }
