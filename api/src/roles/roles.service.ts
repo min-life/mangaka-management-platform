@@ -10,7 +10,6 @@ import { ERROR } from '../share/constants/message-error';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { serializeRole } from '../share/utils/role-serializer';
-import { ERROR } from '../share/constants/message-error';
 
 @Injectable()
 export class RolesService {
