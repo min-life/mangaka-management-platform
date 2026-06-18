@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Permission, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { ERROR } from '../share/constants/message-error';
 import { PermissionResponseDto } from './dto/permission.dto';
 import { PermissionFilterDto } from './dto/permission-filter.dto';
 import { UpdatePermissionDto } from './dto/update-permission.dto';
@@ -52,7 +51,7 @@ export class PermissionsService {
     const permission = await this.prisma.permission.findUnique({ where: { id } });
 
     if (!permission) {
-      throw new NotFoundException(ERROR.NFPERMISSION);
+      throw new NotFoundException('Permission not found');
     }
 
     return permission;
