@@ -1,5 +1,17 @@
 import axios from 'axios';
 
+import { clearAccessToken, getAccessToken, setAccessToken } from '@/lib/auth-storage';
+import { AUTH_LOGOUT_EVENT } from '@/types/auth';
+
+type RefreshResponse = {
+  accessToken?: string;
+  access_token?: string;
+  data?: {
+    accessToken?: string;
+    access_token?: string;
+  };
+};
+
 export const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api',
   timeout: 10000,
@@ -11,7 +23,7 @@ export const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+    const token = getAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -20,7 +32,7 @@ api.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-let refreshPromise: Promise<any> | null = null;
+let refreshPromise: Promise<string> | null = null;
 
 api.interceptors.response.use(
   (response) => response?.data,
@@ -31,23 +43,37 @@ api.interceptors.response.use(
       try {
         if (!refreshPromise) {
           refreshPromise = axios
-            .post(
+            .post<RefreshResponse>(
               `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api'}/auth/refresh`,
               {},
               { withCredentials: true },
             )
-            .then((res) => res.data.access_token)
+            .then((res) => {
+              const nextToken =
+                res.data.accessToken ??
+                res.data.access_token ??
+                res.data.data?.accessToken ??
+                res.data.data?.access_token;
+
+              if (!nextToken) {
+                throw new Error('Refresh response did not include an access token.');
+              }
+
+              return nextToken;
+            })
             .finally(() => {
               refreshPromise = null;
             });
         }
-        const access_token = await refreshPromise;
-        localStorage.setItem('access_token', access_token);
-        originalRequest.headers.Authorization = `Bearer ${access_token}`;
-        return axios(originalRequest);
+        const accessToken = await refreshPromise;
+        setAccessToken(accessToken);
+        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        return api(originalRequest);
       } catch (rfError) {
-        localStorage.removeItem('access_token');
-        window.location.href = '/login';
+        if (typeof window !== 'undefined') {
+          clearAccessToken();
+          window.dispatchEvent(new CustomEvent(AUTH_LOGOUT_EVENT));
+        }
         return Promise.reject(rfError);
       }
     }
