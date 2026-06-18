@@ -8,6 +8,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { SCOPE } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
 import { MailService } from '../mail/mail.service';
@@ -59,16 +60,26 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(body.password, BCRYPT_SALT_ROUNDS);
     const emailVerifyToken = randomUUID();
     const emailVerifyExpiresAt = new Date(Date.now() + EMAIL_VERIFY_EXPIRES_IN_MS);
+    const defaultRole = await this.getSysDefaultRoleOrThrow();
 
-    await this.prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        displayName: body.displayName.trim(),
-        isActive: false,
-        emailVerifyToken,
-        emailVerifyExpiresAt,
-      },
+    await this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          displayName: body.displayName.trim(),
+          isActive: false,
+          emailVerifyToken,
+          emailVerifyExpiresAt,
+        },
+      });
+
+      await tx.userRole.create({
+        data: {
+          userId: user.id,
+          roleId: defaultRole.id,
+        },
+      });
     });
 
     await this.mailService.sendVerifyEmail(email, this.buildVerifyEmailUrl(emailVerifyToken));
@@ -173,17 +184,30 @@ export class AuthService {
     }
 
     if (!user) {
-      user = await this.prisma.user.create({
-        data: {
-          email,
-          displayName: googleUser.displayName,
-          avatarUrl: googleUser.avatarUrl,
-          googleId: googleUser.googleId,
-          password: null,
-          isActive: true,
-          emailVerifyToken: null,
-          emailVerifyExpiresAt: null,
-        },
+      const defaultRole = await this.getSysDefaultRoleOrThrow();
+
+      user = await this.prisma.$transaction(async (tx) => {
+        const createdUser = await tx.user.create({
+          data: {
+            email,
+            displayName: googleUser.displayName,
+            avatarUrl: googleUser.avatarUrl,
+            googleId: googleUser.googleId,
+            password: null,
+            isActive: true,
+            emailVerifyToken: null,
+            emailVerifyExpiresAt: null,
+          },
+        });
+
+        await tx.userRole.create({
+          data: {
+            userId: createdUser.id,
+            roleId: defaultRole.id,
+          },
+        });
+
+        return createdUser;
       });
     }
 
@@ -337,6 +361,21 @@ export class AuthService {
     });
 
     return { refreshToken, refreshTokenExpiresAt };
+  }
+
+  private async getSysDefaultRoleOrThrow() {
+    const role = await this.prisma.role.findFirst({
+      where: {
+        scope: SCOPE.SYS,
+        isDefault: true,
+      },
+    });
+
+    if (!role) {
+      throw new InternalServerErrorException(ERROR.SVSYSDEFAULTROLE);
+    }
+
+    return role;
   }
 
   private buildVerifyEmailUrl(token: string): string {

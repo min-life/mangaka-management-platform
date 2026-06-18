@@ -208,9 +208,10 @@ model Project {
 }
 
 model Permission {
-  id    Int    @id @default(autoincrement())
-  name  String @unique
-  scope SCOPE  @default(SYS)
+  id          Int     @id @default(autoincrement())
+  name        String  @unique
+  scope       SCOPE   @default(SYS)
+  description String?
 
   // Relations with rolePermission model
   rolePermissions RolePermission[]
