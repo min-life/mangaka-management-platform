@@ -24,6 +24,7 @@ async function bootstrap() {
     .setTitle('Mangaka API')
     .setDescription('The mangaka API description')
     .setVersion('1.0')
+    .addBearerAuth()
     .build();
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, documentFactory);

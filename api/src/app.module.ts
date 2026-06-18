@@ -11,7 +11,7 @@ import { UsersModule } from './users/users.module';
 import { RolesModule } from './roles/roles.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { ProjectsModule } from './projects/projects.module';
-// import { ResourcesModule } from './resources/resources.module';
+import { EditorBoardsModule } from './editor-boards/editor-boards.module';
 
 @Module({
   imports: [
@@ -24,7 +24,7 @@ import { ProjectsModule } from './projects/projects.module';
     RolesModule,
     PermissionsModule,
     ProjectsModule,
-    // ResourcesModule,
+    EditorBoardsModule,
   ],
   controllers: [AppController],
   providers: [
