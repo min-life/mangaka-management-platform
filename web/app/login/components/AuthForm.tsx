@@ -2,11 +2,22 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { FormEvent, useState } from 'react';
+import { useState } from 'react';
 import { AxiosError } from 'axios';
-import { BookOpen, Loader2, MessageSquare } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 
-import api from '@/lib/api';
+import { setAccessToken } from '@/lib/auth-storage';
+import { validateLogin, type LoginErrors } from '@/lib/validators/auth';
+import { login } from '@/services/auth.service';
+import { AuthBrand } from '@/components/auth/AuthBrand';
+import {
+  authErrorClassName,
+  authInputClassName,
+  authLabelClassName,
+  authPanelClassName,
+  authPrimaryButtonClassName,
+} from '@/components/auth/auth-styles';
+import { SocialLogin } from '@/components/auth/SocialLogin';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -33,27 +44,6 @@ type AuthFormProps = {
   showSocialLogin?: boolean;
 };
 
-type LoginResponse = {
-  accessToken: string;
-  user: {
-    id: string;
-    email: string;
-    name: string | null;
-  };
-};
-
-type LoginErrors = Partial<{
-  email: string;
-  password: string;
-  form: string;
-}>;
-
-const inputClassName =
-  'h-12 rounded border-[#4c4546] bg-[#1b1b1b] px-4 text-sm text-[#e2e2e2] placeholder:text-[#988e90] focus-visible:border-blue-500 focus-visible:ring-blue-500/40';
-
-const labelClassName =
-  'text-xs font-semibold uppercase leading-4 tracking-[0.05em] text-[#cfc4c5]';
-
 export function AuthForm({
   title,
   description,
@@ -69,12 +59,9 @@ export function AuthForm({
   const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<LoginErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const apiBaseUrl = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api').replace(
-    /\/$/,
-    '',
-  );
   const oauthError =
     searchParams.get('error') === 'oauth_email_exists'
       ? 'This email is already registered. Please sign in with your email and password.'
@@ -83,22 +70,12 @@ export function AuthForm({
         : null;
 
   const validate = () => {
-    const nextErrors: LoginErrors = {};
-    const normalizedEmail = email.trim();
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-      nextErrors.email = 'Enter a valid email address.';
-    }
-
-    if (password.length < 6) {
-      nextErrors.password = 'Password must be at least 6 characters.';
-    }
-
+    const nextErrors = validateLogin(email, password);
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!validate()) {
@@ -109,12 +86,12 @@ export function AuthForm({
     setErrors({});
 
     try {
-      const response = await api.post<LoginResponse, LoginResponse>('/auth/login', {
+      const response = await login({
         email: email.trim().toLowerCase(),
         password,
       });
 
-      localStorage.setItem('access_token', response.accessToken);
+      setAccessToken(response.accessToken);
       router.push(submitHref);
     } catch (error) {
       const axiosError = error as AxiosError<{ message?: string }>;
@@ -132,50 +109,64 @@ export function AuthForm({
   };
 
   return (
-    <section className="relative z-10 flex w-full flex-col justify-center border-r border-[#4c4546] bg-[#131313] px-6 py-12 lg:w-[480px] lg:px-12">
-      <div className="mb-12">
-        <div className="mb-8 flex items-center gap-3">
-          <BookOpen className="size-8 text-[#c6c6c6]" />
-          <h1 className="text-xl font-bold text-[#e2e2e2]">MangaStudio</h1>
+    <section className={authPanelClassName}>
+      <div className="mb-10">
+        <div className="mb-8">
+          <AuthBrand />
         </div>
-        <h2 className="mb-2 text-2xl font-semibold leading-8 text-[#e2e2e2]">{title}</h2>
-        <p className="text-sm leading-5 text-[#cfc4c5]">{description}</p>
+        <h2 className="mb-2 text-2xl font-bold leading-8 text-[#eeeeee]">{title}</h2>
+        <p className="text-sm leading-5 text-[#EEEEEE]">{description}</p>
       </div>
 
-      <form className="space-y-6" onSubmit={handleSubmit}>
+      <form className="space-y-5" onSubmit={handleSubmit}>
         {fields.map((field) => (
           <div className="space-y-2" key={field.id}>
             <div className="flex justify-between gap-3">
-              <label className={labelClassName} htmlFor={field.id}>
+              <label className={authLabelClassName} htmlFor={field.id}>
                 {field.label}
               </label>
               {field.action ? (
                 <Link
-                  className="text-xs font-semibold leading-4 tracking-[0.05em] text-[#c6c6c6] hover:underline"
+                  className="text-xs font-bold leading-4 tracking-[0.05em] text-[#FFD369] hover:underline"
                   href={field.action.href}
                 >
                   {field.action.label}
                 </Link>
               ) : null}
             </div>
-            <Input
-              autoComplete={field.id === 'email' ? 'email' : 'current-password'}
-              className={inputClassName}
-              id={field.id}
-              name={field.id}
-              onChange={(event) => {
-                if (field.id === 'email') {
-                  setEmail(event.target.value);
-                }
-
-                if (field.id === 'password') {
-                  setPassword(event.target.value);
-                }
-              }}
-              placeholder={field.placeholder}
-              type={field.type}
-              value={field.id === 'email' ? email : field.id === 'password' ? password : undefined}
-            />
+            {field.id === 'password' ? (
+              <div className="relative">
+                <Input
+                  autoComplete="current-password"
+                  className={`${authInputClassName} pr-12`}
+                  id={field.id}
+                  name={field.id}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder={field.placeholder}
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                />
+                <button
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  className="absolute right-3 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-[4px] text-[#d8dee8] hover:bg-[#4A5260] hover:text-[#FFD369]"
+                  onClick={() => setShowPassword((current) => !current)}
+                  type="button"
+                >
+                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              </div>
+            ) : (
+              <Input
+                autoComplete="email"
+                className={authInputClassName}
+                id={field.id}
+                name={field.id}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder={field.placeholder}
+                type={field.type}
+                value={email}
+              />
+            )}
             {field.id === 'email' && errors.email ? (
               <p className="text-xs text-red-300">{errors.email}</p>
             ) : null}
@@ -186,13 +177,13 @@ export function AuthForm({
         ))}
 
         {errors.form || oauthError ? (
-          <div className="rounded border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm text-red-200">
+          <div className={authErrorClassName}>
             {errors.form ?? oauthError}
           </div>
         ) : null}
 
         <Button
-          className="h-14 w-full rounded bg-[#c6c6c6] text-xs font-bold uppercase tracking-[0.2em] text-[#303030] hover:bg-white disabled:cursor-not-allowed disabled:opacity-70"
+          className={authPrimaryButtonClassName}
           disabled={isSubmitting}
           type="submit"
         >
@@ -200,44 +191,13 @@ export function AuthForm({
           {submitLabel}
         </Button>
 
-        {showSocialLogin ? (
-          <>
-            <div className="relative flex items-center py-4">
-              <div className="h-px flex-1 bg-[#4c4546]" />
-              <span className="mx-4 text-xs font-semibold uppercase tracking-[0.05em] text-[#988e90]">
-                Or Continue With
-              </span>
-              <div className="h-px flex-1 bg-[#4c4546]" />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <Button
-                className="h-14 rounded border-[#4c4546] bg-transparent text-[#e2e2e2] hover:bg-[#1f1f1f]"
-                onClick={() => {
-                  window.location.href = `${apiBaseUrl}/auth/google`;
-                }}
-                type="button"
-                variant="outline"
-              >
-                <span className="size-4 rounded-full border border-[#4c4546] bg-[#c6c6c6]" />
-                Google
-              </Button>
-              <Button
-                className="h-14 rounded border-[#4c4546] bg-transparent text-[#e2e2e2] hover:bg-[#1f1f1f]"
-                variant="outline"
-              >
-                <MessageSquare className="size-4" />
-                Discord
-              </Button>
-            </div>
-          </>
-        ) : null}
+        {showSocialLogin ? <SocialLogin /> : null}
       </form>
 
-      <footer className="mt-12 text-center">
-        <p className="text-xs text-[#cfc4c5]">
+      <footer className="mt-10 text-center">
+        <p className="text-xs font-medium text-[#EEEEEE]">
           {footerText}{' '}
-          <Link className="font-bold text-[#c6c6c6] hover:underline" href={footerLinkHref}>
+          <Link className="font-black text-[#FFD369] hover:underline" href={footerLinkHref}>
             {footerLinkLabel}
           </Link>
         </p>
