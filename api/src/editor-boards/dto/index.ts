@@ -6,3 +6,4 @@ export * from './add-board-projects.req.dto';
 export * from './query-board-members.req.dto';
 export * from './query-board-projects.req.dto';
 export * from './query-board-applications.req.dto';
+export * from './editor-board.res.dto';

@@ -22,8 +22,15 @@ import { CurrentUser, Permissions } from '../share/decorators';
 import type { JwtPayload } from '../auth/interfaces';
 import {
   AddBoardMembersReqDto,
+  AddBoardProjectsResponseDto,
   AddBoardProjectsReqDto,
+  BoardApplicationsResponseDto,
+  BoardMemberResponseDto,
+  BoardMembersResponseDto,
+  BoardProjectsResponseDto,
   CreateBoardReqDto,
+  EditorBoardResponseDto,
+  EditorBoardsResponseDto,
   QueryBoardApplicationsReqDto,
   QueryBoardMembersReqDto,
   QueryBoardProjectsReqDto,
@@ -38,7 +45,10 @@ export class EditorBoardsController {
   constructor(private readonly editorBoardsService: EditorBoardsService) {}
 
   @ApiOperation({ summary: 'Create editor board' })
-  @ApiCreatedResponse({ description: 'Editor board created successfully' })
+  @ApiCreatedResponse({
+    description: 'Editor board created successfully',
+    type: EditorBoardResponseDto,
+  })
   @Post()
   async createEditorBoard(@CurrentUser() currentUser: JwtPayload, @Body() data: CreateBoardReqDto) {
     const board = await this.editorBoardsService.createEditorBoard({
@@ -51,7 +61,10 @@ export class EditorBoardsController {
   }
 
   @ApiOperation({ summary: 'Get editor boards' })
-  @ApiOkResponse({ description: 'Editor boards retrieved successfully' })
+  @ApiOkResponse({
+    description: 'Editor boards retrieved successfully',
+    type: EditorBoardsResponseDto,
+  })
   @Get()
   async getEditorBoards(@CurrentUser() currentUser: JwtPayload, @Query() query: QueryBoardsReqDto) {
     const filter = {
@@ -83,7 +96,10 @@ export class EditorBoardsController {
   })
   @ApiOperation({ summary: 'Get editor board details' })
   @ApiParam({ name: 'id', type: Number, description: 'Editor board id' })
-  @ApiOkResponse({ description: 'Editor board retrieved successfully' })
+  @ApiOkResponse({
+    description: 'Editor board retrieved successfully',
+    type: EditorBoardResponseDto,
+  })
   @Get(':id')
   async getBoardDetails(@Param('id', ParseIntPipe) id: number) {
     const board = await this.editorBoardsService.getBoardById(id);
@@ -112,7 +128,10 @@ export class EditorBoardsController {
   })
   @ApiOperation({ summary: 'Update editor board' })
   @ApiParam({ name: 'id', type: Number, description: 'Editor board id' })
-  @ApiOkResponse({ description: 'Editor board updated successfully' })
+  @ApiOkResponse({
+    description: 'Editor board updated successfully',
+    type: EditorBoardResponseDto,
+  })
   @Patch(':id')
   async updateBoard(
     @Param('id', ParseIntPipe) id: number,
@@ -151,7 +170,10 @@ export class EditorBoardsController {
   })
   @ApiOperation({ summary: 'Get editor board members' })
   @ApiParam({ name: 'id', type: Number, description: 'Editor board id' })
-  @ApiOkResponse({ description: 'Editor board members retrieved successfully' })
+  @ApiOkResponse({
+    description: 'Editor board members retrieved successfully',
+    type: BoardMembersResponseDto,
+  })
   @Get(':id/members')
   async getBoardMembers(
     @Param('id', ParseIntPipe) id: number,
@@ -177,7 +199,10 @@ export class EditorBoardsController {
   @ApiOperation({ summary: 'Get editor board member details' })
   @ApiParam({ name: 'id', type: Number, description: 'Editor board id' })
   @ApiParam({ name: 'userId', type: Number, description: 'User id' })
-  @ApiOkResponse({ description: 'Editor board member retrieved successfully' })
+  @ApiOkResponse({
+    description: 'Editor board member retrieved successfully',
+    type: BoardMemberResponseDto,
+  })
   @Get(':id/members/:userId')
   async getBoardMember(
     @Param('id', ParseIntPipe) id: number,
@@ -214,7 +239,10 @@ export class EditorBoardsController {
   @ApiOperation({ summary: 'Set editor board member as lead' })
   @ApiParam({ name: 'id', type: Number, description: 'Editor board id' })
   @ApiParam({ name: 'userId', type: Number, description: 'User id' })
-  @ApiOkResponse({ description: 'Editor board member updated successfully' })
+  @ApiOkResponse({
+    description: 'Editor board member updated successfully',
+    type: BoardMemberResponseDto,
+  })
   @Patch(':id/members/:userId/lead')
   async updateBoardMember(
     @Param('id', ParseIntPipe) id: number,
@@ -233,7 +261,10 @@ export class EditorBoardsController {
   })
   @ApiOperation({ summary: 'Get editor board projects' })
   @ApiParam({ name: 'id', type: Number, description: 'Editor board id' })
-  @ApiOkResponse({ description: 'Editor board projects retrieved successfully' })
+  @ApiOkResponse({
+    description: 'Editor board projects retrieved successfully',
+    type: BoardProjectsResponseDto,
+  })
   @Get(':id/projects')
   async getBoardProjects(
     @Param('id', ParseIntPipe) id: number,
@@ -258,7 +289,10 @@ export class EditorBoardsController {
   })
   @ApiOperation({ summary: 'Add projects to editor board' })
   @ApiParam({ name: 'id', type: Number, description: 'Editor board id' })
-  @ApiOkResponse({ description: 'Projects added successfully' })
+  @ApiOkResponse({
+    description: 'Projects added successfully',
+    type: AddBoardProjectsResponseDto,
+  })
   @Post(':id/projects')
   async addProjectsToBoard(
     @Param('id', ParseIntPipe) id: number,
@@ -277,7 +311,10 @@ export class EditorBoardsController {
   })
   @ApiOperation({ summary: 'Get editor board applications' })
   @ApiParam({ name: 'id', type: Number, description: 'Editor board id' })
-  @ApiOkResponse({ description: 'Editor board applications retrieved successfully' })
+  @ApiOkResponse({
+    description: 'Editor board applications retrieved successfully',
+    type: BoardApplicationsResponseDto,
+  })
   @Get(':id/applications')
   async getBoardApplications(
     @Param('id', ParseIntPipe) id: number,
