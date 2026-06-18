@@ -36,8 +36,6 @@ export class PermissionGuard implements CanActivate {
       Number(resourceId),
     );
 
-    console.log(userPermissions);
-
     if (permissionMetadata.mode === 'ANY') {
       return permissionMetadata.permissions.some((permission) =>
         userPermissions.includes(permission),

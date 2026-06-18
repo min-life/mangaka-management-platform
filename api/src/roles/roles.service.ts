@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { SCOPE } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { ERROR } from '../share/constants/message-error';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { serializeRole } from '../share/utils/role-serializer';
@@ -73,7 +74,7 @@ export class RolesService {
     const projectAssignedCount = await this.prisma.userProject.count({ where: { roleId } });
 
     if (assignedCount > 0 || projectAssignedCount > 0) {
-      throw new ConflictException();
+      throw new ConflictException(ERROR.EVLROLEASSIGNED);
     }
 
     await this.prisma.role.delete({ where: { id: roleId } });
@@ -90,11 +91,11 @@ export class RolesService {
     });
 
     if (permissions.length !== uniquePermissionIds.length) {
-      throw new BadRequestException('Invalid permissions');
+      throw new BadRequestException(ERROR.EVLPERMISSIONSCOPE);
     }
 
     if (permissions.some((permission) => permission.scope !== role.scope)) {
-      throw new BadRequestException('Invalid permissions');
+      throw new BadRequestException(ERROR.EVLPERMISSIONSCOPE);
     }
 
     await this.prisma.$transaction([
@@ -114,7 +115,7 @@ export class RolesService {
     const role = await this.prisma.role.findUnique({ where: { id: roleId } });
 
     if (!role) {
-      throw new NotFoundException();
+      throw new NotFoundException(ERROR.NFROLE);
     }
 
     return role;

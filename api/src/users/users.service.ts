@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
@@ -14,6 +15,8 @@ const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS ?? 10);
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll() {
@@ -150,11 +153,16 @@ export class UsersService {
         case 'COMMENT':
           permissions = permissions.concat(await this.getCommentPermission(userId, resourceId!));
           break;
+        case 'APPLICATION':
+          permissions = permissions.concat(
+            await this.getApplicationPermission(userId, resourceId!),
+          );
+          break;
       }
 
       return permissions;
     } catch (error) {
-      console.error('Error fetching user permissions:', error);
+      this.logger.error('Error fetching user permissions:', error);
       if (error instanceof NotFoundException || error instanceof ForbiddenException) {
         throw error;
       }
@@ -415,6 +423,45 @@ export class UsersService {
     return permissions;
   }
 
+  private async getApplicationPermission(
+    userId: number,
+    applicationId: number,
+  ): Promise<Permission[]> {
+    let permissions = [] as Permission[];
+    // lấy application từ applicationId
+    const application = await this.prisma.application.findUnique({
+      where: { id: applicationId },
+      select: { projectId: true },
+    });
+    if (!application) {
+      throw new NotFoundException(ERROR.NFAPPLICATION);
+    }
+
+    // kiểm tra user có phải thành viên của project không
+    // nếu không, báo lỗi 403
+    const isMember = await this.isProjectMember(userId, application.projectId);
+    if (!isMember) {
+      throw new ForbiddenException();
+    }
+
+    // nếu có, lấy permission dựa trên project permissions
+    permissions = permissions.concat(
+      await this.getProjectOwnerPermission(userId, application.projectId),
+    );
+    if (permissions.length === 0) {
+      permissions = permissions.concat(
+        await this.getProjectMemberPermission(userId, application.projectId),
+      );
+    }
+
+    // Thêm application permissions dựa trên role
+    if (permissions.includes('project:owner')) {
+      permissions.push('project:application.approve');
+    }
+
+    return permissions;
+  }
+
   private async isProjectMember(userId: number, projectId: number): Promise<boolean> {
     const userProject = await this.prisma.userProject.count({
       where: {
@@ -459,7 +506,7 @@ export class UsersService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException(ERROR.NFUSER);
     }
 
     return user;
@@ -469,7 +516,7 @@ export class UsersService {
     const role = await this.prisma.role.findUnique({ where: { id: roleId } });
 
     if (!role) {
-      throw new NotFoundException('Role not found');
+      throw new NotFoundException(ERROR.NFROLE);
     }
 
     return role;

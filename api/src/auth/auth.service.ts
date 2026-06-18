@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -39,6 +40,8 @@ type GoogleCallbackResult = {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
@@ -210,7 +213,7 @@ export class AuthService {
         refreshTokenExpiresAt,
       };
     } catch (error) {
-      console.error('Error during Google OAuth callback:', error);
+      this.logger.error('Error during Google OAuth callback:', error);
       throw new InternalServerErrorException(ERROR.SVLOGIN);
     }
   }

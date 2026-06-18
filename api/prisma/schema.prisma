@@ -27,7 +27,7 @@ enum APPLICATION_STATUS {
   PENDING
   APPROVE
   REJECT
-  CANCELD
+  CANCELED
 }
 
 enum APPLICATION_TYPE {
@@ -36,21 +36,21 @@ enum APPLICATION_TYPE {
 }
 
 model User {
-  id          Int      @id @default(autoincrement())
-  displayName String?  @map("display_name")
-  avatarUrl   String?  @map("avatar_url")
-  email       String   @unique
-  password    String?
-  googleId    String?  @unique @map("google_id")
-  isActive    Boolean  @default(false) @map("is_active")
-  emailVerifyToken     String?   @unique @map("email_verify_token")
-  emailVerifyExpiresAt DateTime? @map("email_verify_expires_at")
+  id                     Int       @id @default(autoincrement())
+  displayName            String?   @map("display_name")
+  avatarUrl              String?   @map("avatar_url")
+  email                  String    @unique
+  password               String?
+  googleId               String?   @unique @map("google_id")
+  isActive               Boolean   @default(false) @map("is_active")
+  emailVerifyToken       String?   @unique @map("email_verify_token")
+  emailVerifyExpiresAt   DateTime? @map("email_verify_expires_at")
   passwordResetToken     String?   @unique @map("password_reset_token")
   passwordResetExpiresAt DateTime? @map("password_reset_expires_at")
-  createdBy   Int?     @map("created_by")
-  updatedBy   Int?     @map("updated_by")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  createdBy              Int?      @map("created_by")
+  updatedBy              Int?      @map("updated_by")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @default(now()) @updatedAt @map("updated_at")
 
   // Relations with itself
   createdByUser User?  @relation("UserCreatedByUser", fields: [createdBy], references: [id])
@@ -69,8 +69,8 @@ model User {
   updatedProjects Project[] @relation("ProjectUpdatedByUser")
 
   // Relations with editorBoard model
-  createdEditorBoards EditorBoard[] @relation("EditorBoardCreatedByUser")
-  updatedEditorBoards EditorBoard[] @relation("EditorBoardUpdatedByUser")
+  createdEditorBoards EditorBoard[]     @relation("EditorBoardCreatedByUser")
+  updatedEditorBoards EditorBoard[]     @relation("EditorBoardUpdatedByUser")
   userEditorBoards    UserEditorBoard[]
 
   // Relations with folder model
@@ -114,7 +114,7 @@ model Role {
   code      String   @unique
   scope     SCOPE    @default(SYS)
   name      String
-  isDefault Boolean @default(false)
+  isDefault Boolean  @default(false)
   createdBy Int?     @map("created_by")
   updatedBy Int?     @map("updated_by")
   createdAt DateTime @default(now()) @map("created_at")
@@ -440,7 +440,7 @@ model Application {
   description String?
   materials   Json
   type        APPLICATION_TYPE
-  status      APPLICATION_STATUS  @default(PENDING)
+  status      APPLICATION_STATUS @default(PENDING)
   verifyBy    Int?               @map("verify_by")
   createdBy   Int?               @map("created_by")
   updatedBy   Int?               @map("updated_by")
