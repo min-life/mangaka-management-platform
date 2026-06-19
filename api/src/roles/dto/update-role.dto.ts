@@ -1,12 +1,5 @@
 import { SCOPE } from '@prisma/client';
-import {
-  ArrayUnique,
-  IsArray,
-  IsBoolean,
-  IsEnum,
-  IsOptional,
-  IsString,
-} from 'class-validator';
+import { ArrayUnique, IsArray, IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
 
 export class UpdateRoleDto {
   @IsString()
