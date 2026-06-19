@@ -8,7 +8,7 @@ import { Permissions, Public } from './share/decorators';
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
-  // @Public()
+  @Public()
   @Permissions({
     mode: 'ALL',
     permissions: ['board:leader'],
