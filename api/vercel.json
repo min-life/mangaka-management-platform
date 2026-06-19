@@ -6,6 +6,11 @@
       "use": "@vercel/node"
     }
   ],
+  "functions": {
+    "src/main.ts": {
+      "includeFiles": "node_modules/swagger-ui-dist/**/*"
+    }
+  },
   "routes": [
     {
       "src": "/(.*)",
