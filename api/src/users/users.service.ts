@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -13,7 +14,7 @@ import { Prisma, SCOPE } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
-import { requireEnv } from '../share/helpers/env';
+import { requireEnv, requireNumberEnv } from '../share/helpers/env';
 import { serializeRole } from '../share/utils/role-serializer';
 import { Resource, Permission, GoogleUser } from '../auth/interfaces';
 import { CreateStaffUserDto } from './dto/create-staff-user.dto';
@@ -21,7 +22,7 @@ import { UpdatePasswordDto } from './dto/update-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
-const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS ?? 10);
+const BCRYPT_SALT_ROUNDS = requireNumberEnv('BCRYPT_SALT_ROUNDS');
 
 @Injectable()
 export class UsersService {
@@ -33,28 +34,36 @@ export class UsersService {
   ) {}
 
   async findAll() {
-    const users = await this.prisma.user.findMany({ orderBy: { id: 'asc' } });
-    return { data: users.map(this.serializeUser) };
+    try {
+      const users = await this.prisma.user.findMany({ orderBy: { id: 'asc' } });
+      return { data: users.map(this.serializeUser) };
+    } catch (error) {
+      this.handleError(error, 'Get all users fail', ERROR.SVGETPROJECTMEMBERS);
+    }
   }
 
   async findOne(userId: number) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: { userRoles: { include: { role: true }, orderBy: { roleId: 'asc' } } },
-    });
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        include: { userRoles: { include: { role: true }, orderBy: { roleId: 'asc' } } },
+      });
 
-    if (!user) {
-      throw new NotFoundException(ERROR.NFUSER);
+      if (!user) {
+        throw new NotFoundException(ERROR.NFUSER);
+      }
+
+      return {
+        data: {
+          ...this.serializeUser(user),
+          isActive: user.isActive,
+          googleLinked: !!user.googleId,
+          roles: user.userRoles.map((userRole) => serializeRole(userRole.role)),
+        },
+      };
+    } catch (error) {
+      this.handleError(error, 'Get user fail', ERROR.SVGETPROJECTMEMBER);
     }
-
-    return {
-      data: {
-        ...this.serializeUser(user),
-        isActive: user.isActive,
-        googleLinked: !!user.googleId,
-        roles: user.userRoles.map((userRole) => serializeRole(userRole.role)),
-      },
-    };
   }
 
   async getMe(userId: number) {
@@ -62,44 +71,50 @@ export class UsersService {
   }
 
   async createStaffUser(currentUserId: number, dto: CreateStaffUserDto) {
-    const email = dto.email.trim().toLowerCase();
-    const existingUser = await this.prisma.user.findUnique({ where: { email } });
+    try {
+      const email = dto.email.trim().toLowerCase();
+      const existingUser = await this.prisma.user.findUnique({ where: { email } });
 
-    if (existingUser) {
-      throw new ConflictException(ERROR.CFLEMAIL);
+      if (existingUser) {
+        throw new ConflictException(ERROR.CFLEMAIL);
+      }
+
+      const roleIds = await this.validateSysRoles(dto.roleIds);
+      const password = dto.password
+        ? await bcrypt.hash(dto.password, BCRYPT_SALT_ROUNDS)
+        : undefined;
+
+      const user = await this.prisma.$transaction(async (tx) => {
+        const createdUser = await tx.user.create({
+          data: {
+            email,
+            password,
+            displayName: dto.displayName?.trim(),
+            avatarUrl: dto.avatarUrl,
+            isActive: true,
+            createdBy: currentUserId,
+            updatedBy: currentUserId,
+          },
+        });
+
+        await tx.userRole.createMany({
+          data: roleIds.map((roleId) => ({ userId: createdUser.id, roleId })),
+          skipDuplicates: true,
+        });
+
+        return createdUser;
+      });
+
+      return { data: this.serializeUser(user) };
+    } catch (error) {
+      this.handleError(error, 'Create staff user fail', ERROR.SVADDPROJECTMEMBER);
     }
-
-    const roleIds = await this.validateSysRoles(dto.roleIds);
-    const password = dto.password ? await bcrypt.hash(dto.password, BCRYPT_SALT_ROUNDS) : undefined;
-
-    const user = await this.prisma.$transaction(async (tx) => {
-      const createdUser = await tx.user.create({
-        data: {
-          email,
-          password,
-          displayName: dto.displayName?.trim(),
-          avatarUrl: dto.avatarUrl,
-          isActive: true,
-          createdBy: currentUserId,
-          updatedBy: currentUserId,
-        },
-      });
-
-      await tx.userRole.createMany({
-        data: roleIds.map((roleId) => ({ userId: createdUser.id, roleId })),
-        skipDuplicates: true,
-      });
-
-      return createdUser;
-    });
-
-    return { data: this.serializeUser(user) };
   }
 
   async update(userId: number, data: UpdateUserDto & { updatedBy?: number }) {
-    await this.ensureUser(userId);
-
     try {
+      await this.ensureUser(userId);
+
       const user = await this.prisma.user.update({
         where: { id: userId },
         data: {
@@ -117,171 +132,207 @@ export class UsersService {
       return { data: this.serializeUser(user) };
     } catch (error) {
       this.handleUserUniqueConflict(error);
-      throw error;
+      this.handleError(error, 'Update user fail', ERROR.SVUPDATEPROJECTMEMBER);
     }
   }
 
   async updateMe(userId: number, dto: UpdateProfileDto) {
-    const user = await this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        displayName: dto.displayName?.trim(),
-        avatarUrl: dto.avatarUrl,
-        updatedBy: userId,
-      },
-    });
+    try {
+      const user = await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          displayName: dto.displayName?.trim(),
+          avatarUrl: dto.avatarUrl,
+          updatedBy: userId,
+        },
+      });
 
-    return { data: this.serializeUser(user) };
+      return { data: this.serializeUser(user) };
+    } catch (error) {
+      this.handleError(error, 'Update profile fail', ERROR.SVUPDATEPROJECTMEMBER);
+    }
   }
 
   async updatePassword(userId: number, dto: UpdatePasswordDto) {
-    const user = await this.ensureUser(userId);
+    try {
+      const user = await this.ensureUser(userId);
 
-    if (!user.password) {
-      throw new UnauthorizedException(ERROR.EVLCURRENTPASSWORD);
+      if (!user.password) {
+        throw new UnauthorizedException(ERROR.EVLCURRENTPASSWORD);
+      }
+
+      const isCurrentPasswordValid = await bcrypt.compare(dto.currentPassword, user.password);
+      if (!isCurrentPasswordValid) {
+        throw new UnauthorizedException(ERROR.EVLCURRENTPASSWORD);
+      }
+
+      await this.prisma.$transaction([
+        this.prisma.user.update({
+          where: { id: userId },
+          data: {
+            password: await bcrypt.hash(dto.newPassword, BCRYPT_SALT_ROUNDS),
+            updatedBy: userId,
+          },
+        }),
+        this.prisma.refreshToken.deleteMany({ where: { userId } }),
+      ]);
+
+      return { data: { success: true } };
+    } catch (error) {
+      this.handleError(error, 'Update password fail', ERROR.SVUPDATEPROJECTMEMBER);
     }
-
-    const isCurrentPasswordValid = await bcrypt.compare(dto.currentPassword, user.password);
-    if (!isCurrentPasswordValid) {
-      throw new UnauthorizedException(ERROR.EVLCURRENTPASSWORD);
-    }
-
-    await this.prisma.$transaction([
-      this.prisma.user.update({
-        where: { id: userId },
-        data: {
-          password: await bcrypt.hash(dto.newPassword, BCRYPT_SALT_ROUNDS),
-          updatedBy: userId,
-        },
-      }),
-      this.prisma.refreshToken.deleteMany({ where: { userId } }),
-    ]);
-
-    return { data: { success: true } };
   }
 
   async delete(userId: number) {
-    await this.ensureUser(userId);
-    await this.prisma.user.delete({ where: { id: userId } });
-    return { data: { success: true } };
+    try {
+      await this.ensureUser(userId);
+      await this.prisma.user.delete({ where: { id: userId } });
+      return { data: { success: true } };
+    } catch (error) {
+      this.handleError(error, 'Delete user fail', ERROR.SVREMOVEPROJECTMEMBER);
+    }
   }
 
   async findRoles(userId: number) {
-    await this.ensureUser(userId);
+    try {
+      await this.ensureUser(userId);
 
-    const userRoles = await this.prisma.userRole.findMany({
-      where: { userId },
-      include: { role: true },
-      orderBy: { roleId: 'asc' },
-    });
+      const userRoles = await this.prisma.userRole.findMany({
+        where: { userId },
+        include: { role: true },
+        orderBy: { roleId: 'asc' },
+      });
 
-    return { data: userRoles.map((userRole) => serializeRole(userRole.role)) };
+      return { data: userRoles.map((userRole) => serializeRole(userRole.role)) };
+    } catch (error) {
+      this.handleError(error, 'Get user roles fail', ERROR.SVGETBOARDMEMBERS);
+    }
   }
 
   async appendRoles(userId: number, roleIds: number[]) {
-    await this.ensureUser(userId);
-    const validRoleIds = await this.validateSysRoles(roleIds);
+    try {
+      await this.ensureUser(userId);
+      const validRoleIds = await this.validateSysRoles(roleIds);
 
-    await this.prisma.userRole.createMany({
-      data: validRoleIds.map((roleId) => ({ userId, roleId })),
-      skipDuplicates: true,
-    });
+      await this.prisma.userRole.createMany({
+        data: validRoleIds.map((roleId) => ({ userId, roleId })),
+        skipDuplicates: true,
+      });
 
-    return { data: { success: true } };
+      return { data: { success: true } };
+    } catch (error) {
+      this.handleError(error, 'Append user roles fail', ERROR.SVADDBOARDMEMBER);
+    }
   }
 
   async replaceRoles(userId: number, roleIds: number[]) {
-    await this.ensureUser(userId);
-    const validRoleIds = await this.validateSysRoles(roleIds);
+    try {
+      await this.ensureUser(userId);
+      const validRoleIds = await this.validateSysRoles(roleIds);
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.userRole.deleteMany({ where: { userId } });
+      await this.prisma.$transaction(async (tx) => {
+        await tx.userRole.deleteMany({ where: { userId } });
 
-      if (validRoleIds.length > 0) {
-        await tx.userRole.createMany({
-          data: validRoleIds.map((roleId) => ({ userId, roleId })),
-          skipDuplicates: true,
-        });
-      }
-    });
+        if (validRoleIds.length > 0) {
+          await tx.userRole.createMany({
+            data: validRoleIds.map((roleId) => ({ userId, roleId })),
+            skipDuplicates: true,
+          });
+        }
+      });
 
-    return { data: { success: true } };
+      return { data: { success: true } };
+    } catch (error) {
+      this.handleError(error, 'Replace user roles fail', ERROR.SVUPDBOARDMEMBER);
+    }
   }
 
   async findProjects(userId: number) {
-    await this.ensureUser(userId);
+    try {
+      await this.ensureUser(userId);
 
-    const userProjects = await this.prisma.userProject.findMany({
-      where: { userId },
-      include: { project: true, role: true },
-      orderBy: [{ projectId: 'asc' }, { roleId: 'asc' }],
-    });
+      const userProjects = await this.prisma.userProject.findMany({
+        where: { userId },
+        include: { project: true, role: true },
+        orderBy: [{ projectId: 'asc' }, { roleId: 'asc' }],
+      });
 
-    return {
-      data: userProjects.map((userProject) => ({
-        ...userProject.project,
-        role: serializeRole(userProject.role),
-        assignedAt: userProject.createdAt,
-        updatedAt: userProject.updatedAt,
-      })),
-    };
+      return {
+        data: userProjects.map((userProject) => ({
+          ...userProject.project,
+          role: serializeRole(userProject.role),
+          assignedAt: userProject.createdAt,
+          updatedAt: userProject.updatedAt,
+        })),
+      };
+    } catch (error) {
+      this.handleError(error, 'Get user projects fail', ERROR.SVGETBOARDPROJECTS);
+    }
   }
 
   async findEditorBoards(userId: number) {
-    await this.ensureUser(userId);
+    try {
+      await this.ensureUser(userId);
 
-    const userEditorBoards = await this.prisma.userEditorBoard.findMany({
-      where: { userId },
-      include: { editorBoard: true },
-      orderBy: { editorBoardId: 'asc' },
-    });
+      const userEditorBoards = await this.prisma.userEditorBoard.findMany({
+        where: { userId },
+        include: { editorBoard: true },
+        orderBy: { editorBoardId: 'asc' },
+      });
 
-    return {
-      data: userEditorBoards.map((userEditorBoard) => ({
-        ...userEditorBoard.editorBoard,
-        isLead: userEditorBoard.isLead,
-      })),
-    };
+      return {
+        data: userEditorBoards.map((userEditorBoard) => ({
+          ...userEditorBoard.editorBoard,
+          isLead: userEditorBoard.isLead,
+        })),
+      };
+    } catch (error) {
+      this.handleError(error, 'Get user editor boards fail', ERROR.SVGETBOARDS);
+    }
   }
 
   async linkGoogleAccount(state: string | undefined, googleUser: GoogleUser) {
-    let userId: number;
     try {
-      userId = this.verifyGoogleLinkState(state);
-    } catch {
-      return this.buildFrontendUrl('/auth/oauth-error?reason=invalid_state');
+      let userId: number;
+      try {
+        userId = this.verifyGoogleLinkState(state);
+      } catch {
+        return this.buildFrontendUrl('/auth/oauth-error?reason=invalid_state');
+      }
+
+      if (!googleUser.email || !googleUser.googleId) {
+        return this.buildFrontendUrl('/auth/oauth-error?reason=invalid_google_account');
+      }
+
+      const linkedUser = await this.prisma.user.findUnique({
+        where: { googleId: googleUser.googleId },
+      });
+
+      if (linkedUser && linkedUser.id !== userId) {
+        return this.buildFrontendUrl('/auth/oauth-error?reason=google_account_already_linked');
+      }
+
+      const currentUser = await this.ensureUser(userId);
+      const googleEmail = googleUser.email.trim().toLowerCase();
+      if (currentUser.email.trim().toLowerCase() !== googleEmail) {
+        return this.buildFrontendUrl('/auth/oauth-error?reason=email_mismatch');
+      }
+
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          googleId: googleUser.googleId,
+          avatarUrl: googleUser.avatarUrl ?? currentUser.avatarUrl,
+          displayName: currentUser.displayName ?? googleUser.displayName,
+          isActive: true,
+          updatedBy: userId,
+        },
+      });
+
+      return this.buildFrontendUrl('/auth/oauth-success?linked=google');
+    } catch (error) {
+      this.handleError(error, 'Link Google account fail', ERROR.SVUPDATEBOARD);
     }
-
-    if (!googleUser.email || !googleUser.googleId) {
-      return this.buildFrontendUrl('/auth/oauth-error?reason=invalid_google_account');
-    }
-
-    const linkedUser = await this.prisma.user.findUnique({
-      where: { googleId: googleUser.googleId },
-    });
-
-    if (linkedUser && linkedUser.id !== userId) {
-      return this.buildFrontendUrl('/auth/oauth-error?reason=google_account_already_linked');
-    }
-
-    const currentUser = await this.ensureUser(userId);
-    const googleEmail = googleUser.email.trim().toLowerCase();
-    if (currentUser.email.trim().toLowerCase() !== googleEmail) {
-      return this.buildFrontendUrl('/auth/oauth-error?reason=email_mismatch');
-    }
-
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        googleId: googleUser.googleId,
-        avatarUrl: googleUser.avatarUrl ?? currentUser.avatarUrl,
-        displayName: currentUser.displayName ?? googleUser.displayName,
-        isActive: true,
-        updatedBy: userId,
-      },
-    });
-
-    return this.buildFrontendUrl('/auth/oauth-success?linked=google');
   }
 
   private async validateSysRoles(roleIds: number[]) {
@@ -291,7 +342,7 @@ export class UsersService {
     });
 
     if (roles.length !== uniqueRoleIds.length) {
-      throw new BadRequestException('Invalid roles');
+      throw new BadRequestException(ERROR.EVLSYSROLES);
     }
 
     return uniqueRoleIds;
@@ -299,7 +350,7 @@ export class UsersService {
 
   private verifyGoogleLinkState(state: string | undefined) {
     if (!state) {
-      throw new BadRequestException('Invalid Google link state');
+      throw new BadRequestException(ERROR.EVLGOOGLELINKSTATE);
     }
 
     try {
@@ -308,7 +359,7 @@ export class UsersService {
       });
 
       if (!payload.userId) {
-        throw new BadRequestException('Invalid Google link state');
+        throw new BadRequestException(ERROR.EVLGOOGLELINKSTATE);
       }
 
       return payload.userId;
@@ -316,7 +367,7 @@ export class UsersService {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new BadRequestException('Invalid Google link state');
+      throw new BadRequestException(ERROR.EVLGOOGLELINKSTATE);
     }
   }
 
@@ -391,8 +442,8 @@ export class UsersService {
 
   private async getBoardPermission(userId: number, editorBoardId: number): Promise<Permission[]> {
     let permissions = [] as Permission[];
-    // kiểm tra user có phải thành viên của board không
-    // nếu không, báo lỗi 403
+    // Check if user is a board member
+    // If not, throw 403 error
     const userEditorBoard = await this.prisma.userEditorBoard.findUnique({
       where: {
         userId_editorBoardId: {
@@ -406,7 +457,7 @@ export class UsersService {
       throw new ForbiddenException();
     }
 
-    // nếu có, lấy permission
+    // If yes, get permission
     const board = await this.prisma.editorBoard.findUnique({ where: { id: editorBoardId } });
 
     if (board?.createdBy === userId) {
@@ -424,14 +475,14 @@ export class UsersService {
 
   private async getProjectPermission(userId: number, projectId: number): Promise<Permission[]> {
     let permissions = [] as Permission[];
-    // kiểm tra user có phải thành viên của project không
-    // nếu không, báo lỗi 403
+    // Check if user is a project member
+    // If not, throw 403 error
     const isMember = await this.isProjectMember(userId, projectId);
     if (!isMember) {
       throw new ForbiddenException();
     }
 
-    // nếu có, lấy permission
+    // If yes, get permission
     permissions = permissions.concat(await this.getProjectOwnerPermission(userId, projectId));
     if (permissions.length === 0) {
       permissions = permissions.concat(await this.getProjectMemberPermission(userId, projectId));
@@ -441,20 +492,20 @@ export class UsersService {
 
   private async getFolderPermission(userId: number, folderId: number): Promise<Permission[]> {
     let permissions = [] as Permission[];
-    // lấy projectId từ folderId
+    // Get projectId from folderId
     const folder = await this.prisma.folder.findUnique({ where: { id: folderId } });
     if (!folder) {
       throw new NotFoundException(ERROR.NFFOLDER);
     }
 
-    // kiểm tra user có phải thành viên của project không
-    // nếu không, báo lỗi 403
+    // Check if user is a project member
+    // If not, throw 403 error
     const isMember = await this.isProjectMember(userId, folder.projectId);
     if (!isMember) {
       throw new ForbiddenException();
     }
 
-    // nếu có, lấy permission
+    // If yes, get permission
     permissions = permissions.concat(
       await this.getProjectOwnerPermission(userId, folder.projectId),
     );
@@ -469,7 +520,7 @@ export class UsersService {
 
   private async getFilePermission(userId: number, fileId: number): Promise<Permission[]> {
     let permissions = [] as Permission[];
-    // lấy projectId từ fileId
+    // Get projectId from fileId
     const file = await this.prisma.file.findUnique({
       where: { id: fileId },
       select: { folder: { select: { projectId: true } } },
@@ -478,14 +529,14 @@ export class UsersService {
       throw new NotFoundException(ERROR.NFFILE);
     }
 
-    // kiểm tra user có phải thành viên của project không
-    // nếu không, báo lỗi 403
+    // Check if user is a project member
+    // If not, throw 403 error
     const isMember = await this.isProjectMember(userId, file.folder.projectId);
     if (!isMember) {
       throw new ForbiddenException();
     }
 
-    // nếu có, lấy permission
+    // If yes, get permission
     permissions = permissions.concat(
       await this.getProjectOwnerPermission(userId, file.folder.projectId),
     );
@@ -500,7 +551,7 @@ export class UsersService {
 
   private async getMaterialPermission(userId: number, materialId: number): Promise<Permission[]> {
     let permissions = [] as Permission[];
-    // lấy projectId từ materialId
+    // Get projectId from materialId
     const material = await this.prisma.fileMaterial.findUnique({
       where: { id: materialId },
       select: { file: { select: { folder: { select: { projectId: true } } } } },
@@ -509,14 +560,14 @@ export class UsersService {
       throw new NotFoundException(ERROR.NFMATERIAL);
     }
 
-    // kiểm tra user có phải thành viên của project không
-    // nếu không, báo lỗi 403
+    // Check if user is a project member
+    // If not, throw 403 error
     const isMember = await this.isProjectMember(userId, material.file.folder.projectId);
     if (!isMember) {
       throw new ForbiddenException();
     }
 
-    // nếu có, lấy permission
+    // If yes, get permission
     permissions = permissions.concat(
       await this.getProjectOwnerPermission(userId, material.file.folder.projectId),
     );
@@ -532,7 +583,7 @@ export class UsersService {
 
   private async getTaskPermission(userId: number, taskId: number): Promise<Permission[]> {
     let permissions = [] as Permission[];
-    // lấy projectId từ taskId
+    // Get projectId from taskId
     const task = await this.prisma.task.findUnique({
       where: { id: taskId },
       select: { file: { select: { folder: { select: { projectId: true } } } } },
@@ -541,14 +592,14 @@ export class UsersService {
       throw new NotFoundException(ERROR.NFTASK);
     }
 
-    // kiểm tra user có phải thành viên của project không
-    // nếu không, báo lỗi 403
+    // Check if user is a project member
+    // If not, throw 403 error
     const isMember = await this.isProjectMember(userId, task.file.folder.projectId);
     if (!isMember) {
       throw new ForbiddenException();
     }
 
-    // nếu có, lấy permission
+    // If yes, get permission
     permissions = permissions.concat(
       await this.getProjectOwnerPermission(userId, task.file.folder.projectId),
     );
@@ -563,7 +614,7 @@ export class UsersService {
 
   private async getFramePermission(userId: number, frameId: number): Promise<Permission[]> {
     let permissions = [] as Permission[];
-    // lấy projectId từ frameId
+    // Get projectId from frameId
     const frame = await this.prisma.taskCommentFrame.findUnique({
       where: { id: frameId },
       select: {
@@ -574,14 +625,14 @@ export class UsersService {
       throw new NotFoundException(ERROR.NFFRAME);
     }
 
-    // kiểm tra user có phải thành viên của project không
-    // nếu không, báo lỗi 403
+    // Check if user is a project member
+    // If not, throw 403 error
     const isMember = await this.isProjectMember(userId, frame.task.file.folder.projectId);
     if (!isMember) {
       throw new ForbiddenException();
     }
 
-    // nếu có, lấy permission
+    // If yes, get permission
     permissions = permissions.concat(
       await this.getProjectOwnerPermission(userId, frame.task.file.folder.projectId),
     );
@@ -596,7 +647,7 @@ export class UsersService {
 
   private async getCommentPermission(userId: number, commentId: number): Promise<Permission[]> {
     let permissions = [] as Permission[];
-    // lấy projectId từ commentId
+    // Get projectId from commentId
     const comment = await this.prisma.taskComment.findUnique({
       where: { id: commentId },
       select: {
@@ -611,14 +662,14 @@ export class UsersService {
       throw new NotFoundException(ERROR.NFCOMMENT);
     }
 
-    // kiểm tra user có phải thành viên của project không
-    // nếu không, báo lỗi 403
+    // Check if user is a project member
+    // If not, throw 403 error
     const isMember = await this.isProjectMember(userId, comment.frame.task.file.folder.projectId);
     if (!isMember) {
       throw new ForbiddenException();
     }
 
-    // nếu có, lấy permission
+    // If yes, get permission
     permissions = permissions.concat(
       await this.getProjectOwnerPermission(userId, comment.frame.task.file.folder.projectId),
     );
@@ -636,7 +687,7 @@ export class UsersService {
     applicationId: number,
   ): Promise<Permission[]> {
     let permissions = [] as Permission[];
-    // lấy application từ applicationId
+    // Get application from applicationId
     const application = await this.prisma.application.findUnique({
       where: { id: applicationId },
       select: { projectId: true },
@@ -645,14 +696,14 @@ export class UsersService {
       throw new NotFoundException(ERROR.NFAPPLICATION);
     }
 
-    // kiểm tra user có phải thành viên của project không
-    // nếu không, báo lỗi 403
+    // Check if user is a project member
+    // If not, throw 403 error
     const isMember = await this.isProjectMember(userId, application.projectId);
     if (!isMember) {
       throw new ForbiddenException();
     }
 
-    // nếu có, lấy permission dựa trên project permissions
+    // If yes, get permission based on project permissions
     permissions = permissions.concat(
       await this.getProjectOwnerPermission(userId, application.projectId),
     );
@@ -662,7 +713,7 @@ export class UsersService {
       );
     }
 
-    // Thêm application permissions dựa trên role
+    // Add application permissions based on role
     if (permissions.includes('project:owner')) {
       permissions.push('project:application.approve');
     }
@@ -696,9 +747,9 @@ export class UsersService {
     userId: number,
     projectId: number,
   ): Promise<Permission[]> {
-    // tìm role user trong project
-    // join role_permission để lấy permission của role đó
-    // select permission.name
+    // Find user role in project
+    // Join role_permission to get permissions of that role
+    // Select permission.name
     const permissions = await this.prisma.$queryRaw<[{ name: Permission }]>`
       SELECT DISTINCT p.name
       FROM user_projects up
@@ -741,7 +792,7 @@ export class UsersService {
       }
 
       if (error.meta.target.includes('google_id')) {
-        throw new ConflictException('Google account is already linked.');
+        throw new ConflictException(ERROR.CFLGOOGLEACCOUNT);
       }
     }
   }
@@ -762,5 +813,13 @@ export class UsersService {
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
+  }
+
+  private handleError(error: unknown, logMessage: string, clientMessage: string): never {
+    this.logger.error(logMessage, error instanceof Error ? error.stack : String(error));
+    if (error instanceof HttpException) {
+      throw error;
+    }
+    throw new InternalServerErrorException(clientMessage);
   }
 }

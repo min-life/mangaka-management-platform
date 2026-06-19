@@ -102,4 +102,7 @@ export const ERROR = {
   NFPROJECTSTAT: 'Project stat is not exist',
   SVGETPROJECTSTATSBYPROJECT: 'Server is not available to get project stats.',
   SVIMPORTPROJECTSTATS: 'Server is not available to import project stats.',
+  EVLSYSROLES: 'Invalid system roles',
+  EVLGOOGLELINKSTATE: 'Invalid Google link state',
+  CFLGOOGLEACCOUNT: 'Google account is already linked',
 };

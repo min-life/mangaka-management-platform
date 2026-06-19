@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -50,178 +51,198 @@ export class AuthService {
   ) {}
 
   async register(body: RegisterDto) {
-    const email = body.email.trim().toLowerCase();
-    const existingUser = await this.prisma.user.findUnique({ where: { email } });
+    try {
+      const email = body.email.trim().toLowerCase();
+      const existingUser = await this.prisma.user.findUnique({ where: { email } });
 
-    if (existingUser) {
-      throw new ConflictException(ERROR.CFLEMAIL);
-    }
+      if (existingUser) {
+        throw new ConflictException(ERROR.CFLEMAIL);
+      }
 
-    const hashedPassword = await bcrypt.hash(body.password, BCRYPT_SALT_ROUNDS);
-    const emailVerifyToken = randomUUID();
-    const emailVerifyExpiresAt = new Date(Date.now() + EMAIL_VERIFY_EXPIRES_IN_MS);
-    const defaultRole = await this.getSysDefaultRoleOrThrow();
-
-    await this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          email,
-          password: hashedPassword,
-          displayName: body.displayName.trim(),
-          isActive: false,
-          emailVerifyToken,
-          emailVerifyExpiresAt,
-        },
-      });
-
-      await tx.userRole.create({
-        data: {
-          userId: user.id,
-          roleId: defaultRole.id,
-        },
-      });
-    });
-
-    await this.mailService.sendVerifyEmail(email, this.buildVerifyEmailUrl(emailVerifyToken));
-
-    return;
-  }
-
-  async verifyEmail(token?: string) {
-    if (!token) {
-      throw new BadRequestException(ERROR.EVLVERIFYEMAIL);
-    }
-
-    const user = await this.prisma.user.findUnique({
-      where: { emailVerifyToken: token },
-    });
-
-    if (!user || !user.emailVerifyExpiresAt || user.emailVerifyExpiresAt <= new Date()) {
-      throw new BadRequestException(ERROR.EVLVERIFYEMAIL);
-    }
-
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        isActive: true,
-        emailVerifyToken: null,
-        emailVerifyExpiresAt: null,
-      },
-    });
-
-    return;
-  }
-
-  async forgotPassword(body: ForgotPasswordDto) {
-    const email = body.email.trim().toLowerCase();
-    const user = await this.prisma.user.findUnique({ where: { email } });
-
-    if (!user) {
-      throw new NotFoundException(ERROR.NFUSER);
-    }
-
-    const passwordResetToken = randomUUID();
-    const passwordResetExpiresAt = new Date(Date.now() + PASSWORD_RESET_EXPIRES_IN_MS);
-
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        passwordResetToken,
-        passwordResetExpiresAt,
-      },
-    });
-
-    await this.mailService.sendResetPasswordEmail(
-      email,
-      this.buildResetPasswordUrl(passwordResetToken),
-    );
-
-    return { data: { success: true } };
-  }
-
-  async resetPassword(body: ResetPasswordDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { passwordResetToken: body.token },
-    });
-
-    if (!user || !user.passwordResetExpiresAt || user.passwordResetExpiresAt <= new Date()) {
-      throw new BadRequestException(ERROR.EVLRESETPASSWORD);
-    }
-
-    await this.prisma.$transaction([
-      this.prisma.user.update({
-        where: { id: user.id },
-        data: {
-          password: await bcrypt.hash(body.password, BCRYPT_SALT_ROUNDS),
-          passwordResetToken: null,
-          passwordResetExpiresAt: null,
-        },
-      }),
-      this.prisma.refreshToken.deleteMany({ where: { userId: user.id } }),
-    ]);
-
-    return { data: { success: true } };
-  }
-
-  async googleLogin(googleUser: GoogleUser) {
-    const email = googleUser.email.trim().toLowerCase();
-    let user = await this.prisma.user.findFirst({
-      where: {
-        OR: [{ googleId: googleUser.googleId }, { email }],
-      },
-    });
-
-    if (user && !user.googleId) {
-      user = await this.prisma.user.update({
-        where: { id: user.id },
-        data: {
-          googleId: googleUser.googleId,
-          isActive: true,
-          avatarUrl: googleUser.avatarUrl ?? user.avatarUrl,
-          displayName: user.displayName ?? googleUser.displayName,
-        },
-      });
-    }
-
-    if (!user) {
+      const hashedPassword = await bcrypt.hash(body.password, BCRYPT_SALT_ROUNDS);
+      const emailVerifyToken = randomUUID();
+      const emailVerifyExpiresAt = new Date(Date.now() + EMAIL_VERIFY_EXPIRES_IN_MS);
       const defaultRole = await this.getSysDefaultRoleOrThrow();
 
-      user = await this.prisma.$transaction(async (tx) => {
-        const createdUser = await tx.user.create({
+      await this.prisma.$transaction(async (tx) => {
+        const user = await tx.user.create({
           data: {
             email,
-            displayName: googleUser.displayName,
-            avatarUrl: googleUser.avatarUrl,
-            googleId: googleUser.googleId,
-            password: null,
-            isActive: true,
-            emailVerifyToken: null,
-            emailVerifyExpiresAt: null,
+            password: hashedPassword,
+            displayName: body.displayName.trim(),
+            isActive: false,
+            emailVerifyToken,
+            emailVerifyExpiresAt,
           },
         });
 
         await tx.userRole.create({
           data: {
-            userId: createdUser.id,
+            userId: user.id,
             roleId: defaultRole.id,
           },
         });
-
-        return createdUser;
       });
+
+      await this.mailService.sendVerifyEmail(email, this.buildVerifyEmailUrl(emailVerifyToken));
+
+      return;
+    } catch (error) {
+      this.handleError(error, 'Register fail', ERROR.SVREGISTER);
     }
+  }
 
-    const accessToken = await this.signAccessToken(user.id, user.email);
-    const { refreshToken, refreshTokenExpiresAt } = await this.createRefreshToken(
-      user.id,
-      user.email,
-    );
+  async verifyEmail(token?: string) {
+    try {
+      if (!token) {
+        throw new BadRequestException(ERROR.EVLVERIFYEMAIL);
+      }
 
-    return {
-      accessToken,
-      refreshToken,
-      refreshTokenExpiresAt,
-    };
+      const user = await this.prisma.user.findUnique({
+        where: { emailVerifyToken: token },
+      });
+
+      if (!user || !user.emailVerifyExpiresAt || user.emailVerifyExpiresAt <= new Date()) {
+        throw new BadRequestException(ERROR.EVLVERIFYEMAIL);
+      }
+
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          isActive: true,
+          emailVerifyToken: null,
+          emailVerifyExpiresAt: null,
+        },
+      });
+
+      return;
+    } catch (error) {
+      this.handleError(error, 'Verify email fail', ERROR.SVREGISTER);
+    }
+  }
+
+  async forgotPassword(body: ForgotPasswordDto) {
+    try {
+      const email = body.email.trim().toLowerCase();
+      const user = await this.prisma.user.findUnique({ where: { email } });
+
+      if (!user) {
+        throw new NotFoundException(ERROR.NFUSER);
+      }
+
+      const passwordResetToken = randomUUID();
+      const passwordResetExpiresAt = new Date(Date.now() + PASSWORD_RESET_EXPIRES_IN_MS);
+
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          passwordResetToken,
+          passwordResetExpiresAt,
+        },
+      });
+
+      await this.mailService.sendResetPasswordEmail(
+        email,
+        this.buildResetPasswordUrl(passwordResetToken),
+      );
+
+      return { data: { success: true } };
+    } catch (error) {
+      this.handleError(error, 'Forgot password fail', ERROR.SVLOGIN);
+    }
+  }
+
+  async resetPassword(body: ResetPasswordDto) {
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { passwordResetToken: body.token },
+      });
+
+      if (!user || !user.passwordResetExpiresAt || user.passwordResetExpiresAt <= new Date()) {
+        throw new BadRequestException(ERROR.EVLRESETPASSWORD);
+      }
+
+      await this.prisma.$transaction([
+        this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            password: await bcrypt.hash(body.password, BCRYPT_SALT_ROUNDS),
+            passwordResetToken: null,
+            passwordResetExpiresAt: null,
+          },
+        }),
+        this.prisma.refreshToken.deleteMany({ where: { userId: user.id } }),
+      ]);
+
+      return { data: { success: true } };
+    } catch (error) {
+      this.handleError(error, 'Reset password fail', ERROR.SVLOGIN);
+    }
+  }
+
+  async googleLogin(googleUser: GoogleUser) {
+    try {
+      const email = googleUser.email.trim().toLowerCase();
+      let user = await this.prisma.user.findFirst({
+        where: {
+          OR: [{ googleId: googleUser.googleId }, { email }],
+        },
+      });
+
+      if (user && !user.googleId) {
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            googleId: googleUser.googleId,
+            isActive: true,
+            avatarUrl: googleUser.avatarUrl ?? user.avatarUrl,
+            displayName: user.displayName ?? googleUser.displayName,
+          },
+        });
+      }
+
+      if (!user) {
+        const defaultRole = await this.getSysDefaultRoleOrThrow();
+
+        user = await this.prisma.$transaction(async (tx) => {
+          const createdUser = await tx.user.create({
+            data: {
+              email,
+              displayName: googleUser.displayName,
+              avatarUrl: googleUser.avatarUrl,
+              googleId: googleUser.googleId,
+              password: null,
+              isActive: true,
+              emailVerifyToken: null,
+              emailVerifyExpiresAt: null,
+            },
+          });
+
+          await tx.userRole.create({
+            data: {
+              userId: createdUser.id,
+              roleId: defaultRole.id,
+            },
+          });
+
+          return createdUser;
+        });
+      }
+
+      const accessToken = await this.signAccessToken(user.id, user.email);
+      const { refreshToken, refreshTokenExpiresAt } = await this.createRefreshToken(
+        user.id,
+        user.email,
+      );
+
+      return {
+        accessToken,
+        refreshToken,
+        refreshTokenExpiresAt,
+      };
+    } catch (error) {
+      this.handleError(error, 'Google login fail', ERROR.SVLOGIN);
+    }
   }
 
   async handleGoogleCallback(googleUser: GoogleUser): Promise<GoogleCallbackResult> {
@@ -237,98 +258,112 @@ export class AuthService {
         refreshTokenExpiresAt,
       };
     } catch (error) {
-      this.logger.error('Error during Google OAuth callback:', error);
-      throw new InternalServerErrorException(ERROR.SVLOGIN);
+      this.handleError(error, 'Google OAuth callback fail', ERROR.SVLOGIN);
     }
   }
 
   async login(body: LoginDto) {
-    const email = body.email.trim().toLowerCase();
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    try {
+      const email = body.email.trim().toLowerCase();
+      const user = await this.prisma.user.findUnique({ where: { email } });
 
-    if (!user?.password) {
-      throw new UnauthorizedException(ERROR.EVLLOGIN);
+      if (!user?.password) {
+        throw new UnauthorizedException(ERROR.EVLLOGIN);
+      }
+
+      if (!user.isActive) {
+        throw new UnauthorizedException(ERROR.EVLACTIVE);
+      }
+
+      const isPasswordValid = await bcrypt.compare(body.password, user.password);
+      if (!isPasswordValid) {
+        throw new UnauthorizedException(ERROR.EVLLOGIN);
+      }
+
+      const accessToken = await this.signAccessToken(user.id, user.email);
+      const { refreshToken, refreshTokenExpiresAt } = await this.createRefreshToken(
+        user.id,
+        user.email,
+      );
+
+      return {
+        accessToken,
+        refreshToken,
+        refreshTokenExpiresAt,
+      };
+    } catch (error) {
+      this.handleError(error, 'Login fail', ERROR.SVLOGIN);
     }
-
-    if (!user.isActive) {
-      throw new UnauthorizedException(ERROR.EVLACTIVE);
-    }
-
-    const isPasswordValid = await bcrypt.compare(body.password, user.password);
-    if (!isPasswordValid) {
-      throw new UnauthorizedException(ERROR.EVLLOGIN);
-    }
-
-    const accessToken = await this.signAccessToken(user.id, user.email);
-    const { refreshToken, refreshTokenExpiresAt } = await this.createRefreshToken(
-      user.id,
-      user.email,
-    );
-
-    return {
-      accessToken,
-      refreshToken,
-      refreshTokenExpiresAt,
-    };
   }
 
   async refresh(refreshToken?: string) {
-    if (!refreshToken) {
-      throw new UnauthorizedException(ERROR.EVLLOGIN);
-    }
-
-    const storedToken = await this.prisma.refreshToken.findUnique({
-      where: { token: refreshToken },
-      include: { user: true },
-    });
-
-    if (!storedToken || storedToken.expiresAt <= new Date()) {
-      if (storedToken) {
-        await this.prisma.refreshToken.delete({ where: { token: refreshToken } });
-      }
-      throw new UnauthorizedException(ERROR.EVLLOGIN);
-    }
-
     try {
-      await this.jwtService.verifyAsync(refreshToken, {
-        secret: requireEnv('REFRESH_TOKEN_SECRET'),
+      if (!refreshToken) {
+        throw new UnauthorizedException(ERROR.EVLLOGIN);
+      }
+
+      const storedToken = await this.prisma.refreshToken.findUnique({
+        where: { token: refreshToken },
+        include: { user: true },
       });
-    } catch {
+
+      if (!storedToken || storedToken.expiresAt <= new Date()) {
+        if (storedToken) {
+          await this.prisma.refreshToken.delete({ where: { token: refreshToken } });
+        }
+        throw new UnauthorizedException(ERROR.EVLLOGIN);
+      }
+
+      try {
+        await this.jwtService.verifyAsync(refreshToken, {
+          secret: requireEnv('REFRESH_TOKEN_SECRET'),
+        });
+      } catch {
+        await this.prisma.refreshToken.delete({ where: { token: refreshToken } });
+        throw new UnauthorizedException(ERROR.EVLLOGIN);
+      }
+
+      const accessToken = await this.signAccessToken(storedToken.user.id, storedToken.user.email);
+      const nextRefresh = await this.createRefreshToken(
+        storedToken.user.id,
+        storedToken.user.email,
+      );
+
       await this.prisma.refreshToken.delete({ where: { token: refreshToken } });
-      throw new UnauthorizedException(ERROR.EVLLOGIN);
+
+      return {
+        accessToken,
+        refreshToken: nextRefresh.refreshToken,
+        refreshTokenExpiresAt: nextRefresh.refreshTokenExpiresAt,
+      };
+    } catch (error) {
+      this.handleError(error, 'Refresh token fail', ERROR.SVLOGIN);
     }
-
-    const accessToken = await this.signAccessToken(storedToken.user.id, storedToken.user.email);
-    const nextRefresh = await this.createRefreshToken(storedToken.user.id, storedToken.user.email);
-
-    await this.prisma.refreshToken.delete({ where: { token: refreshToken } });
-
-    return {
-      accessToken,
-      refreshToken: nextRefresh.refreshToken,
-      refreshTokenExpiresAt: nextRefresh.refreshTokenExpiresAt,
-    };
   }
 
   async logout(refreshToken?: string, authorization?: string): Promise<void> {
-    const accessToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+    try {
+      const accessToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
 
-    if (accessToken) {
-      const payload = this.jwtService.decode(accessToken) as { exp?: number } | null;
-      if (payload?.exp) {
-        await this.prisma.blacklistToken.upsert({
-          where: { token: accessToken },
-          update: { expiresAt: new Date(payload.exp * 1000) },
-          create: {
-            token: accessToken,
-            expiresAt: new Date(payload.exp * 1000),
-          },
-        });
+      if (accessToken) {
+        const payload = this.jwtService.decode(accessToken) as { exp?: number } | null;
+        if (payload?.exp) {
+          await this.prisma.blacklistToken.upsert({
+            where: { token: accessToken },
+            update: { expiresAt: new Date(payload.exp * 1000) },
+            create: {
+              token: accessToken,
+              expiresAt: new Date(payload.exp * 1000),
+            },
+          });
+        }
       }
-    }
 
-    if (refreshToken) {
-      await this.prisma.refreshToken.deleteMany({ where: { token: refreshToken } });
+      if (refreshToken) {
+        await this.prisma.refreshToken.deleteMany({ where: { token: refreshToken } });
+      }
+    } catch (error) {
+      this.handleError(error, 'Logout fail', ERROR.SVLOGOUT);
     }
   }
 
@@ -391,5 +426,13 @@ export class AuthService {
   private buildFrontendUrl(path: string): string {
     const baseUrl = requireEnv('WEB_ORIGIN');
     return `${baseUrl.replace(/\/$/, '')}${path}`;
+  }
+
+  private handleError(error: unknown, logMessage: string, clientMessage: string): never {
+    this.logger.error(logMessage, error instanceof Error ? error.stack : String(error));
+    if (error instanceof HttpException) {
+      throw error;
+    }
+    throw new InternalServerErrorException(clientMessage);
   }
 }
