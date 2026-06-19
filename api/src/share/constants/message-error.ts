@@ -1,6 +1,7 @@
 export const ERROR = {
   CFLEMAIL: 'Email is exist.',
   EVLLOGIN: 'Invalid email or password.',
+  EVLCURRENTPASSWORD: 'Current password is incorrect.',
   EVLACTIVE: 'Please verify your email before login.',
   EVLVERIFYEMAIL: 'Invalid or expired verify email token.',
   EVLRESETPASSWORD: 'Invalid or expired reset password token.',

@@ -1,15 +1,25 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
   Logger,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { Prisma, SCOPE } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
-import { Resource, Permission } from '../auth/interfaces';
+import { requireEnv } from '../share/helpers/env';
+import { serializeRole } from '../share/utils/role-serializer';
+import { Resource, Permission, GoogleUser } from '../auth/interfaces';
+import { CreateStaffUserDto } from './dto/create-staff-user.dto';
+import { UpdatePasswordDto } from './dto/update-password.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS ?? 10);
 
@@ -17,7 +27,10 @@ const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS ?? 10);
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwtService: JwtService,
+  ) {}
 
   async findAll() {
     const users = await this.prisma.user.findMany({ orderBy: { id: 'asc' } });
@@ -25,72 +38,126 @@ export class UsersService {
   }
 
   async findOne(userId: number) {
-    const user = await this.ensureUser(userId);
-    return { data: this.serializeUser(user) };
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { userRoles: { include: { role: true }, orderBy: { roleId: 'asc' } } },
+    });
+
+    if (!user) {
+      throw new NotFoundException(ERROR.NFUSER);
+    }
+
+    return {
+      data: {
+        ...this.serializeUser(user),
+        isActive: user.isActive,
+        googleLinked: !!user.googleId,
+        roles: user.userRoles.map((userRole) => serializeRole(userRole.role)),
+      },
+    };
   }
 
   async getMe(userId: number) {
     return this.findOne(userId);
   }
 
-  async create(data: {
-    email: string;
-    password?: string;
-    displayName?: string;
-    avatarUrl?: string;
-    createdBy?: number;
-  }) {
-    const email = data.email.trim().toLowerCase();
+  async createStaffUser(currentUserId: number, dto: CreateStaffUserDto) {
+    const email = dto.email.trim().toLowerCase();
     const existingUser = await this.prisma.user.findUnique({ where: { email } });
 
     if (existingUser) {
       throw new ConflictException(ERROR.CFLEMAIL);
     }
 
-    const user = await this.prisma.user.create({
-      data: {
-        email,
-        password: data.password ? await bcrypt.hash(data.password, BCRYPT_SALT_ROUNDS) : undefined,
-        displayName: data.displayName?.trim(),
-        avatarUrl: data.avatarUrl,
-        isActive: true,
-        createdBy: data.createdBy,
-        updatedBy: data.createdBy,
-      },
+    const roleIds = await this.validateSysRoles(dto.roleIds);
+    const password = dto.password ? await bcrypt.hash(dto.password, BCRYPT_SALT_ROUNDS) : undefined;
+
+    const user = await this.prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({
+        data: {
+          email,
+          password,
+          displayName: dto.displayName?.trim(),
+          avatarUrl: dto.avatarUrl,
+          isActive: true,
+          createdBy: currentUserId,
+          updatedBy: currentUserId,
+        },
+      });
+
+      await tx.userRole.createMany({
+        data: roleIds.map((roleId) => ({ userId: createdUser.id, roleId })),
+        skipDuplicates: true,
+      });
+
+      return createdUser;
     });
 
     return { data: this.serializeUser(user) };
   }
 
-  async update(
-    userId: number,
-    data: {
-      email?: string;
-      password?: string;
-      displayName?: string;
-      avatarUrl?: string;
-      updatedBy?: number;
-    },
-  ) {
+  async update(userId: number, data: UpdateUserDto & { updatedBy?: number }) {
     await this.ensureUser(userId);
 
+    try {
+      const user = await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          email: data.email?.trim().toLowerCase(),
+          password: data.password
+            ? await bcrypt.hash(data.password, BCRYPT_SALT_ROUNDS)
+            : undefined,
+          displayName: data.displayName?.trim(),
+          avatarUrl: data.avatarUrl,
+          isActive: data.isActive,
+          updatedBy: data.updatedBy,
+        },
+      });
+
+      return { data: this.serializeUser(user) };
+    } catch (error) {
+      this.handleUserUniqueConflict(error);
+      throw error;
+    }
+  }
+
+  async updateMe(userId: number, dto: UpdateProfileDto) {
     const user = await this.prisma.user.update({
       where: { id: userId },
       data: {
-        email: data.email?.trim().toLowerCase(),
-        password: data.password ? await bcrypt.hash(data.password, BCRYPT_SALT_ROUNDS) : undefined,
-        displayName: data.displayName?.trim(),
-        avatarUrl: data.avatarUrl,
-        updatedBy: data.updatedBy,
+        displayName: dto.displayName?.trim(),
+        avatarUrl: dto.avatarUrl,
+        updatedBy: userId,
       },
     });
 
     return { data: this.serializeUser(user) };
   }
 
-  async updateCurrentUserDisplayName(userId: number, displayName: string) {
-    const result = await this.update(userId, { displayName, updatedBy: userId });
-    return result.data;
+  async updatePassword(userId: number, dto: UpdatePasswordDto) {
+    const user = await this.ensureUser(userId);
+
+    if (!user.password) {
+      throw new UnauthorizedException(ERROR.EVLCURRENTPASSWORD);
+    }
+
+    const isCurrentPasswordValid = await bcrypt.compare(dto.currentPassword, user.password);
+    if (!isCurrentPasswordValid) {
+      throw new UnauthorizedException(ERROR.EVLCURRENTPASSWORD);
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          password: await bcrypt.hash(dto.newPassword, BCRYPT_SALT_ROUNDS),
+          updatedBy: userId,
+        },
+      }),
+      this.prisma.refreshToken.deleteMany({ where: { userId } }),
+    ]);
+
+    return { data: { success: true } };
   }
 
   async delete(userId: number) {
@@ -99,22 +166,163 @@ export class UsersService {
     return { data: { success: true } };
   }
 
-  async assignRole(userId: number, roleId: number) {
+  async findRoles(userId: number) {
     await this.ensureUser(userId);
-    await this.ensureRole(roleId);
 
-    await this.prisma.userRole.upsert({
-      where: { userId_roleId: { userId, roleId } },
-      update: {},
-      create: { userId, roleId },
+    const userRoles = await this.prisma.userRole.findMany({
+      where: { userId },
+      include: { role: true },
+      orderBy: { roleId: 'asc' },
+    });
+
+    return { data: userRoles.map((userRole) => serializeRole(userRole.role)) };
+  }
+
+  async appendRoles(userId: number, roleIds: number[]) {
+    await this.ensureUser(userId);
+    const validRoleIds = await this.validateSysRoles(roleIds);
+
+    await this.prisma.userRole.createMany({
+      data: validRoleIds.map((roleId) => ({ userId, roleId })),
+      skipDuplicates: true,
     });
 
     return { data: { success: true } };
   }
 
-  async removeRole(userId: number, roleId: number) {
-    await this.prisma.userRole.deleteMany({ where: { userId, roleId } });
+  async replaceRoles(userId: number, roleIds: number[]) {
+    await this.ensureUser(userId);
+    const validRoleIds = await this.validateSysRoles(roleIds);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.userRole.deleteMany({ where: { userId } });
+
+      if (validRoleIds.length > 0) {
+        await tx.userRole.createMany({
+          data: validRoleIds.map((roleId) => ({ userId, roleId })),
+          skipDuplicates: true,
+        });
+      }
+    });
+
     return { data: { success: true } };
+  }
+
+  async findProjects(userId: number) {
+    await this.ensureUser(userId);
+
+    const userProjects = await this.prisma.userProject.findMany({
+      where: { userId },
+      include: { project: true, role: true },
+      orderBy: [{ projectId: 'asc' }, { roleId: 'asc' }],
+    });
+
+    return {
+      data: userProjects.map((userProject) => ({
+        ...userProject.project,
+        role: serializeRole(userProject.role),
+        assignedAt: userProject.createdAt,
+        updatedAt: userProject.updatedAt,
+      })),
+    };
+  }
+
+  async findEditorBoards(userId: number) {
+    await this.ensureUser(userId);
+
+    const userEditorBoards = await this.prisma.userEditorBoard.findMany({
+      where: { userId },
+      include: { editorBoard: true },
+      orderBy: { editorBoardId: 'asc' },
+    });
+
+    return {
+      data: userEditorBoards.map((userEditorBoard) => ({
+        ...userEditorBoard.editorBoard,
+        isLead: userEditorBoard.isLead,
+      })),
+    };
+  }
+
+  async linkGoogleAccount(state: string | undefined, googleUser: GoogleUser) {
+    let userId: number;
+    try {
+      userId = this.verifyGoogleLinkState(state);
+    } catch {
+      return this.buildFrontendUrl('/auth/oauth-error?reason=invalid_state');
+    }
+
+    if (!googleUser.email || !googleUser.googleId) {
+      return this.buildFrontendUrl('/auth/oauth-error?reason=invalid_google_account');
+    }
+
+    const linkedUser = await this.prisma.user.findUnique({
+      where: { googleId: googleUser.googleId },
+    });
+
+    if (linkedUser && linkedUser.id !== userId) {
+      return this.buildFrontendUrl('/auth/oauth-error?reason=google_account_already_linked');
+    }
+
+    const currentUser = await this.ensureUser(userId);
+    const googleEmail = googleUser.email.trim().toLowerCase();
+    if (currentUser.email.trim().toLowerCase() !== googleEmail) {
+      return this.buildFrontendUrl('/auth/oauth-error?reason=email_mismatch');
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        googleId: googleUser.googleId,
+        avatarUrl: googleUser.avatarUrl ?? currentUser.avatarUrl,
+        displayName: currentUser.displayName ?? googleUser.displayName,
+        isActive: true,
+        updatedBy: userId,
+      },
+    });
+
+    return this.buildFrontendUrl('/auth/oauth-success?linked=google');
+  }
+
+  private async validateSysRoles(roleIds: number[]) {
+    const uniqueRoleIds = [...new Set(roleIds.map(Number))];
+    const roles = await this.prisma.role.findMany({
+      where: { id: { in: uniqueRoleIds }, scope: SCOPE.SYS },
+    });
+
+    if (roles.length !== uniqueRoleIds.length) {
+      throw new BadRequestException('Invalid roles');
+    }
+
+    return uniqueRoleIds;
+  }
+
+  private verifyGoogleLinkState(state: string | undefined) {
+    if (!state) {
+      throw new BadRequestException('Invalid Google link state');
+    }
+
+    try {
+      const payload = this.jwtService.verify<{ userId?: number }>(state, {
+        secret: requireEnv('ACCESS_TOKEN_SECRET'),
+      });
+
+      if (!payload.userId) {
+        throw new BadRequestException('Invalid Google link state');
+      }
+
+      return payload.userId;
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Invalid Google link state');
+    }
+  }
+
+  private buildFrontendUrl(path: string): string {
+    const baseUrl = requireEnv('WEB_ORIGIN');
+    return `${baseUrl.replace(/\/$/, '')}${path}`;
   }
 
   async getUserPermissions(
@@ -520,6 +728,22 @@ export class UsersService {
     }
 
     return role;
+  }
+
+  private handleUserUniqueConflict(error: unknown) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002' &&
+      Array.isArray(error.meta?.target)
+    ) {
+      if (error.meta.target.includes('email')) {
+        throw new ConflictException(ERROR.CFLEMAIL);
+      }
+
+      if (error.meta.target.includes('google_id')) {
+        throw new ConflictException('Google account is already linked.');
+      }
+    }
   }
 
   private serializeUser(user: {
