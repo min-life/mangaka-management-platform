@@ -26,21 +26,11 @@ async function bootstrap() {
     .setVersion('1.0')
     .addBearerAuth()
     .build();
-  // 2. Định nghĩa các URL CDN cho asset của Swagger
-  // Chọn phiên bản (CDN_VERSION) khớp hoặc gần nhất với bản swagger-ui-express bạn dùng
-  const CDN_VERSION = '4.15.5';
-  const customOptions = {
-    customCssUrl: [
-      `https://cloudflare.com${CDN_VERSION}/swagger-ui.min.css`,
-      `https://cloudflare.com${CDN_VERSION}/swagger-ui-standalone-preset.min.css`,
-    ],
-    customJs: [
-      `https://cloudflare.com${CDN_VERSION}/swagger-ui-bundle.min.js`,
-      `https://cloudflare.com${CDN_VERSION}/swagger-ui-standalone-preset.min.js`,
-    ],
-  };
   const documentFactory = () => SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, documentFactory, customOptions);
+  SwaggerModule.setup('docs', app, documentFactory, {
+    customCssUrl: 'https://cloudflare.com',
+    customJs: ['https://cloudflare.com', 'https://cloudflare.com'],
+  });
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();
