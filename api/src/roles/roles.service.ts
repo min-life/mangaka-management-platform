@@ -1,7 +1,10 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
   Injectable,
+  InternalServerErrorException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Permission, Prisma, SCOPE } from '@prisma/client';
@@ -13,20 +16,30 @@ import { serializeRole } from '../share/utils/role-serializer';
 
 @Injectable()
 export class RolesService {
+  private readonly logger = new Logger(RolesService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async findRoles(scope?: SCOPE) {
-    const roles = await this.prisma.role.findMany({
-      where: scope ? { scope } : undefined,
-      orderBy: { id: 'asc' },
-    });
+    try {
+      const roles = await this.prisma.role.findMany({
+        where: scope ? { scope } : undefined,
+        orderBy: { id: 'asc' },
+      });
 
-    return { data: roles.map(serializeRole) };
+      return { data: roles.map(serializeRole) };
+    } catch (error) {
+      this.handleError(error, 'Get roles fail', ERROR.SVGETBOARDS);
+    }
   }
 
   async findOne(roleId: number) {
-    const role = await this.ensureRole(roleId);
-    return { data: serializeRole(role) };
+    try {
+      const role = await this.ensureRole(roleId);
+      return { data: serializeRole(role) };
+    } catch (error) {
+      this.handleError(error, 'Get role fail', ERROR.SVGETBOARD);
+    }
   }
 
   async createRole(currentUserId: number, dto: CreateRoleDto) {
@@ -102,66 +115,78 @@ export class RolesService {
   }
 
   async deleteRole(roleId: number) {
-    await this.ensureRole(roleId);
+    try {
+      await this.ensureRole(roleId);
 
-    const assignedCount = await this.prisma.userRole.count({ where: { roleId } });
-    const projectAssignedCount = await this.prisma.userProject.count({ where: { roleId } });
+      const assignedCount = await this.prisma.userRole.count({ where: { roleId } });
+      const projectAssignedCount = await this.prisma.userProject.count({ where: { roleId } });
 
-    if (assignedCount > 0 || projectAssignedCount > 0) {
-      throw new ConflictException(ERROR.CFLROLEASSIGNED);
+      if (assignedCount > 0 || projectAssignedCount > 0) {
+        throw new ConflictException(ERROR.CFLROLEASSIGNED);
+      }
+
+      await this.prisma.role.delete({ where: { id: roleId } });
+
+      return { data: { success: true } };
+    } catch (error) {
+      this.handleError(error, 'Delete role fail', ERROR.SVDELETEBOARD);
     }
-
-    await this.prisma.role.delete({ where: { id: roleId } });
-
-    return { data: { success: true } };
   }
 
   async findPermissions(roleId: number) {
-    await this.ensureRole(roleId);
+    try {
+      await this.ensureRole(roleId);
 
-    const rolePermissions = await this.prisma.rolePermission.findMany({
-      where: { roleId },
-      include: { permission: true },
-      orderBy: { permissionId: 'asc' },
-    });
+      const rolePermissions = await this.prisma.rolePermission.findMany({
+        where: { roleId },
+        include: { permission: true },
+        orderBy: { permissionId: 'asc' },
+      });
 
-    return {
-      data: rolePermissions.map((rolePermission) =>
-        this.serializePermission(rolePermission.permission),
-      ),
-    };
+      return {
+        data: rolePermissions.map((rolePermission) =>
+          this.serializePermission(rolePermission.permission),
+        ),
+      };
+    } catch (error) {
+      this.handleError(error, 'Get role permissions fail', ERROR.SVGETBOARDMEMBERS);
+    }
   }
 
   async replacePermissions(roleId: number, permissionIds: number[]) {
-    const role = await this.ensureRole(roleId);
-    const uniquePermissionIds = [...new Set(permissionIds)];
+    try {
+      const role = await this.ensureRole(roleId);
+      const uniquePermissionIds = [...new Set(permissionIds)];
 
-    const permissions = await this.prisma.permission.findMany({
-      where: { id: { in: uniquePermissionIds } },
-    });
+      const permissions = await this.prisma.permission.findMany({
+        where: { id: { in: uniquePermissionIds } },
+      });
 
-    if (permissions.length !== uniquePermissionIds.length) {
-      throw new BadRequestException(ERROR.EVLPERMISSIONSCOPE);
-    }
-
-    if (permissions.some((permission) => permission.scope !== role.scope)) {
-      throw new BadRequestException(ERROR.EVLPERMISSIONSCOPE);
-    }
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.rolePermission.deleteMany({ where: { roleId } });
-
-      if (uniquePermissionIds.length > 0) {
-        await tx.rolePermission.createMany({
-          data: uniquePermissionIds.map((permissionId) => ({
-            roleId,
-            permissionId,
-          })),
-        });
+      if (permissions.length !== uniquePermissionIds.length) {
+        throw new BadRequestException(ERROR.EVLPERMISSIONSCOPE);
       }
-    });
 
-    return { data: { success: true } };
+      if (permissions.some((permission) => permission.scope !== role.scope)) {
+        throw new BadRequestException(ERROR.EVLPERMISSIONSCOPE);
+      }
+
+      await this.prisma.$transaction(async (tx) => {
+        await tx.rolePermission.deleteMany({ where: { roleId } });
+
+        if (uniquePermissionIds.length > 0) {
+          await tx.rolePermission.createMany({
+            data: uniquePermissionIds.map((permissionId) => ({
+              roleId,
+              permissionId,
+            })),
+          });
+        }
+      });
+
+      return { data: { success: true } };
+    } catch (error) {
+      this.handleError(error, 'Replace role permissions fail', ERROR.SVUPDBOARDMEMBER);
+    }
   }
 
   private async ensureRole(roleId: number) {
@@ -191,5 +216,32 @@ export class RolesService {
     ) {
       throw new ConflictException(ERROR.CFROLECODE);
     }
+  }
+
+  private buildPagination(pagination?: { page?: number; limit?: number }) {
+    const page = pagination?.page || 1;
+    const limit = pagination?.limit || 10;
+    return {
+      page,
+      limit,
+      skip: (page - 1) * limit,
+    };
+  }
+
+  private buildPaginationMeta(total: number, page: number, limit: number) {
+    return {
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    };
+  }
+
+  private handleError(error: unknown, logMessage: string, clientMessage: string): never {
+    this.logger.error(logMessage, error instanceof Error ? error.stack : String(error));
+    if (error instanceof HttpException) {
+      throw error;
+    }
+    throw new InternalServerErrorException(clientMessage);
   }
 }

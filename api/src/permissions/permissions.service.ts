@@ -5,10 +5,15 @@ import { ERROR } from '../share/constants/message-error';
 import { PermissionResponseDto } from './dto/permission.dto';
 import { PermissionFilterDto } from './dto/permission-filter.dto';
 import { UpdatePermissionDto } from './dto/update-permission.dto';
+import { UserPermissionsResponseDto } from './dto/user-permissions-response.dto';
+import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class PermissionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly usersService: UsersService,
+  ) {}
 
   async findAll(query: PermissionFilterDto): Promise<PermissionResponseDto[]> {
     const where: Prisma.PermissionWhereInput = {};
@@ -46,6 +51,27 @@ export class PermissionsService {
     });
 
     return this.serializePermission(permission);
+  }
+
+  async getMySysPermissions(userId: number): Promise<UserPermissionsResponseDto> {
+    const permissions = await this.usersService.getUserPermissions(userId);
+    return { data: permissions };
+  }
+
+  async getMyProjectPermissions(
+    userId: number,
+    projectId: number,
+  ): Promise<UserPermissionsResponseDto> {
+    const permissions = await this.usersService.getUserPermissions(userId, 'PROJECT', projectId);
+    return { data: permissions };
+  }
+
+  async getMyBoardPermissions(
+    userId: number,
+    boardId: number,
+  ): Promise<UserPermissionsResponseDto> {
+    const permissions = await this.usersService.getUserPermissions(userId, 'BOARD', boardId);
+    return { data: permissions };
   }
 
   private async ensurePermission(id: number) {
