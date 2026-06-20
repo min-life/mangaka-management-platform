@@ -1,5 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { APPLICATION_STATUS, APPLICATION_TYPE } from '@prisma/client';
+import { UserResDto } from '../../share/dto';
+import { ProjectResDto } from '../../projects/dto';
+import { ApplicationResDto } from '../../applications/dto';
 
 export class PaginationResDto {
   @ApiProperty({ example: 25 })
@@ -22,11 +25,17 @@ export class EditorBoardResDto {
   @ApiProperty({ example: 'Weekly Manga Review Board' })
   name!: string;
 
-  @ApiPropertyOptional({ example: 1, nullable: true })
-  createdBy?: number | null;
+  @ApiPropertyOptional({ example: 'Board for weekly manga reviews', nullable: true })
+  description?: string | null;
 
-  @ApiPropertyOptional({ example: 1, nullable: true })
-  updatedBy?: number | null;
+  @ApiPropertyOptional({ example: 'https://example.com/board.png', nullable: true })
+  imageUrl?: string | null;
+
+  @ApiPropertyOptional({ type: UserResDto, nullable: true })
+  createdByUser?: UserResDto | null;
+
+  @ApiPropertyOptional({ type: UserResDto, nullable: true })
+  updatedByUser?: UserResDto | null;
 
   @ApiProperty({ example: '2026-06-18T03:00:00.000Z' })
   createdAt!: Date;
@@ -36,78 +45,21 @@ export class EditorBoardResDto {
 }
 
 export class BoardMemberResDto {
-  @ApiProperty({ example: 2 })
-  id!: number;
-
-  @ApiProperty({ example: 'editor@example.com' })
-  email!: string;
-
-  @ApiPropertyOptional({ example: 'Min Editor', nullable: true })
-  displayName?: string | null;
+  @ApiProperty({ type: UserResDto })
+  user!: UserResDto;
 
   @ApiProperty({ example: false })
   isLead!: boolean;
 }
 
 export class BoardProjectResDto {
-  @ApiProperty({ example: 10 })
-  id!: number;
-
-  @ApiProperty({ example: 'One-shot Chapter 01' })
-  name!: string;
-
-  @ApiPropertyOptional({ example: 1, nullable: true })
-  editorBoardId?: number | null;
-
-  @ApiPropertyOptional({ example: 1, nullable: true })
-  createdBy?: number | null;
-
-  @ApiPropertyOptional({ example: 1, nullable: true })
-  updatedBy?: number | null;
-
-  @ApiProperty({ example: '2026-06-18T03:00:00.000Z' })
-  createdAt!: Date;
-
-  @ApiProperty({ example: '2026-06-18T03:00:00.000Z' })
-  updatedAt!: Date;
+  @ApiProperty({ type: ProjectResDto })
+  project!: ProjectResDto;
 }
 
 export class BoardApplicationResDto {
-  @ApiProperty({ example: 7 })
-  id!: number;
-
-  @ApiProperty({ example: 10 })
-  projectId!: number;
-
-  @ApiProperty({ example: 'Publish request for chapter 01' })
-  title!: string;
-
-  @ApiPropertyOptional({ example: 'Please review before publishing.', nullable: true })
-  description?: string | null;
-
-  @ApiProperty({ example: [{ fileId: 1, page: 1 }] })
-  materials!: unknown;
-
-  @ApiProperty({ enum: APPLICATION_TYPE, example: APPLICATION_TYPE.PUBLISH_REQUEST })
-  type!: APPLICATION_TYPE;
-
-  @ApiProperty({ enum: APPLICATION_STATUS, example: APPLICATION_STATUS.PENDING })
-  status!: APPLICATION_STATUS;
-
-  @ApiPropertyOptional({ example: 3, nullable: true })
-  verifyBy?: number | null;
-
-  @ApiPropertyOptional({ example: 1, nullable: true })
-  createdBy?: number | null;
-
-  @ApiPropertyOptional({ example: 1, nullable: true })
-  updatedBy?: number | null;
-
-  @ApiProperty({ example: '2026-06-18T03:00:00.000Z' })
-  createdAt!: Date;
-
-  @ApiProperty({ example: '2026-06-18T03:00:00.000Z' })
-  updatedAt!: Date;
+  @ApiProperty({ type: ApplicationResDto })
+  application!: ApplicationResDto;
 }
 
 export class AddProjectsResultResDto {

@@ -10,6 +10,71 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
 
+const USER_SELECT = {
+  select: {
+    id: true,
+    email: true,
+    displayName: true,
+    avatarUrl: true,
+  },
+};
+
+const PROJECT_SELECT = {
+  id: true,
+  name: true,
+  description: true,
+  imageUrl: true,
+  editorBoard: {
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      imageUrl: true,
+      createdByUser: USER_SELECT,
+      updatedByUser: USER_SELECT,
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
+  createdByUser: USER_SELECT,
+  updatedByUser: USER_SELECT,
+  createdAt: true,
+  updatedAt: true,
+};
+
+const FOLDER_SELECT = {
+  id: true,
+  title: true,
+  description: true,
+  parent: {
+    select: {
+      id: true,
+      title: true,
+      description: true,
+    },
+  },
+  project: {
+    select: PROJECT_SELECT,
+  },
+  createdByUser: USER_SELECT,
+  updatedByUser: USER_SELECT,
+  createdAt: true,
+  updatedAt: true,
+};
+
+const FILE_SELECT = {
+  id: true,
+  title: true,
+  description: true,
+  folder: {
+    select: FOLDER_SELECT,
+  },
+  createdByUser: USER_SELECT,
+  updatedByUser: USER_SELECT,
+  createdAt: true,
+  updatedAt: true,
+};
+
 @Injectable()
 export class FoldersService {
   private readonly logger = new Logger(FoldersService.name);
@@ -18,7 +83,14 @@ export class FoldersService {
 
   async getFolderById(id: number) {
     try {
-      return await this.ensureFolder(id);
+      const folder = await this.prisma.folder.findUnique({
+        where: { id },
+        select: FOLDER_SELECT,
+      });
+      if (!folder) {
+        throw new NotFoundException(ERROR.NFFOLDER);
+      }
+      return folder;
     } catch (error) {
       this.handleError(error, 'Get folder fail', ERROR.SVGETFOLDER);
     }
@@ -42,6 +114,7 @@ export class FoldersService {
           description: data.description,
           updatedBy: data.userId,
         },
+        select: FOLDER_SELECT,
       });
     } catch (error) {
       this.handleError(error, 'Update folder fail', ERROR.SVUPDATEFOLDER);
@@ -84,6 +157,7 @@ export class FoldersService {
           orderBy,
           skip,
           take: limit,
+          select: FILE_SELECT,
         }),
       ]);
 
@@ -114,6 +188,7 @@ export class FoldersService {
           folderId,
           createdBy: data.userId,
         },
+        select: FILE_SELECT,
       });
     } catch (error) {
       this.handleError(error, 'Create file fail', ERROR.SVCREATEFILE);
@@ -147,6 +222,7 @@ export class FoldersService {
           orderBy,
           skip,
           take: limit,
+          select: FOLDER_SELECT,
         }),
       ]);
 
@@ -178,6 +254,7 @@ export class FoldersService {
           projectId: parentFolder.projectId,
           createdBy: data.userId,
         },
+        select: FOLDER_SELECT,
       });
     } catch (error) {
       this.handleError(error, 'Create child folder fail', ERROR.SVCREATECHILDFOLDER);

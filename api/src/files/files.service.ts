@@ -10,6 +10,99 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
 
+const USER_SELECT = {
+  select: {
+    id: true,
+    email: true,
+    displayName: true,
+    avatarUrl: true,
+  },
+};
+
+const PROJECT_SELECT = {
+  id: true,
+  name: true,
+  description: true,
+  imageUrl: true,
+  editorBoard: {
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      imageUrl: true,
+      createdByUser: USER_SELECT,
+      updatedByUser: USER_SELECT,
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
+  createdByUser: USER_SELECT,
+  updatedByUser: USER_SELECT,
+  createdAt: true,
+  updatedAt: true,
+};
+
+const FOLDER_SELECT = {
+  id: true,
+  title: true,
+  description: true,
+  project: {
+    select: PROJECT_SELECT,
+  },
+  createdByUser: USER_SELECT,
+  updatedByUser: USER_SELECT,
+  createdAt: true,
+  updatedAt: true,
+};
+
+const FILE_SELECT = {
+  id: true,
+  title: true,
+  description: true,
+  folder: {
+    select: FOLDER_SELECT,
+  },
+  createdByUser: USER_SELECT,
+  updatedByUser: USER_SELECT,
+  createdAt: true,
+  updatedAt: true,
+};
+
+const MATERIAL_SELECT = {
+  id: true,
+  file: {
+    select: FILE_SELECT,
+  },
+  materials: true,
+  createdByUser: USER_SELECT,
+  updatedByUser: USER_SELECT,
+  createdAt: true,
+  updatedAt: true,
+};
+
+const TASK_SELECT = {
+  id: true,
+  title: true,
+  description: true,
+  status: true,
+  parent: {
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      status: true,
+    },
+  },
+  file: {
+    select: FILE_SELECT,
+  },
+  assignedByUser: USER_SELECT,
+  createdByUser: USER_SELECT,
+  updatedByUser: USER_SELECT,
+  createdAt: true,
+  updatedAt: true,
+};
+
 @Injectable()
 export class FilesService {
   private readonly logger = new Logger(FilesService.name);
@@ -18,7 +111,14 @@ export class FilesService {
 
   async getFileById(id: number) {
     try {
-      return await this.ensureFile(id);
+      const file = await this.prisma.file.findUnique({
+        where: { id },
+        select: FILE_SELECT,
+      });
+      if (!file) {
+        throw new NotFoundException(ERROR.NFFILE);
+      }
+      return file;
     } catch (error) {
       this.handleError(error, 'Get file fail', ERROR.SVGETFILE);
     }
@@ -42,6 +142,7 @@ export class FilesService {
           description: data.description,
           updatedBy: data.userId,
         },
+        select: FILE_SELECT,
       });
     } catch (error) {
       this.handleError(error, 'Update file fail', ERROR.SVUPDATEFILE);
@@ -64,6 +165,7 @@ export class FilesService {
       const material = await this.prisma.fileMaterial.findFirst({
         where: { fileId },
         orderBy: { createdAt: 'desc' },
+        select: MATERIAL_SELECT,
       });
 
       return material;
@@ -88,6 +190,7 @@ export class FilesService {
           fileId,
           createdBy: data.userId,
         },
+        select: MATERIAL_SELECT,
       });
     } catch (error) {
       this.handleError(error, 'Create material fail', ERROR.SVCREATEMATERIAL);
@@ -123,6 +226,7 @@ export class FilesService {
           orderBy,
           skip,
           take: limit,
+          select: TASK_SELECT,
         }),
       ]);
 
@@ -159,6 +263,7 @@ export class FilesService {
           assignedBy: data.assignedBy,
           createdBy: data.userId,
         },
+        select: TASK_SELECT,
       });
     } catch (error) {
       this.handleError(error, 'Create task fail', ERROR.SVCREATETASK);

@@ -9,6 +9,47 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
 
+const USER_SELECT = {
+  select: {
+    id: true,
+    email: true,
+    displayName: true,
+    avatarUrl: true,
+  },
+};
+
+const PROJECT_SELECT = {
+  id: true,
+  name: true,
+  description: true,
+  imageUrl: true,
+  editorBoard: {
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      imageUrl: true,
+      createdByUser: USER_SELECT,
+      updatedByUser: USER_SELECT,
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
+  createdByUser: USER_SELECT,
+  updatedByUser: USER_SELECT,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.ProjectSelect;
+
+const PROJECT_STAT_SELECT = {
+  id: true,
+  project: {
+    select: PROJECT_SELECT,
+  },
+  metrics: true,
+  updatedAt: true,
+} satisfies Prisma.ProjectStatSelect;
+
 @Injectable()
 export class ProjectStatsService {
   private readonly logger = new Logger(ProjectStatsService.name);
@@ -17,7 +58,14 @@ export class ProjectStatsService {
 
   async getProjectStatById(id: number) {
     try {
-      return await this.ensureProjectStat(id);
+      const projectStat = await this.prisma.projectStat.findUnique({
+        where: { id },
+        select: PROJECT_STAT_SELECT,
+      });
+      if (!projectStat) {
+        throw new NotFoundException(ERROR.NFPROJECTSTAT);
+      }
+      return projectStat;
     } catch (error) {
       this.handleError(error, 'Get project stat fail', ERROR.SVGETPROJECTSTAT);
     }
@@ -38,6 +86,7 @@ export class ProjectStatsService {
           metrics: data.metrics as Prisma.InputJsonValue,
           updatedAt: new Date(),
         },
+        select: PROJECT_STAT_SELECT,
       });
     } catch (error) {
       this.handleError(error, 'Update project stat fail', ERROR.SVUPDATEPROJECTSTAT);
@@ -54,7 +103,10 @@ export class ProjectStatsService {
   }
 
   private async ensureProjectStat(id: number) {
-    const projectStat = await this.prisma.projectStat.findUnique({ where: { id } });
+    const projectStat = await this.prisma.projectStat.findUnique({
+      where: { id },
+      select: PROJECT_STAT_SELECT,
+    });
     if (!projectStat) {
       throw new NotFoundException(ERROR.NFPROJECTSTAT);
     }
