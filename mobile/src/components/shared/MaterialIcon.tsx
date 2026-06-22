@@ -21,6 +21,7 @@ const ICON_MAP: Record<string, MaterialIconName> = {
   mail:          'mail-outline',
   dashboard:     'dashboard',
   home:          'home',
+  lock:          'lock-outline',
 
   // ── Work Items ─────────────────────────────────────────────
   checklist:     'checklist',
@@ -36,6 +37,11 @@ const ICON_MAP: Record<string, MaterialIconName> = {
   // ── Header / Actions ──────────────────────────────────────
   search:        'search',
   add:           'add',
+  link:          'link',
+  fork:          'call-split',
+  bell:          'notifications-none',
+  code:          'code',
+  file:          'insert-drive-file',
   image:         'image',
   close:         'close',
   check:         'check',
@@ -61,6 +67,8 @@ const ICON_MAP: Record<string, MaterialIconName> = {
   settings:      'settings',
   notifications: 'notifications',
   chevron_right: 'chevron-right',
+  apps:          'apps',
+  group_add:     'group-add',
 
   // ── Profile Screen ──────────────────────────────────────
   apartment:     'apartment',

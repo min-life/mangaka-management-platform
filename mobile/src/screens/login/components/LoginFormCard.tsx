@@ -1,6 +1,7 @@
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
+import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
 
 import LoginSubmitButton from './LoginSubmitButton';
@@ -41,15 +42,25 @@ export default function LoginFormCard({
 }: LoginFormCardProps) {
   return (
     <View
-      className="rounded-[18px] p-6"
+      className="rounded-[20px] p-5"
       style={{
         backgroundColor: Colors.surface,
+        borderColor: Colors.borderFaint,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.07)',
       }}
     >
+      <View className="mb-5">
+        <Text className="text-[22px] font-bold" style={{ color: Colors.text }}>
+          Sign in
+        </Text>
+        <Text className="mt-1 text-[13px] leading-5" style={{ color: Colors.textMuted }}>
+          Use your studio account to continue.
+        </Text>
+      </View>
+
       <LoginTextField
         label="Email"
+        iconName="mail"
         value={email}
         onChangeText={onEmailChange}
         placeholder="artist@mangaka.studio"
@@ -60,9 +71,10 @@ export default function LoginFormCard({
 
       <LoginTextField
         label="Password"
+        iconName="lock"
         value={password}
         onChangeText={onPasswordChange}
-        placeholder="••••••••"
+        placeholder="Password"
         secureTextEntry={!showPassword}
         autoCapitalize="none"
         showSecureTextToggle
@@ -72,10 +84,16 @@ export default function LoginFormCard({
 
       {errorMessage ? (
         <View
-          className="mb-4 rounded-xl px-4 py-3"
-          style={{ backgroundColor: 'rgba(239,68,68,0.12)' }}
+          accessibilityRole="alert"
+          className="mb-4 flex-row rounded-xl px-4 py-3"
+          style={{
+            backgroundColor: 'rgba(239,68,68,0.12)',
+            borderColor: 'rgba(239,68,68,0.22)',
+            borderWidth: 1,
+          }}
         >
-          <Text className="text-[13px] leading-5" style={{ color: Colors.iconTask }}>
+          <MaterialIcon name="error" color={Colors.iconTask} size={18} />
+          <Text className="ml-2 flex-1 text-[13px] leading-5" style={{ color: Colors.text }}>
             {errorMessage}
           </Text>
         </View>
@@ -83,10 +101,16 @@ export default function LoginFormCard({
 
       {successMessage ? (
         <View
-          className="mb-4 rounded-xl px-4 py-3"
-          style={{ backgroundColor: 'rgba(93,211,158,0.12)' }}
+          accessibilityRole="alert"
+          className="mb-4 flex-row rounded-xl px-4 py-3"
+          style={{
+            backgroundColor: 'rgba(93,211,158,0.12)',
+            borderColor: 'rgba(93,211,158,0.22)',
+            borderWidth: 1,
+          }}
         >
-          <Text className="text-[13px] leading-5" style={{ color: Colors.statusDone }}>
+          <MaterialIcon name="check_circle" color={Colors.statusDone} size={18} />
+          <Text className="ml-2 flex-1 text-[13px] leading-5" style={{ color: Colors.text }}>
             {successMessage}
           </Text>
         </View>
@@ -101,12 +125,14 @@ export default function LoginFormCard({
 
       <TouchableOpacity
         activeOpacity={isLoading || isForgotLoading ? 1 : 0.7}
-        className="mt-6 items-center"
+        accessibilityRole="button"
+        accessibilityState={{ disabled: isLoading || isForgotLoading }}
+        className="mt-5 h-11 items-center justify-center"
         disabled={isLoading || isForgotLoading}
         onPress={onForgotPassword}
       >
-        <Text className="text-[13px]" style={{ color: Colors.textMuted }}>
-          {isForgotLoading ? 'Sending reset link...' : 'Forgot password?'}
+        <Text className="text-[13px] font-semibold" style={{ color: Colors.textMuted }}>
+          {isForgotLoading ? 'Sending reset link...' : 'Forgot your password?'}
         </Text>
       </TouchableOpacity>
     </View>

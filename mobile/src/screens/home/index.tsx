@@ -35,7 +35,10 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         <HomeSectionTitle />
-        <WorkItemsSection onTasksPress={() => navigation.navigate('Tasks')} />
+        <WorkItemsSection
+          onTasksPress={() => navigation.navigate('Tasks')}
+          onProjectsPress={() => navigation.navigate('Projects')}
+        />
         <TodayActivitySection />
       </Animated.ScrollView>
 

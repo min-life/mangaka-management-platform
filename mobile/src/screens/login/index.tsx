@@ -1,10 +1,5 @@
 import React, { useState, useRef } from 'react';
-import {
-  Animated,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-} from 'react-native';
+import { Animated, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 
@@ -17,16 +12,15 @@ import LoginBrandHeader from './components/LoginBrandHeader';
 import LoginFormCard from './components/LoginFormCard';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const FORGOT_SUCCESS_MESSAGE =
-  'Nếu email tồn tại, hướng dẫn đặt lại mật khẩu đã được gửi.';
+const FORGOT_SUCCESS_MESSAGE = 'Nếu email tồn tại, hướng dẫn đặt lại mật khẩu đã được gửi.';
 
 export default function LoginScreen() {
   const navigation = useNavigation<RootStackNavProp>();
 
-  const [email, setEmail]               = useState('');
-  const [password, setPassword]         = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading]       = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [isForgotLoading, setIsForgotLoading] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -34,7 +28,7 @@ export default function LoginScreen() {
 
   // Fade-in animation cho header
   const headerOpacity = useRef(new Animated.Value(0)).current;
-  const headerTransY  = useRef(new Animated.Value(-12)).current;
+  const headerTransY = useRef(new Animated.Value(-12)).current;
 
   React.useEffect(() => {
     Animated.parallel([
@@ -139,6 +133,16 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: Colors.bg }}>
+      <View
+        className="absolute left-[-80px] top-[-80px] h-56 w-56 rounded-full"
+        style={{ backgroundColor: 'rgba(255,211,105,0.08)' }}
+        pointerEvents="none"
+      />
+      <View
+        className="absolute bottom-[-96px] right-[-72px] h-64 w-64 rounded-full"
+        style={{ backgroundColor: 'rgba(93,211,158,0.07)' }}
+        pointerEvents="none"
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         className="flex-1"
@@ -146,31 +150,37 @@ export default function LoginScreen() {
         <ScrollView
           contentContainerStyle={{
             flexGrow: 1,
-            justifyContent: 'center',
-            paddingHorizontal: 24,
-            paddingVertical: 48,
+            justifyContent: 'space-between',
+            paddingHorizontal: 20,
+            paddingBottom: 28,
+            paddingTop: 36,
           }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <LoginBrandHeader opacity={headerOpacity} translateY={headerTransY} />
-          <LoginFormCard
-            email={email}
-            password={password}
-            showPassword={showPassword}
-            isLoading={isLoading}
-            isForgotLoading={isForgotLoading}
-            loginSuccess={loginSuccess}
-            isFormValid={isFormValid}
-            errorMessage={errorMessage}
-            successMessage={successMessage}
-            onEmailChange={handleEmailChange}
-            onPasswordChange={handlePasswordChange}
-            onTogglePassword={() => setShowPassword(!showPassword)}
-            onLogin={handleLogin}
-            onForgotPassword={handleForgotPassword}
-          />
-          <DevGoHomeButton onPress={() => navigation.navigate('Home')} />
+          <View>
+            <LoginBrandHeader opacity={headerOpacity} translateY={headerTransY} />
+          </View>
+
+          <View className="mt-8">
+            <LoginFormCard
+              email={email}
+              password={password}
+              showPassword={showPassword}
+              isLoading={isLoading}
+              isForgotLoading={isForgotLoading}
+              loginSuccess={loginSuccess}
+              isFormValid={isFormValid}
+              errorMessage={errorMessage}
+              successMessage={successMessage}
+              onEmailChange={handleEmailChange}
+              onPasswordChange={handlePasswordChange}
+              onTogglePassword={() => setShowPassword(!showPassword)}
+              onLogin={handleLogin}
+              onForgotPassword={handleForgotPassword}
+            />
+            <DevGoHomeButton onPress={() => navigation.navigate('Home')} />
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

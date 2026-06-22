@@ -6,6 +6,7 @@ import { Colors } from '@/src/constants/colors';
 
 interface LoginTextFieldProps extends TextInputProps {
   label: string;
+  iconName: string;
   onToggleSecureText?: () => void;
   showSecureTextToggle?: boolean;
   secureTextVisible?: boolean;
@@ -13,28 +14,34 @@ interface LoginTextFieldProps extends TextInputProps {
 
 export default function LoginTextField({
   label,
+  iconName,
   onToggleSecureText,
   showSecureTextToggle,
   secureTextVisible,
   ...inputProps
 }: LoginTextFieldProps) {
   return (
-    <View className={showSecureTextToggle ? 'mb-6' : 'mb-5'}>
-      <Text className="text-[12px] font-medium mb-1.5" style={{ color: Colors.textMuted }}>
+    <View className={showSecureTextToggle ? 'mb-5' : 'mb-4'}>
+      <Text
+        className="mb-2 text-[12px] font-semibold uppercase"
+        style={{ color: Colors.textMuted }}
+      >
         {label}
       </Text>
       <View className="relative">
+        <View className="absolute left-4 z-10 h-12 items-center justify-center">
+          <MaterialIcon name={iconName} color={Colors.textMuted} size={20} />
+        </View>
         <TextInput
           {...inputProps}
           placeholderTextColor={Colors.textFaint}
-          className={`h-12 pl-4 rounded-xl text-[16px] ${
-            showSecureTextToggle ? 'pr-12' : 'pr-4'
-          }`}
+          accessibilityLabel={label}
+          className={`h-12 rounded-xl pl-12 text-[16px] ${showSecureTextToggle ? 'pr-12' : 'pr-4'}`}
           style={{
-            backgroundColor: Colors.surfaceContainer,
+            backgroundColor: 'rgba(34,40,49,0.58)',
             color: Colors.text,
             borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.08)',
+            borderColor: Colors.borderFaint,
           }}
           selectionColor={Colors.accent}
         />
@@ -43,7 +50,9 @@ export default function LoginTextField({
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={onToggleSecureText}
-            className="absolute right-3 h-12 items-center justify-center"
+            accessibilityLabel={secureTextVisible ? 'Hide password' : 'Show password'}
+            accessibilityRole="button"
+            className="absolute right-2 h-12 w-10 items-center justify-center"
             style={{ top: 0 }}
           >
             <MaterialIcon
@@ -57,4 +66,3 @@ export default function LoginTextField({
     </View>
   );
 }
-

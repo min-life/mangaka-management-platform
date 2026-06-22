@@ -8,10 +8,13 @@ export type RootStackParamList = {
   Login: undefined;
   Home: undefined;
   Tasks: undefined;
+  Projects: undefined;
+  ProjectDetail: { projectId: string };
+  Resources: { projectId: string };
+  ResourceFile: { projectId: string; fileId: string; parentFolderId: string };
   TaskDetail: undefined;
   Profile: undefined;
   Notifications: undefined;
-  // ProjectDetail: { projectId: string };
 };
 
 /**

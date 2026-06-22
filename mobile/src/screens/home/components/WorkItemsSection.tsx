@@ -7,9 +7,13 @@ import { WORK_ITEMS } from '@/src/constants/homeData';
 
 interface WorkItemsSectionProps {
   onTasksPress: () => void;
+  onProjectsPress: () => void;
 }
 
-export default function WorkItemsSection({ onTasksPress }: WorkItemsSectionProps) {
+export default function WorkItemsSection({
+  onTasksPress,
+  onProjectsPress,
+}: WorkItemsSectionProps) {
   return (
     <View
       className="rounded-xl overflow-hidden"
@@ -24,10 +28,15 @@ export default function WorkItemsSection({ onTasksPress }: WorkItemsSectionProps
           key={item.id}
           item={item}
           isLast={index === WORK_ITEMS.length - 1}
-          onPress={item.id === 'tasks' ? onTasksPress : undefined}
+          onPress={
+            item.id === 'tasks'
+              ? onTasksPress
+              : item.id === 'projects'
+                ? onProjectsPress
+                : undefined
+          }
         />
       ))}
     </View>
   );
 }
-

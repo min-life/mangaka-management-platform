@@ -1,0 +1,120 @@
+import React from 'react';
+import { ScrollView, Text, View } from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+
+import BottomNavBar from '@/src/components/shared/BottomNavBar';
+import { Colors } from '@/src/constants/colors';
+import { PROJECTS } from '@/src/constants/projectsData';
+import { RootStackParamList } from '@/src/navigation/types';
+
+import {
+  ProjectActionButtons,
+  ProjectBranchRow,
+  ProjectDetailHero,
+  ProjectDetailMenuItem,
+  ProjectDetailTopBar,
+} from './components';
+
+type ProjectDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'ProjectDetail'>;
+
+export default function ProjectDetailScreen({ navigation, route }: ProjectDetailScreenProps) {
+  const project = PROJECTS.find((item) => item.id === route.params.projectId);
+
+  if (!project) {
+    return (
+      <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
+        <ProjectDetailTopBar onBack={() => navigation.goBack()} />
+        <View className="flex-1 items-center justify-center px-6">
+          <Text className="text-center text-[15px] font-medium" style={{ color: Colors.text }}>
+            Project not found
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  const menuItems = [
+    {
+      label: 'Resource',
+      count: project.files,
+      icon: 'folder',
+      iconColor: '#FFFFFF',
+      iconBg: '#22C55E',
+      onPress: () => navigation.navigate('Resources', { projectId: project.id }),
+    },
+    {
+      label: 'Application',
+      count:
+        project.applications.pending +
+        project.applications.approved +
+        project.applications.rejected +
+        project.applications.cancelled,
+      icon: 'apps',
+      iconColor: '#FFFFFF',
+      iconBg: Colors.statusProgress,
+    },
+    {
+      label: 'Task',
+      count:
+        project.tasks.pending +
+        project.tasks.inProgress +
+        project.tasks.review +
+        project.tasks.done,
+      icon: 'checklist',
+      iconColor: '#FFFFFF',
+      iconBg: Colors.accent,
+    },
+    {
+      label: 'Contribute',
+      count: project.contributors,
+      icon: 'group_add',
+      iconColor: '#FFFFFF',
+      iconBg: '#DB2777',
+    },
+    {
+      label: 'More',
+      icon: 'more_vert',
+      iconColor: Colors.textMuted,
+      iconBg: 'rgba(237,241,251,0.08)',
+      trailingIcon: 'expand_less',
+    },
+  ];
+
+  return (
+    <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
+      <ProjectDetailTopBar onBack={() => navigation.goBack()} />
+
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingBottom: 24 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <ProjectDetailHero project={project} />
+
+        <View
+          style={{
+            borderTopWidth: 1,
+            borderBottomWidth: 1,
+            borderColor: Colors.borderFaint,
+          }}
+        >
+          {menuItems.map((item, index) => (
+            <ProjectDetailMenuItem
+              key={item.label}
+              icon={item.icon}
+              iconColor={item.iconColor}
+              iconBg={item.iconBg}
+              label={item.label}
+              count={item.count}
+              onPress={item.onPress}
+              trailingIcon={item.trailingIcon}
+              isLast={index === menuItems.length - 1}
+            />
+          ))}
+        </View>
+      </ScrollView>
+
+      <BottomNavBar activeTab="home" />
+    </View>
+  );
+}

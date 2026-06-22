@@ -22,13 +22,17 @@ export default function LoginSubmitButton({
       activeOpacity={isFormValid ? 0.85 : 1}
       onPress={onPress}
       disabled={!isFormValid || isLoading}
-      className="h-14 rounded-xl items-center justify-center"
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !isFormValid || isLoading, busy: isLoading }}
+      className="h-14 items-center justify-center rounded-xl"
       style={{
         backgroundColor: loginSuccess
           ? Colors.statusDone
           : isFormValid
             ? Colors.accent
             : Colors.surfaceContainer,
+        borderColor: isFormValid || loginSuccess ? 'transparent' : Colors.borderFaint,
+        borderWidth: 1,
       }}
     >
       {isLoading ? (
@@ -37,18 +41,20 @@ export default function LoginSubmitButton({
         <View className="flex-row items-center gap-2">
           <MaterialIcon name="check_circle" color={Colors.bg} size={20} />
           <Text className="font-bold text-[16px]" style={{ color: Colors.bg }}>
-            Welcome back!
+            Signed in
           </Text>
         </View>
       ) : (
-        <Text
-          className="font-bold text-[16px]"
-          style={{ color: isFormValid ? Colors.bg : Colors.textFaint }}
-        >
-          Login
-        </Text>
+        <View className="flex-row items-center gap-2">
+          <Text
+            className="font-bold text-[16px]"
+            style={{ color: isFormValid ? Colors.bg : Colors.textFaint }}
+          >
+            Sign in
+          </Text>
+          {isFormValid ? <MaterialIcon name="arrow_forward" color={Colors.bg} size={17} /> : null}
+        </View>
       )}
     </TouchableOpacity>
   );
 }
-

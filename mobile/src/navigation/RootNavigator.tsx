@@ -5,6 +5,10 @@ import { RootStackParamList } from './types';
 
 import HomeScreen from '@/src/screens/home';
 import TasksScreen from '@/src/screens/tasks';
+import ProjectsScreen from '@/src/screens/projects';
+import ProjectDetailScreen from '@/src/screens/projectDetail';
+import ResourcesScreen from '@/src/screens/resources';
+import ResourceFileScreen from '@/src/screens/resourceFile';
 import TaskDetailScreen from '@/src/screens/taskDetail';
 import ProfileScreen from '@/src/screens/profile';
 import NotificationsScreen from '@/src/screens/notifications';
@@ -37,6 +41,10 @@ export default function RootNavigator() {
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="Tasks" component={TasksScreen} />
+        <Stack.Screen name="Projects" component={ProjectsScreen} />
+        <Stack.Screen name="ProjectDetail" component={ProjectDetailScreen} />
+        <Stack.Screen name="Resources" component={ResourcesScreen} />
+        <Stack.Screen name="ResourceFile" component={ResourceFileScreen} />
         <Stack.Screen name="TaskDetail" component={TaskDetailScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />
         <Stack.Screen name="Notifications" component={NotificationsScreen} />

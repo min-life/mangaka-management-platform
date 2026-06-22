@@ -1,6 +1,7 @@
 import React from 'react';
-import { Text, TouchableOpacity } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 
+import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
 
 interface DevGoHomeButtonProps {
@@ -12,17 +13,20 @@ export default function DevGoHomeButton({ onPress }: DevGoHomeButtonProps) {
     <TouchableOpacity
       activeOpacity={0.75}
       onPress={onPress}
-      className="mt-4 h-12 rounded-xl items-center justify-center"
+      accessibilityRole="button"
+      className="mt-4 h-12 items-center justify-center rounded-xl"
       style={{
-        backgroundColor: Colors.surfaceContainer,
+        backgroundColor: 'rgba(237,241,251,0.06)',
         borderWidth: 1,
         borderColor: Colors.borderSubtle,
       }}
     >
-      <Text className="font-semibold text-[15px]" style={{ color: Colors.text }}>
-        Go Home
-      </Text>
+      <View className="flex-row items-center gap-2">
+        <MaterialIcon name="home" color={Colors.textMuted} size={18} />
+        <Text className="font-semibold text-[14px]" style={{ color: Colors.textMuted }}>
+          Preview home
+        </Text>
+      </View>
     </TouchableOpacity>
   );
 }
-
