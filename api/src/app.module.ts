@@ -11,7 +11,14 @@ import { UsersModule } from './users/users.module';
 import { RolesModule } from './roles/roles.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { ProjectsModule } from './projects/projects.module';
-// import { ResourcesModule } from './resources/resources.module';
+import { EditorBoardsModule } from './editor-boards/editor-boards.module';
+import { ApplicationsModule } from './applications/applications.module';
+import { FoldersModule } from './folders/folders.module';
+import { FilesModule } from './files/files.module';
+import { MaterialsModule } from './materials/materials.module';
+import { TasksModule } from './tasks/tasks.module';
+import { FramesModule } from './frames/frames.module';
+import { ProjectStatsModule } from './project-stats/project-stats.module';
 
 @Module({
   imports: [
@@ -24,7 +31,14 @@ import { ProjectsModule } from './projects/projects.module';
     RolesModule,
     PermissionsModule,
     ProjectsModule,
-    // ResourcesModule,
+    EditorBoardsModule,
+    ApplicationsModule,
+    FoldersModule,
+    FilesModule,
+    MaterialsModule,
+    TasksModule,
+    FramesModule,
+    ProjectStatsModule,
   ],
   controllers: [AppController],
   providers: [

@@ -1,0 +1,432 @@
+import {
+  BadRequestException,
+  ConflictException,
+  HttpException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { APPLICATION_TYPE, Prisma } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { ERROR } from '../share/constants/message-error';
+import type { Pagination } from '../share/interfaces';
+import type { FilterBoards, OrderBoards } from './interfaces/get-editor-boards.interface';
+
+const BOARD_MEMBER_SELECT = {
+  user: {
+    select: {
+      id: true,
+      email: true,
+      displayName: true,
+    },
+  },
+  isLead: true,
+} satisfies Prisma.UserEditorBoardSelect;
+
+@Injectable()
+export class EditorBoardsService {
+  private readonly logger = new Logger(EditorBoardsService.name);
+
+  constructor(private readonly prisma: PrismaService) {}
+
+  async createEditorBoard(data: { name: string; userId: number }) {
+    try {
+      const board = await this.prisma.$transaction(async (prisma) => {
+        const newBoard = await prisma.editorBoard.create({
+          data: {
+            name: data.name,
+            createdBy: data.userId,
+            updatedBy: data.userId,
+          },
+        });
+
+        await prisma.userEditorBoard.create({
+          data: {
+            userId: data.userId,
+            editorBoardId: newBoard.id,
+          },
+        });
+
+        return newBoard;
+      });
+      return board;
+    } catch (error) {
+      this.handleError(error, 'Create editor board fail', ERROR.SVCREBOARD);
+    }
+  }
+
+  async getEditorBoards(
+    userId: number,
+    filter?: FilterBoards,
+    sort?: OrderBoards,
+    pagination?: Pagination,
+  ) {
+    try {
+      const where: Prisma.EditorBoardWhereInput = {
+        ...(filter?.name && { name: { contains: filter.name, mode: 'insensitive' } }),
+        ...(filter?.me
+          ? { createdBy: userId }
+          : { OR: [{ createdBy: userId }, { userEditorBoards: { some: { userId } } }] }),
+      };
+      const field = sort?.field || 'createdAt';
+      const order = sort?.order || 'desc';
+      const orderBy: Prisma.EditorBoardOrderByWithRelationInput = { [field]: order };
+      const { page, limit, skip } = this.buildPagination(pagination);
+
+      const [total, boards] = await this.prisma.$transaction([
+        this.prisma.editorBoard.count({ where }),
+        this.prisma.editorBoard.findMany({
+          where,
+          orderBy,
+          skip,
+          take: limit,
+        }),
+      ]);
+
+      return {
+        boards,
+        pagination: this.buildPaginationMeta(total, page, limit),
+      };
+    } catch (error) {
+      this.handleError(error, 'Get editor boards fail', ERROR.SVGETBOARDS);
+    }
+  }
+
+  async getBoardById(id: number) {
+    try {
+      return await this.ensureBoard(id);
+    } catch (error) {
+      this.handleError(error, 'Get editor board fail', ERROR.SVGETBOARD);
+    }
+  }
+
+  async deleteBoard(id: number) {
+    try {
+      await this.ensureBoard(id);
+      await this.prisma.editorBoard.delete({
+        where: { id },
+      });
+    } catch (error) {
+      this.handleError(error, 'Delete editor board fail', ERROR.SVDELETEBOARD);
+    }
+  }
+
+  async updateBoard(id: number, data: { name?: string; userId: number }) {
+    try {
+      await this.ensureBoard(id);
+      const board = await this.prisma.editorBoard.update({
+        where: { id },
+        data: {
+          name: data.name,
+          updatedBy: data.userId,
+        },
+      });
+      return board;
+    } catch (error) {
+      this.handleError(error, 'Update editor board fail', ERROR.SVUPDATEBOARD);
+    }
+  }
+
+  async addMembersToBoard(editorBoardId: number, userIds: number[]) {
+    try {
+      await this.ensureBoard(editorBoardId);
+
+      const uniqueUserIds = this.uniqueIds(userIds);
+      const existingUsers = await this.prisma.user.count({
+        where: { id: { in: uniqueUserIds } },
+      });
+      if (existingUsers !== uniqueUserIds.length) {
+        throw new NotFoundException(ERROR.NFUSER);
+      }
+
+      await this.prisma.userEditorBoard.createMany({
+        data: uniqueUserIds.map((userId) => ({
+          userId,
+          editorBoardId,
+        })),
+        skipDuplicates: true,
+      });
+    } catch (error) {
+      this.handleError(error, 'Add member to editor board fail', ERROR.SVADDBOARDMEMBER);
+    }
+  }
+
+  async getBoardMembers(
+    editorBoardId: number,
+    filter?: { search?: string },
+    sort?: { field?: 'displayName' | 'email'; order?: 'asc' | 'desc' },
+    pagination?: Pagination,
+  ) {
+    try {
+      await this.ensureBoard(editorBoardId);
+
+      const where: Prisma.UserEditorBoardWhereInput = {
+        editorBoardId,
+        ...(filter?.search && {
+          OR: [
+            { user: { displayName: { contains: filter.search, mode: 'insensitive' } } },
+            { user: { email: { contains: filter.search, mode: 'insensitive' } } },
+          ],
+        }),
+      };
+      const field = sort?.field || 'displayName';
+      const order = sort?.order || 'asc';
+      const orderBy: Prisma.UserEditorBoardOrderByWithRelationInput = {
+        user: { [field]: order },
+      };
+      const { page, limit, skip } = this.buildPagination(pagination);
+
+      const [total, members] = await this.prisma.$transaction([
+        this.prisma.userEditorBoard.count({ where }),
+        this.prisma.userEditorBoard.findMany({
+          where,
+          orderBy,
+          skip,
+          take: limit,
+          select: BOARD_MEMBER_SELECT,
+        }),
+      ]);
+
+      return {
+        data: members.map((member) => ({ ...member.user, isLead: member.isLead })),
+        pagination: this.buildPaginationMeta(total, page, limit),
+      };
+    } catch (error) {
+      this.handleError(error, 'Get board members fail', ERROR.SVGETBOARDMEMBERS);
+    }
+  }
+
+  async getBoardMember(editorBoardId: number, userId: number) {
+    try {
+      const member = await this.findBoardMember(editorBoardId, userId);
+      return { ...member.user, isLead: member.isLead };
+    } catch (error) {
+      this.handleError(error, 'Get board member fail', ERROR.SVGETBOARDMEMBER);
+    }
+  }
+
+  async removeBoardMember(editorBoardId: number, userId: number) {
+    try {
+      await this.ensureBoard(editorBoardId);
+
+      const owner = await this.prisma.editorBoard.count({
+        where: {
+          id: editorBoardId,
+          createdBy: userId,
+        },
+      });
+      if (owner > 0) {
+        throw new BadRequestException(ERROR.EVLRMOWNER);
+      }
+
+      await this.findBoardMember(editorBoardId, userId);
+      await this.prisma.userEditorBoard.delete({
+        where: {
+          userId_editorBoardId: {
+            editorBoardId,
+            userId,
+          },
+        },
+      });
+    } catch (error) {
+      this.handleError(error, 'Remove board member fail', ERROR.SVREMOVEBOARDMEMBER);
+    }
+  }
+
+  async setToLead(editorBoardId: number, userId: number) {
+    try {
+      await this.findBoardMember(editorBoardId, userId);
+
+      const updatedMember = await this.prisma.$transaction(async (prisma) => {
+        await prisma.userEditorBoard.updateMany({
+          where: { editorBoardId },
+          data: { isLead: false },
+        });
+        const member = await prisma.userEditorBoard.update({
+          where: {
+            userId_editorBoardId: {
+              editorBoardId,
+              userId,
+            },
+          },
+          data: {
+            isLead: true,
+          },
+          select: BOARD_MEMBER_SELECT,
+        });
+        return { ...member.user, isLead: member.isLead };
+      });
+      return updatedMember;
+    } catch (error) {
+      this.handleError(error, 'Update board member fail', ERROR.SVUPDBOARDMEMBER);
+    }
+  }
+
+  async getBoardProjects(
+    editorBoardId: number,
+    filter?: { search?: string },
+    order?: { field: 'name' | 'createdAt'; order: 'asc' | 'desc' },
+    pagination?: Pagination,
+  ) {
+    try {
+      await this.ensureBoard(editorBoardId);
+
+      const where: Prisma.ProjectWhereInput = {
+        editorBoardId,
+        ...(filter?.search && {
+          name: { contains: filter.search, mode: 'insensitive' },
+        }),
+      };
+      const orderBy: Prisma.ProjectOrderByWithRelationInput | undefined = order
+        ? { [order.field]: order.order }
+        : undefined;
+      const { page, limit, skip } = this.buildPagination(pagination);
+
+      const [total, projects] = await this.prisma.$transaction([
+        this.prisma.project.count({ where }),
+        this.prisma.project.findMany({
+          where,
+          orderBy,
+          take: limit,
+          skip,
+        }),
+      ]);
+
+      return { projects, pagination: this.buildPaginationMeta(total, page, limit) };
+    } catch (error) {
+      this.handleError(error, 'Get board projects fail', ERROR.SVGETBOARDPROJECTS);
+    }
+  }
+
+  async addProjectsToBoard(editorBoardId: number, projectIds: number[]) {
+    try {
+      await this.ensureBoard(editorBoardId);
+
+      const uniqueProjectIds = this.uniqueIds(projectIds);
+      const projects = await this.prisma.$transaction(async (prisma) => {
+        const existingProjects = await prisma.project.count({
+          where: { id: { in: uniqueProjectIds } },
+        });
+        if (existingProjects !== uniqueProjectIds.length) {
+          throw new NotFoundException(ERROR.NFPROJECT);
+        }
+
+        const cflProjects = await prisma.project.count({
+          where: {
+            id: { in: uniqueProjectIds },
+            editorBoardId: { not: null },
+            NOT: { editorBoardId },
+          },
+        });
+        if (cflProjects > 0) {
+          throw new ConflictException(ERROR.CFLBOARDPROJECTS);
+        }
+
+        return prisma.project.updateMany({
+          where: { id: { in: uniqueProjectIds } },
+          data: { editorBoardId },
+        });
+      });
+      return projects;
+    } catch (error) {
+      this.handleError(error, 'Add projects to board fail', ERROR.SVADDBOARDPROJECTS);
+    }
+  }
+
+  async getBoardApplications(
+    editorBoardId: number,
+    filter?: { search?: string },
+    order?: { field: 'title' | 'createdAt'; order: 'asc' | 'desc' },
+    pagination?: Pagination,
+  ) {
+    try {
+      await this.ensureBoard(editorBoardId);
+
+      const where: Prisma.ApplicationWhereInput = {
+        project: { editorBoardId },
+        type: APPLICATION_TYPE.PUBLISH_REQUEST,
+        ...(filter?.search && {
+          title: { contains: filter.search, mode: 'insensitive' },
+        }),
+      };
+      const orderBy: Prisma.ApplicationOrderByWithRelationInput | undefined = order
+        ? { [order.field]: order.order }
+        : undefined;
+      const { page, limit, skip } = this.buildPagination(pagination);
+
+      const [total, applications] = await this.prisma.$transaction([
+        this.prisma.application.count({ where }),
+        this.prisma.application.findMany({
+          where,
+          orderBy,
+          take: limit,
+          skip,
+        }),
+      ]);
+
+      return { applications, pagination: this.buildPaginationMeta(total, page, limit) };
+    } catch (error) {
+      this.handleError(error, 'Get board applications fail', ERROR.SVGETBOARDAPPLICATIONS);
+    }
+  }
+
+  private buildPagination(pagination?: Pagination) {
+    const page = pagination?.page || 1;
+    const limit = pagination?.limit || 10;
+    return {
+      page,
+      limit,
+      skip: (page - 1) * limit,
+    };
+  }
+
+  private buildPaginationMeta(total: number, page: number, limit: number) {
+    return {
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    };
+  }
+
+  private async ensureBoard(id: number) {
+    const board = await this.prisma.editorBoard.findUnique({
+      where: { id },
+    });
+    if (!board) {
+      throw new NotFoundException(ERROR.NFBOARD);
+    }
+    return board;
+  }
+
+  private async findBoardMember(editorBoardId: number, userId: number) {
+    await this.ensureBoard(editorBoardId);
+
+    const member = await this.prisma.userEditorBoard.findUnique({
+      where: {
+        userId_editorBoardId: {
+          editorBoardId,
+          userId,
+        },
+      },
+      select: BOARD_MEMBER_SELECT,
+    });
+    if (!member) {
+      throw new NotFoundException(ERROR.NFUSER);
+    }
+    return member;
+  }
+
+  private uniqueIds(ids: number[]) {
+    return [...new Set(ids)];
+  }
+
+  private handleError(error: unknown, logMessage: string, clientMessage: string): never {
+    this.logger.error(logMessage, error instanceof Error ? error.stack : String(error));
+    if (error instanceof HttpException) {
+      throw error;
+    }
+    throw new InternalServerErrorException(clientMessage);
+  }
+}

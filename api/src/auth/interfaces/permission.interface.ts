@@ -6,7 +6,16 @@ export interface PermissionMetadata {
 }
 
 export type PermissionMode = 'ANY' | 'ALL';
-export type Resource = 'BOARD' | 'PROJECT' | 'FOLDER' | 'FILE' | 'MATERIAL' | 'TASK' | 'FRAME' | 'COMMENT';
+export type Resource =
+  | 'BOARD'
+  | 'PROJECT'
+  | 'FOLDER'
+  | 'FILE'
+  | 'MATERIAL'
+  | 'TASK'
+  | 'FRAME'
+  | 'COMMENT'
+  | 'APPLICATION';
 export type Permission =
   | 'admin'
   | 'user:read'
@@ -47,5 +56,10 @@ export type Permission =
   | 'project:frame.delete'
   | 'project:comment.create'
   | 'project:comment.update'
-  | 'project:comment.delete';
+  | 'project:comment.delete'
+  | 'project:application.create'
+  | 'project:application.read'
+  | 'project:application.update'
+  | 'project:application.delete'
+  | 'project:application.approve';
 // ChuongTV #005 end
