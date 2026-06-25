@@ -33,13 +33,160 @@ const PROJECT_MEMBER_SELECT = {
   updatedAt: true,
 } satisfies Prisma.UserProjectSelect;
 
+const EDITOR_BOARD_SELECT = {
+  id: true,
+  name: true,
+  description: true,
+  imageUrl: true,
+  createdByUser: {
+    select: {
+      id: true,
+      email: true,
+      displayName: true,
+      avatarUrl: true,
+    },
+  },
+  updatedByUser: {
+    select: {
+      id: true,
+      email: true,
+      displayName: true,
+      avatarUrl: true,
+    },
+  },
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.EditorBoardSelect;
+
+const PROJECT_SELECT = {
+  id: true,
+  name: true,
+  description: true,
+  imageUrl: true,
+  editorBoard: {
+    select: EDITOR_BOARD_SELECT,
+  },
+  createdByUser: {
+    select: {
+      id: true,
+      email: true,
+      displayName: true,
+      avatarUrl: true,
+    },
+  },
+  updatedByUser: {
+    select: {
+      id: true,
+      email: true,
+      displayName: true,
+      avatarUrl: true,
+    },
+  },
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.ProjectSelect;
+
+const PROJECT_WITH_MEMBERS_SELECT = {
+  ...PROJECT_SELECT,
+  userProjects: {
+    select: PROJECT_MEMBER_SELECT,
+  },
+} satisfies Prisma.ProjectSelect;
+
+const APPLICATION_SELECT = {
+  id: true,
+  project: {
+    select: PROJECT_SELECT,
+  },
+  title: true,
+  description: true,
+  materials: true,
+  type: true,
+  status: true,
+  verifiedByUser: {
+    select: {
+      id: true,
+      email: true,
+      displayName: true,
+      avatarUrl: true,
+    },
+  },
+  createdByUser: {
+    select: {
+      id: true,
+      email: true,
+      displayName: true,
+      avatarUrl: true,
+    },
+  },
+  updatedByUser: {
+    select: {
+      id: true,
+      email: true,
+      displayName: true,
+      avatarUrl: true,
+    },
+  },
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.ApplicationSelect;
+
+const FOLDER_SELECT = {
+  id: true,
+  title: true,
+  description: true,
+  parent: {
+    select: {
+      id: true,
+      title: true,
+      description: true,
+    },
+  },
+  project: {
+    select: PROJECT_SELECT,
+  },
+  createdByUser: {
+    select: {
+      id: true,
+      email: true,
+      displayName: true,
+      avatarUrl: true,
+    },
+  },
+  updatedByUser: {
+    select: {
+      id: true,
+      email: true,
+      displayName: true,
+      avatarUrl: true,
+    },
+  },
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.FolderSelect;
+
+const PROJECT_STAT_SELECT = {
+  id: true,
+  project: {
+    select: PROJECT_SELECT,
+  },
+  metrics: true,
+  updatedAt: true,
+} satisfies Prisma.ProjectStatSelect;
+
 @Injectable()
 export class ProjectsService {
   private readonly logger = new Logger(ProjectsService.name);
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async createProject(data: { name: string; editorBoardId?: number | null; userId: number }) {
+  async createProject(data: {
+    name: string;
+    editorBoardId?: number | null;
+    userId: number;
+    description?: string;
+    imageUrl?: string;
+  }) {
     try {
       const project = await this.prisma.$transaction(async (prisma) => {
         if (data.editorBoardId) {
@@ -53,7 +200,10 @@ export class ProjectsService {
             editorBoardId: data.editorBoardId,
             createdBy: data.userId,
             updatedBy: data.userId,
+            description: data.description,
+            imageUrl: data.imageUrl,
           },
+          select: PROJECT_WITH_MEMBERS_SELECT,
         });
 
         await prisma.userProject.create({
@@ -98,6 +248,7 @@ export class ProjectsService {
           orderBy: { [field]: order },
           skip,
           take: limit,
+          select: PROJECT_WITH_MEMBERS_SELECT,
         }),
       ]);
 
@@ -112,7 +263,14 @@ export class ProjectsService {
 
   async getProjectById(id: number) {
     try {
-      return await this.ensureProject(id);
+      const project = await this.prisma.project.findUnique({
+        where: { id },
+        select: PROJECT_WITH_MEMBERS_SELECT,
+      });
+      if (!project) {
+        throw new NotFoundException(ERROR.NFPROJECT);
+      }
+      return project;
     } catch (error) {
       this.handleError(error, 'Get project fail', ERROR.SVGETPROJECT);
     }
@@ -135,6 +293,7 @@ export class ProjectsService {
           editorBoardId: data.editorBoardId,
           updatedBy: data.userId,
         },
+        select: PROJECT_SELECT,
       });
     } catch (error) {
       this.handleError(error, 'Update project fail', ERROR.SVUPDATEPROJECT);
@@ -300,6 +459,7 @@ export class ProjectsService {
       await this.ensureProject(projectId);
       return await this.prisma.editorBoard.findFirst({
         where: { projects: { some: { id: projectId } } },
+        select: EDITOR_BOARD_SELECT,
       });
     } catch (error) {
       this.handleError(error, 'Get project editor board fail', ERROR.SVGETPROJECTBOARD);
@@ -350,6 +510,7 @@ export class ProjectsService {
           orderBy,
           skip,
           take: limit,
+          select: APPLICATION_SELECT,
         }),
       ]);
 
@@ -384,6 +545,7 @@ export class ProjectsService {
           createdBy: data.userId,
           updatedBy: data.userId,
         },
+        select: APPLICATION_SELECT,
       });
     } catch (error) {
       this.handleError(error, 'Create project application fail', ERROR.SVCREPROJECTAPPLICATION);
@@ -416,6 +578,7 @@ export class ProjectsService {
           orderBy,
           skip,
           take: limit,
+          select: FOLDER_SELECT,
         }),
       ]);
 
@@ -452,6 +615,7 @@ export class ProjectsService {
           createdBy: data.userId,
           updatedBy: data.userId,
         },
+        select: FOLDER_SELECT,
       });
     } catch (error) {
       this.handleError(error, 'Create project folder fail', ERROR.SVCREPROJECTFOLDER);
@@ -565,6 +729,7 @@ export class ProjectsService {
 
       const projectStat = await this.prisma.projectStat.findFirst({
         where: { projectId },
+        select: PROJECT_STAT_SELECT,
       });
 
       return projectStat;
@@ -588,6 +753,7 @@ export class ProjectsService {
             metrics: data.metrics as Prisma.InputJsonValue,
             updatedAt: new Date(),
           },
+          select: PROJECT_STAT_SELECT,
         });
       }
 
@@ -597,6 +763,7 @@ export class ProjectsService {
           metrics: data.metrics as Prisma.InputJsonValue,
           updatedAt: new Date(),
         },
+        select: PROJECT_STAT_SELECT,
       });
     } catch (error) {
       this.handleError(error, 'Import project stats fail', ERROR.SVIMPORTPROJECTSTATS);

@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PROGRESS_STATUS } from '@prisma/client';
+import { UserResDto } from '../../share/dto';
+import { FileResDto } from '../../files/dto';
 
 export class PaginationResDto {
   @ApiProperty({ example: 25 })
@@ -28,20 +30,20 @@ export class TaskResDto {
   @ApiProperty({ enum: PROGRESS_STATUS, example: PROGRESS_STATUS.PENDING })
   status!: PROGRESS_STATUS;
 
-  @ApiPropertyOptional({ example: 9, nullable: true })
-  parentId?: number | null;
+  @ApiPropertyOptional({ type: TaskResDto, nullable: true })
+  parent?: TaskResDto | null;
 
-  @ApiProperty({ example: 5 })
-  fileId!: number;
+  @ApiProperty({ type: FileResDto })
+  file!: FileResDto;
 
-  @ApiPropertyOptional({ example: 2, nullable: true })
-  assignedBy?: number | null;
+  @ApiPropertyOptional({ type: UserResDto, nullable: true })
+  assignedByUser?: UserResDto | null;
 
-  @ApiPropertyOptional({ example: 1, nullable: true })
-  createdBy?: number | null;
+  @ApiPropertyOptional({ type: UserResDto, nullable: true })
+  createdByUser?: UserResDto | null;
 
-  @ApiPropertyOptional({ example: 1, nullable: true })
-  updatedBy?: number | null;
+  @ApiPropertyOptional({ type: UserResDto, nullable: true })
+  updatedByUser?: UserResDto | null;
 
   @ApiProperty({ example: '2026-06-18T03:00:00.000Z' })
   createdAt!: Date;

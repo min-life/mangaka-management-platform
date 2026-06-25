@@ -14,4 +14,14 @@ export class CreateProjectReqDto {
   @IsInt()
   @Min(1)
   editorBoardId?: number;
+
+  @ApiPropertyOptional({ example: 'Description of the project' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({ example: 'https://example.com/image.jpg' })
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
 }

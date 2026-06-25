@@ -10,6 +10,114 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
 
+const USER_SELECT = {
+  select: {
+    id: true,
+    email: true,
+    displayName: true,
+    avatarUrl: true,
+  },
+};
+
+const FOLDER_SELECT = {
+  id: true,
+  title: true,
+  description: true,
+  project: {
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      imageUrl: true,
+      editorBoard: {
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          imageUrl: true,
+          createdByUser: USER_SELECT,
+          updatedByUser: USER_SELECT,
+          createdAt: true,
+          updatedAt: true,
+        },
+      },
+      createdByUser: USER_SELECT,
+      updatedByUser: USER_SELECT,
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
+  createdByUser: USER_SELECT,
+  updatedByUser: USER_SELECT,
+  createdAt: true,
+  updatedAt: true,
+};
+
+const FILE_SELECT = {
+  id: true,
+  title: true,
+  description: true,
+  folder: {
+    select: FOLDER_SELECT,
+  },
+  createdByUser: USER_SELECT,
+  updatedByUser: USER_SELECT,
+  createdAt: true,
+  updatedAt: true,
+};
+
+const TASK_SELECT = {
+  id: true,
+  title: true,
+  description: true,
+  status: true,
+  parent: {
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      status: true,
+    },
+  },
+  file: {
+    select: FILE_SELECT,
+  },
+  assignedByUser: USER_SELECT,
+  createdByUser: USER_SELECT,
+  updatedByUser: USER_SELECT,
+  createdAt: true,
+  updatedAt: true,
+};
+
+const FRAME_SELECT = {
+  id: true,
+  startX: true,
+  startY: true,
+  endX: true,
+  endY: true,
+  task: {
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      status: true,
+    },
+  },
+  createdByUser: USER_SELECT,
+  updatedByUser: USER_SELECT,
+  createdAt: true,
+  updatedAt: true,
+};
+
+const COMMENT_SELECT = {
+  id: true,
+  content: true,
+  frameId: true,
+  createdByUser: USER_SELECT,
+  createdAt: true,
+  updatedAt: true,
+};
+
 @Injectable()
 export class TasksService {
   private readonly logger = new Logger(TasksService.name);
@@ -18,7 +126,14 @@ export class TasksService {
 
   async getTaskById(id: number) {
     try {
-      return await this.ensureTask(id);
+      const task = await this.prisma.task.findUnique({
+        where: { id },
+        select: TASK_SELECT,
+      });
+      if (!task) {
+        throw new NotFoundException(ERROR.NFTASK);
+      }
+      return task;
     } catch (error) {
       this.handleError(error, 'Get task fail', ERROR.SVGETTASK);
     }
@@ -48,6 +163,7 @@ export class TasksService {
           assignedBy: data.assignedBy,
           updatedBy: data.userId,
         },
+        select: TASK_SELECT,
       });
     } catch (error) {
       this.handleError(error, 'Update task fail', ERROR.SVUPDATETASK);
@@ -92,6 +208,7 @@ export class TasksService {
           orderBy,
           skip,
           take: limit,
+          select: TASK_SELECT,
         }),
       ]);
 
@@ -125,6 +242,7 @@ export class TasksService {
           orderBy,
           skip,
           take: limit,
+          select: FRAME_SELECT,
         }),
       ]);
 
@@ -159,6 +277,7 @@ export class TasksService {
           taskId,
           createdBy: data.userId,
         },
+        select: FRAME_SELECT,
       });
     } catch (error) {
       this.handleError(error, 'Create frame fail', ERROR.SVCREATEFRAME);
@@ -186,6 +305,7 @@ export class TasksService {
           orderBy: { createdAt: 'desc' },
           skip,
           take: limit,
+          select: COMMENT_SELECT,
         }),
       ]);
 

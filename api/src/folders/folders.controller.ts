@@ -24,13 +24,12 @@ import {
   ChildrenResponseDto,
   CreateChildFolderReqDto,
   CreateFileReqDto,
-  FileResponseDto,
-  FilesResponseDto,
   FolderResponseDto,
   QueryFolderChildrenReqDto,
   QueryFolderFilesReqDto,
   UpdateFolderReqDto,
 } from './dto';
+import { FileResponseDto, FilesResponseDto } from '../files/dto';
 
 @ApiTags('Folders')
 @ApiBearerAuth()

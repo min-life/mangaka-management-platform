@@ -1,4 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { UserResDto } from '../../share/dto';
+import { ProjectResDto } from '../../projects/dto';
 
 export class PaginationResDto {
   @ApiProperty({ example: 25 })
@@ -24,43 +26,17 @@ export class FolderResDto {
   @ApiPropertyOptional({ example: 'Initial rough sketches.', nullable: true })
   description?: string | null;
 
-  @ApiPropertyOptional({ example: 1, nullable: true })
-  parentId?: number | null;
+  @ApiPropertyOptional({ type: FolderResDto, nullable: true })
+  parent?: FolderResDto | null;
 
-  @ApiProperty({ example: 10 })
-  projectId!: number;
+  @ApiProperty({ type: ProjectResDto })
+  project!: ProjectResDto;
 
-  @ApiPropertyOptional({ example: 1, nullable: true })
-  createdBy?: number | null;
+  @ApiPropertyOptional({ type: UserResDto, nullable: true })
+  createdByUser?: UserResDto | null;
 
-  @ApiPropertyOptional({ example: 1, nullable: true })
-  updatedBy?: number | null;
-
-  @ApiProperty({ example: '2026-06-18T03:00:00.000Z' })
-  createdAt!: Date;
-
-  @ApiProperty({ example: '2026-06-18T03:00:00.000Z' })
-  updatedAt!: Date;
-}
-
-export class FileResDto {
-  @ApiProperty({ example: 5 })
-  id!: number;
-
-  @ApiProperty({ example: 'Chapter 01 Page 1' })
-  title!: string;
-
-  @ApiPropertyOptional({ example: 'First page of chapter 01.', nullable: true })
-  description?: string | null;
-
-  @ApiProperty({ example: 4 })
-  folderId!: number;
-
-  @ApiPropertyOptional({ example: 1, nullable: true })
-  createdBy?: number | null;
-
-  @ApiPropertyOptional({ example: 1, nullable: true })
-  updatedBy?: number | null;
+  @ApiPropertyOptional({ type: UserResDto, nullable: true })
+  updatedByUser?: UserResDto | null;
 
   @ApiProperty({ example: '2026-06-18T03:00:00.000Z' })
   createdAt!: Date;
@@ -74,14 +50,9 @@ export class FolderResponseDto {
   data!: FolderResDto;
 }
 
-export class FileResponseDto {
-  @ApiProperty({ type: FileResDto })
-  data!: FileResDto;
-}
-
-export class FilesResponseDto {
-  @ApiProperty({ type: [FileResDto] })
-  data!: FileResDto[];
+export class FoldersResponseDto {
+  @ApiProperty({ type: [FolderResDto] })
+  data!: FolderResDto[];
 
   @ApiProperty({ type: PaginationResDto })
   pagination!: PaginationResDto;
