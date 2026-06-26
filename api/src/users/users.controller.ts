@@ -15,8 +15,14 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-<<<<<<< Updated upstream
-import { ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 import type { Response } from 'express';
 =======
 import {
@@ -41,13 +47,17 @@ import { ReplaceUserRolesDto } from './dto/replace-user-roles.dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { QueryUsersReqDto, UsersResponseDto } from './dto';
 import { UsersService } from './users.service';
 
+@ApiTags('Users')
 @ApiBearerAuth()
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  @ApiOperation({ summary: 'Get current user profile' })
+  @ApiOkResponse({ description: 'User profile retrieved successfully' })
   @Get('me')
   getMe(@CurrentUser() currentUser: JwtPayload) {
     return this.usersService.getMe(currentUser.userId);
@@ -70,6 +80,8 @@ export class UsersController {
     return this.usersService.updateMe(currentUser.userId, body);
   }
 
+  @ApiOperation({ summary: 'Update current user password' })
+  @ApiOkResponse({ description: 'Password updated successfully' })
   @Patch('me/password')
   updatePassword(@CurrentUser() currentUser: JwtPayload, @Body() body: UpdatePasswordDto) {
     return this.usersService.updatePassword(currentUser.userId, body);
@@ -128,6 +140,8 @@ export class UsersController {
   }
 
   @Public()
+  @ApiOperation({ summary: 'Google account linking callback' })
+  @ApiOkResponse({ description: 'Account linked successfully' })
   @Get('me/link-account/callback')
   @UseGuards(GoogleLinkGuard)
   async linkGoogleAccountCallback(
@@ -139,54 +153,84 @@ export class UsersController {
     return response.redirect(redirectUrl);
   }
 
+  @ApiOperation({ summary: 'Get all users (admin only)' })
+  @ApiOkResponse({ description: 'Users retrieved successfully', type: UsersResponseDto })
   @Get()
   @Permissions({ mode: 'ANY', permissions: ['admin', 'user:read'] })
-  findAll() {
-    return this.usersService.findAll();
+  findAll(@Query() query: QueryUsersReqDto) {
+    const { search, isActive, field, order, page, limit } = query;
+    return this.usersService.findAll(
+      { search, isActive },
+      { field, order },
+      { page: page ?? 1, limit: limit ?? 10 },
+    );
   }
 
+  @ApiOperation({ summary: 'Create staff user (admin only)' })
+  @ApiCreatedResponse({ description: 'User created successfully' })
   @Post()
   @Permissions({ mode: 'ANY', permissions: ['admin'] })
   create(@CurrentUser() currentUser: JwtPayload, @Body() body: CreateStaffUserDto) {
     return this.usersService.createStaffUser(currentUser.userId, body);
   }
 
+  @ApiOperation({ summary: 'Get user roles' })
+  @ApiParam({ name: 'userId', type: Number, description: 'User ID' })
+  @ApiOkResponse({ description: 'User roles retrieved successfully' })
   @Get(':userId/roles')
   @Permissions({ mode: 'ANY', permissions: ['admin', 'role:read'] })
   findRoles(@Param('userId') userId: string) {
     return this.usersService.findRoles(Number(userId));
   }
 
+  @ApiOperation({ summary: 'Append roles to user' })
+  @ApiParam({ name: 'userId', type: Number, description: 'User ID' })
+  @ApiOkResponse({ description: 'Roles appended successfully' })
   @Post(':userId/roles')
   @Permissions({ mode: 'ANY', permissions: ['admin', 'role:read'] })
   appendRoles(@Param('userId') userId: string, @Body() body: AppendUserRolesDto) {
     return this.usersService.appendRoles(Number(userId), body.roleIds);
   }
 
+  @ApiOperation({ summary: 'Replace user roles' })
+  @ApiParam({ name: 'userId', type: Number, description: 'User ID' })
+  @ApiOkResponse({ description: 'Roles replaced successfully' })
   @Put(':userId/roles')
   @Permissions({ mode: 'ANY', permissions: ['admin', 'role:read'] })
   replaceRoles(@Param('userId') userId: string, @Body() body: ReplaceUserRolesDto) {
     return this.usersService.replaceRoles(Number(userId), body.roleIds);
   }
 
+  @ApiOperation({ summary: 'Get user projects' })
+  @ApiParam({ name: 'userId', type: Number, description: 'User ID' })
+  @ApiOkResponse({ description: 'User projects retrieved successfully' })
   @Get(':userId/projects')
   @Permissions({ mode: 'ANY', permissions: ['admin', 'project:read'] })
   findProjects(@Param('userId') userId: string) {
     return this.usersService.findProjects(Number(userId));
   }
 
+  @ApiOperation({ summary: 'Get user editor boards' })
+  @ApiParam({ name: 'userId', type: Number, description: 'User ID' })
+  @ApiOkResponse({ description: 'User editor boards retrieved successfully' })
   @Get(':userId/editor-boards')
   @Permissions({ mode: 'ANY', permissions: ['admin', 'project:read'] })
   findEditorBoards(@Param('userId') userId: string) {
     return this.usersService.findEditorBoards(Number(userId));
   }
 
+  @ApiOperation({ summary: 'Get user by ID' })
+  @ApiParam({ name: 'id', type: Number, description: 'User ID' })
+  @ApiOkResponse({ description: 'User retrieved successfully' })
   @Get(':id')
   @Permissions({ mode: 'ANY', permissions: ['admin', 'user:read'] })
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(Number(id));
   }
 
+  @ApiOperation({ summary: 'Update user' })
+  @ApiParam({ name: 'id', type: Number, description: 'User ID' })
+  @ApiOkResponse({ description: 'User updated successfully' })
   @Patch(':id')
   @Permissions({ mode: 'ANY', permissions: ['admin', 'user:update'] })
   update(
@@ -197,6 +241,9 @@ export class UsersController {
     return this.usersService.update(Number(id), { ...body, updatedBy: currentUser.userId });
   }
 
+  @ApiOperation({ summary: 'Delete user' })
+  @ApiParam({ name: 'id', type: Number, description: 'User ID' })
+  @ApiOkResponse({ description: 'User deleted successfully' })
   @Delete(':id')
   @Permissions({ mode: 'ANY', permissions: ['admin', 'user:delete'] })
   delete(@Param('id') id: string) {

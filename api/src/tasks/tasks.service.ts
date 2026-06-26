@@ -89,6 +89,26 @@ const TASK_SELECT = {
   updatedAt: true,
 };
 
+const TASK_LIST_SELECT = {
+  id: true,
+  title: true,
+  description: true,
+  status: true,
+  parentId: true,
+  fileId: true,
+  file: {
+    select: {
+      id: true,
+      title: true,
+    },
+  },
+  assignedByUser: USER_SELECT,
+  createdByUser: USER_SELECT,
+  updatedByUser: USER_SELECT,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.TaskSelect;
+
 const FRAME_SELECT = {
   id: true,
   startX: true,
@@ -208,7 +228,7 @@ export class TasksService {
           orderBy,
           skip,
           take: limit,
-          select: TASK_SELECT,
+          select: TASK_LIST_SELECT,
         }),
       ]);
 
@@ -315,6 +335,46 @@ export class TasksService {
       };
     } catch (error) {
       this.handleError(error, 'Get task comments fail', ERROR.SVGETTASKCOMMENTS);
+    }
+  }
+
+  async getMyTasks(
+    userId: number,
+    filter?: {
+      search?: string;
+      status?: PROGRESS_STATUS;
+    },
+    sort?: { field: 'title' | 'createdAt'; order: 'asc' | 'desc' },
+    pagination?: Pagination,
+  ) {
+    try {
+      const where: Prisma.TaskWhereInput = {
+        assignedBy: userId,
+        ...(filter?.search && { title: { contains: filter.search, mode: 'insensitive' } }),
+        ...(filter?.status && { status: filter.status }),
+      };
+      const orderBy: Prisma.TaskOrderByWithRelationInput = sort
+        ? { [sort.field]: sort.order }
+        : { createdAt: 'desc' };
+      const { page, limit, skip } = this.buildPagination(pagination);
+
+      const [total, tasks] = await this.prisma.$transaction([
+        this.prisma.task.count({ where }),
+        this.prisma.task.findMany({
+          where,
+          orderBy,
+          skip,
+          take: limit,
+          select: TASK_LIST_SELECT,
+        }),
+      ]);
+
+      return {
+        tasks,
+        pagination: this.buildPaginationMeta(total, page, limit),
+      };
+    } catch (error) {
+      this.handleError(error, 'Get my tasks fail', ERROR.SVGETTASK);
     }
   }
 

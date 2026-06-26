@@ -29,8 +29,8 @@ export class FolderResDto {
   @ApiPropertyOptional({ type: FolderResDto, nullable: true })
   parent?: FolderResDto | null;
 
-  @ApiProperty({ type: ProjectResDto })
-  project!: ProjectResDto;
+  @ApiPropertyOptional({ type: () => ProjectResDto, nullable: true })
+  project?: ProjectResDto | null;
 
   @ApiPropertyOptional({ type: UserResDto, nullable: true })
   createdByUser?: UserResDto | null;

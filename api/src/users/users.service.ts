@@ -21,6 +21,7 @@ import { ERROR } from '../share/constants/message-error';
 import { requireEnv, requireNumberEnv } from '../share/helpers/env';
 import { serializeRole } from '../share/utils/role-serializer';
 import { Resource, Permission, GoogleUser } from '../auth/interfaces';
+import { Pagination } from '../share/interfaces';
 import { CreateStaffUserDto } from './dto/create-staff-user.dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -54,10 +55,44 @@ export class UsersService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async findAll() {
+  async findAll(
+    filter?: { search?: string; isActive?: boolean },
+    sort?: { field?: 'createdAt' | 'displayName' | 'email'; order?: 'asc' | 'desc' },
+    pagination?: Pagination,
+  ) {
     try {
-      const users = await this.prisma.user.findMany({ orderBy: { id: 'asc' } });
-      return { data: users.map(this.serializeUser) };
+      const where: Prisma.UserWhereInput = {
+        ...(filter?.search && {
+          OR: [
+            { displayName: { contains: filter.search, mode: 'insensitive' } },
+            { email: { contains: filter.search, mode: 'insensitive' } },
+          ],
+        }),
+        ...(filter?.isActive !== undefined && { isActive: filter.isActive }),
+      };
+      
+      const field = sort?.field || 'createdAt';
+      const order = sort?.order || 'desc';
+      const { page, limit, skip } = this.buildPagination(pagination);
+
+      const [total, users] = await this.prisma.$transaction([
+        this.prisma.user.count({ where }),
+        this.prisma.user.findMany({
+          where,
+          orderBy: { [field]: order },
+          skip,
+          take: limit,
+        }),
+      ]);
+
+      return {
+        data: users.map((user) => ({
+          ...this.serializeUser(user),
+          isActive: user.isActive,
+          googleLinked: !!user.googleId,
+        })),
+        pagination: this.buildPaginationMeta(total, page, limit),
+      };
     } catch (error) {
       this.handleError(error, 'Get all users fail', ERROR.SVGETPROJECTMEMBERS);
     }
@@ -911,6 +946,21 @@ export class UsersService {
         throw new ConflictException(ERROR.CFLGOOGLEACCOUNT);
       }
     }
+  }
+
+  private buildPagination(pagination?: Pagination) {
+    const page = pagination?.page || 1;
+    const limit = pagination?.limit || 10;
+    return { page, limit, skip: (page - 1) * limit };
+  }
+
+  private buildPaginationMeta(total: number, page: number, limit: number) {
+    return {
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    };
   }
 
   private serializeUser(user: {

@@ -1,4 +1,11 @@
 import { Body, Controller, Get, Headers, HttpCode, Post, Res, UseGuards } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import type { Response } from 'express';
 import { LoginDto } from './dto/login.dto';
@@ -20,35 +27,46 @@ const REFRESH_COOKIE_OPTIONS = {
   path: '/api/auth',
 };
 
+@ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Public()
+  @ApiOperation({ summary: 'Register a new user' })
+  @ApiCreatedResponse({ description: 'User registered successfully' })
   @Post('register')
   register(@Body() body: RegisterDto) {
     return this.authService.register(body);
   }
 
   @Public()
+  @ApiOperation({ summary: 'Verify user email' })
+  @ApiOkResponse({ description: 'Email verified successfully' })
   @Post('verify-email')
   verifyEmail(@Body() body: VerifyEmailDto) {
     return this.authService.verifyEmail(body.token);
   }
 
   @Public()
+  @ApiOperation({ summary: 'Request password reset' })
+  @ApiOkResponse({ description: 'Password reset email sent' })
   @Post('forgot')
   forgotPassword(@Body() body: ForgotPasswordDto) {
     return this.authService.forgotPassword(body);
   }
 
   @Public()
+  @ApiOperation({ summary: 'Reset password with token' })
+  @ApiOkResponse({ description: 'Password reset successfully' })
   @Post('reset')
   resetPassword(@Body() body: ResetPasswordDto) {
     return this.authService.resetPassword(body);
   }
 
   @Public()
+  @ApiOperation({ summary: 'Initiate Google OAuth' })
+  @ApiOkResponse({ description: 'Redirects to Google OAuth' })
   @Get('google')
   @UseGuards(AuthGuard('google'))
   googleAuth() {
@@ -56,6 +74,8 @@ export class AuthController {
   }
 
   @Public()
+  @ApiOperation({ summary: 'Google OAuth callback' })
+  @ApiOkResponse({ description: 'Authentication successful' })
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   async googleCallback(
@@ -76,6 +96,8 @@ export class AuthController {
   }
 
   @Public()
+  @ApiOperation({ summary: 'Login with email and password' })
+  @ApiOkResponse({ description: 'Login successful' })
   @Post('login')
   async login(@Body() body: LoginDto, @Res({ passthrough: true }) response: Response) {
     const { refreshToken, refreshTokenExpiresAt, ...loginResponse } =
@@ -90,6 +112,8 @@ export class AuthController {
   }
 
   @Public()
+  @ApiOperation({ summary: 'Refresh access token' })
+  @ApiOkResponse({ description: 'Token refreshed successfully' })
   @Post('refresh')
   async refresh(
     @Cookie('refreshToken') cookieRefreshToken: string | undefined,
@@ -108,6 +132,8 @@ export class AuthController {
   }
 
   @Public()
+  @ApiOperation({ summary: 'Logout user' })
+  @ApiOkResponse({ description: 'Logout successful' })
   @Post('logout')
   @HttpCode(204)
   async logout(

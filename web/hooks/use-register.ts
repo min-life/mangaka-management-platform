@@ -4,15 +4,10 @@ import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AxiosError } from 'axios';
 
+import type { RegisterErrors } from '@/lib/validators/auth';
 import { register as registerRequest } from '@/services/auth.service';
 
-export type RegisterErrors = Partial<{
-  displayName: string;
-  email: string;
-  password: string;
-  confirmPassword: string;
-  form: string;
-}>;
+export type { RegisterErrors };
 
 type RegisterValues = {
   displayName: string;

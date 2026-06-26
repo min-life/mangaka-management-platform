@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
-import { ApiOperation, ApiOkResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiOperation, ApiOkResponse, ApiParam, ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Permissions } from '../share/decorators';
 import { CurrentUser } from '../share/decorators';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
@@ -8,6 +8,7 @@ import { PermissionFilterDto } from './dto/permission-filter.dto';
 import { UpdatePermissionDto } from './dto/update-permission.dto';
 import { UserPermissionsResponseDto } from './dto/user-permissions-response.dto';
 
+@ApiTags('Permissions')
 @ApiBearerAuth()
 @Controller('permissions')
 export class PermissionsController {

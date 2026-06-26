@@ -6,7 +6,13 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { APPLICATION_STATUS, APPLICATION_TYPE, Prisma, SCOPE } from '@prisma/client';
+import {
+  APPLICATION_STATUS,
+  APPLICATION_TYPE,
+  Prisma,
+  PROGRESS_STATUS,
+  SCOPE,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
@@ -32,6 +38,28 @@ const PROJECT_MEMBER_SELECT = {
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.UserProjectSelect;
+
+const buildProjectMemberSelect = (projectId: number) => ({
+  ...PROJECT_MEMBER_SELECT,
+  user: {
+    select: {
+      ...PROJECT_MEMBER_SELECT.user.select,
+      _count: {
+        select: {
+          assignedTasks: {
+            where: {
+              file: {
+                folder: {
+                  projectId,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+} satisfies Prisma.UserProjectSelect);
 
 const EDITOR_BOARD_SELECT = {
   id: true,
@@ -375,17 +403,21 @@ export class ProjectsService {
           orderBy,
           skip,
           take: limit,
-          select: PROJECT_MEMBER_SELECT,
+          select: buildProjectMemberSelect(projectId),
         }),
       ]);
 
       return {
-        data: members.map((member) => ({
-          ...member.user,
-          role: member.role,
-          createdAt: member.createdAt,
-          updatedAt: member.updatedAt,
-        })),
+        data: members.map((member) => {
+          const { _count, ...userWithoutCount } = member.user as any;
+          return {
+            ...userWithoutCount,
+            numberOfTasks: _count?.assignedTasks || 0,
+            role: member.role,
+            createdAt: member.createdAt,
+            updatedAt: member.updatedAt,
+          };
+        }),
         pagination: this.buildPaginationMeta(total, page, limit),
       };
     } catch (error) {
@@ -396,8 +428,30 @@ export class ProjectsService {
   async getProjectMember(projectId: number, userId: number) {
     try {
       const member = await this.findProjectMember(projectId, userId);
+      const { _count, ...userWithoutCount } = member.user as any;
+      const taskGroupBy = await this.prisma.task.groupBy({
+        by: ['status'],
+        where: {
+          assignedBy: userId,
+          file: { folder: { projectId } },
+        },
+        _count: { id: true },
+      });
+
+      const taskOverview = { total: 0, pending: 0, inprogress: 0, review: 0, done: 0 };
+      taskGroupBy.forEach((group) => {
+        const count = group._count.id;
+        taskOverview.total += count;
+        if (group.status === PROGRESS_STATUS.PENDING) taskOverview.pending = count;
+        else if (group.status === PROGRESS_STATUS.INPROGRESS) taskOverview.inprogress = count;
+        else if (group.status === PROGRESS_STATUS.REVIEW) taskOverview.review = count;
+        else if (group.status === PROGRESS_STATUS.DONE) taskOverview.done = count;
+      });
+
       return {
-        ...member.user,
+        ...userWithoutCount,
+        numberOfTasks: _count?.assignedTasks || 0,
+        taskOverview,
         role: member.role,
         createdAt: member.createdAt,
         updatedAt: member.updatedAt,
@@ -425,12 +479,14 @@ export class ProjectsService {
         });
         return prisma.userProject.findFirstOrThrow({
           where: { projectId, userId },
-          select: PROJECT_MEMBER_SELECT,
+          select: buildProjectMemberSelect(projectId),
         });
       });
 
+      const { _count, ...userWithoutCount } = updatedMember.user as any;
       return {
-        ...updatedMember.user,
+        ...userWithoutCount,
+        numberOfTasks: _count?.assignedTasks || 0,
         role: updatedMember.role,
         createdAt: updatedMember.createdAt,
         updatedAt: updatedMember.updatedAt,
@@ -622,6 +678,93 @@ export class ProjectsService {
     }
   }
 
+  async getMyProjectTasks(
+    projectId: number,
+    userId: number,
+    filter?: {
+      search?: string;
+      status?: PROGRESS_STATUS;
+    },
+    sort?: { field: 'title' | 'createdAt'; order: 'asc' | 'desc' },
+    pagination?: Pagination,
+  ) {
+    try {
+      await this.ensureProject(projectId);
+
+      const where: Prisma.TaskWhereInput = {
+        file: {
+          folder: {
+            projectId,
+          },
+        },
+        assignedBy: userId,
+        ...(filter?.search && { title: { contains: filter.search, mode: 'insensitive' } }),
+        ...(filter?.status && { status: filter.status }),
+      };
+      const orderBy: Prisma.TaskOrderByWithRelationInput = sort
+        ? { [sort.field]: sort.order }
+        : { createdAt: 'desc' };
+      const { page, limit, skip } = this.buildPagination(pagination);
+
+      const [total, tasks] = await this.prisma.$transaction([
+        this.prisma.task.count({ where }),
+        this.prisma.task.findMany({
+          where,
+          orderBy,
+          skip,
+          take: limit,
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            status: true,
+            parentId: true,
+            fileId: true,
+            file: {
+              select: {
+                id: true,
+                title: true,
+              },
+            },
+            assignedByUser: {
+              select: {
+                id: true,
+                email: true,
+                displayName: true,
+                avatarUrl: true,
+              },
+            },
+            createdByUser: {
+              select: {
+                id: true,
+                email: true,
+                displayName: true,
+                avatarUrl: true,
+              },
+            },
+            updatedByUser: {
+              select: {
+                id: true,
+                email: true,
+                displayName: true,
+                avatarUrl: true,
+              },
+            },
+            createdAt: true,
+            updatedAt: true,
+          },
+        }),
+      ]);
+
+      return {
+        tasks,
+        pagination: this.buildPaginationMeta(total, page, limit),
+      };
+    } catch (error) {
+      this.handleError(error, 'Get my project tasks fail', ERROR.SVGETTASK);
+    }
+  }
+
   private buildPagination(pagination?: Pagination) {
     const page = pagination?.page || 1;
     const limit = pagination?.limit || 10;
@@ -692,7 +835,7 @@ export class ProjectsService {
         projectId,
         userId,
       },
-      select: PROJECT_MEMBER_SELECT,
+      select: buildProjectMemberSelect(projectId),
     });
     if (!member) {
       throw new NotFoundException(ERROR.NFUSER);
