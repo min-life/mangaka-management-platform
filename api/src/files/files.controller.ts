@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -16,10 +26,9 @@ import {
   FileResponseDto,
   MaterialResponseDto,
   QueryFileTasksReqDto,
-  TaskResponseDto,
-  TasksResponseDto,
   UpdateFileReqDto,
 } from './dto';
+import { TaskResponseDto, TasksResponseDto } from '../tasks/dto';
 
 @ApiTags('Files')
 @ApiBearerAuth()
@@ -136,10 +145,7 @@ export class FilesController {
     type: TasksResponseDto,
   })
   @Get(':id/tasks')
-  async getFileTasks(
-    @Param('id', ParseIntPipe) id: number,
-    @Query() query: QueryFileTasksReqDto,
-  ) {
+  async getFileTasks(@Param('id', ParseIntPipe) id: number, @Query() query: QueryFileTasksReqDto) {
     const result = await this.filesService.getFileTasks(
       id,
       { search: query.search, status: query.status },

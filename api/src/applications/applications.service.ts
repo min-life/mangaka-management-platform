@@ -10,6 +10,95 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
 
+const PROJECT_SELECT = {
+  id: true,
+  name: true,
+  description: true,
+  imageUrl: true,
+  editorBoard: {
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      imageUrl: true,
+      createdByUser: {
+        select: {
+          id: true,
+          email: true,
+          displayName: true,
+          avatarUrl: true,
+        },
+      },
+      updatedByUser: {
+        select: {
+          id: true,
+          email: true,
+          displayName: true,
+          avatarUrl: true,
+        },
+      },
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
+  createdByUser: {
+    select: {
+      id: true,
+      email: true,
+      displayName: true,
+      avatarUrl: true,
+    },
+  },
+  updatedByUser: {
+    select: {
+      id: true,
+      email: true,
+      displayName: true,
+      avatarUrl: true,
+    },
+  },
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.ProjectSelect;
+
+const APPLICATION_SELECT = {
+  id: true,
+  project: {
+    select: PROJECT_SELECT,
+  },
+  title: true,
+  description: true,
+  materials: true,
+  type: true,
+  status: true,
+  verifiedByUser: {
+    select: {
+      id: true,
+      email: true,
+      displayName: true,
+      avatarUrl: true,
+    },
+  },
+  createdByUser: {
+    select: {
+      id: true,
+      email: true,
+      displayName: true,
+      avatarUrl: true,
+    },
+  },
+  updatedByUser: {
+    select: {
+      id: true,
+      email: true,
+      displayName: true,
+      avatarUrl: true,
+    },
+  },
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.ApplicationSelect;
+
 @Injectable()
 export class ApplicationsService {
   private readonly logger = new Logger(ApplicationsService.name);
@@ -45,6 +134,7 @@ export class ApplicationsService {
           orderBy,
           skip,
           take: limit,
+          select: APPLICATION_SELECT,
         }),
       ]);
 
@@ -59,7 +149,14 @@ export class ApplicationsService {
 
   async getApplicationById(id: number) {
     try {
-      return await this.ensureApplication(id);
+      const application = await this.prisma.application.findUnique({
+        where: { id },
+        select: APPLICATION_SELECT,
+      });
+      if (!application) {
+        throw new NotFoundException(ERROR.NFAPPLICATION);
+      }
+      return application;
     } catch (error) {
       this.handleError(error, 'Get application fail', ERROR.SVGETAPPLICATION);
     }
@@ -85,6 +182,7 @@ export class ApplicationsService {
           materials: data.materials as Prisma.InputJsonValue,
           updatedBy: data.userId,
         },
+        select: APPLICATION_SELECT,
       });
     } catch (error) {
       this.handleError(error, 'Update application fail', ERROR.SVUPDATEAPPLICATION);
@@ -116,6 +214,7 @@ export class ApplicationsService {
           status: data.status,
           verifyBy: data.userId,
         },
+        select: APPLICATION_SELECT,
       });
     } catch (error) {
       this.handleError(error, 'Update application status fail', ERROR.SVUPDATEAPPLICATION);

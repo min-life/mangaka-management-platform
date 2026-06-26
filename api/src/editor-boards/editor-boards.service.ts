@@ -13,16 +13,61 @@ import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
 import type { FilterBoards, OrderBoards } from './interfaces/get-editor-boards.interface';
 
-const BOARD_MEMBER_SELECT = {
-  user: {
-    select: {
-      id: true,
-      email: true,
-      displayName: true,
-    },
+const USER_SELECT = {
+  select: {
+    id: true,
+    email: true,
+    displayName: true,
+    avatarUrl: true,
   },
+};
+
+const BOARD_MEMBER_SELECT = {
+  user: USER_SELECT,
   isLead: true,
 } satisfies Prisma.UserEditorBoardSelect;
+
+const EDITOR_BOARD_SELECT = {
+  id: true,
+  name: true,
+  description: true,
+  imageUrl: true,
+  createdByUser: USER_SELECT,
+  updatedByUser: USER_SELECT,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.EditorBoardSelect;
+
+const PROJECT_SELECT = {
+  id: true,
+  name: true,
+  description: true,
+  imageUrl: true,
+  editorBoard: {
+    select: EDITOR_BOARD_SELECT,
+  },
+  createdByUser: USER_SELECT,
+  updatedByUser: USER_SELECT,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.ProjectSelect;
+
+const APPLICATION_SELECT = {
+  id: true,
+  project: {
+    select: PROJECT_SELECT,
+  },
+  title: true,
+  description: true,
+  materials: true,
+  type: true,
+  status: true,
+  verifiedByUser: USER_SELECT,
+  createdByUser: USER_SELECT,
+  updatedByUser: USER_SELECT,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.ApplicationSelect;
 
 @Injectable()
 export class EditorBoardsService {
@@ -39,6 +84,7 @@ export class EditorBoardsService {
             createdBy: data.userId,
             updatedBy: data.userId,
           },
+          select: EDITOR_BOARD_SELECT,
         });
 
         await prisma.userEditorBoard.create({
@@ -81,6 +127,7 @@ export class EditorBoardsService {
           orderBy,
           skip,
           take: limit,
+          select: EDITOR_BOARD_SELECT,
         }),
       ]);
 
@@ -95,7 +142,14 @@ export class EditorBoardsService {
 
   async getBoardById(id: number) {
     try {
-      return await this.ensureBoard(id);
+      const board = await this.prisma.editorBoard.findUnique({
+        where: { id },
+        select: EDITOR_BOARD_SELECT,
+      });
+      if (!board) {
+        throw new NotFoundException(ERROR.NFBOARD);
+      }
+      return board;
     } catch (error) {
       this.handleError(error, 'Get editor board fail', ERROR.SVGETBOARD);
     }
@@ -121,6 +175,7 @@ export class EditorBoardsService {
           name: data.name,
           updatedBy: data.userId,
         },
+        select: EDITOR_BOARD_SELECT,
       });
       return board;
     } catch (error) {
@@ -290,6 +345,7 @@ export class EditorBoardsService {
           orderBy,
           take: limit,
           skip,
+          select: PROJECT_SELECT,
         }),
       ]);
 
@@ -362,6 +418,7 @@ export class EditorBoardsService {
           orderBy,
           take: limit,
           skip,
+          select: APPLICATION_SELECT,
         }),
       ]);
 

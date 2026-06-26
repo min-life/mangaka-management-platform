@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { APPLICATION_STATUS, APPLICATION_TYPE, SCOPE } from '@prisma/client';
+import { UserResDto } from '../../share/dto';
 
 export class PaginationResDto {
   @ApiProperty({ example: 25 })
@@ -15,6 +16,32 @@ export class PaginationResDto {
   totalPages!: number;
 }
 
+export class EditorBoardResDto {
+  @ApiProperty({ example: 1 })
+  id!: number;
+
+  @ApiProperty({ example: 'Weekly Manga Review Board' })
+  name!: string;
+
+  @ApiPropertyOptional({ example: 'Board for weekly manga reviews', nullable: true })
+  description?: string | null;
+
+  @ApiPropertyOptional({ example: 'https://example.com/board.png', nullable: true })
+  imageUrl?: string | null;
+
+  @ApiPropertyOptional({ type: UserResDto, nullable: true })
+  createdByUser?: UserResDto | null;
+
+  @ApiPropertyOptional({ type: UserResDto, nullable: true })
+  updatedByUser?: UserResDto | null;
+
+  @ApiProperty({ example: '2026-06-18T03:00:00.000Z' })
+  createdAt!: Date;
+
+  @ApiProperty({ example: '2026-06-18T03:00:00.000Z' })
+  updatedAt!: Date;
+}
+
 export class ProjectResDto {
   @ApiProperty({ example: 10 })
   id!: number;
@@ -22,14 +49,20 @@ export class ProjectResDto {
   @ApiProperty({ example: 'One-shot Chapter 01' })
   name!: string;
 
-  @ApiPropertyOptional({ example: 1, nullable: true })
-  editorBoardId?: number | null;
+  @ApiPropertyOptional({ example: 'A one-shot manga chapter', nullable: true })
+  description?: string | null;
 
-  @ApiPropertyOptional({ example: 1, nullable: true })
-  createdBy?: number | null;
+  @ApiPropertyOptional({ example: 'https://example.com/project.png', nullable: true })
+  imageUrl?: string | null;
 
-  @ApiPropertyOptional({ example: 1, nullable: true })
-  updatedBy?: number | null;
+  @ApiPropertyOptional({ type: EditorBoardResDto, nullable: true })
+  editorBoard?: EditorBoardResDto | null;
+
+  @ApiPropertyOptional({ type: UserResDto, nullable: true })
+  createdByUser?: UserResDto | null;
+
+  @ApiPropertyOptional({ type: UserResDto, nullable: true })
+  updatedByUser?: UserResDto | null;
 
   @ApiProperty({ example: '2026-06-18T03:00:00.000Z' })
   createdAt!: Date;
@@ -56,17 +89,8 @@ export class RoleResDto {
 }
 
 export class ProjectMemberResDto {
-  @ApiProperty({ example: 2 })
-  id!: number;
-
-  @ApiProperty({ example: 'member@example.com' })
-  email!: string;
-
-  @ApiPropertyOptional({ example: 'Project Member', nullable: true })
-  displayName?: string | null;
-
-  @ApiPropertyOptional({ example: 'https://example.com/avatar.png', nullable: true })
-  avatarUrl?: string | null;
+  @ApiProperty({ type: UserResDto })
+  user!: UserResDto;
 
   @ApiProperty({ type: RoleResDto })
   role!: RoleResDto;
@@ -79,31 +103,16 @@ export class ProjectMemberResDto {
 }
 
 export class ProjectEditorBoardResDto {
-  @ApiProperty({ example: 1 })
-  id!: number;
-
-  @ApiProperty({ example: 'Weekly Manga Review Board' })
-  name!: string;
-
-  @ApiPropertyOptional({ example: 1, nullable: true })
-  createdBy?: number | null;
-
-  @ApiPropertyOptional({ example: 1, nullable: true })
-  updatedBy?: number | null;
-
-  @ApiProperty({ example: '2026-06-18T03:00:00.000Z' })
-  createdAt!: Date;
-
-  @ApiProperty({ example: '2026-06-18T03:00:00.000Z' })
-  updatedAt!: Date;
+  @ApiProperty({ type: EditorBoardResDto, nullable: true })
+  data!: EditorBoardResDto | null;
 }
 
 export class ProjectApplicationResDto {
   @ApiProperty({ example: 7 })
   id!: number;
 
-  @ApiProperty({ example: 10 })
-  projectId!: number;
+  @ApiProperty({ type: ProjectResDto })
+  project!: ProjectResDto;
 
   @ApiProperty({ example: 'Publish request for chapter 01' })
   title!: string;
@@ -120,14 +129,14 @@ export class ProjectApplicationResDto {
   @ApiProperty({ enum: APPLICATION_STATUS, example: APPLICATION_STATUS.PENDING })
   status!: APPLICATION_STATUS;
 
-  @ApiPropertyOptional({ example: 3, nullable: true })
-  verifyBy?: number | null;
+  @ApiPropertyOptional({ type: UserResDto, nullable: true })
+  verifiedByUser?: UserResDto | null;
 
-  @ApiPropertyOptional({ example: 1, nullable: true })
-  createdBy?: number | null;
+  @ApiPropertyOptional({ type: UserResDto, nullable: true })
+  createdByUser?: UserResDto | null;
 
-  @ApiPropertyOptional({ example: 1, nullable: true })
-  updatedBy?: number | null;
+  @ApiPropertyOptional({ type: UserResDto, nullable: true })
+  updatedByUser?: UserResDto | null;
 
   @ApiProperty({ example: '2026-06-18T03:00:00.000Z' })
   createdAt!: Date;
@@ -146,17 +155,17 @@ export class ProjectFolderResDto {
   @ApiPropertyOptional({ example: 'Initial rough sketches.', nullable: true })
   description?: string | null;
 
-  @ApiPropertyOptional({ example: 1, nullable: true })
-  parentId?: number | null;
+  @ApiPropertyOptional({ type: ProjectFolderResDto, nullable: true })
+  parent?: ProjectFolderResDto | null;
 
-  @ApiProperty({ example: 10 })
-  projectId!: number;
+  @ApiProperty({ type: ProjectResDto })
+  project!: ProjectResDto;
 
-  @ApiPropertyOptional({ example: 1, nullable: true })
-  createdBy?: number | null;
+  @ApiPropertyOptional({ type: UserResDto, nullable: true })
+  createdByUser?: UserResDto | null;
 
-  @ApiPropertyOptional({ example: 1, nullable: true })
-  updatedBy?: number | null;
+  @ApiPropertyOptional({ type: UserResDto, nullable: true })
+  updatedByUser?: UserResDto | null;
 
   @ApiProperty({ example: '2026-06-18T03:00:00.000Z' })
   createdAt!: Date;

@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { APPLICATION_STATUS, APPLICATION_TYPE } from '@prisma/client';
+import { UserResDto } from '../../share/dto';
+import { ProjectResDto } from '../../projects/dto';
 
 export class PaginationResDto {
   @ApiProperty({ example: 25 })
@@ -19,8 +21,8 @@ export class ApplicationResDto {
   @ApiProperty({ example: 7 })
   id!: number;
 
-  @ApiProperty({ example: 10 })
-  projectId!: number;
+  @ApiProperty({ type: ProjectResDto })
+  project!: ProjectResDto;
 
   @ApiProperty({ example: 'Publish request for chapter 01' })
   title!: string;
@@ -37,14 +39,14 @@ export class ApplicationResDto {
   @ApiProperty({ enum: APPLICATION_STATUS, example: APPLICATION_STATUS.PENDING })
   status!: APPLICATION_STATUS;
 
-  @ApiPropertyOptional({ example: 3, nullable: true })
-  verifyBy?: number | null;
+  @ApiPropertyOptional({ type: UserResDto, nullable: true })
+  verifiedByUser?: UserResDto | null;
 
-  @ApiPropertyOptional({ example: 1, nullable: true })
-  createdBy?: number | null;
+  @ApiPropertyOptional({ type: UserResDto, nullable: true })
+  createdByUser?: UserResDto | null;
 
-  @ApiPropertyOptional({ example: 1, nullable: true })
-  updatedBy?: number | null;
+  @ApiPropertyOptional({ type: UserResDto, nullable: true })
+  updatedByUser?: UserResDto | null;
 
   @ApiProperty({ example: '2026-06-18T03:00:00.000Z' })
   createdAt!: Date;
