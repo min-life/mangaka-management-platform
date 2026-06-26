@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { FileText, Grid2X2, List, Search } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -105,10 +106,10 @@ export function FileCollection({
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-3 p-4">
+          <div className="grid items-start grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-3 p-4">
             {files.map((file) => (
               <button
-                className={`min-h-56 overflow-hidden rounded-[5px] border text-left transition-colors hover:border-[#FFD369]/60 hover:bg-[#17202b] ${
+                className={`h-[228px] overflow-hidden rounded-[5px] border text-left transition-colors hover:border-[#FFD369]/60 hover:bg-[#17202b] ${
                   selectedFileId === file.id
                     ? 'border-[#FFD369] bg-[#17202b]'
                     : 'border-[#39424f] bg-[#151c25]'
@@ -147,15 +148,22 @@ export function FileCollection({
 }
 
 function FileThumbnail({ file, size }: { file: FileExplorerItem; size: 'lg' | 'sm' }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const canShowPreview = Boolean(file.previewUrl) && !imageFailed;
   const className =
     size === 'lg'
-      ? 'relative h-28 w-full overflow-hidden bg-[#0d151e]'
-      : 'relative size-14 shrink-0 overflow-hidden rounded-[4px] border border-[#303842] bg-[#0d151e]';
+      ? 'relative block h-32 w-full overflow-hidden bg-[#0d151e]'
+      : 'relative block size-14 shrink-0 overflow-hidden rounded-[4px] border border-[#303842] bg-[#0d151e]';
 
   return (
     <span className={className}>
-      {file.previewUrl ? (
-        <img alt="" className="h-full w-full object-cover opacity-85" src={file.previewUrl} />
+      {canShowPreview ? (
+        <img
+          alt=""
+          className="block h-full w-full object-cover opacity-85"
+          onError={() => setImageFailed(true)}
+          src={file.previewUrl}
+        />
       ) : (
         <span className="grid h-full w-full place-items-center text-[#FFD369]">
           <FileText className={size === 'lg' ? 'size-7' : 'size-5'} />

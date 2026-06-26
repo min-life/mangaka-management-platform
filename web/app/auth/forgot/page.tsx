@@ -7,6 +7,7 @@ import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import { authImages } from '@/components/auth/auth-assets';
+import { AuthBackLink } from '@/components/auth/AuthBackLink';
 import { AuthBrand } from '@/components/auth/AuthBrand';
 import { AuthHero } from '@/components/auth/AuthHero';
 import {
@@ -99,6 +100,7 @@ function ForgotPasswordContent() {
     <main className="flex min-h-screen overflow-hidden bg-[#222831] text-[#eeeeee]">
       <section className={authPanelClassName}>
         <div className="mb-10">
+          <AuthBackLink />
           <div className="mb-8">
             <AuthBrand />
           </div>

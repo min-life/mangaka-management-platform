@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { compressImageFile } from '@/lib/image-upload';
 import { createProject, type ProjectResponse } from '@/services/project.service';
 import type { EditorBoardResponse } from '@/services/editor-board.service';
 
@@ -33,8 +34,6 @@ const fieldClassName =
 const labelClassName =
   'text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]';
 
-const maxInlineImageLength = 90_000;
-
 function getErrorMessage(error: unknown) {
   if (error instanceof AxiosError) {
     const message = error.response?.data?.message;
@@ -42,57 +41,6 @@ function getErrorMessage(error: unknown) {
   }
 
   return 'Create project failed.';
-}
-
-function compressImageFile(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const objectUrl = URL.createObjectURL(file);
-    const image = new Image();
-
-    image.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-
-      if (!context) {
-        reject(new Error('Canvas is not available.'));
-        return;
-      }
-
-      const baseScale = Math.min(1, 960 / image.width, 540 / image.height);
-      let width = Math.max(1, Math.round(image.width * baseScale));
-      let height = Math.max(1, Math.round(image.height * baseScale));
-
-      for (let resizeAttempt = 0; resizeAttempt < 6; resizeAttempt += 1) {
-        canvas.width = width;
-        canvas.height = height;
-        context.clearRect(0, 0, width, height);
-        context.drawImage(image, 0, 0, width, height);
-
-        for (const quality of [0.78, 0.68, 0.58, 0.48, 0.38, 0.3]) {
-          const dataUrl = canvas.toDataURL('image/jpeg', quality);
-
-          if (dataUrl.length <= maxInlineImageLength) {
-            resolve(dataUrl);
-            return;
-          }
-        }
-
-        width = Math.max(1, Math.round(width * 0.78));
-        height = Math.max(1, Math.round(height * 0.78));
-      }
-
-      reject(new Error('Image is too large. Please choose a smaller cover image.'));
-    };
-
-    image.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      reject(new Error('Unable to read the selected image.'));
-    };
-
-    image.src = objectUrl;
-  });
 }
 
 type CreateProjectDialogProps = {
@@ -199,7 +147,7 @@ export function CreateProjectDialog({ editorBoards = [], onCreated }: CreateProj
   return (
     <Dialog onOpenChange={handleOpenChange} open={open}>
       <DialogTrigger asChild>
-        <Button className="h-9 rounded-[4px] bg-[#FFD369] px-4 text-xs font-black text-[#222831] hover:bg-[#eac04f]">
+        <Button className="h-11 rounded-[4px] bg-[#FFD369] px-5 text-sm font-black text-[#222831] hover:bg-[#eac04f]">
           <Plus className="size-4" />
           New Project
         </Button>
