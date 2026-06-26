@@ -12,6 +12,10 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { Prisma, SCOPE } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { promises as fs } from 'fs';
+import { extname, join } from 'path';
+import { randomUUID } from 'crypto';
+import type { Request } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
 import { requireEnv, requireNumberEnv } from '../share/helpers/env';
@@ -23,6 +27,23 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
 const BCRYPT_SALT_ROUNDS = requireNumberEnv('BCRYPT_SALT_ROUNDS');
+const AVATAR_MAX_SIZE = 5 * 1024 * 1024;
+const AVATAR_UPLOAD_DIR = join(process.cwd(), 'uploads', 'avatars');
+const AVATAR_MIME_EXTENSIONS: Record<string, string> = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'image/gif': '.gif',
+};
+
+type AvatarUploadFile = {
+  buffer: Buffer;
+  originalname: string;
+  mimetype: string;
+  size: number;
+};
+
+const ACTIVITY_LIMIT = 3;
 
 @Injectable()
 export class UsersService {
@@ -68,6 +89,56 @@ export class UsersService {
 
   async getMe(userId: number) {
     return this.findOne(userId);
+  }
+
+  async getMeActivities(userId: number) {
+    try {
+      await this.ensureUser(userId);
+
+      const tasks = await this.prisma.task.findMany({
+        where: {
+          OR: [{ createdBy: userId }, { updatedBy: userId }, { assignedBy: userId }],
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: ACTIVITY_LIMIT,
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+          file: {
+            select: {
+              folder: {
+                select: {
+                  project: {
+                    select: {
+                      name: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      return {
+        data: tasks.map((task) => ({
+          id: task.id,
+          title: task.title,
+          description: task.description,
+          status: task.status,
+          projectName: task.file.folder.project.name,
+          createdAt: task.createdAt,
+          updatedAt: task.updatedAt,
+          timeLabel: this.formatRelativeTime(task.updatedAt),
+        })),
+      };
+    } catch (error) {
+      this.handleError(error, 'Get user activities fail', ERROR.SVGETTASK);
+    }
   }
 
   async createStaffUser(currentUserId: number, dto: CreateStaffUserDto) {
@@ -183,6 +254,41 @@ export class UsersService {
     }
   }
 
+  async uploadAvatar(userId: number, file: AvatarUploadFile, request: Request) {
+    try {
+      await this.ensureUser(userId);
+
+      const extension = AVATAR_MIME_EXTENSIONS[file.mimetype];
+      if (!extension) {
+        throw new BadRequestException('Avatar must be a JPG, PNG, WEBP, or GIF image.');
+      }
+
+      if (file.size > AVATAR_MAX_SIZE) {
+        throw new BadRequestException('Avatar must be 5MB or smaller.');
+      }
+
+      await fs.mkdir(AVATAR_UPLOAD_DIR, { recursive: true });
+
+      const originalExtension = extname(file.originalname).toLowerCase();
+      const fileExtension = originalExtension || extension;
+      const fileName = `${userId}-${randomUUID()}${fileExtension}`;
+      const filePath = join(AVATAR_UPLOAD_DIR, fileName);
+
+      await fs.writeFile(filePath, file.buffer);
+
+      const protocol = request.protocol;
+      const host = request.get('host');
+
+      return {
+        data: {
+          avatarUrl: `${protocol}://${host}/uploads/avatars/${fileName}`,
+        },
+      };
+    } catch (error) {
+      this.handleError(error, 'Upload avatar fail', ERROR.SVUPDATEPROJECTMEMBER);
+    }
+  }
+
   async delete(userId: number) {
     try {
       await this.ensureUser(userId);
@@ -253,7 +359,17 @@ export class UsersService {
 
       const userProjects = await this.prisma.userProject.findMany({
         where: { userId },
-        include: { project: true, role: true },
+        include: {
+          project: {
+            include: {
+              projectStats: {
+                orderBy: { updatedAt: 'desc' },
+                take: 1,
+              },
+            },
+          },
+          role: true,
+        },
         orderBy: [{ projectId: 'asc' }, { roleId: 'asc' }],
       });
 
@@ -813,6 +929,38 @@ export class UsersService {
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
+  }
+
+  private formatRelativeTime(date: Date) {
+    const diffInMs = Date.now() - date.getTime();
+    const diffInMinutes = Math.max(0, Math.floor(diffInMs / 60000));
+
+    if (diffInMinutes < 1) {
+      return 'Just now';
+    }
+
+    if (diffInMinutes < 60) {
+      return `${diffInMinutes}m ago`;
+    }
+
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) {
+      return `${diffInHours}h ago`;
+    }
+
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays === 1) {
+      return 'Yesterday';
+    }
+
+    if (diffInDays < 7) {
+      return `${diffInDays} days ago`;
+    }
+
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    });
   }
 
   private handleError(error: unknown, logMessage: string, clientMessage: string): never {

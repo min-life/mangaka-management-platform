@@ -2,6 +2,8 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
+import express from 'express';
+import { join } from 'path';
 import 'dotenv/config';
 import { AppModule } from './app.module';
 
@@ -19,6 +21,7 @@ async function bootstrap() {
     }),
   );
   app.setGlobalPrefix('api');
+  app.use('/uploads', express.static(join(process.cwd(), 'uploads')));
   app.use(cookieParser());
   const config = new DocumentBuilder()
     .setTitle('Mangaka API')

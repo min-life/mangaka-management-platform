@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -8,11 +9,29 @@ import {
   Post,
   Put,
   Query,
+  Req,
   Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+<<<<<<< Updated upstream
 import { ApiBearerAuth } from '@nestjs/swagger';
 import type { Response } from 'express';
+=======
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { Request, Response } from 'express';
+>>>>>>> Stashed changes
 import { GoogleLinkGuard } from '../auth/guards';
 import type { GoogleUser, JwtPayload } from '../auth/interfaces';
 import { CurrentUser, Permissions, Public } from '../share/decorators';
@@ -34,6 +53,18 @@ export class UsersController {
     return this.usersService.getMe(currentUser.userId);
   }
 
+<<<<<<< Updated upstream
+=======
+  @ApiOperation({ summary: 'Get current user activity summary' })
+  @ApiOkResponse({ description: 'Current user activities retrieved successfully' })
+  @Get('me/activities')
+  getMeActivities(@CurrentUser() currentUser: JwtPayload) {
+    return this.usersService.getMeActivities(currentUser.userId);
+  }
+
+  @ApiOperation({ summary: 'Update current user profile' })
+  @ApiOkResponse({ description: 'Profile updated successfully' })
+>>>>>>> Stashed changes
   @Patch('me')
   updateMe(@CurrentUser() currentUser: JwtPayload, @Body() body: UpdateProfileDto) {
     return this.usersService.updateMe(currentUser.userId, body);
@@ -44,6 +75,52 @@ export class UsersController {
     return this.usersService.updatePassword(currentUser.userId, body);
   }
 
+<<<<<<< Updated upstream
+=======
+  @ApiOperation({ summary: 'Upload current user avatar' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        avatar: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+      required: ['avatar'],
+    },
+  })
+  @ApiOkResponse({ description: 'Avatar uploaded successfully' })
+  @Post('me/avatar')
+  @UseInterceptors(
+    FileInterceptor('avatar', {
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: (_request, file, callback) => {
+        if (['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.mimetype)) {
+          callback(null, true);
+          return;
+        }
+
+        callback(new BadRequestException('Avatar must be a JPG, PNG, WEBP, or GIF image.'), false);
+      },
+    }),
+  )
+  uploadAvatar(
+    @CurrentUser() currentUser: JwtPayload,
+    @UploadedFile() avatar: { buffer: Buffer; originalname: string; mimetype: string; size: number },
+    @Req() request: Request,
+  ) {
+    if (!avatar) {
+      throw new BadRequestException('Avatar file is required.');
+    }
+
+    return this.usersService.uploadAvatar(currentUser.userId, avatar, request);
+  }
+
+  @ApiOperation({ summary: 'Initiate Google account linking' })
+  @ApiOkResponse({ description: 'Redirects to Google OAuth' })
+>>>>>>> Stashed changes
   @Get('me/link-account')
   @UseGuards(GoogleLinkGuard)
   linkGoogleAccount() {
