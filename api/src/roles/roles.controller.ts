@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
-import { ApiOperation, ApiOkResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiOperation, ApiOkResponse, ApiParam, ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, Permissions } from '../share/decorators';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { RolesService } from './roles.service';
@@ -8,6 +8,7 @@ import { UpdateRoleDto } from './dto/update-role.dto';
 import { FindRolesQueryDto } from './dto/find-roles-query.dto';
 import { ReplaceRolePermissionsDto } from './dto/replace-role-permissions.dto';
 
+@ApiTags('Roles')
 @ApiBearerAuth()
 @Controller('roles')
 export class RolesController {
