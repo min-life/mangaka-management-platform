@@ -29,6 +29,7 @@ import { ReplaceUserRolesDto } from './dto/replace-user-roles.dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { QueryUsersReqDto, UsersResponseDto } from './dto';
 import { UsersService } from './users.service';
 
 @ApiTags('Users')
@@ -81,11 +82,16 @@ export class UsersController {
   }
 
   @ApiOperation({ summary: 'Get all users (admin only)' })
-  @ApiOkResponse({ description: 'Users retrieved successfully' })
+  @ApiOkResponse({ description: 'Users retrieved successfully', type: UsersResponseDto })
   @Get()
   @Permissions({ mode: 'ANY', permissions: ['admin', 'user:read'] })
-  findAll() {
-    return this.usersService.findAll();
+  findAll(@Query() query: QueryUsersReqDto) {
+    const { search, isActive, field, order, page, limit } = query;
+    return this.usersService.findAll(
+      { search, isActive },
+      { field, order },
+      { page: page ?? 1, limit: limit ?? 10 },
+    );
   }
 
   @ApiOperation({ summary: 'Create staff user (admin only)' })

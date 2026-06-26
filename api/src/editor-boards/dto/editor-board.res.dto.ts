@@ -37,6 +37,9 @@ export class EditorBoardResDto {
   @ApiPropertyOptional({ type: UserResDto, nullable: true })
   updatedByUser?: UserResDto | null;
 
+  @ApiProperty({ example: 5 })
+  numberOfProjects!: number;
+
   @ApiProperty({ example: '2026-06-18T03:00:00.000Z' })
   createdAt!: Date;
 

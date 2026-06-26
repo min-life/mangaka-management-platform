@@ -44,6 +44,8 @@ import {
   CreateProjectStatReqDto,
   ProjectStatResponseDto,
 } from './dto';
+import { TasksResponseDto } from '../tasks/dto';
+import { QueryMyTasksReqDto } from '../tasks/dto';
 
 @ApiTags('Projects')
 @ApiBearerAuth()
@@ -77,6 +79,47 @@ export class ProjectsController {
     });
     return {
       data: project,
+    };
+  }
+
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['project:read', 'board:leader'],
+    resource: 'TASK',
+  })
+  @ApiOperation({ summary: 'Get all tasks of current user in a specific project' })
+  @ApiParam({ name: 'id', type: Number, description: 'Project id' })
+  @ApiOkResponse({
+    description: 'User tasks in project retrieved successfully',
+    type: TasksResponseDto,
+  })
+  @Get(':id/tasks')
+  async getMyProjectTasks(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() currentUser: JwtPayload,
+    @Query() query: QueryMyTasksReqDto,
+  ) {
+    if (query.me !== true) {
+      return {
+        data: [],
+        pagination: {
+          total: 0,
+          page: query.page || 1,
+          limit: query.limit || 10,
+          totalPages: 1,
+        },
+      };
+    }
+    const result = await this.projectsService.getMyProjectTasks(
+      id,
+      currentUser.userId,
+      { search: query.search, status: query.status },
+      query.field && query.order ? { field: query.field, order: query.order } : undefined,
+      query.page && query.limit ? { page: query.page, limit: query.limit } : undefined,
+    );
+    return {
+      data: result.tasks,
+      pagination: result.pagination,
     };
   }
 
