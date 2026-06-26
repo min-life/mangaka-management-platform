@@ -26,6 +26,7 @@ import {
   FrameResponseDto,
   FramesResponseDto,
   QueryFramesReqDto,
+  QueryMyTasksReqDto,
   QueryTasksReqDto,
   TaskResponseDto,
   TasksResponseDto,
@@ -36,7 +37,37 @@ import {
 @ApiBearerAuth()
 @Controller('tasks')
 export class TasksController {
-  constructor(private readonly tasksService: TasksService) {}
+  constructor(private readonly tasksService: TasksService) { }
+
+  @ApiOperation({ summary: 'Get all tasks of current user across all projects' })
+  @ApiOkResponse({
+    description: 'User tasks retrieved successfully',
+    type: TasksResponseDto,
+  })
+  @Get()
+  async getMyTasks(@CurrentUser() currentUser: JwtPayload, @Query() query: QueryMyTasksReqDto) {
+    if (query.me !== true) {
+      return {
+        data: [],
+        pagination: {
+          total: 0,
+          page: query.page || 1,
+          limit: query.limit || 10,
+          totalPages: 1,
+        },
+      };
+    }
+    const result = await this.tasksService.getMyTasks(
+      currentUser.userId,
+      { search: query.search, status: query.status },
+      query.field && query.order ? { field: query.field, order: query.order } : undefined,
+      query.page && query.limit ? { page: query.page, limit: query.limit } : undefined,
+    );
+    return {
+      data: result.tasks,
+      pagination: result.pagination,
+    };
+  }
 
   @Permissions({
     mode: 'ANY',

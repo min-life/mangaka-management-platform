@@ -88,12 +88,35 @@ export class RoleResDto {
   isDefault!: boolean;
 }
 
+export class TaskOverviewResDto {
+  @ApiProperty({ example: 10 })
+  total!: number;
+
+  @ApiProperty({ example: 2 })
+  pending!: number;
+
+  @ApiProperty({ example: 5 })
+  inprogress!: number;
+
+  @ApiProperty({ example: 2 })
+  review!: number;
+
+  @ApiProperty({ example: 1 })
+  done!: number;
+}
+
 export class ProjectMemberResDto {
   @ApiProperty({ type: UserResDto })
   user!: UserResDto;
 
   @ApiProperty({ type: RoleResDto })
   role!: RoleResDto;
+
+  @ApiProperty({ example: 5 })
+  numberOfTasks!: number;
+
+  @ApiPropertyOptional({ type: TaskOverviewResDto, nullable: true })
+  taskOverview?: TaskOverviewResDto | null;
 
   @ApiProperty({ example: '2026-06-18T03:00:00.000Z' })
   createdAt!: Date;

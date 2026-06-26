@@ -127,12 +127,25 @@ export class EditorBoardsService {
           orderBy,
           skip,
           take: limit,
-          select: EDITOR_BOARD_SELECT,
+          select: {
+            ...EDITOR_BOARD_SELECT,
+            _count: {
+              select: {
+                projects: true,
+              },
+            },
+          },
         }),
       ]);
 
+      const boardsWithProjectCount = boards.map((board) => ({
+        ...board,
+        numberOfProjects: board._count.projects,
+        _count: undefined,
+      }));
+
       return {
-        boards,
+        boards: boardsWithProjectCount,
         pagination: this.buildPaginationMeta(total, page, limit),
       };
     } catch (error) {
