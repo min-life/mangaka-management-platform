@@ -4,6 +4,8 @@ import { Suspense, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
+import { setAccessToken } from '@/lib/auth-storage';
+
 function LoadingState() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#131313] text-[#e2e2e2]">
@@ -26,7 +28,7 @@ function OAuthSuccessContent() {
       return;
     }
 
-    localStorage.setItem('access_token', accessToken);
+    setAccessToken(accessToken);
     router.replace(safeNextPath);
   }, [router, searchParams]);
 
