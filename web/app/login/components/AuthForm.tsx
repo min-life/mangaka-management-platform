@@ -71,7 +71,7 @@ export function AuthForm({
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<LoginErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const apiBaseUrl = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api').replace(
+  const apiBaseUrl = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api').replace(
     /\/$/,
     '',
   );
