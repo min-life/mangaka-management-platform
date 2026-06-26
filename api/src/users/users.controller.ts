@@ -17,16 +17,6 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
-  ApiCreatedResponse,
-  ApiOkResponse,
-  ApiOperation,
-  ApiParam,
-  ApiTags,
-} from '@nestjs/swagger';
-import type { Response } from 'express';
-=======
-import {
-  ApiBearerAuth,
   ApiBody,
   ApiConsumes,
   ApiCreatedResponse,
@@ -37,7 +27,6 @@ import {
 } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request, Response } from 'express';
->>>>>>> Stashed changes
 import { GoogleLinkGuard } from '../auth/guards';
 import type { GoogleUser, JwtPayload } from '../auth/interfaces';
 import { CurrentUser, Permissions, Public } from '../share/decorators';
@@ -63,8 +52,6 @@ export class UsersController {
     return this.usersService.getMe(currentUser.userId);
   }
 
-<<<<<<< Updated upstream
-=======
   @ApiOperation({ summary: 'Get current user activity summary' })
   @ApiOkResponse({ description: 'Current user activities retrieved successfully' })
   @Get('me/activities')
@@ -74,7 +61,6 @@ export class UsersController {
 
   @ApiOperation({ summary: 'Update current user profile' })
   @ApiOkResponse({ description: 'Profile updated successfully' })
->>>>>>> Stashed changes
   @Patch('me')
   updateMe(@CurrentUser() currentUser: JwtPayload, @Body() body: UpdateProfileDto) {
     return this.usersService.updateMe(currentUser.userId, body);
@@ -87,8 +73,6 @@ export class UsersController {
     return this.usersService.updatePassword(currentUser.userId, body);
   }
 
-<<<<<<< Updated upstream
-=======
   @ApiOperation({ summary: 'Upload current user avatar' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -132,7 +116,6 @@ export class UsersController {
 
   @ApiOperation({ summary: 'Initiate Google account linking' })
   @ApiOkResponse({ description: 'Redirects to Google OAuth' })
->>>>>>> Stashed changes
   @Get('me/link-account')
   @UseGuards(GoogleLinkGuard)
   linkGoogleAccount() {
