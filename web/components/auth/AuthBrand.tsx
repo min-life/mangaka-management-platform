@@ -2,7 +2,7 @@ export function AuthBrand() {
   return (
     <div className="flex items-center gap-4">
       <img
-        src="/brand/3-removebg-preview.png"
+        src="/brand/1.png"
         alt="Inkly"
         className="h-20 w-auto object-contain"
       />
