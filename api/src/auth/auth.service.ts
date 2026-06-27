@@ -53,11 +53,6 @@ export class AuthService {
   async register(body: RegisterDto) {
     try {
       const email = body.email.trim().toLowerCase();
-      const existingUser = await this.prisma.user.findUnique({ where: { email } });
-
-      if (existingUser) {
-        throw new ConflictException(ERROR.CFLEMAIL);
-      }
 
       const hashedPassword = await bcrypt.hash(body.password, BCRYPT_SALT_ROUNDS);
       const emailVerifyToken = randomUUID();
@@ -87,7 +82,10 @@ export class AuthService {
       await this.mailService.sendVerifyEmail(email, this.buildVerifyEmailUrl(emailVerifyToken));
 
       return;
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.code === 'P2002') {
+        throw new ConflictException(ERROR.CFLEMAIL);
+      }
       this.handleError(error, 'Register fail', ERROR.SVREGISTER);
     }
   }
@@ -127,7 +125,7 @@ export class AuthService {
       const user = await this.prisma.user.findUnique({ where: { email } });
 
       if (!user) {
-        throw new NotFoundException(ERROR.NFUSER);
+        return;
       }
 
       const passwordResetToken = randomUUID();
@@ -146,7 +144,7 @@ export class AuthService {
         this.buildResetPasswordUrl(passwordResetToken),
       );
 
-      return { data: { success: true } };
+      return;
     } catch (error) {
       this.handleError(error, 'Forgot password fail', ERROR.SVLOGIN);
     }
@@ -160,6 +158,13 @@ export class AuthService {
 
       if (!user || !user.passwordResetExpiresAt || user.passwordResetExpiresAt <= new Date()) {
         throw new BadRequestException(ERROR.EVLRESETPASSWORD);
+      }
+
+      if (user.password) {
+        const isSamePassword = await bcrypt.compare(body.password, user.password);
+        if (isSamePassword) {
+          throw new BadRequestException(ERROR.EVLSAMEPASSWORD);
+        }
       }
 
       await this.prisma.$transaction([
@@ -272,7 +277,7 @@ export class AuthService {
       }
 
       if (!user.isActive) {
-        throw new UnauthorizedException(ERROR.EVLACTIVE);
+        throw new UnauthorizedException(ERROR.EVLLOGIN);
       }
 
       const isPasswordValid = await bcrypt.compare(body.password, user.password);
