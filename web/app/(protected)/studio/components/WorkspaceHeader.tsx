@@ -1,0 +1,159 @@
+'use client';
+
+import { Bell, ChevronDown, LogOut, Settings, User } from 'lucide-react';
+
+import { useAuth } from '@/hooks/useAuth';
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
+export function WorkspaceHeader() {
+  const { logout, user } = useAuth();
+  const displayName = user?.displayName || user?.email || 'Current user';
+  const email = user?.email ?? 'No email';
+  const roleLabel = user?.role ?? 'Workspace Member';
+  const initials = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('') || 'U';
+
+  return (
+    <header className="flex h-16 items-center justify-between border-b border-[#393E46] bg-[#222831] px-6">
+      {/* LEFT */}
+      <div className="flex items-center gap-4">
+        <img
+          src="/brand/1.png"
+          alt="Inkly"
+          className="h-[50px] w-auto object-contain"
+        />
+
+        <div className="h-7 w-px bg-[#434A55]" />
+
+        <div className="leading-tight">
+          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8B93A5]">
+            Workspace
+          </p>
+
+          <h1 className="text-[15px] font-semibold text-white">
+            Production Workspace
+          </h1>
+        </div>
+      </div>
+
+      {/* RIGHT */}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          className="relative rounded-lg p-2 text-[#B8BEC8] transition hover:bg-[#2F3742] hover:text-white"
+        >
+          <Bell className="size-5" />
+
+          <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full border border-[#222831] bg-[#FFD369]" />
+        </button>
+
+        <button
+          type="button"
+          className="rounded-lg p-2 text-[#B8BEC8] transition hover:bg-[#2F3742] hover:text-white"
+        >
+          <Settings className="size-5" />
+        </button>
+
+        <div className="mx-2 h-8 w-px bg-[#434A55]" />
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="flex items-center gap-4 rounded-xl px-2 py-1.5 transition hover:bg-[#2F3742]"
+              type="button"
+            >
+              {user?.avatarUrl ? (
+                <img
+                  src={user.avatarUrl}
+                  alt={displayName}
+                  className="h-9 w-9 rounded-full border border-[#FFD369] object-cover"
+                />
+              ) : (
+                <span className="grid h-9 w-9 place-items-center rounded-full border border-[#FFD369] bg-[#101820] text-xs font-black text-white">
+                  {initials}
+                </span>
+              )}
+
+              <div className="hidden text-left md:block">
+                <p className="text-sm font-semibold leading-none text-white">
+                  {displayName}
+                </p>
+
+                <p className="mt-1 text-[11px] font-medium text-[#8B93A5]">
+                  {roleLabel}
+                </p>
+              </div>
+
+              <ChevronDown className="size-4 text-[#8B93A5]" />
+            </button>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuContent
+            align="end"
+            className="w-72 border-[#393E46] bg-[#222831] text-white"
+          >
+            <DropdownMenuLabel className="py-3">
+              <div className="flex items-center gap-4">
+                {user?.avatarUrl ? (
+                  <img
+                    src={user.avatarUrl}
+                    alt={displayName}
+                    className="h-10 w-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <span className="grid h-10 w-10 place-items-center rounded-full border border-[#FFD369] bg-[#101820] text-xs font-black text-white">
+                    {initials}
+                  </span>
+                )}
+
+                <div>
+                  <p className="font-semibold">{displayName}</p>
+
+                  <p className="text-xs text-[#8B93A5]">
+                    {email}
+                  </p>
+
+                  <p className="text-[11px] font-bold text-[#FFD369]">
+                    {roleLabel}
+                  </p>
+                </div>
+              </div>
+            </DropdownMenuLabel>
+
+            <DropdownMenuSeparator className="bg-[#393E46]" />
+
+            <DropdownMenuGroup>
+              <DropdownMenuItem className="cursor-pointer focus:bg-[#2F3742]">
+                <User className="mr-2 size-4" />
+                My Profile
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+
+            <DropdownMenuSeparator className="bg-[#393E46]" />
+
+            <DropdownMenuItem
+              onClick={logout}
+              className="cursor-pointer text-red-400 focus:bg-[#2F3742] focus:text-red-400"
+            >
+              <LogOut className="mr-2 size-4" />
+              Logout
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </header>
+  );
+}
