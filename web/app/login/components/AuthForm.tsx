@@ -9,6 +9,7 @@ import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { setAccessToken } from '@/lib/auth-storage';
 import { validateLogin, type LoginErrors } from '@/lib/validators/auth';
 import { login } from '@/services/auth.service';
+import { AuthBackLink } from '@/components/auth/AuthBackLink';
 import { AuthBrand } from '@/components/auth/AuthBrand';
 import {
   authErrorClassName,
@@ -110,11 +111,12 @@ export function AuthForm({
 
   return (
     <section className={authPanelClassName}>
-      <div className="mb-10">
-        <div className="mb-8">
+      <div className="mb-8">
+        <AuthBackLink />
+        <div className="mb-5">
           <AuthBrand />
         </div>
-        <h2 className="mb-2 text-2xl font-bold leading-8 text-[#eeeeee]">{title}</h2>
+        <h2 className="mb-2 text-[28px] font-bold leading-9 text-[#eeeeee]">{title}</h2>
         <p className="text-sm leading-5 text-[#EEEEEE]">{description}</p>
       </div>
 

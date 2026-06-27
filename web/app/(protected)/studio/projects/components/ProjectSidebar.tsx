@@ -1,13 +1,10 @@
 'use client';
 
 import {
-  BarChart3,
   ClipboardList,
   FileCheck2,
   FolderOpen,
   LayoutDashboard,
-  Megaphone,
-  Settings,
   Users,
 } from 'lucide-react';
 
@@ -25,16 +22,10 @@ export function ProjectSidebar({ projectId }: ProjectSidebarProps) {
     { href: `${baseHref}/applications`, icon: FileCheck2, label: 'Applications' },
     { href: `${baseHref}/files`, icon: FolderOpen, label: 'Files' },
     { href: `${baseHref}/tasks`, icon: ClipboardList, label: 'Tasks' },
-    { href: `${baseHref}/publishing`, icon: Megaphone, label: 'Publishing' },
-    { href: `${baseHref}/reports`, icon: BarChart3, label: 'Reports' },
-  ];
-  const footerItems: StudioSidebarItem[] = [
-    { href: `${baseHref}/settings`, icon: Settings, label: 'Settings' },
   ];
 
   return (
     <StudioSidebar
-      footerItems={footerItems}
       items={navItems}
       subtitle="Production Workspace"
     />

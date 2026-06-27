@@ -1,21 +1,15 @@
 export function AuthBrand() {
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex flex-col items-start gap-1">
       <img
         src="/brand/1.png"
         alt="Inkly"
-        className="h-20 w-auto object-contain"
+        className="h-24 w-auto object-contain"
       />
 
-      <div>
-        <h1 className="text-3xl font-bold text-[#FFD369]">
-          Inkly
-        </h1>
-
-        <p className="text-xs text-[#9CA3AF]">
-          Create • Review • Publish
-        </p>
-      </div>
+      <p className="pl-1 text-[11px] font-bold uppercase tracking-[0.12em] text-[#b7c0ce]">
+        Create / Review / Publish
+      </p>
     </div>
   );
 }

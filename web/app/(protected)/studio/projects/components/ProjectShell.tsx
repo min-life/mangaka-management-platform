@@ -16,7 +16,7 @@ export function ProjectShell({
     <main className="workspace-scrollbar flex h-screen overflow-hidden bg-[#101820] text-[#eeeeee]">
       <ProjectSidebar projectId={projectId} />
       <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
-        <ProjectAppHeader projectName={projectName} />
+        <ProjectAppHeader projectId={projectId} projectName={projectName} />
         <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
       </div>
     </main>

@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { compressImageFile } from '@/lib/image-upload';
 import {
   createEditorBoard,
   type EditorBoardResponse,
@@ -28,8 +29,6 @@ const fieldClassName =
 const labelClassName =
   'text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]';
 
-const maxInlineImageLength = 70_000;
-
 function getErrorMessage(error: unknown) {
   if (error instanceof AxiosError) {
     const message = error.response?.data?.message;
@@ -37,57 +36,6 @@ function getErrorMessage(error: unknown) {
   }
 
   return 'Create board failed.';
-}
-
-function compressBoardImageFile(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const objectUrl = URL.createObjectURL(file);
-    const image = new Image();
-
-    image.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-
-      if (!context) {
-        reject(new Error('Canvas is not available.'));
-        return;
-      }
-
-      const baseScale = Math.min(1, 640 / image.width, 640 / image.height);
-      let width = Math.max(1, Math.round(image.width * baseScale));
-      let height = Math.max(1, Math.round(image.height * baseScale));
-
-      for (let resizeAttempt = 0; resizeAttempt < 6; resizeAttempt += 1) {
-        canvas.width = width;
-        canvas.height = height;
-        context.clearRect(0, 0, width, height);
-        context.drawImage(image, 0, 0, width, height);
-
-        for (const quality of [0.76, 0.64, 0.52, 0.42, 0.32]) {
-          const dataUrl = canvas.toDataURL('image/jpeg', quality);
-
-          if (dataUrl.length <= maxInlineImageLength) {
-            resolve(dataUrl);
-            return;
-          }
-        }
-
-        width = Math.max(1, Math.round(width * 0.76));
-        height = Math.max(1, Math.round(height * 0.76));
-      }
-
-      reject(new Error('Image is too large. Please choose a smaller board mark.'));
-    };
-
-    image.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      reject(new Error('Unable to read the selected image.'));
-    };
-
-    image.src = objectUrl;
-  });
 }
 
 type CreateBoardDialogProps = {
@@ -138,7 +86,12 @@ export function CreateBoardDialog({ onCreated }: CreateBoardDialogProps) {
     }
 
     try {
-      const compressedImage = await compressBoardImageFile(file);
+      const compressedImage = await compressImageFile(file, {
+        maxHeight: 640,
+        maxInlineImageLength: 70_000,
+        maxWidth: 640,
+        qualities: [0.76, 0.64, 0.52, 0.42, 0.32],
+      });
       setBoardImage(compressedImage);
       setBoardImageName(file.name);
       setBoardImageSize(file.size);
