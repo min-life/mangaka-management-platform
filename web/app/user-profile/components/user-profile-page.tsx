@@ -43,9 +43,10 @@ import {
   getCurrentUserEditorBoards,
   getCurrentUserProfile,
   getCurrentUserProjects,
+  getApiErrorMessage,
   updateCurrentUserPassword,
   updateCurrentUserProfile,
-  uploadAvatarToCloudinaryMock,
+  uploadAvatarToDataUrl,
   type UpdatePasswordPayload,
   type UserActivity,
   type UserEditorBoard,
@@ -129,7 +130,7 @@ function ProjectCard({ project }: { project: UserProject }) {
               : 'border-[#4CAF50]/20 bg-[#4CAF50]/10 text-[#4CAF50]',
           )}
         >
-          {metrics.statusLabel}
+          {metrics.statusLabel}*
         </Badge>
       </div>
       <h4 className="mb-1 text-[18px] font-semibold leading-6 text-[var(--profile-title)]">
@@ -532,10 +533,10 @@ export function UserProfilePage() {
     setError('');
 
     try {
-      const [profileData, projectData, boardData, activityData] = await Promise.all([
-        getCurrentUserProfile(),
-        getCurrentUserProjects(),
-        getCurrentUserEditorBoards(),
+      const profileData = await getCurrentUserProfile();
+      const [projectData, boardData, activityData] = await Promise.all([
+        getCurrentUserProjects(profileData.id),
+        getCurrentUserEditorBoards(profileData.id),
         getCurrentUserActivities(),
       ]);
 
@@ -543,8 +544,8 @@ export function UserProfilePage() {
       setProjects(projectData);
       setEditorBoards(boardData);
       setActivities(activityData);
-    } catch {
-      setError('Unable to load profile data.');
+    } catch (loadError) {
+      setError(getApiErrorMessage(loadError, 'Unable to load profile data.'));
     } finally {
       setIsLoading(false);
     }
@@ -564,18 +565,22 @@ export function UserProfilePage() {
 
     try {
       const uploadResult = values.avatarFile
-        ? await uploadAvatarToCloudinaryMock(values.avatarFile)
+        ? await uploadAvatarToDataUrl(values.avatarFile)
         : null;
       const updatedUser = await updateCurrentUserProfile({
         displayName: values.displayName,
         ...(uploadResult?.avatarUrl ? { avatarUrl: uploadResult.avatarUrl } : {}),
       });
 
-      setCurrentUser(updatedUser);
+      setCurrentUser((currentUser) => ({
+        ...(currentUser ?? updatedUser),
+        ...updatedUser,
+        roles: updatedUser.roles.length ? updatedUser.roles : (currentUser?.roles ?? []),
+      }));
       setIsEditProfileOpen(false);
       toast.success('Profile updated successfully');
-    } catch {
-      toast.error('Unable to update your profile.');
+    } catch (updateError) {
+      toast.error(getApiErrorMessage(updateError, 'Unable to update your profile.'));
     } finally {
       setIsProfileSubmitting(false);
     }
@@ -588,8 +593,8 @@ export function UserProfilePage() {
       await updateCurrentUserPassword(values);
       setIsPasswordOpen(false);
       toast.success('Password updated successfully');
-    } catch {
-      toast.error('Unable to update password.');
+    } catch (passwordError) {
+      toast.error(getApiErrorMessage(passwordError, 'Unable to update password.'));
     } finally {
       setIsPasswordSubmitting(false);
     }
@@ -621,12 +626,11 @@ export function UserProfilePage() {
       <header className="sticky top-0 z-40 border-b border-[var(--profile-border)] bg-[var(--profile-header)] px-8 py-4">
         <div className="flex items-center justify-between gap-8">
           <div className="flex items-center gap-8">
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded bg-[var(--profile-accent)] text-[#0e141c]">
-                <PenLine className="size-5" />
-              </div>
-              <h1 className="text-[18px] font-semibold text-[var(--profile-title)]">MangaFlow</h1>
-            </div>
+            <img
+              alt="Inkly"
+              className="h-[50px] w-auto object-contain"
+              src="/brand/1.png"
+            />
             <Separator
               className="hidden h-6 bg-[var(--profile-border)] md:block"
               orientation="vertical"

@@ -1,11 +1,7 @@
-import {
-  mockActivities,
-  mockCurrentUser,
-  mockEditorBoards,
-  mockProjects,
-} from '../const/mock-data';
+import api from '@/lib/api';
+import { compressImageFile } from '@/lib/image-upload';
 
-export type Scope = 'SYS' | 'PRJ';
+export type Scope = 'SYS' | 'PRJ' | string;
 export type ProgressStatus = 'PENDING' | 'INPROGRESS' | 'REVIEW' | 'DONE';
 
 export type UserRole = {
@@ -84,59 +80,135 @@ export type UpdatePasswordPayload = {
   newPassword: string;
 };
 
-const MOCK_DELAY = 250;
+type ApiResponse<T> = {
+  data: T;
+};
 
-let currentUserMockState: UserProfile = clone(mockCurrentUser);
+type ApiUserProfile = Omit<UserProfile, 'googleLinked' | 'isActive' | 'roles'> & {
+  googleLinked?: boolean;
+  isActive?: boolean;
+  roles?: UserRole[];
+};
 
-function clone<T>(value: T): T {
-  return structuredClone(value);
+type ApiUserProject = Omit<UserProject, 'projectStats'> & {
+  projectStats?: Array<{
+    id: number;
+    projectId: number;
+    metrics: unknown;
+    updatedAt: string;
+  }>;
+};
+
+function unwrapData<T>(response: unknown): T {
+  return (response as ApiResponse<T>).data ?? (response as T);
 }
 
-async function wait() {
-  await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
+function normalizeProfile(user: ApiUserProfile): UserProfile {
+  return {
+    ...user,
+    googleLinked: user.googleLinked ?? false,
+    isActive: user.isActive ?? true,
+    roles: user.roles ?? [],
+  };
+}
+
+function normalizeProject(project: ApiUserProject): UserProject {
+  const apiMetrics = project.projectStats?.[0]?.metrics as
+    | { progress?: unknown; statusLabel?: unknown }
+    | undefined;
+  const progress = typeof apiMetrics?.progress === 'number' ? apiMetrics.progress : 0;
+  const statusLabel =
+    apiMetrics?.statusLabel === 'Revision' || apiMetrics?.statusLabel === 'Blocked'
+      ? apiMetrics.statusLabel
+      : 'On Track';
+
+  return {
+    ...project,
+    projectStats: [
+      {
+        id: project.projectStats?.[0]?.id ?? project.id,
+        metrics: {
+          progress,
+          statusLabel,
+        },
+        projectId: project.id,
+        updatedAt: project.projectStats?.[0]?.updatedAt ?? project.updatedAt,
+      },
+    ],
+  };
 }
 
 export async function getCurrentUserProfile() {
-  await wait();
-  return clone(currentUserMockState);
+  const response = await api.get<ApiResponse<ApiUserProfile>, ApiResponse<ApiUserProfile>>(
+    '/users/me',
+  );
+
+  return normalizeProfile(unwrapData<ApiUserProfile>(response));
 }
 
-export async function getCurrentUserProjects() {
-  await wait();
-  return clone(mockProjects);
+export async function getCurrentUserProjects(userId?: number) {
+  const targetUserId = userId ?? (await getCurrentUserProfile()).id;
+  const response = await api.get<ApiResponse<ApiUserProject[]>, ApiResponse<ApiUserProject[]>>(
+    `/users/${targetUserId}/projects`,
+  );
+
+  return unwrapData<ApiUserProject[]>(response).map(normalizeProject);
 }
 
-export async function getCurrentUserEditorBoards() {
-  await wait();
-  return clone(mockEditorBoards);
+export async function getCurrentUserEditorBoards(userId?: number) {
+  const targetUserId = userId ?? (await getCurrentUserProfile()).id;
+  const response = await api.get<ApiResponse<UserEditorBoard[]>, ApiResponse<UserEditorBoard[]>>(
+    `/users/${targetUserId}/editor-boards`,
+  );
+
+  return unwrapData<UserEditorBoard[]>(response);
 }
 
-export async function getCurrentUserActivities() {
-  await wait();
-  return clone(mockActivities);
+export async function getCurrentUserActivities(): Promise<UserActivity[]> {
+  return [];
 }
 
 export async function updateCurrentUserProfile(payload: UpdateProfilePayload) {
-  await wait();
-  currentUserMockState = {
-    ...currentUserMockState,
-    displayName: payload.displayName,
-    avatarUrl: payload.avatarUrl ?? currentUserMockState.avatarUrl,
-    updatedAt: new Date().toISOString(),
-  };
+  const response = await api.patch<ApiResponse<ApiUserProfile>, ApiResponse<ApiUserProfile>>(
+    '/users/me',
+    payload,
+  );
 
-  return clone(currentUserMockState);
+  return normalizeProfile(unwrapData<ApiUserProfile>(response));
 }
 
-export async function updateCurrentUserPassword(_payload: UpdatePasswordPayload) {
-  await wait();
-  return { success: true };
+export async function updateCurrentUserPassword(payload: UpdatePasswordPayload) {
+  const response = await api.patch<ApiResponse<{ success: boolean }>, ApiResponse<{ success: boolean }>>(
+    '/users/me/password',
+    payload,
+  );
+
+  return unwrapData<{ success: boolean }>(response);
 }
 
-export async function uploadAvatarToCloudinaryMock(file: File) {
-  await wait();
+export async function uploadAvatarToDataUrl(file: File) {
   return {
-    publicId: `mock-cloudinary/avatar/${crypto.randomUUID()}`,
-    avatarUrl: URL.createObjectURL(file),
+    avatarUrl: await compressImageFile(file, {
+      maxHeight: 320,
+      maxInlineImageLength: 120_000,
+      maxWidth: 320,
+    }),
   };
+}
+
+export function getApiErrorMessage(error: unknown, fallback: string) {
+  if (typeof error === 'object' && error && 'response' in error) {
+    const response = (error as { response?: { data?: { message?: string | string[] } } }).response;
+    const message = response?.data?.message;
+
+    if (Array.isArray(message)) {
+      return message.join(' ');
+    }
+
+    if (message) {
+      return message;
+    }
+  }
+
+  return error instanceof Error && error.message ? error.message : fallback;
 }

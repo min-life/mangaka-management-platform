@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Bell, ChevronDown, LogOut, Settings, User } from 'lucide-react';
 
 import { useAuth } from '@/hooks/useAuth';
@@ -136,9 +137,11 @@ export function WorkspaceHeader() {
             <DropdownMenuSeparator className="bg-[#393E46]" />
 
             <DropdownMenuGroup>
-              <DropdownMenuItem className="cursor-pointer focus:bg-[#2F3742]">
-                <User className="mr-2 size-4" />
-                My Profile
+              <DropdownMenuItem asChild className="cursor-pointer focus:bg-[#2F3742]">
+                <Link href="/user-profile">
+                  <User className="mr-2 size-4" />
+                  My Profile
+                </Link>
               </DropdownMenuItem>
             </DropdownMenuGroup>
 

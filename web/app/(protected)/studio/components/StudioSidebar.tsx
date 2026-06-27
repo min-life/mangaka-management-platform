@@ -67,7 +67,9 @@ export function StudioSidebar({
       }`}
     >
       <div className={isCollapsed ? 'px-0' : 'px-1'}>
-        <div className={`flex h-14 items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
+        <div
+          className={`flex h-14 items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}
+        >
           <img
             alt={logoAlt}
             className={`w-auto object-contain ${isCollapsed ? 'max-h-9 max-w-[44px]' : 'max-h-[68px] max-w-[170px]'}`}
