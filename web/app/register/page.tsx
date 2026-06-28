@@ -1,47 +1,39 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useState } from 'react';
-import { BadgeCheck, BookOpen, Loader2 } from 'lucide-react';
+import { useState } from 'react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 
+import { authImages } from '@/components/auth/auth-assets';
+import { AuthBackLink } from '@/components/auth/AuthBackLink';
+import { AuthBrand } from '@/components/auth/AuthBrand';
+import { AuthHero } from '@/components/auth/AuthHero';
+import {
+  authErrorClassName,
+  authInputClassName,
+  authLabelClassName,
+  authPanelClassName,
+  authPrimaryButtonClassName,
+} from '@/components/auth/auth-styles';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useRegister, type RegisterErrors } from '@/hooks/use-register';
-import { images } from './const/studio-data';
+import { useRegister } from '@/hooks/use-register';
+import { validateRegister } from '@/lib/validators/auth';
 
-// KietDM #001
 export default function Page() {
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const { errors, isSubmitting, register, setErrors } = useRegister();
 
   const validate = () => {
-    const nextErrors: RegisterErrors = {};
-    const normalizedEmail = email.trim();
-
-    if (displayName.trim().length < 5) {
-      nextErrors.displayName = 'User name must be at least 5 characters.';
-    }
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-      nextErrors.email = 'Enter a valid email address.';
-    }
-
-    if (password.length < 6) {
-      nextErrors.password = 'Password must be at least 6 characters.';
-    }
-
-    if (confirmPassword !== password) {
-      nextErrors.confirmPassword = 'Passwords do not match.';
-    }
-
+    const nextErrors = validateRegister(displayName, email, password);
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!validate()) {
@@ -52,31 +44,28 @@ export default function Page() {
   };
 
   return (
-    <main className="flex min-h-screen overflow-hidden bg-[#131313] text-[#e2e2e2]">
-      <section className="relative z-10 flex w-full flex-col justify-center border-r border-[#4c4546] bg-[#131313] px-6 py-12 lg:w-[480px] lg:px-12">
+    <main className="flex min-h-screen overflow-hidden bg-[#222831] text-[#eeeeee]">
+      <section className={authPanelClassName}>
         <div className="mb-10">
-          <div className="mb-8 flex items-center gap-3">
-            <BookOpen className="size-8 text-[#c6c6c6]" />
-            <h1 className="text-xl font-bold text-[#e2e2e2]">MangaStudio</h1>
+          <AuthBackLink />
+          <div className="mb-8">
+            <AuthBrand />
           </div>
-          <h2 className="mb-2 text-2xl font-semibold leading-8 text-[#e2e2e2]">
+          <h2 className="mb-2 text-2xl font-bold leading-8 text-[#eeeeee]">
             Create Your Account
           </h2>
-          <p className="text-sm leading-5 text-[#cfc4c5]">
-            Join the next generation of manga production.
+          <p className="text-sm leading-5 text-[#EEEEEE]">
+            Start managing chapters, files, and production tasks with your studio team.
           </p>
         </div>
 
         <form className="space-y-5" onSubmit={handleSubmit}>
           <div className="space-y-2">
-            <label
-              className="text-xs font-semibold uppercase leading-4 tracking-[0.05em] text-[#cfc4c5]"
-              htmlFor="display_name"
-            >
+            <label className={authLabelClassName} htmlFor="display_name">
               User name
             </label>
             <Input
-              className="h-12 rounded border-[#4c4546] bg-[#1b1b1b] px-4 text-sm text-[#e2e2e2] placeholder:text-[#988e90] focus-visible:border-blue-500 focus-visible:ring-blue-500/40"
+              className={authInputClassName}
               id="display_name"
               name="display_name"
               onChange={(event) => setDisplayName(event.target.value)}
@@ -90,15 +79,12 @@ export default function Page() {
           </div>
 
           <div className="space-y-2">
-            <label
-              className="text-xs font-semibold uppercase leading-4 tracking-[0.05em] text-[#cfc4c5]"
-              htmlFor="email"
-            >
+            <label className={authLabelClassName} htmlFor="email">
               Email Address
             </label>
             <Input
               autoComplete="email"
-              className="h-12 rounded border-[#4c4546] bg-[#1b1b1b] px-4 text-sm text-[#e2e2e2] placeholder:text-[#988e90] focus-visible:border-blue-500 focus-visible:ring-blue-500/40"
+              className={authInputClassName}
               id="email"
               name="email"
               onChange={(event) => setEmail(event.target.value)}
@@ -110,55 +96,40 @@ export default function Page() {
           </div>
 
           <div className="space-y-2">
-            <label
-              className="text-xs font-semibold uppercase leading-4 tracking-[0.05em] text-[#cfc4c5]"
-              htmlFor="password"
-            >
+            <label className={authLabelClassName} htmlFor="password">
               Password
             </label>
-            <Input
-              autoComplete="new-password"
-              className="h-12 rounded border-[#4c4546] bg-[#1b1b1b] px-4 text-sm text-[#e2e2e2] placeholder:text-[#988e90] focus-visible:border-blue-500 focus-visible:ring-blue-500/40"
-              id="password"
-              name="password"
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="••••••••"
-              type="password"
-              value={password}
-            />
+            <div className="relative">
+              <Input
+                autoComplete="new-password"
+                className={`${authInputClassName} pr-12`}
+                id="password"
+                name="password"
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="••••••••"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+              />
+              <button
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                className="absolute right-3 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-[4px] text-[#d8dee8] hover:bg-[#4A5260] hover:text-[#FFD369]"
+                onClick={() => setShowPassword((current) => !current)}
+                type="button"
+              >
+                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </button>
+            </div>
             {errors.password ? <p className="text-xs text-red-300">{errors.password}</p> : null}
           </div>
 
-          <div className="space-y-2">
-            <label
-              className="text-xs font-semibold uppercase leading-4 tracking-[0.05em] text-[#cfc4c5]"
-              htmlFor="confirmPassword"
-            >
-              Confirm Password
-            </label>
-            <Input
-              autoComplete="new-password"
-              className="h-12 rounded border-[#4c4546] bg-[#1b1b1b] px-4 text-sm text-[#e2e2e2] placeholder:text-[#988e90] focus-visible:border-blue-500 focus-visible:ring-blue-500/40"
-              id="confirmPassword"
-              name="confirmPassword"
-              onChange={(event) => setConfirmPassword(event.target.value)}
-              placeholder="••••••••"
-              type="password"
-              value={confirmPassword}
-            />
-            {errors.confirmPassword ? (
-              <p className="text-xs text-red-300">{errors.confirmPassword}</p>
-            ) : null}
-          </div>
-
           {errors.form ? (
-            <div className="rounded border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm text-red-200">
+            <div className={authErrorClassName}>
               {errors.form}
             </div>
           ) : null}
 
           <Button
-            className="h-14 w-full rounded bg-[#c6c6c6] text-xs font-bold uppercase tracking-[0.2em] text-[#303030] hover:bg-white disabled:cursor-not-allowed disabled:opacity-70"
+            className={authPrimaryButtonClassName}
             disabled={isSubmitting}
             type="submit"
           >
@@ -168,41 +139,25 @@ export default function Page() {
         </form>
 
         <footer className="mt-10 text-center">
-          <p className="text-xs text-[#cfc4c5]">
+          <p className="text-xs font-medium text-[#EEEEEE]">
             You have an account?{' '}
-            <Link className="font-bold text-[#c6c6c6] hover:underline" href="/login">
+            <Link className="font-black text-[#FFD369] hover:underline" href="/login">
               Login
             </Link>
           </p>
         </footer>
       </section>
 
-      <section className="relative hidden flex-1 overflow-hidden bg-[#0e0e0e] lg:block">
-        <img
-          alt="Professional manga production workstation"
-          className="absolute inset-0 h-full w-full object-cover opacity-60 grayscale brightness-50"
-          src={images.loginHero}
-        />
-        <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-[#131313] via-transparent to-transparent p-16">
-          <div className="max-w-xl">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#c6c6c6]/20 bg-[#c6c6c6]/5 px-3 py-1 text-[#c6c6c6] backdrop-blur-md">
-              <BadgeCheck className="size-4" />
-              <span className="text-xs font-semibold uppercase tracking-wider">
-                Production Grade v2.4
-              </span>
-            </div>
-            <h3 className="mb-6 text-5xl font-bold leading-[56px] tracking-normal text-[#e2e2e2]">
-              Precision tools for <br />
-              <span className="italic text-[#c6c6c6]">modern storytelling.</span>
-            </h3>
-            <p className="text-base leading-6 text-[#cfc4c5]">
-              Streamline your manga production from rough storyboard to final ink. Connect with your
-              team, manage chapters, and review artwork in a unified workspace built for
-              professionals.
-            </p>
-          </div>
-        </div>
-      </section>
+      <AuthHero
+        description="Bring storyboards, files, tasks, and reviews into one focused workspace built for manga teams moving from draft pages to publication."
+        image={authImages.hero}
+        title={
+          <>
+            Manage every chapter, <br />
+            <span className="italic text-[#FFD369]">from sketch to release.</span>
+          </>
+        }
+      />
     </main>
   );
 }

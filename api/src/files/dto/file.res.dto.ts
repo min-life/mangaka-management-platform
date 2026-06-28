@@ -26,8 +26,8 @@ export class FileResDto {
   @ApiPropertyOptional({ example: 'First page of chapter 01.', nullable: true })
   description?: string | null;
 
-  @ApiProperty({ type: FolderResDto })
-  folder!: FolderResDto;
+  @ApiPropertyOptional({ type: () => FolderResDto, nullable: true })
+  folder?: FolderResDto | null;
 
   @ApiPropertyOptional({ type: UserResDto, nullable: true })
   createdByUser?: UserResDto | null;

@@ -5,6 +5,8 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiConflictResponse,
+  ApiBadRequestResponse,
 } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import type { Response } from 'express';
@@ -30,11 +32,12 @@ const REFRESH_COOKIE_OPTIONS = {
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Public()
   @ApiOperation({ summary: 'Register a new user' })
   @ApiCreatedResponse({ description: 'User registered successfully' })
+  @ApiConflictResponse({ description: 'Email already exists' })
   @Post('register')
   register(@Body() body: RegisterDto) {
     return this.authService.register(body);
@@ -43,6 +46,7 @@ export class AuthController {
   @Public()
   @ApiOperation({ summary: 'Verify user email' })
   @ApiOkResponse({ description: 'Email verified successfully' })
+  @ApiBadRequestResponse({ description: 'Invalid, expired, or already used verify email token' })
   @Post('verify-email')
   verifyEmail(@Body() body: VerifyEmailDto) {
     return this.authService.verifyEmail(body.token);
@@ -50,7 +54,7 @@ export class AuthController {
 
   @Public()
   @ApiOperation({ summary: 'Request password reset' })
-  @ApiOkResponse({ description: 'Password reset email sent' })
+  @ApiOkResponse({ description: 'Password reset email sent if email exists' })
   @Post('forgot')
   forgotPassword(@Body() body: ForgotPasswordDto) {
     return this.authService.forgotPassword(body);
@@ -59,6 +63,7 @@ export class AuthController {
   @Public()
   @ApiOperation({ summary: 'Reset password with token' })
   @ApiOkResponse({ description: 'Password reset successfully' })
+  @ApiBadRequestResponse({ description: 'Invalid token or new password cannot be the same as old password' })
   @Post('reset')
   resetPassword(@Body() body: ResetPasswordDto) {
     return this.authService.resetPassword(body);
