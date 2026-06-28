@@ -1,16 +1,18 @@
 import React from 'react';
-import { Text, TextInput, View, Animated } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
 
 import CommentBubble from '@/src/components/sub-component/CommentBubble';
 import FrameListPanel from '@/src/components/sub-component/FrameListPanel';
 import { COMMENTS, FRAMES } from '@/src/constants/taskDetailData';
-import { FrameAnnotation } from '@/src/types/taskDetail';
+import { Comment, FrameAnnotation } from '@/src/types/taskDetail';
 import { Colors } from '@/src/constants/colors';
 
 import { C } from './theme';
 
 interface DiscussionTabProps {
   comment: string;
+  comments?: Comment[];
+  frames?: FrameAnnotation[];
   onCommentChange: (comment: string) => void;
   selectedFrame: FrameAnnotation | null;
   onSelectFrame: (frame: FrameAnnotation) => void;
@@ -18,13 +20,15 @@ interface DiscussionTabProps {
 
 export default function DiscussionTab({
   comment,
+  comments = COMMENTS,
+  frames = FRAMES,
   onCommentChange,
   selectedFrame,
   onSelectFrame,
 }: DiscussionTabProps) {
   // Lọc comments theo frame đang chọn
   const visibleComments = selectedFrame
-    ? COMMENTS.filter((c) => c.frameId === selectedFrame.id)
+    ? comments.filter((c) => c.frameId === selectedFrame.id)
     : [];
 
   return (
@@ -39,7 +43,8 @@ export default function DiscussionTab({
 
       {/* ── Danh sách frame ──────────────────────────────────── */}
       <FrameListPanel
-        frames={FRAMES}
+        comments={comments}
+        frames={frames}
         selectedFrameId={selectedFrame?.id ?? null}
         onSelectFrame={onSelectFrame}
       />

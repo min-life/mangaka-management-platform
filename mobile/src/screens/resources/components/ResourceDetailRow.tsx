@@ -5,6 +5,8 @@ import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
 import { ResourceNode } from '@/src/types/resources';
 
+import { getPageCount } from './resourceFormatters';
+
 interface ResourceDetailRowProps {
   node: ResourceNode;
   isLast: boolean;
@@ -16,54 +18,61 @@ export default function ResourceDetailRow({
   isLast,
   onPress,
 }: ResourceDetailRowProps) {
-  const isFolder = node.type === 'folder';
+  const isChapter = node.type === 'folder';
+  const helperText = isChapter
+    ? `${getPageCount(node)} page${getPageCount(node) === 1 ? '' : 's'}`
+    : node.description ?? node.language;
 
   return (
     <TouchableOpacity
-      activeOpacity={0.75}
+      activeOpacity={0.76}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${isFolder ? 'Folder' : 'File'} ${node.name}`}
-      className="flex-row items-center pl-4"
-      style={{ minHeight: 58 }}
+      accessibilityLabel={`${isChapter ? 'Chapter' : 'Page'} ${node.name}`}
+      className={isLast ? 'mx-4 mb-0' : 'mx-4 mb-3'}
     >
       <View
-        className="h-10 w-10 items-center justify-center rounded-lg"
+        className="flex-row rounded-2xl p-4"
         style={{
-          backgroundColor: isFolder
-            ? 'rgba(77,166,255,0.16)'
-            : 'rgba(237,241,251,0.08)',
+          backgroundColor: Colors.surface,
+          borderWidth: 1,
+          borderColor: Colors.borderFaint,
         }}
       >
-        <MaterialIcon
-          name={isFolder ? 'folder' : 'file'}
-          color={isFolder ? '#79BDF8' : Colors.textMuted}
-          size={22}
-        />
-      </View>
-
-      <View
-        className="ml-4 flex-1 flex-row items-center py-3"
-        style={{
-          borderBottomWidth: isLast ? 0 : 1,
-          borderBottomColor: Colors.borderFaint,
-        }}
-      >
-        <View className="flex-1">
-          <Text
-            className="text-[15px] font-medium"
-            style={{ color: Colors.text }}
-            numberOfLines={1}
-          >
-            {node.name}
-          </Text>
-          <Text className="mt-0.5 text-[12px]" style={{ color: Colors.textMuted }}>
-            {isFolder ? 'Folder' : node.language}
-          </Text>
+        <View
+          className="h-12 w-12 items-center justify-center rounded-2xl"
+          style={{
+            backgroundColor: isChapter
+              ? 'rgba(230,161,75,0.22)'
+              : 'rgba(77,166,255,0.18)',
+          }}
+        >
+          <MaterialIcon
+            name={isChapter ? 'description' : 'image'}
+            color={isChapter ? Colors.iconFolder : Colors.statusProgress}
+            size={24}
+          />
         </View>
 
-        <View className="mr-4">
-          <MaterialIcon name="chevron_right" color={Colors.textFaint} size={23} />
+        <View className="ml-4 flex-1">
+          <View className="flex-row items-center">
+            <Text
+              className="flex-1 text-[16px] font-bold"
+              style={{ color: Colors.text }}
+              numberOfLines={1}
+            >
+              {node.name}
+            </Text>
+            <MaterialIcon name="chevron_right" color={Colors.textFaint} size={22} />
+          </View>
+
+          <Text className="mt-1 text-[12px] font-semibold" style={{ color: Colors.textFaint }}>
+            {isChapter ? 'Chapter' : 'Manga page'}
+          </Text>
+
+          <Text className="mt-2 text-[13px] leading-5" style={{ color: Colors.textMuted }} numberOfLines={2}>
+            {helperText}
+          </Text>
         </View>
       </View>
     </TouchableOpacity>

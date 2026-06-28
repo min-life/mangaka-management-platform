@@ -5,292 +5,321 @@ import {
   ResourceNode,
 } from '@/src/types/resources';
 
-const apiTree: ResourceFolderNode = {
-  id: 'root',
-  name: 'Resource',
-  type: 'folder',
-  parentId: null,
-  description: 'Project resource root',
-  children: [
-    {
-      id: 'api',
-      name: 'api',
+interface PageSeed {
+  id: string;
+  name: string;
+  description: string;
+  content: string;
+}
+
+interface ChapterSeed {
+  id: string;
+  name: string;
+  description: string;
+  pages: PageSeed[];
+}
+
+interface ArcSeed {
+  id: string;
+  name: string;
+  description: string;
+  createdBy: string;
+  createdByName: string;
+  createdAt: string;
+  updatedAt: string;
+  chapters: ChapterSeed[];
+}
+
+const arcSeeds: ArcSeed[] = [
+  {
+    id: 'awakening-arc',
+    name: 'Awakening Arc',
+    description: 'Opening arc where the lead discovers the blade mark and leaves the harbor town.',
+    createdBy: 'user-haruto-sato',
+    createdByName: 'Haruto Sato',
+    createdAt: '2026-05-18T08:30:00.000Z',
+    updatedAt: '2026-06-28T03:40:00.000Z',
+    chapters: [
+      {
+        id: 'awakening-chapter-01',
+        name: 'Chapter 01 - The First Mark',
+        description: 'Introduce the village, the mark, and the first editorial review batch.',
+        pages: [
+          {
+            id: 'awakening-c01-page-001',
+            name: 'Page 001',
+            description: 'Opening splash page for the coastal village.',
+            content: `# Page 001
+
+Wide establishing panel of the harbor town at dawn.
+
+- Check skyline perspective.
+- Confirm speech balloon placement does not cover the blade mark.
+- Background tone should stay soft for the opening mood.
+`,
+          },
+          {
+            id: 'awakening-c01-page-002',
+            name: 'Page 002',
+            description: 'Lead character notices the mark on his palm.',
+            content: `# Page 002
+
+Close-up sequence where the lead discovers the glowing blade mark.
+
+- Review hand anatomy.
+- Add stronger contrast around the mark.
+- Keep final panel silent.
+`,
+          },
+          {
+            id: 'awakening-c01-page-003',
+            name: 'Page 003',
+            description: 'Inciting incident at the shrine gate.',
+            content: `# Page 003
+
+The shrine gate fractures as the first shadow creature appears.
+
+- Verify action line direction.
+- Mark panel 4 for sound effect lettering.
+- Needs frame comments for creature silhouette.
+`,
+          },
+        ],
+      },
+      {
+        id: 'awakening-chapter-02',
+        name: 'Chapter 02 - Harbor Oath',
+        description: 'The lead accepts the journey and makes the first promise.',
+        pages: [
+          {
+            id: 'awakening-c02-page-001',
+            name: 'Page 001',
+            description: 'Departure scene with the mentor.',
+            content: `# Page 001
+
+Mentor gives the wrapped sword at the old pier.
+
+- Check emotional beat in panel 2.
+- Reduce texture density behind dialogue.
+`,
+          },
+          {
+            id: 'awakening-c02-page-002',
+            name: 'Page 002',
+            description: 'Travel montage toward the mountain path.',
+            content: `# Page 002
+
+Travel montage from harbor to mountain trail.
+
+- Confirm page flow from left cliff to bottom road.
+- Add weather notes for final render.
+`,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'ronin-trial-arc',
+    name: 'Ronin Trial Arc',
+    description: 'Tournament and trial arc focused on rival introductions and combat review.',
+    createdBy: 'user-yumi-tanaka',
+    createdByName: 'Yumi Tanaka',
+    createdAt: '2026-05-24T06:45:00.000Z',
+    updatedAt: '2026-06-27T11:30:00.000Z',
+    chapters: [
+      {
+        id: 'ronin-trial-chapter-03',
+        name: 'Chapter 03 - Trial Gate',
+        description: 'Candidates enter the trial grounds and meet the masked judge.',
+        pages: [
+          {
+            id: 'ronin-c03-page-001',
+            name: 'Page 001',
+            description: 'Trial gate crowd composition.',
+            content: `# Page 001
+
+Crowd scene at the trial gate.
+
+- Simplify background faces in panels 1 and 2.
+- Check mask design consistency.
+`,
+          },
+          {
+            id: 'ronin-c03-page-002',
+            name: 'Page 002',
+            description: 'First rival reveal.',
+            content: `# Page 002
+
+Rival reveal with vertical speed-line panel.
+
+- Increase contrast on cloak edge.
+- Review lettering around the challenge line.
+`,
+          },
+        ],
+      },
+      {
+        id: 'ronin-trial-chapter-04',
+        name: 'Chapter 04 - Broken Bamboo',
+        description: 'First combat chapter with choreography and impact frames.',
+        pages: [
+          {
+            id: 'ronin-c04-page-001',
+            name: 'Page 001',
+            description: 'Opening exchange in the bamboo field.',
+            content: `# Page 001
+
+Opening sword exchange in the bamboo field.
+
+- Mark action impact frames.
+- Check panel 5 motion blur.
+`,
+          },
+          {
+            id: 'ronin-c04-page-002',
+            name: 'Page 002',
+            description: 'Counterattack and cliffhanger beat.',
+            content: `# Page 002
+
+Counterattack lands near the final page turn.
+
+- Strengthen black fill in final panel.
+- Add comment frame over the broken sword guard.
+`,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'night-market-arc',
+    name: 'Night Market Arc',
+    description: 'Investigation arc through the hidden market and its spirit merchants.',
+    createdBy: 'user-linh-tran',
+    createdByName: 'Linh Tran',
+    createdAt: '2026-06-03T07:45:00.000Z',
+    updatedAt: '2026-06-28T04:35:00.000Z',
+    chapters: [
+      {
+        id: 'night-market-chapter-05',
+        name: 'Chapter 05 - Lantern Deal',
+        description: 'The crew follows a coded lantern trail into the market.',
+        pages: [
+          {
+            id: 'night-c05-page-001',
+            name: 'Page 001',
+            description: 'Lantern alley entrance.',
+            content: `# Page 001
+
+The crew enters the lantern alley.
+
+- Review value grouping in the crowd.
+- Keep lantern symbols readable at mobile scale.
+`,
+          },
+          {
+            id: 'night-c05-page-002',
+            name: 'Page 002',
+            description: 'Merchant bargain sequence.',
+            content: `# Page 002
+
+Spirit merchant offers the first bargain.
+
+- Check expression clarity.
+- Add frame notes for prop continuity.
+`,
+          },
+        ],
+      },
+    ],
+  },
+];
+
+function makePage(projectId: string, chapterId: string, page: PageSeed): ResourceFileNode {
+  return {
+    id: `${projectId}-${page.id}`,
+    name: page.name,
+    type: 'file',
+    folderId: `${projectId}-${chapterId}`,
+    description: page.description,
+    language: 'Manga Page',
+    content: page.content,
+    createdByName: 'Page Team',
+    createdAt: '2026-06-20T09:00:00.000Z',
+    updatedAt: '2026-06-28T05:00:00.000Z',
+  };
+}
+
+function makeChapter(
+  projectId: string,
+  arcId: string,
+  chapter: ChapterSeed,
+): ResourceFolderNode {
+  return {
+    id: `${projectId}-${chapter.id}`,
+    name: chapter.name,
+    type: 'folder',
+    projectId,
+    parentId: `${projectId}-${arcId}`,
+    description: chapter.description,
+    createdByName: 'Chapter Team',
+    createdAt: '2026-06-10T08:00:00.000Z',
+    updatedAt: '2026-06-28T04:30:00.000Z',
+    children: chapter.pages.map((page) => makePage(projectId, chapter.id, page)),
+  };
+}
+
+function makeArc(projectId: string, arc: ArcSeed): ResourceFolderNode {
+  return {
+    id: `${projectId}-${arc.id}`,
+    name: arc.name,
+    type: 'folder',
+    projectId,
+    parentId: null,
+    createdBy: arc.createdBy,
+    createdByName: arc.createdByName,
+    createdAt: arc.createdAt,
+    updatedAt: arc.updatedAt,
+    description: arc.description,
+    children: arc.chapters.map((chapter) => makeChapter(projectId, arc.id, chapter)),
+  };
+}
+
+function makeProjectResourceTree(projectId: string): ProjectResourceTree {
+  return {
+    projectId,
+    root: {
+      id: `${projectId}-resource-root`,
+      name: 'Resource',
       type: 'folder',
+      projectId,
       parentId: null,
-      description: 'Backend API source, configuration, and project service resources.',
-      children: [
-        {
-          id: 'api-prisma',
-          name: 'prisma',
-          type: 'folder',
-          parentId: 'api',
-          description: 'Database schema and Prisma migration resources.',
-          children: [
-            {
-              id: 'api-prisma-schema',
-              name: 'schema.prisma',
-              type: 'file',
-              language: 'Prisma',
-              content: `# Prisma Schema
-
-Project resources map to folders, files, and file materials.
-
-\`\`\`prisma
-model Project {
-  id        Int      @id @default(autoincrement())
-  name      String
-  folders   Folder[]
-}
-\`\`\`
-`,
-            },
-          ],
-        },
-        {
-          id: 'api-src',
-          name: 'src',
-          type: 'folder',
-          parentId: 'api',
-          description: 'API application source code and services.',
-          children: [
-            {
-              id: 'api-src-main',
-              name: 'main.ts',
-              type: 'file',
-              language: 'TypeScript',
-              content: `# API Entry
-
-Bootstraps the backend service for project and manuscript workflows.
-
-\`\`\`ts
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  await app.listen(3000);
-}
-\`\`\`
-`,
-            },
-            {
-              id: 'api-src-projects',
-              name: 'projects.service.ts',
-              type: 'file',
-              language: 'TypeScript',
-              content: `# Projects Service
-
-Handles project membership, resource browsing, and application summaries.
-
-- Load projects by user role.
-- Resolve folder trees by project.
-- Return file metadata and materials.
-`,
-            },
-          ],
-        },
-        {
-          id: 'api-test',
-          name: 'test',
-          type: 'folder',
-          parentId: 'api',
-          description: 'Automated API test resources.',
-          children: [
-            {
-              id: 'api-test-projects',
-              name: 'projects.e2e-spec.ts',
-              type: 'file',
-              language: 'TypeScript',
-              content: `# Project E2E
-
-Verifies project resource access rules and folder traversal.
-`,
-            },
-          ],
-        },
-        {
-          id: 'api-gitignore',
-          name: '.gitignore',
-          type: 'file',
-          language: 'Text',
-          content: `# Ignore
-
-node_modules
-dist
-.env
-`,
-        },
-        {
-          id: 'api-prettierrc',
-          name: '.prettierrc',
-          type: 'file',
-          language: 'JSON',
-          content: `# Prettier
-
-\`\`\`json
-{
-  "singleQuote": true,
-  "trailingComma": "all"
-}
-\`\`\`
-`,
-        },
-        {
-          id: 'api-readme',
-          name: 'README.md',
-          type: 'file',
-          language: 'Markdown',
-          content: `# API
-
-Tài liệu cài đặt và chạy cho thư mục \`api\`.
-
-## Yêu cầu
-
-- Node.js đã được cài sẵn.
-- Bạn đang đứng trong thư mục \`api\`.
-
-## Cài đặt
-
-Trong thư mục \`api\`, ưu tiên cài dependencies bằng lệnh sau:
-
-\`\`\`bash
-npm ci
-\`\`\`
-
-Lệnh này cài theo đúng \`package-lock.json\` và thường ổn định hơn.
-`,
-        },
-        {
-          id: 'api-eslint',
-          name: 'eslint.config.mjs',
-          type: 'file',
-          language: 'JavaScript',
-          content: `# ESLint Config
-
-Shared lint rules for API source files.
-`,
-        },
-        {
-          id: 'api-nest-cli',
-          name: 'nest-cli.json',
-          type: 'file',
-          language: 'JSON',
-          content: `# Nest CLI
-
-\`\`\`json
-{
-  "collection": "@nestjs/schematics",
-  "sourceRoot": "src"
-}
-\`\`\`
-`,
-        },
-        {
-          id: 'api-package-lock',
-          name: 'package-lock.json',
-          type: 'file',
-          language: 'JSON',
-          content: `# Lockfile
-
-Generated dependency lockfile for reproducible installs.
-`,
-        },
-        {
-          id: 'api-package',
-          name: 'package.json',
-          type: 'file',
-          language: 'JSON',
-          content: `# Package
-
-\`\`\`json
-{
-  "scripts": {
-    "start": "nest start",
-    "test": "jest"
-  }
-}
-\`\`\`
-`,
-        },
-        {
-          id: 'api-prisma-config',
-          name: 'prisma.config.ts',
-          type: 'file',
-          language: 'TypeScript',
-          content: `# Prisma Config
-
-Loads database configuration for Prisma migrations.
-`,
-        },
-      ],
+      description: 'Project manga resources grouped by arc, chapter, and page.',
+      children: arcSeeds.map((arc) => makeArc(projectId, arc)),
     },
-    {
-      id: 'mobile',
-      name: 'mobile',
-      type: 'folder',
-      parentId: null,
-      description: 'React Native mobile client resources.',
-      children: [
-        {
-          id: 'mobile-src',
-          name: 'src',
-          type: 'folder',
-          parentId: 'mobile',
-          description: 'Mobile app source files.',
-          children: [
-            {
-              id: 'mobile-src-readme',
-              name: 'README.md',
-              type: 'file',
-              language: 'Markdown',
-              content: `# Mobile
-
-React Native app for manga production workflows.
-`,
-            },
-          ],
-        },
-        {
-          id: 'mobile-app',
-          name: 'App.tsx',
-          type: 'file',
-          language: 'TypeScript',
-          content: `# App
-
-Root provider and navigation entry for the mobile client.
-`,
-        },
-      ],
-    },
-    {
-      id: 'web',
-      name: 'web',
-      type: 'folder',
-      parentId: null,
-      description: 'Web dashboard resources.',
-      children: [
-        {
-          id: 'web-readme',
-          name: 'README.md',
-          type: 'file',
-          language: 'Markdown',
-          content: `# Web
-
-Web dashboard for editorial and admin workflows.
-`,
-        },
-      ],
-    },
-  ],
-};
+  };
+}
 
 export const PROJECT_RESOURCE_TREES: ProjectResourceTree[] = [
-  { projectId: 'dragon-blade', root: apiTree },
-  { projectId: 'moonlight-ronin', root: apiTree },
-  { projectId: 'frame-cleaner', root: apiTree },
-  { projectId: 'lettering-queue', root: apiTree },
-  { projectId: 'night-market', root: apiTree },
+  makeProjectResourceTree('dragon-blade'),
+  makeProjectResourceTree('moonlight-ronin'),
+  makeProjectResourceTree('frame-cleaner'),
+  makeProjectResourceTree('lettering-queue'),
+  makeProjectResourceTree('night-market'),
 ];
 
 export function getProjectResourceTree(projectId: string): ResourceFolderNode {
-  return PROJECT_RESOURCE_TREES.find((tree) => tree.projectId === projectId)?.root ?? apiTree;
+  return (
+    PROJECT_RESOURCE_TREES.find((tree) => tree.projectId === projectId)?.root ??
+    makeProjectResourceTree(projectId).root
+  );
+}
+
+export function getProjectRootFolders(projectId: string): ResourceFolderNode[] {
+  return getProjectResourceTree(projectId).children.filter(
+    (node): node is ResourceFolderNode => node.type === 'folder' && node.parentId === null,
+  );
 }
 
 export function findResourceNode(
@@ -316,6 +345,24 @@ export function findResourceFile(
 ): ResourceFileNode | undefined {
   const node = findResourceNode(root, fileId);
   return node?.type === 'file' ? node : undefined;
+}
+
+export function findResourceFolder(
+  root: ResourceFolderNode,
+  folderId: string,
+): ResourceFolderNode | undefined {
+  const node = findResourceNode(root, folderId);
+  return node?.type === 'folder' ? node : undefined;
+}
+
+export function getFolderChildren(folder: ResourceFolderNode): ResourceFolderNode[] {
+  return folder.children.filter(
+    (node): node is ResourceFolderNode => node.type === 'folder',
+  );
+}
+
+export function getFolderFiles(folder: ResourceFolderNode): ResourceFileNode[] {
+  return folder.children.filter((node): node is ResourceFileNode => node.type === 'file');
 }
 
 export function findParentFolderId(

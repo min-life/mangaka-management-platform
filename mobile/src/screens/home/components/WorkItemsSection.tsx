@@ -6,11 +6,15 @@ import { Colors } from '@/src/constants/colors';
 import { WORK_ITEMS } from '@/src/constants/homeData';
 
 interface WorkItemsSectionProps {
+  onApplicationsPress: () => void;
+  onEditorBoardsPress: () => void;
   onTasksPress: () => void;
   onProjectsPress: () => void;
 }
 
 export default function WorkItemsSection({
+  onApplicationsPress,
+  onEditorBoardsPress,
   onTasksPress,
   onProjectsPress,
 }: WorkItemsSectionProps) {
@@ -33,7 +37,11 @@ export default function WorkItemsSection({
               ? onTasksPress
               : item.id === 'projects'
                 ? onProjectsPress
-                : undefined
+                : item.id === 'applications'
+                  ? onApplicationsPress
+                  : item.id === 'editor-board'
+                    ? onEditorBoardsPress
+                    : undefined
           }
         />
       ))}

@@ -36,6 +36,8 @@ export default function HomeScreen() {
       >
         <HomeSectionTitle />
         <WorkItemsSection
+          onApplicationsPress={() => navigation.navigate('Applications')}
+          onEditorBoardsPress={() => navigation.navigate('EditorBoards')}
           onTasksPress={() => navigation.navigate('Tasks')}
           onProjectsPress={() => navigation.navigate('Projects')}
         />

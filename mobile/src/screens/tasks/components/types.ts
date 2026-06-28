@@ -4,6 +4,7 @@ export type FilterChip = 'All' | 'Assigned' | 'In Progress' | 'Review' | 'Done';
 
 export interface Task {
   id: string;
+  projectId: string;
   priority: Priority;
   title: string;
   project: string;
@@ -11,4 +12,3 @@ export interface Task {
   assignees: string[];
   dueLabel: string;
 }
-

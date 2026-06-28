@@ -3,10 +3,19 @@ import { Text, View } from 'react-native';
 
 import ContributorRow from '@/src/components/sub-component/ContributorRow';
 import { CONTRIBUTORS, TASK_INFO } from '@/src/constants/taskDetailData';
+import { Contributor } from '@/src/types/taskDetail';
 
 import { C } from './theme';
 
-export default function OverviewTab() {
+interface OverviewTabProps {
+  contributors?: Contributor[];
+  description?: string;
+}
+
+export default function OverviewTab({
+  contributors = CONTRIBUTORS,
+  description = TASK_INFO.description,
+}: OverviewTabProps) {
   return (
     <View className="mt-6 gap-4">
       <View
@@ -19,7 +28,7 @@ export default function OverviewTab() {
         >
           Description
         </Text>
-        <Text style={{ color: C.text, lineHeight: 22 }}>{TASK_INFO.description}</Text>
+        <Text style={{ color: C.text, lineHeight: 22 }}>{description}</Text>
       </View>
 
       <View
@@ -33,7 +42,7 @@ export default function OverviewTab() {
           Contributors
         </Text>
         <View className="gap-4">
-          {CONTRIBUTORS.map((contributor) => (
+          {contributors.map((contributor) => (
             <ContributorRow key={contributor.id} contributor={contributor} />
           ))}
         </View>
@@ -41,4 +50,3 @@ export default function OverviewTab() {
     </View>
   );
 }
-

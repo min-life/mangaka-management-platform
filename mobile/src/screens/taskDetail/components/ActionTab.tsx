@@ -5,7 +5,15 @@ import MaterialIcon from '@/src/components/shared/MaterialIcon';
 
 import { C } from './theme';
 
-export default function ActionTab() {
+interface ActionTabProps {
+  approveLabel?: string;
+  rejectLabel?: string;
+}
+
+export default function ActionTab({
+  approveLabel = 'Approve Page',
+  rejectLabel = 'Reject Page',
+}: ActionTabProps) {
   return (
     <View className="mt-6 gap-3">
       {/* Approve */}
@@ -16,7 +24,7 @@ export default function ActionTab() {
       >
         <MaterialIcon name="check_circle" color="#222831" size={22} />
         <Text className="font-bold text-[15px]" style={{ color: '#222831' }}>
-          Approve Page
+          {approveLabel}
         </Text>
       </TouchableOpacity>
 
@@ -28,7 +36,7 @@ export default function ActionTab() {
       >
         <MaterialIcon name="cancel" color={C.onError} size={22} />
         <Text className="font-bold text-[15px]" style={{ color: C.onError }}>
-          Reject Page
+          {rejectLabel}
         </Text>
       </TouchableOpacity>
     </View>

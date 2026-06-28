@@ -4,10 +4,16 @@ export interface ResourceNodeBase {
   id: string;
   name: string;
   type: ResourceNodeType;
+  createdBy?: string;
+  createdByName?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  coverUri?: string;
 }
 
 export interface ResourceFolderNode extends ResourceNodeBase {
   type: 'folder';
+  projectId?: string;
   parentId: string | null;
   description?: string;
   children: ResourceNode[];
@@ -15,6 +21,8 @@ export interface ResourceFolderNode extends ResourceNodeBase {
 
 export interface ResourceFileNode extends ResourceNodeBase {
   type: 'file';
+  folderId?: string;
+  description?: string;
   language: string;
   content: string;
 }

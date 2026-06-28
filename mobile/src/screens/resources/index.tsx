@@ -1,22 +1,14 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import BottomNavBar from '@/src/components/shared/BottomNavBar';
 import { Colors } from '@/src/constants/colors';
-import {
-  findParentFolderId,
-  findResourceNode,
-  getProjectResourceTree,
-} from '@/src/constants/resourcesData';
+import { getProjectRootFolders } from '@/src/constants/resourcesData';
 import { RootStackParamList } from '@/src/navigation/types';
-import { ResourceFolderNode } from '@/src/types/resources';
 
 import {
-  ResourceDetailRow,
-  ResourceFolderDetailHero,
-  ResourceFolderDetailTopBar,
-  ResourceListRow,
+  ResourceFolderCardItem,
   ResourceSearchBar,
   ResourceTopBar,
   ResourcesEmptyState,
@@ -25,137 +17,62 @@ import {
 type ResourcesScreenProps = NativeStackScreenProps<RootStackParamList, 'Resources'>;
 
 export default function ResourcesScreen({ navigation, route }: ResourcesScreenProps) {
-  const root = getProjectResourceTree(route.params.projectId);
-  const [currentFolderId, setCurrentFolderId] = useState(root.id);
   const [search, setSearch] = useState('');
 
-  const currentFolder = useMemo(() => {
-    const node = findResourceNode(root, currentFolderId);
-    return node?.type === 'folder' ? node : root;
-  }, [currentFolderId, root]);
-
-  const parentFolder = useMemo(() => {
-    const parentId = findParentFolderId(root, currentFolder.id);
-    const parent = parentId ? findResourceNode(root, parentId) : undefined;
-    return parent?.type === 'folder' ? parent : undefined;
-  }, [currentFolder.id, root]);
-
-  const isRoot = currentFolder.id === root.id;
-
   const rootFolders = useMemo(
-    () =>
-      root.children.filter(
-        (node) => node.type === 'folder' && node.parentId === null,
-      ),
-    [root.children],
+    () => getProjectRootFolders(route.params.projectId),
+    [route.params.projectId],
   );
 
-  const visibleRootFolders = useMemo(() => {
+  const visibleFolders = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return rootFolders;
 
-    return rootFolders.filter((node) =>
-      node.name.toLowerCase().includes(query),
+    return rootFolders.filter((folder) =>
+      [folder.name, folder.description, folder.createdByName]
+        .filter(Boolean)
+        .some((value) => value?.toLowerCase().includes(query)),
     );
   }, [rootFolders, search]);
 
-  const handleBack = () => {
-    if (isRoot) {
-      navigation.goBack();
-      return;
-    }
-
-    setSearch('');
-    setCurrentFolderId(parentFolder?.id ?? root.id);
-  };
-
-  const handleNodePress = (node: ResourceFolderNode['children'][number]) => {
-    setSearch('');
-
-    if (node.type === 'folder') {
-      setCurrentFolderId(node.id);
-      return;
-    }
-
-    navigation.navigate('ResourceFile', {
-      projectId: route.params.projectId,
-      fileId: node.id,
-      parentFolderId: currentFolder.id,
-    });
-  };
-
-  const backLabel = 'Back';
-
-  if (isRoot) {
-    return (
-      <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
-        <ResourceTopBar backLabel={backLabel} title="Resource" onBack={handleBack} />
-        <ResourceSearchBar search={search} onSearchChange={setSearch} />
-
-        <ScrollView
-          className="flex-1"
-          contentContainerStyle={{ paddingBottom: 24 }}
-          showsVerticalScrollIndicator
-        >
-          <View
-            style={{
-              borderTopWidth: 1,
-              borderBottomWidth: 1,
-              borderColor: Colors.borderFaint,
-            }}
-          >
-            {visibleRootFolders.length > 0 ? (
-              visibleRootFolders.map((node, index) => (
-                <ResourceListRow
-                  key={node.id}
-                  node={node}
-                  isLast={index === visibleRootFolders.length - 1}
-                  onPress={() => handleNodePress(node)}
-                />
-              ))
-            ) : (
-              <ResourcesEmptyState />
-            )}
-          </View>
-        </ScrollView>
-
-        <BottomNavBar activeTab="home" />
-      </View>
-    );
-  }
-
   return (
     <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
-      <ResourceFolderDetailTopBar onBack={handleBack} />
+      <ResourceTopBar backLabel="Back" title="Resource" onBack={() => navigation.goBack()} />
 
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 24 }}
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <ResourceFolderDetailHero folder={currentFolder} />
+        <View className="px-4">
+          <View className="pb-2 pt-3">
+            <Text className="text-[30px] font-black" style={{ color: Colors.text }}>
+              Story arcs
+            </Text>
+            <Text className="mt-2 text-[14px] leading-6" style={{ color: Colors.textMuted }}>
+              Browse this project by arc, then open chapters and manga pages.
+            </Text>
+          </View>
+          <ResourceSearchBar search={search} onSearchChange={setSearch} />
+        </View>
 
-        <View
-          style={{
-            borderTopWidth: 1,
-            borderBottomWidth: 1,
-            borderColor: Colors.borderFaint,
-          }}
-        >
-          {currentFolder.children.length > 0 ? (
-            currentFolder.children.map((node, index) => (
-              <ResourceDetailRow
-                key={node.id}
-                node={node}
-                isLast={index === currentFolder.children.length - 1}
-                onPress={() => handleNodePress(node)}
+        <View className="gap-4 px-4 pt-4">
+          {visibleFolders.length > 0 ? (
+            visibleFolders.map((folder) => (
+              <ResourceFolderCardItem
+                key={folder.id}
+                folder={folder}
+                onPress={() =>
+                  navigation.navigate('ResourceFolderDetail', {
+                    projectId: route.params.projectId,
+                    folderId: folder.id,
+                  })
+                }
               />
             ))
           ) : (
-            <ResourcesEmptyState
-              title="This folder is empty"
-              message="Folder and file items will appear here."
-            />
+            <ResourcesEmptyState />
           )}
         </View>
       </ScrollView>

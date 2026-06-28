@@ -24,9 +24,17 @@ export interface ProjectStatsSummary {
 export interface ProjectItem {
   id: string;
   owner: string;
+  createdBy: string;
+  createdByName: string;
+  createdAt: string;
+  updatedAt: string;
   name: string;
+  description?: string;
   type: ProjectType;
   editorBoard: string;
+  editorBoardLeaderName: string;
+  editorBoardLeaderAvatarUri?: string;
+  editorBoardLeaderInitials: string;
   currentUserRole: string;
   activeMembers: number;
   stars: number;
@@ -44,4 +52,5 @@ export interface ProjectItem {
   languageColor: string;
   avatarInitials: string;
   avatarBg: string;
+  coverUri?: string;
 }

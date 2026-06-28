@@ -93,6 +93,9 @@ const ICON_MAP: Record<string, MaterialIconName> = {
   info:          'info-outline',
   warning:       'warning-amber',
   error:         'error-outline',
+  assessment:    'assessment',
+  view_list:     'view-list',
+  view_module:   'view-module',
 };
 
 // ─── Props ────────────────────────────────────────────────────────────────────

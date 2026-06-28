@@ -4,12 +4,11 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import BottomNavBar from '@/src/components/shared/BottomNavBar';
 import { Colors } from '@/src/constants/colors';
+import { getProjectApplications } from '@/src/constants/applicationsData';
 import { PROJECTS } from '@/src/constants/projectsData';
 import { RootStackParamList } from '@/src/navigation/types';
 
 import {
-  ProjectActionButtons,
-  ProjectBranchRow,
   ProjectDetailHero,
   ProjectDetailMenuItem,
   ProjectDetailTopBar,
@@ -19,6 +18,7 @@ type ProjectDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'Proj
 
 export default function ProjectDetailScreen({ navigation, route }: ProjectDetailScreenProps) {
   const project = PROJECTS.find((item) => item.id === route.params.projectId);
+  const projectApplications = getProjectApplications(route.params.projectId);
 
   if (!project) {
     return (
@@ -44,14 +44,11 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
     },
     {
       label: 'Application',
-      count:
-        project.applications.pending +
-        project.applications.approved +
-        project.applications.rejected +
-        project.applications.cancelled,
+      count: projectApplications.length,
       icon: 'apps',
       iconColor: '#FFFFFF',
       iconBg: Colors.statusProgress,
+      onPress: () => navigation.navigate('Applications', { projectId: project.id }),
     },
     {
       label: 'Task',
@@ -63,6 +60,7 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
       icon: 'checklist',
       iconColor: '#FFFFFF',
       iconBg: Colors.accent,
+      onPress: () => navigation.navigate('Tasks', { projectId: project.id }),
     },
     {
       label: 'Contribute',
@@ -70,6 +68,13 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
       icon: 'group_add',
       iconColor: '#FFFFFF',
       iconBg: '#DB2777',
+    },
+    {
+      label: 'Report',
+      icon: 'assessment',
+      iconColor: '#FFFFFF',
+      iconBg: '#8B5CF6',
+      onPress: () => navigation.navigate('ProjectReport', { projectId: project.id }),
     },
     {
       label: 'More',

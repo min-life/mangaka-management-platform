@@ -5,62 +5,86 @@ import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
 import { ResourceFolderNode } from '@/src/types/resources';
 
+import {
+  getDirectChapterCount,
+  getPageCount,
+  getResourceDateRange,
+} from './resourceFormatters';
+
 interface ResourceFolderDetailHeroProps {
   folder: ResourceFolderNode;
+}
+
+function DetailMetric({
+  icon,
+  label,
+  value,
+}: {
+  icon: string;
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <View
+      className="flex-1 rounded-2xl px-3 py-3"
+      style={{
+        backgroundColor: Colors.surface,
+        borderWidth: 1,
+        borderColor: Colors.borderFaint,
+      }}
+    >
+      <MaterialIcon name={icon} color={Colors.accent} size={19} />
+      <Text className="mt-2 text-[18px] font-black" style={{ color: Colors.text }}>
+        {value}
+      </Text>
+      <Text className="mt-0.5 text-[11px] font-semibold" style={{ color: Colors.textMuted }}>
+        {label}
+      </Text>
+    </View>
+  );
 }
 
 export default function ResourceFolderDetailHero({
   folder,
 }: ResourceFolderDetailHeroProps) {
-  const folderCount = folder.children.filter(
-    (node) => node.type === 'folder',
-  ).length;
-  const fileCount = folder.children.filter((node) => node.type === 'file').length;
+  const chapterCount = getDirectChapterCount(folder);
+  const pageCount = getPageCount(folder);
+  const isArc = folder.parentId === null;
 
   return (
-    <View className="px-4 pb-6 pt-5">
+    <View className="px-4 pb-5 pt-4">
       <View className="flex-row items-center">
         <View
-          className="h-9 w-9 items-center justify-center rounded-full"
-          style={{ backgroundColor: 'rgba(77,166,255,0.16)' }}
+          className="h-11 w-11 items-center justify-center rounded-2xl"
+          style={{ backgroundColor: isArc ? Colors.iconFolder : Colors.statusProgress }}
         >
-          <MaterialIcon name="folder" color={Colors.statusProgress} size={22} />
+          <MaterialIcon name={isArc ? 'folder' : 'description'} color={Colors.bg} size={23} />
         </View>
-        <Text
-          className="ml-3 flex-1 text-[15px]"
-          style={{ color: 'rgba(237,241,251,0.68)' }}
-          numberOfLines={1}
-        >
-          Resource folder
-        </Text>
+        <View className="ml-3 flex-1">
+          <Text className="text-[12px] font-bold uppercase" style={{ color: Colors.textFaint }}>
+            {isArc ? 'Story Arc' : 'Chapter'}
+          </Text>
+          <Text className="mt-0.5 text-[13px]" style={{ color: Colors.textMuted }}>
+            {getResourceDateRange(folder)}
+          </Text>
+        </View>
       </View>
 
       <Text
-        className="mt-5 text-3xl font-bold leading-tight"
+        className="mt-5 text-[30px] font-black leading-tight"
         style={{ color: Colors.text }}
-        numberOfLines={2}
+        numberOfLines={3}
       >
         {folder.name}
       </Text>
 
-      <Text
-        className="mt-5 text-[15px]"
-        style={{ color: Colors.text }}
-        numberOfLines={3}
-      >
-        {folder.description ?? 'No description'}
+      <Text className="mt-3 text-[14px] leading-6" style={{ color: Colors.textMuted }}>
+        {folder.description ?? 'Manga production content for this section.'}
       </Text>
 
-      <View className="mt-5 flex-row">
-        <Text className="text-[12px]" style={{ color: Colors.textMuted }}>
-          {folderCount} folder{folderCount === 1 ? '' : 's'}
-        </Text>
-        <Text className="mx-2 text-[12px]" style={{ color: Colors.textFaint }}>
-          /
-        </Text>
-        <Text className="text-[12px]" style={{ color: Colors.textMuted }}>
-          {fileCount} file{fileCount === 1 ? '' : 's'}
-        </Text>
+      <View className="mt-5 flex-row gap-3">
+        <DetailMetric icon="folder" label="Chapters" value={chapterCount} />
+        <DetailMetric icon="image" label="Pages" value={pageCount} />
       </View>
     </View>
   );

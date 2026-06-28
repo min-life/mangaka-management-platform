@@ -7,9 +7,10 @@ import { Colors } from '@/src/constants/colors';
 
 interface TasksTopBarProps {
   onBack: () => void;
+  title?: string;
 }
 
-export default function TasksTopBar({ onBack }: TasksTopBarProps) {
+export default function TasksTopBar({ onBack, title = 'Tasks' }: TasksTopBarProps) {
   return (
     <SafeAreaView edges={['top']} style={{ backgroundColor: Colors.bg }}>
       <View
@@ -27,8 +28,12 @@ export default function TasksTopBar({ onBack }: TasksTopBarProps) {
           <MaterialIcon name="arrow_back" color={Colors.text} size={22} />
         </TouchableOpacity>
 
-        <Text className="text-2xl font-bold flex-1" style={{ color: Colors.text }}>
-          Tasks
+        <Text
+          className="text-2xl font-bold flex-1"
+          style={{ color: Colors.text }}
+          numberOfLines={1}
+        >
+          {title}
         </Text>
         <TouchableOpacity
           activeOpacity={0.7}
@@ -40,4 +45,3 @@ export default function TasksTopBar({ onBack }: TasksTopBarProps) {
     </SafeAreaView>
   );
 }
-

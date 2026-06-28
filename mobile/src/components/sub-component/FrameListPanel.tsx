@@ -1,11 +1,13 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { Colors } from '@/src/constants/colors';
 import { FrameAnnotation } from '@/src/types/taskDetail';
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { COMMENTS } from '@/src/constants/taskDetailData';
+import { Comment } from '@/src/types/taskDetail';
 
 interface FrameListPanelProps {
+  comments?: Comment[];
   frames: FrameAnnotation[];
   selectedFrameId: string | null;
   onSelectFrame: (frame: FrameAnnotation) => void;
@@ -16,6 +18,7 @@ interface FrameListPanelProps {
  * Click vào frame → khoanh vùng đỏ trên ảnh + hiển thị comments của frame đó.
  */
 export default function FrameListPanel({
+  comments = COMMENTS,
   frames,
   selectedFrameId,
   onSelectFrame,
@@ -24,7 +27,7 @@ export default function FrameListPanel({
     <View className="gap-2">
       {frames.map((frame, index) => {
         const isSelected = frame.id === selectedFrameId;
-        const commentCount = COMMENTS.filter((c) => c.frameId === frame.id).length;
+        const commentCount = comments.filter((c) => c.frameId === frame.id).length;
 
         return (
           <TouchableOpacity

@@ -1,0 +1,886 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mangaka API - Phan tich he thong backend</title>
+  <style>
+    :root {
+      --bg: #f7f8fb;
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #5d6b82;
+      --line: #d9e0ea;
+      --accent: #0f766e;
+      --accent-2: #7c3aed;
+      --warn: #b45309;
+      --danger: #b91c1c;
+      --code: #eef2f7;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.58;
+    }
+
+    header {
+      background: #172033;
+      color: #fff;
+      padding: 42px 24px 36px;
+      border-bottom: 6px solid var(--accent);
+    }
+
+    header .wrap,
+    main {
+      width: min(1180px, calc(100% - 36px));
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(30px, 4vw, 48px);
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 42px 0 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--line);
+      font-size: 26px;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 28px 0 10px;
+      font-size: 20px;
+      letter-spacing: 0;
+    }
+
+    h4 {
+      margin: 20px 0 8px;
+      font-size: 16px;
+      letter-spacing: 0;
+    }
+
+    p { margin: 8px 0 12px; }
+
+    main { padding: 26px 0 56px; }
+
+    a { color: var(--accent); }
+
+    code {
+      background: var(--code);
+      border: 1px solid #d7deea;
+      border-radius: 5px;
+      padding: 1px 5px;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 0.94em;
+    }
+
+    pre {
+      overflow: auto;
+      background: #111827;
+      color: #e5e7eb;
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .subtitle {
+      max-width: 860px;
+      color: #d7dee9;
+      font-size: 18px;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 18px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      border-radius: 999px;
+      padding: 4px 10px;
+      background: rgba(255, 255, 255, 0.12);
+      color: #eef5ff;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      font-size: 13px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 14px;
+      margin: 14px 0;
+    }
+
+    .toc {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 8px;
+      padding-left: 0;
+      list-style: none;
+    }
+
+    .toc a {
+      display: block;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      text-decoration: none;
+      color: var(--ink);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 20px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    th,
+    td {
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th {
+      background: #edf3f8;
+      color: #243145;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    tr:last-child td { border-bottom: 0; }
+
+    .method {
+      display: inline-block;
+      min-width: 58px;
+      border-radius: 5px;
+      padding: 2px 6px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 12px;
+      color: #fff;
+    }
+
+    .get { background: #2563eb; }
+    .post { background: #059669; }
+    .patch { background: #7c3aed; }
+    .put { background: #9333ea; }
+    .delete { background: #dc2626; }
+
+    .note {
+      border-left: 4px solid var(--accent);
+      background: #ecfdf5;
+      padding: 12px 14px;
+      border-radius: 6px;
+      margin: 14px 0;
+    }
+
+    .warning {
+      border-left: 4px solid var(--warn);
+      background: #fff7ed;
+      padding: 12px 14px;
+      border-radius: 6px;
+      margin: 14px 0;
+    }
+
+    .danger {
+      border-left: 4px solid var(--danger);
+      background: #fef2f2;
+      padding: 12px 14px;
+      border-radius: 6px;
+      margin: 14px 0;
+    }
+
+    .small { color: var(--muted); font-size: 14px; }
+
+    .flow {
+      list-style: none;
+      padding-left: 0;
+      display: grid;
+      gap: 8px;
+    }
+
+    .flow li {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+
+    @media (max-width: 720px) {
+      header .wrap,
+      main { width: min(100% - 24px, 1180px); }
+      table { display: block; overflow-x: auto; }
+      th, td { min-width: 160px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>Mangaka API - đọc hiểu backend</h1>
+      <p class="subtitle">
+        Tài liệu này tổng hợp những gì backend trong thư mục <code>api/</code> đang làm:
+        kiến trúc NestJS, schema Prisma, luồng xác thực, phân quyền, module nghiệp vụ,
+        endpoint chính và các điểm cần chú ý khi frontend/mobile tích hợp.
+      </p>
+      <div class="meta">
+        <span class="pill">Nguồn đọc: <code>api/src</code>, <code>api/prisma/schema.prisma</code>, config và test</span>
+        <span class="pill">Ngày lập: 2026-06-26</span>
+        <span class="pill">Không đọc nội dung secret trong <code>.env</code></span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section id="toc">
+      <h2>Mục lục</h2>
+      <ul class="toc">
+        <li><a href="#summary">1. Kết luận nhanh</a></li>
+        <li><a href="#stack">2. Công nghệ và runtime</a></li>
+        <li><a href="#domain">3. Domain hệ thống</a></li>
+        <li><a href="#flows">4. Luồng flow nghiệp vụ</a></li>
+        <li><a href="#data-model">5. Mô hình dữ liệu</a></li>
+        <li><a href="#auth">6. Xác thực</a></li>
+        <li><a href="#permission">7. Phân quyền</a></li>
+        <li><a href="#modules">8. Module nghiệp vụ</a></li>
+        <li><a href="#api-map">9. Bản đồ endpoint</a></li>
+        <li><a href="#env">10. Biến môi trường và triển khai</a></li>
+        <li><a href="#risks">11. Điểm cần chú ý</a></li>
+      </ul>
+    </section>
+
+    <section id="summary">
+      <h2>1. Kết luận nhanh</h2>
+      <div class="card">
+        <p>
+          Đây là backend quản trị quy trình sản xuất/xuất bản manga. Hệ thống xoay quanh
+          <strong>project</strong>, <strong>editor board</strong>, cây <strong>folder/file</strong>,
+          <strong>materials</strong> dạng JSON, <strong>tasks</strong>, vùng comment trên trang/khung
+          và <strong>applications</strong> để gửi duyệt bản thảo hoặc yêu cầu xuất bản.
+        </p>
+        <p>
+          Backend dùng NestJS 11, Prisma 7 với PostgreSQL, JWT access token, refresh token lưu DB,
+          Google OAuth, email verify/reset password qua Nodemailer, Swagger tại <code>/docs</code>
+          và prefix API toàn cục <code>/api</code>.
+        </p>
+        <p>
+          Thiết kế phân quyền là phần quan trọng nhất: có quyền hệ thống theo role <code>SYS</code>
+          và quyền theo project qua role <code>PRJ</code>. Ngoài role, hệ thống còn sinh quyền ngữ cảnh
+          như <code>project:owner</code>, <code>board:owner</code>, <code>board:leader</code>,
+          <code>board:member</code>.
+        </p>
+      </div>
+    </section>
+
+    <section id="stack">
+      <h2>2. Công nghệ và runtime</h2>
+      <table>
+        <thead>
+          <tr><th>Thành phần</th><th>Chi tiết</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Framework</td><td>NestJS <code>@nestjs/common/core/platform-express</code> version 11.</td></tr>
+          <tr><td>Database</td><td>PostgreSQL qua Prisma Client 7 và <code>@prisma/adapter-pg</code>.</td></tr>
+          <tr><td>Validation</td><td><code>ValidationPipe</code> global: <code>whitelist</code>, <code>forbidNonWhitelisted</code>, <code>transform</code>.</td></tr>
+          <tr><td>Auth</td><td>Passport JWT, Passport Google OAuth2, bcrypt, cookie-parser.</td></tr>
+          <tr><td>Docs</td><td>Swagger document title <code>Mangaka API</code>, UI ở <code>/docs</code>.</td></tr>
+          <tr><td>API prefix</td><td>Tất cả controller nằm dưới <code>/api</code>, ví dụ <code>/api/auth/login</code>.</td></tr>
+          <tr><td>CORS</td><td>Origin lấy từ <code>WEB_ORIGIN</code>, fallback <code>http://localhost:3001</code>, bật credentials.</td></tr>
+          <tr><td>Deploy</td><td><code>vercel.json</code> trỏ mọi route về <code>src/main.ts</code> bằng <code>@vercel/node</code>.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Lệnh chính</h3>
+      <table>
+        <thead>
+          <tr><th>Lệnh</th><th>Ý nghĩa</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>npm run start:dev</code></td><td>Chạy Nest ở chế độ watch.</td></tr>
+          <tr><td><code>npm run build</code></td><td>Build production bằng Nest CLI.</td></tr>
+          <tr><td><code>npm run start:prod</code></td><td>Chạy <code>node dist/main</code>.</td></tr>
+          <tr><td><code>npm run test</code></td><td>Chạy Jest unit test trong <code>src</code>.</td></tr>
+          <tr><td><code>npm run test:e2e</code></td><td>Chạy e2e test trong <code>test/</code>.</td></tr>
+          <tr><td><code>postinstall</code></td><td>Tự chạy <code>prisma generate</code> sau khi cài package.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="domain">
+      <h2>3. Domain hệ thống</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Người dùng và staff</h3>
+          <p>User có email/password hoặc Google account. User thường tự đăng ký rồi verify email; staff/admin có thể tạo user active ngay và gán role hệ thống.</p>
+        </div>
+        <div class="card">
+          <h3>Role và permission</h3>
+          <p>Role có scope <code>SYS</code> hoặc <code>PRJ</code>. Permission cũng có scope tương ứng. Role default được dùng khi đăng ký user hoặc tạo project.</p>
+        </div>
+        <div class="card">
+          <h3>Project</h3>
+          <p>Project là đơn vị manga/chapter/công việc chính. Project có owner là người tạo, có members theo role project và có thể thuộc một editor board.</p>
+        </div>
+        <div class="card">
+          <h3>Editor board</h3>
+          <p>Editor board gom editor/reviewer, có owner, members và tối đa một lead do API <code>setToLead</code> reset các lead khác về false.</p>
+        </div>
+        <div class="card">
+          <h3>Asset/work tree</h3>
+          <p>Trong project có cây folder. Folder chứa file. File có materials JSON và tasks. Task có thể lồng nhau và có frame/comment để review theo vùng.</p>
+        </div>
+        <div class="card">
+          <h3>Application</h3>
+          <p>Application là đơn gửi duyệt: <code>MANUSCRIPT_REVIEW</code> hoặc <code>PUBLISH_REQUEST</code>, có trạng thái <code>PENDING</code>, <code>APPROVE</code>, <code>REJECT</code>, <code>CANCELLED</code>.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="flows">
+      <h2>4. Luồng flow nghiệp vụ</h2>
+      <p>
+        Backend này có thể đọc như một chuỗi flow nối tiếp nhau: trước hết user phải được xác thực,
+        sau đó được kiểm quyền, rồi mới đi vào các workflow quản lý project, editor board, tài nguyên
+        sản xuất manga, review/comment và gửi duyệt/xuất bản.
+      </p>
+
+      <h3>4.1. Flow đăng ký, xác thực và duy trì phiên</h3>
+      <ul class="flow">
+        <li><strong>Đăng ký tài khoản:</strong> client gọi <code>POST /api/auth/register</code> với email, password và display name. Backend chuẩn hóa email về lowercase, hash password bằng bcrypt, tạo user chưa active, gán role hệ thống mặc định <code>SYS</code>, sinh token verify email và gửi email xác thực.</li>
+        <li><strong>Xác thực email:</strong> user mở link hoặc client gửi token đến <code>POST /api/auth/verify-email</code>. Nếu token còn hạn, backend bật <code>isActive=true</code> và xóa token verify khỏi user.</li>
+        <li><strong>Đăng nhập:</strong> client gọi <code>POST /api/auth/login</code>. Backend kiểm tra user tồn tại, có password, đã active và password đúng. Kết quả là access token trả trong body, refresh token được set vào cookie <code>refreshToken</code> dạng <code>httpOnly</code>.</li>
+        <li><strong>Duy trì phiên:</strong> khi access token hết hạn, client gọi <code>POST /api/auth/refresh</code>. Backend lấy refresh token từ cookie hoặc body, kiểm tra token trong DB, verify JWT, tạo access token mới, tạo refresh token mới và xóa refresh token cũ. Đây là cơ chế refresh token rotation.</li>
+        <li><strong>Đăng xuất:</strong> client gọi <code>POST /api/auth/logout</code>. Backend xóa refresh token khỏi DB, clear cookie và nếu request có Bearer access token thì đưa access token đó vào blacklist tới thời điểm hết hạn.</li>
+        <li><strong>Quên/đặt lại mật khẩu:</strong> <code>POST /api/auth/forgot</code> tạo password reset token và gửi email; <code>POST /api/auth/reset</code> đổi password, xóa reset token và xóa toàn bộ refresh token của user để bắt đăng nhập lại.</li>
+        <li><strong>Google OAuth:</strong> <code>GET /api/auth/google</code> chuyển qua Google; callback tìm user bằng Google id hoặc email, tự link Google nếu email đã có, hoặc tạo user mới active ngay. Sau đó backend redirect về frontend với access token và set refresh cookie.</li>
+      </ul>
+
+      <h3>4.2. Flow kiểm quyền cho mọi request</h3>
+      <ul class="flow">
+        <li><strong>Bước 1 - global auth:</strong> mọi endpoint mặc định đi qua <code>GlobalAuthGuard</code>. Chỉ endpoint có <code>@Public()</code> mới bỏ qua JWT.</li>
+        <li><strong>Bước 2 - kiểm access token:</strong> <code>AccessTokenStrategy</code> lấy Bearer token, kiểm token có nằm trong <code>blacklist_tokens</code> không, sau đó kiểm user trong DB còn tồn tại.</li>
+        <li><strong>Bước 3 - đọc metadata permission:</strong> <code>PermissionGuard</code> đọc <code>@Permissions</code> trên controller method. Nếu method không khai báo permission thì chỉ cần JWT là qua.</li>
+        <li><strong>Bước 4 - gom quyền:</strong> nếu là quyền hệ thống, backend query từ <code>user_roles -> role_permissions -> permissions</code>. Nếu là quyền tài nguyên, backend truy ngược resource về project/board để xác định user có phải member, owner hoặc board lead không.</li>
+        <li><strong>Bước 5 - so khớp:</strong> mode <code>ANY</code> nghĩa là user chỉ cần có một quyền trong danh sách; mode <code>ALL</code> yêu cầu đủ toàn bộ quyền.</li>
+      </ul>
+
+      <div class="note">
+        <strong>Cách hiểu nhanh:</strong> role <code>SYS</code> trả lời câu hỏi "user này có quyền quản trị toàn hệ thống không?",
+        còn role <code>PRJ</code> trả lời câu hỏi "user này làm được gì trong project cụ thể này?".
+        Các quyền như <code>project:owner</code> và <code>board:leader</code> không đến trực tiếp từ bảng permission,
+        mà được suy ra từ quan hệ dữ liệu.
+      </div>
+
+      <h3>4.3. Flow tạo và vận hành project</h3>
+      <ul class="flow">
+        <li><strong>Tạo project:</strong> user gọi <code>POST /api/projects</code>. Backend tạo project, lấy role project mặc định <code>PRJ</code>, rồi tạo bản ghi <code>UserProject</code> để creator trở thành member của project đó.</li>
+        <li><strong>Xem danh sách project:</strong> <code>GET /api/projects</code> trả về project user tạo hoặc project user đang là member. Query <code>me=true</code> thu hẹp về project user tạo.</li>
+        <li><strong>Quản lý thông tin project:</strong> owner hoặc user có quyền <code>project:update</code> có thể sửa project; owner hoặc <code>project:delete</code> có thể xóa project.</li>
+        <li><strong>Quản lý member:</strong> owner hoặc quyền member tương ứng có thể list, add, update role hoặc remove member. Khi add/update member, backend chỉ chấp nhận role scope <code>PRJ</code>.</li>
+        <li><strong>Bảo vệ owner:</strong> backend không cho remove project owner khỏi project qua API remove member.</li>
+        <li><strong>Gắn editor board:</strong> project có thể được set editor board bằng <code>POST /api/projects/:id/editor-boards</code>, hoặc được board kéo vào bằng <code>POST /api/editor-boards/:id/projects</code>.</li>
+      </ul>
+
+      <h3>4.4. Flow editor board</h3>
+      <ul class="flow">
+        <li><strong>Tạo board:</strong> user gọi <code>POST /api/editor-boards</code>. Backend tạo board và thêm creator vào <code>UserEditorBoard</code>.</li>
+        <li><strong>Quyền board:</strong> creator được xem là <code>board:owner</code> do <code>createdBy</code>; member có <code>board:member</code>; một member có thể được đặt làm <code>board:leader</code>.</li>
+        <li><strong>Thêm member:</strong> owner gọi <code>POST /api/editor-boards/:id/members</code> để thêm user vào board. API dùng <code>skipDuplicates</code> nên thêm trùng không làm vỡ flow.</li>
+        <li><strong>Set lead:</strong> owner gọi <code>PATCH /api/editor-boards/:id/members/:userId/lead</code>. Backend reset toàn bộ <code>isLead=false</code> trong board rồi set user được chọn thành lead, tức mỗi board chỉ có một lead theo logic service.</li>
+        <li><strong>Gắn project vào board:</strong> owner hoặc lead gọi <code>POST /api/editor-boards/:id/projects</code>. Backend chặn project đã thuộc board khác, nhưng cho phép project chưa có board hoặc đã thuộc chính board đó.</li>
+        <li><strong>Xem application của board:</strong> board xem các application type <code>PUBLISH_REQUEST</code> từ project thuộc board qua <code>GET /api/editor-boards/:id/applications</code>.</li>
+      </ul>
+
+      <h3>4.5. Flow cây nội dung sản xuất manga</h3>
+      <ul class="flow">
+        <li><strong>Project chứa folder:</strong> owner hoặc user có <code>project:folder.create</code> tạo folder gốc bằng <code>POST /api/projects/:id/folders</code>. Folder luôn thuộc một project.</li>
+        <li><strong>Folder có cây con:</strong> từ một folder, client gọi <code>POST /api/folders/:id/children</code> để tạo folder con. Backend tự lấy <code>projectId</code> từ parent, bảo đảm child folder nằm cùng project.</li>
+        <li><strong>Folder chứa file:</strong> client gọi <code>POST /api/folders/:id/files</code> để tạo file. File có title/description và thuộc folder.</li>
+        <li><strong>File có materials:</strong> client gọi <code>POST /api/files/:id/materials</code> để lưu JSON materials. Hệ thống không áp schema cứng cho JSON này, nên mobile/frontend có thể lưu cấu trúc như layers, image references, page metadata hoặc editor state tùy nghiệp vụ.</li>
+        <li><strong>File có tasks:</strong> client gọi <code>POST /api/files/:id/tasks</code> để tạo task cho file. Task có status <code>PENDING</code>, <code>INPROGRESS</code>, <code>REVIEW</code>, <code>DONE</code>, có thể có parent task và người được assign qua <code>assignedBy</code>.</li>
+        <li><strong>Task có task con:</strong> <code>GET /api/tasks/:id/children</code> đọc task con theo parentId. Điều này cho phép chia một việc lớn thành nhiều việc nhỏ theo trang, panel hoặc bước xử lý.</li>
+      </ul>
+
+      <h3>4.6. Flow review bằng frame và comment</h3>
+      <ul class="flow">
+        <li><strong>Tạo vùng cần comment:</strong> client gọi <code>POST /api/tasks/:id/frames</code> với <code>startX</code>, <code>startY</code>, <code>endX</code>, <code>endY</code>. Đây là vùng tọa độ trên task/file để reviewer chỉ đúng chỗ cần góp ý.</li>
+        <li><strong>Comment trong frame:</strong> client gọi <code>POST /api/frames/:id/comments</code> với <code>content</code> dạng JSON. Vì content là JSON, frontend có thể lưu text thuần, rich text, mention, attachment hoặc trạng thái resolve nếu sau này mở rộng.</li>
+        <li><strong>Xem comment theo frame:</strong> <code>GET /api/frames/:id/comments</code> trả comment trong một vùng cụ thể.</li>
+        <li><strong>Xem comment theo task:</strong> <code>GET /api/tasks/:id/comments</code> gom tất cả frame của task, sau đó list toàn bộ comment thuộc các frame đó. Đây là endpoint tiện cho màn hình task detail hoặc review summary.</li>
+        <li><strong>Cập nhật/xóa frame:</strong> <code>PATCH /api/frames/:id</code> sửa tọa độ; <code>DELETE /api/frames/:id</code> xóa frame. Do schema cascade comment theo frame, xóa frame cũng kéo theo comments liên quan.</li>
+      </ul>
+
+      <h3>4.7. Flow application review và publish request</h3>
+      <ul class="flow">
+        <li><strong>Tạo application trong project:</strong> owner hoặc user có quyền update project gọi <code>POST /api/projects/:id/applications</code>. Application gồm title, description, materials JSON và type <code>MANUSCRIPT_REVIEW</code> hoặc <code>PUBLISH_REQUEST</code>.</li>
+        <li><strong>List application theo project:</strong> <code>GET /api/projects/:id/applications</code> hỗ trợ search, filter type/status và phân trang.</li>
+        <li><strong>Board xem publish request:</strong> <code>GET /api/editor-boards/:id/applications</code> chỉ lấy application type <code>PUBLISH_REQUEST</code> từ các project thuộc board.</li>
+        <li><strong>Cập nhật application:</strong> user có <code>project:application.update</code> hoặc board leader có thể sửa title, description, materials.</li>
+        <li><strong>Duyệt/từ chối/hủy:</strong> user có <code>project:application.approve</code> hoặc board leader gọi <code>PATCH /api/applications/:id/status</code> để đổi status sang <code>APPROVE</code>, <code>REJECT</code> hoặc <code>CANCELLED</code>. Backend ghi người duyệt vào <code>verifyBy</code>.</li>
+      </ul>
+
+      <h3>4.8. Flow project stats</h3>
+      <ul class="flow">
+        <li><strong>Import stats theo project:</strong> client gọi <code>POST /api/projects/:id/stats</code> với <code>metrics</code> dạng JSON. Backend tìm stat hiện có của project; nếu có thì update, chưa có thì create.</li>
+        <li><strong>Đọc stats theo project:</strong> <code>GET /api/projects/:id/stats</code> trả metrics hiện tại của project.</li>
+        <li><strong>CRUD trực tiếp:</strong> module <code>project-stats</code> cũng có <code>GET/PATCH/DELETE /api/project-stats/:id</code> để thao tác theo id bản ghi stat.</li>
+        <li><strong>Ý nghĩa nghiệp vụ:</strong> <code>metrics</code> là JSON tự do, phù hợp lưu số trang, tiến độ, số task theo trạng thái, dữ liệu dashboard hoặc dữ liệu import từ công cụ khác.</li>
+      </ul>
+
+      <h3>4.9. Flow tổng hợp từ góc nhìn mobile/frontend</h3>
+      <ul class="flow">
+        <li><strong>Mở app:</strong> app kiểm access token hiện có; nếu hết hạn hoặc mất access token thì gọi refresh bằng cookie/body refresh token.</li>
+        <li><strong>Sau login:</strong> app gọi <code>/api/users/me</code> để lấy profile, có thể gọi <code>/api/permissions/me/sys</code> để biết quyền hệ thống.</li>
+        <li><strong>Màn hình project:</strong> app gọi <code>/api/projects</code>, sau đó vào project detail bằng <code>/api/projects/:id</code>, đồng thời có thể gọi <code>/api/permissions/me/projects/:id</code> để bật/tắt nút theo quyền.</li>
+        <li><strong>Màn hình nội dung project:</strong> app đọc folders bằng <code>/api/projects/:id/folders</code>, đi sâu qua <code>/api/folders/:id/children</code> và <code>/api/folders/:id/files</code>, rồi đọc materials/tasks của file.</li>
+        <li><strong>Màn hình review:</strong> app đọc task, frames và comments; user tạo frame/comment khi có quyền tương ứng.</li>
+        <li><strong>Màn hình board:</strong> app list boards, vào board detail, xem members/projects/applications. Lead hoặc owner có thêm hành động gắn project và xử lý publish requests.</li>
+      </ul>
+    </section>
+
+    <section id="data-model">
+      <h2>5. Mô hình dữ liệu</h2>
+      <h3>Enum</h3>
+      <table>
+        <thead>
+          <tr><th>Enum</th><th>Giá trị</th><th>Dùng cho</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>SCOPE</code></td><td><code>SYS</code>, <code>PRJ</code></td><td>Phân tách role/permission hệ thống và role/permission trong project.</td></tr>
+          <tr><td><code>PROGRESS_STATUS</code></td><td><code>PENDING</code>, <code>INPROGRESS</code>, <code>REVIEW</code>, <code>DONE</code></td><td>Trạng thái task.</td></tr>
+          <tr><td><code>APPLICATION_STATUS</code></td><td><code>PENDING</code>, <code>APPROVE</code>, <code>REJECT</code>, <code>CANCELLED</code></td><td>Trạng thái application.</td></tr>
+          <tr><td><code>APPLICATION_TYPE</code></td><td><code>MANUSCRIPT_REVIEW</code>, <code>PUBLISH_REQUEST</code></td><td>Loại application.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Entity chính</h3>
+      <table>
+        <thead>
+          <tr><th>Model</th><th>Vai trò</th><th>Quan hệ đáng nhớ</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>User</code></td><td>Tài khoản hệ thống.</td><td>Có <code>UserRole</code>, <code>UserProject</code>, <code>UserEditorBoard</code>, refresh tokens, audit created/updated cho nhiều bảng.</td></tr>
+          <tr><td><code>Role</code></td><td>Nhóm quyền.</td><td><code>scope</code>, <code>isDefault</code>, nối permission qua <code>RolePermission</code>; role project nối user với project qua <code>UserProject</code>.</td></tr>
+          <tr><td><code>Permission</code></td><td>Permission string, ví dụ <code>project:file.create</code>.</td><td>Scope phải khớp scope của role khi replace permissions.</td></tr>
+          <tr><td><code>EditorBoard</code></td><td>Ban biên tập/editorial board.</td><td>Có projects, members qua <code>UserEditorBoard</code>, owner qua <code>createdBy</code>.</td></tr>
+          <tr><td><code>UserEditorBoard</code></td><td>Membership board.</td><td>Khóa chính ghép <code>userId</code> + <code>editorBoardId</code>, có <code>isLead</code>.</td></tr>
+          <tr><td><code>Project</code></td><td>Đơn vị manga/chapter/workspace.</td><td>Thuộc optional <code>EditorBoard</code>, có folders, applications, projectStats, members.</td></tr>
+          <tr><td><code>UserProject</code></td><td>Membership project.</td><td>Khóa chính ghép <code>userId</code> + <code>projectId</code> + <code>roleId</code>. Service hiện thường xóa role cũ rồi tạo role mới cho user trong project.</td></tr>
+          <tr><td><code>Folder</code></td><td>Cây thư mục trong project.</td><td>Self relation <code>parent/children</code>, cascade delete theo project/parent.</td></tr>
+          <tr><td><code>File</code></td><td>Tệp/trang/chương trong folder.</td><td>Có materials và tasks; cascade delete theo folder.</td></tr>
+          <tr><td><code>FileMaterial</code></td><td>Metadata/tài nguyên JSON của file.</td><td><code>materials</code> là JSON tự do; API lấy material mới nhất của file theo <code>createdAt desc</code>.</td></tr>
+          <tr><td><code>Task</code></td><td>Công việc/review item trên file.</td><td>Self relation parent/children, trạng thái progress, optional <code>assignedBy</code>.</td></tr>
+          <tr><td><code>TaskCommentFrame</code></td><td>Vùng comment trên task.</td><td>Tọa độ decimal <code>startX/startY/endX/endY</code>, chứa comments.</td></tr>
+          <tr><td><code>TaskComment</code></td><td>Comment JSON trong frame.</td><td><code>content</code> là JSON tự do, gắn với frame.</td></tr>
+          <tr><td><code>Application</code></td><td>Đơn review/publish.</td><td>Thuộc project, có materials JSON, người verify ở <code>verifyBy</code>.</td></tr>
+          <tr><td><code>ProjectStat</code></td><td>Metrics JSON của project.</td><td>Service import hoạt động như upsert theo <code>projectId</code> nhưng schema chưa đặt unique projectId.</td></tr>
+          <tr><td><code>RefreshToken</code></td><td>Refresh token đang hợp lệ.</td><td>Token là primary key, xóa khi rotate/logout/reset password.</td></tr>
+          <tr><td><code>BlacklistToken</code></td><td>Access token bị logout trước hạn.</td><td>AccessTokenStrategy kiểm tra token này trước khi cho qua.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="auth">
+      <h2>6. Xác thực</h2>
+      <h3>Luồng email/password</h3>
+      <ul class="flow">
+        <li><strong>Register:</strong> chuẩn hóa email lowercase, hash password bằng bcrypt, tạo user <code>isActive=false</code>, gán role SYS default, tạo token verify email, gửi mail.</li>
+        <li><strong>Verify email:</strong> nhận token, kiểm tra token và hạn, bật <code>isActive=true</code>, xóa token verify.</li>
+        <li><strong>Login:</strong> kiểm tra user có password, active và password đúng; trả access token và set refresh token vào cookie <code>refreshToken</code>.</li>
+        <li><strong>Refresh:</strong> nhận refresh token từ cookie hoặc body, kiểm tra tồn tại trong DB, kiểm JWT, tạo access token mới, rotate refresh token và xóa refresh cũ.</li>
+        <li><strong>Logout:</strong> nếu có access token thì upsert vào <code>blacklist_tokens</code> tới lúc hết hạn; xóa refresh token và clear cookie.</li>
+        <li><strong>Reset password:</strong> forgot tạo token reset; reset hash password mới và xóa toàn bộ refresh token của user.</li>
+      </ul>
+
+      <h3>Luồng Google</h3>
+      <ul class="flow">
+        <li><code>GET /api/auth/google</code> chuyển user sang Google OAuth.</li>
+        <li>Callback tìm user bằng <code>googleId</code> hoặc email. Nếu email đã có nhưng chưa link Google, backend link Google vào user đó và active user.</li>
+        <li>Nếu chưa có user, backend tạo user active, không có password, gán role SYS default.</li>
+        <li>Callback redirect frontend về <code>/auth/oauth-success?access_token=...</code> và set refresh cookie.</li>
+        <li>User đã login có thể link Google qua <code>/api/users/me/link-account</code>; state được ký bằng access token secret.</li>
+      </ul>
+
+      <div class="warning">
+        <strong>Cookie refresh token:</strong> cookie dùng <code>httpOnly</code>, <code>sameSite=none</code>,
+        path <code>/api/auth</code>. Trường <code>secure</code> phụ thuộc <code>NODE_ENV === production</code>,
+        nhưng code gọi <code>requireEnv('NODE_ENV')</code>, nghĩa là thiếu <code>NODE_ENV</code> có thể làm app lỗi khi load controller.
+      </div>
+    </section>
+
+    <section id="permission">
+      <h2>7. Phân quyền</h2>
+      <h3>Cơ chế guard</h3>
+      <ul class="flow">
+        <li><strong><code>@Public()</code>:</strong> bỏ qua global auth và permission guard.</li>
+        <li><strong><code>GlobalAuthGuard</code>:</strong> mặc định mọi endpoint cần JWT access token nếu không public.</li>
+        <li><strong><code>AccessTokenStrategy</code>:</strong> lấy Bearer token, kiểm token blacklist, gọi <code>UsersService.findOne(userId)</code> để bảo đảm user tồn tại.</li>
+        <li><strong><code>PermissionGuard</code>:</strong> đọc metadata <code>@Permissions</code>. Nếu mode <code>ANY</code>, chỉ cần một permission; nếu <code>ALL</code>, phải có tất cả.</li>
+      </ul>
+
+      <h3>Nguồn quyền</h3>
+      <table>
+        <thead>
+          <tr><th>Nguồn</th><th>Cách tính</th><th>Ví dụ</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Global/SYS</td><td>Query raw từ <code>user_roles -> role_permissions -> permissions</code>.</td><td><code>admin</code>, <code>user:read</code>, <code>role:update</code>.</td></tr>
+          <tr><td>Board</td><td>User phải là board member. Owner nếu <code>EditorBoard.createdBy === userId</code>; lead nếu <code>UserEditorBoard.isLead</code>; còn lại member.</td><td><code>board:owner</code>, <code>board:leader</code>, <code>board:member</code>.</td></tr>
+          <tr><td>Project</td><td>User phải là project member. Owner nếu <code>Project.createdBy === userId</code>, nếu không lấy permission từ role PRJ trong <code>UserProject</code>.</td><td><code>project:owner</code>, <code>project:file.create</code>.</td></tr>
+          <tr><td>Nested resources</td><td>Folder/File/Material/Task/Frame/Comment/Application đều truy ngược về project để kiểm membership và role.</td><td>Comment -> Frame -> Task -> File -> Folder -> Project.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Danh sách permission đang định nghĩa</h3>
+      <p class="small">
+        Permission type được khai báo trong <code>src/auth/interfaces/permission.interface.ts</code>.
+      </p>
+      <pre><code>admin
+user:read, user:update, user:delete, user:create
+role:read, role:update, role:delete, role:create
+permission:read, permission:update
+board:owner, board:leader, board:member
+project:owner, project:read, project:update, project:delete
+project:member.read, project:member.update, project:member.add, project:member.remove
+project:folder.create, project:folder.update, project:folder.delete
+project:file.create, project:file.update, project:file.delete
+project:material.create, project:material.update, project:material.delete
+project:task.create, project:task.update, project:task.delete
+project:frame.create, project:frame.update, project:frame.delete
+project:comment.create, project:comment.update, project:comment.delete
+project:application.create, project:application.read, project:application.update
+project:application.delete, project:application.approve</code></pre>
+    </section>
+
+    <section id="modules">
+      <h2>8. Module nghiệp vụ</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>AuthModule</h3>
+          <p>Đăng ký, verify email, login, refresh, logout, forgot/reset password, Google OAuth. Phụ thuộc <code>MailService</code>, <code>PrismaService</code>, <code>JwtService</code>.</p>
+        </div>
+        <div class="card">
+          <h3>UsersModule</h3>
+          <p>Profile current user, password change, admin/staff user management, gán SYS roles, truy vấn projects/editor boards của user, link Google account.</p>
+        </div>
+        <div class="card">
+          <h3>RolesModule</h3>
+          <p>CRUD role, filter theo scope, đảm bảo mỗi scope chỉ một default role, không xóa role đang được user hoặc project dùng.</p>
+        </div>
+        <div class="card">
+          <h3>PermissionsModule</h3>
+          <p>List/filter/update permission metadata, trả quyền hiện tại của user ở mức SYS, project hoặc board.</p>
+        </div>
+        <div class="card">
+          <h3>ProjectsModule</h3>
+          <p>CRUD project, member management, set editor board, list/create applications, list/create folders, read/import project stats.</p>
+        </div>
+        <div class="card">
+          <h3>EditorBoardsModule</h3>
+          <p>CRUD editor board, member management, set lead, gắn projects vào board, xem projects/applications của board.</p>
+        </div>
+        <div class="card">
+          <h3>FoldersModule</h3>
+          <p>CRUD folder, tạo child folder, list/create file trong folder.</p>
+        </div>
+        <div class="card">
+          <h3>FilesModule</h3>
+          <p>CRUD file, lấy/tạo materials JSON cho file, list/create tasks cho file.</p>
+        </div>
+        <div class="card">
+          <h3>TasksModule</h3>
+          <p>CRUD task, list child tasks, list/create frames, aggregate comments của mọi frame trong task.</p>
+        </div>
+        <div class="card">
+          <h3>FramesModule</h3>
+          <p>CRUD frame tọa độ, list/create comments trong frame.</p>
+        </div>
+        <div class="card">
+          <h3>ApplicationsModule</h3>
+          <p>List/detail/update/delete application, update status và ghi người verify.</p>
+        </div>
+        <div class="card">
+          <h3>ProjectStatsModule</h3>
+          <p>CRUD trực tiếp theo id của project stat; module Projects cũng có endpoint get/import stats theo project id.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="api-map">
+      <h2>9. Bản đồ endpoint</h2>
+      <p>
+        Tất cả endpoint dưới đây có prefix <code>/api</code>. Response thường theo dạng
+        <code>{ data: ... }</code>; list thường thêm <code>pagination</code> gồm
+        <code>total</code>, <code>page</code>, <code>limit</code>, <code>totalPages</code>.
+      </p>
+
+      <h3>Auth</h3>
+      <table>
+        <thead><tr><th>Method</th><th>Path</th><th>Mục đích</th><th>Auth</th></tr></thead>
+        <tbody>
+          <tr><td><span class="method post">POST</span></td><td><code>/auth/register</code></td><td>Đăng ký user, gửi verify email.</td><td>Public</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/auth/verify-email</code></td><td>Verify email bằng token.</td><td>Public</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/auth/forgot</code></td><td>Gửi email reset password.</td><td>Public</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/auth/reset</code></td><td>Đặt password mới bằng token.</td><td>Public</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/auth/google</code></td><td>Khởi động Google OAuth.</td><td>Public</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/auth/google/callback</code></td><td>Callback Google, set refresh cookie, redirect frontend.</td><td>Public</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/auth/login</code></td><td>Login email/password.</td><td>Public</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/auth/refresh</code></td><td>Rotate refresh token, cấp access token mới.</td><td>Public</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/auth/logout</code></td><td>Xóa refresh token, blacklist access token.</td><td>Public nhưng nhận Authorization nếu có</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Users</h3>
+      <table>
+        <thead><tr><th>Method</th><th>Path</th><th>Mục đích</th><th>Permission</th></tr></thead>
+        <tbody>
+          <tr><td><span class="method get">GET</span></td><td><code>/users/me</code></td><td>Profile user hiện tại.</td><td>JWT</td></tr>
+          <tr><td><span class="method patch">PATCH</span></td><td><code>/users/me</code></td><td>Cập nhật displayName/avatarUrl.</td><td>JWT</td></tr>
+          <tr><td><span class="method patch">PATCH</span></td><td><code>/users/me/password</code></td><td>Đổi password, xóa refresh token cũ.</td><td>JWT</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/users/me/link-account</code></td><td>Khởi động link Google account.</td><td>JWT + GoogleLinkGuard</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/users/me/link-account/callback</code></td><td>Callback link Google account.</td><td>Public + GoogleLinkGuard</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/users</code></td><td>List users.</td><td><code>admin</code> hoặc <code>user:read</code></td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/users</code></td><td>Tạo staff user active ngay.</td><td><code>admin</code></td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/users/:id</code></td><td>Chi tiết user và roles.</td><td><code>admin</code> hoặc <code>user:read</code></td></tr>
+          <tr><td><span class="method patch">PATCH</span></td><td><code>/users/:id</code></td><td>Admin cập nhật user.</td><td><code>admin</code> hoặc <code>user:update</code></td></tr>
+          <tr><td><span class="method delete">DELETE</span></td><td><code>/users/:id</code></td><td>Xóa user.</td><td><code>admin</code> hoặc <code>user:delete</code></td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/users/:userId/roles</code></td><td>Roles của user.</td><td><code>admin</code> hoặc <code>role:read</code></td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/users/:userId/roles</code></td><td>Append SYS roles.</td><td><code>admin</code> hoặc <code>role:read</code></td></tr>
+          <tr><td><span class="method put">PUT</span></td><td><code>/users/:userId/roles</code></td><td>Replace SYS roles.</td><td><code>admin</code> hoặc <code>role:read</code></td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/users/:userId/projects</code></td><td>Projects của user.</td><td><code>admin</code> hoặc <code>project:read</code></td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/users/:userId/editor-boards</code></td><td>Editor boards của user.</td><td><code>admin</code> hoặc <code>project:read</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>Roles và permissions</h3>
+      <table>
+        <thead><tr><th>Method</th><th>Path</th><th>Mục đích</th><th>Permission</th></tr></thead>
+        <tbody>
+          <tr><td><span class="method get">GET</span></td><td><code>/roles?scope=SYS|PRJ</code></td><td>List roles, optional filter scope.</td><td><code>admin</code> hoặc <code>role:read</code></td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/roles</code></td><td>Tạo role.</td><td><code>admin</code> hoặc <code>role:create</code></td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/roles/:id</code></td><td>Chi tiết role.</td><td><code>admin</code> hoặc <code>role:read</code></td></tr>
+          <tr><td><span class="method patch">PATCH</span></td><td><code>/roles/:id</code></td><td>Cập nhật role; có thể replace permissionIds.</td><td><code>admin</code> hoặc <code>role:update</code></td></tr>
+          <tr><td><span class="method delete">DELETE</span></td><td><code>/roles/:id</code></td><td>Xóa role nếu chưa được gán.</td><td><code>admin</code> hoặc <code>role:delete</code></td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/roles/:id/permissions</code></td><td>List permissions của role.</td><td><code>admin</code> hoặc <code>role:read</code></td></tr>
+          <tr><td><span class="method put">PUT</span></td><td><code>/roles/:id/permissions</code></td><td>Replace permissions, bắt buộc cùng scope role.</td><td><code>admin</code> hoặc <code>role:update</code></td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/permissions</code></td><td>List permissions, filter scope/name/sort.</td><td><code>admin</code> hoặc <code>permission:read</code></td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/permissions/:id</code></td><td>Chi tiết permission.</td><td><code>admin</code> hoặc <code>permission:read</code></td></tr>
+          <tr><td><span class="method patch">PATCH</span></td><td><code>/permissions/:id</code></td><td>Cập nhật scope/description.</td><td><code>admin</code> hoặc <code>permission:update</code></td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/permissions/me/sys</code></td><td>Quyền SYS của current user.</td><td>JWT</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/permissions/me/projects/:id</code></td><td>Quyền current user trong project.</td><td>JWT</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/permissions/me/boards/:id</code></td><td>Quyền current user trong board.</td><td>JWT</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Projects</h3>
+      <table>
+        <thead><tr><th>Method</th><th>Path</th><th>Mục đích</th><th>Permission</th></tr></thead>
+        <tbody>
+          <tr><td><span class="method get">GET</span></td><td><code>/projects</code></td><td>List projects user tạo hoặc tham gia; filter name/me, sort, paginate.</td><td>JWT</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/projects</code></td><td>Tạo project, gán creator làm member với PRJ default role.</td><td>JWT</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/projects/:id</code></td><td>Chi tiết project.</td><td><code>project:owner</code> hoặc <code>project:read</code></td></tr>
+          <tr><td><span class="method patch">PATCH</span></td><td><code>/projects/:id</code></td><td>Cập nhật project.</td><td><code>project:owner</code> hoặc <code>project:update</code></td></tr>
+          <tr><td><span class="method delete">DELETE</span></td><td><code>/projects/:id</code></td><td>Xóa project.</td><td><code>project:owner</code> hoặc <code>project:delete</code></td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/projects/:id/members</code></td><td>List project members.</td><td><code>project:owner</code> hoặc <code>project:member.read</code></td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/projects/:id/members</code></td><td>Gán members với một PRJ role.</td><td><code>project:owner</code> hoặc <code>project:member.add</code></td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/projects/:id/members/:userId</code></td><td>Chi tiết member trong project.</td><td><code>project:owner</code> hoặc <code>project:member.read</code></td></tr>
+          <tr><td><span class="method patch">PATCH</span></td><td><code>/projects/:id/members/:userId</code></td><td>Đổi role member.</td><td><code>project:owner</code> hoặc <code>project:member.update</code></td></tr>
+          <tr><td><span class="method delete">DELETE</span></td><td><code>/projects/:id/members/:userId</code></td><td>Xóa member, không cho xóa owner.</td><td><code>project:owner</code> hoặc <code>project:member.remove</code></td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/projects/:id/editor-boards</code></td><td>Lấy editor board của project.</td><td><code>project:owner</code> hoặc <code>project:read</code></td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/projects/:id/editor-boards</code></td><td>Set editor board cho project.</td><td><code>project:owner</code> hoặc <code>project:update</code></td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/projects/:id/applications</code></td><td>List applications của project.</td><td><code>project:owner</code> hoặc <code>project:read</code></td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/projects/:id/applications</code></td><td>Tạo application trong project.</td><td><code>project:owner</code> hoặc <code>project:update</code></td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/projects/:id/folders</code></td><td>List folders của project.</td><td><code>project:owner</code> hoặc <code>project:read</code></td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/projects/:id/folders</code></td><td>Tạo folder trong project.</td><td><code>project:owner</code> hoặc <code>project:folder.create</code></td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/projects/:id/stats</code></td><td>Lấy stats theo project.</td><td><code>project:read</code> hoặc <code>board:leader</code></td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/projects/:id/stats</code></td><td>Import/upsert stats theo project.</td><td><code>project:update</code> hoặc <code>board:leader</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>Editor boards</h3>
+      <table>
+        <thead><tr><th>Method</th><th>Path</th><th>Mục đích</th><th>Permission</th></tr></thead>
+        <tbody>
+          <tr><td><span class="method post">POST</span></td><td><code>/editor-boards</code></td><td>Tạo board, creator thành member.</td><td>JWT</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/editor-boards</code></td><td>List boards user tạo hoặc tham gia.</td><td>JWT</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/editor-boards/:id</code></td><td>Chi tiết board.</td><td><code>board:owner</code>, <code>board:leader</code> hoặc <code>board:member</code></td></tr>
+          <tr><td><span class="method patch">PATCH</span></td><td><code>/editor-boards/:id</code></td><td>Cập nhật board.</td><td><code>board:owner</code></td></tr>
+          <tr><td><span class="method delete">DELETE</span></td><td><code>/editor-boards/:id</code></td><td>Xóa board.</td><td><code>board:owner</code></td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/editor-boards/:id/members</code></td><td>Thêm members vào board.</td><td><code>board:owner</code></td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/editor-boards/:id/members</code></td><td>List members.</td><td>Board owner/leader/member</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/editor-boards/:id/members/:userId</code></td><td>Chi tiết member.</td><td>Board owner/leader/member</td></tr>
+          <tr><td><span class="method delete">DELETE</span></td><td><code>/editor-boards/:id/members/:userId</code></td><td>Xóa member, không cho xóa owner.</td><td><code>board:owner</code></td></tr>
+          <tr><td><span class="method patch">PATCH</span></td><td><code>/editor-boards/:id/members/:userId/lead</code></td><td>Đặt một member làm lead duy nhất.</td><td><code>board:owner</code></td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/editor-boards/:id/projects</code></td><td>List projects thuộc board.</td><td>Board owner/leader/member</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/editor-boards/:id/projects</code></td><td>Gắn projects vào board; chặn project đã thuộc board khác.</td><td><code>board:owner</code> hoặc <code>board:leader</code></td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/editor-boards/:id/applications</code></td><td>List publish requests của board.</td><td>Board owner/leader/member</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Folders, files, materials, tasks, frames</h3>
+      <table>
+        <thead><tr><th>Method</th><th>Path</th><th>Mục đích</th><th>Permission khai báo</th></tr></thead>
+        <tbody>
+          <tr><td><span class="method get">GET</span></td><td><code>/folders/:id</code></td><td>Chi tiết folder.</td><td><code>project:read</code> hoặc <code>board:leader</code> trên FOLDER</td></tr>
+          <tr><td><span class="method patch">PATCH</span></td><td><code>/folders/:id</code></td><td>Cập nhật folder.</td><td><code>project:folder.update</code> hoặc <code>board:leader</code> trên FOLDER</td></tr>
+          <tr><td><span class="method delete">DELETE</span></td><td><code>/folders/:id</code></td><td>Xóa folder.</td><td><code>project:folder.delete</code> hoặc <code>board:leader</code> trên FOLDER</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/folders/:id/files</code></td><td>List files trong folder.</td><td>FILE, nhưng <code>:id</code> là folder id</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/folders/:id/files</code></td><td>Tạo file trong folder.</td><td>FILE, nhưng <code>:id</code> là folder id</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/folders/:id/children</code></td><td>List child folders.</td><td>FOLDER</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/folders/:id/children</code></td><td>Tạo child folder cùng project với parent.</td><td>FOLDER</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/files/:id</code></td><td>Chi tiết file.</td><td>FILE</td></tr>
+          <tr><td><span class="method patch">PATCH</span></td><td><code>/files/:id</code></td><td>Cập nhật file.</td><td>FILE</td></tr>
+          <tr><td><span class="method delete">DELETE</span></td><td><code>/files/:id</code></td><td>Xóa file.</td><td>FILE</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/files/:id/materials</code></td><td>Lấy material mới nhất của file.</td><td>MATERIAL, nhưng <code>:id</code> là file id</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/files/:id/materials</code></td><td>Tạo material JSON cho file.</td><td>MATERIAL, nhưng <code>:id</code> là file id</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/materials/:id</code></td><td>Chi tiết material.</td><td>MATERIAL</td></tr>
+          <tr><td><span class="method patch">PATCH</span></td><td><code>/materials/:id</code></td><td>Cập nhật JSON materials.</td><td>MATERIAL</td></tr>
+          <tr><td><span class="method delete">DELETE</span></td><td><code>/materials/:id</code></td><td>Xóa material.</td><td>MATERIAL</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/files/:id/tasks</code></td><td>List tasks trong file.</td><td>TASK, nhưng <code>:id</code> là file id</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/files/:id/tasks</code></td><td>Tạo task cho file.</td><td>TASK, nhưng <code>:id</code> là file id</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/tasks/:id</code></td><td>Chi tiết task.</td><td>TASK</td></tr>
+          <tr><td><span class="method patch">PATCH</span></td><td><code>/tasks/:id</code></td><td>Cập nhật task.</td><td>TASK</td></tr>
+          <tr><td><span class="method delete">DELETE</span></td><td><code>/tasks/:id</code></td><td>Xóa task.</td><td>TASK</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/tasks/:id/children</code></td><td>List child tasks.</td><td>TASK</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/tasks/:id/frames</code></td><td>List frames của task.</td><td>FRAME, nhưng <code>:id</code> là task id</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/tasks/:id/frames</code></td><td>Tạo frame tọa độ cho task.</td><td>FRAME, nhưng <code>:id</code> là task id</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/tasks/:id/comments</code></td><td>List comments từ toàn bộ frames của task.</td><td>COMMENT, nhưng <code>:id</code> là task id</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/frames/:id</code></td><td>Chi tiết frame.</td><td>FRAME</td></tr>
+          <tr><td><span class="method patch">PATCH</span></td><td><code>/frames/:id</code></td><td>Cập nhật tọa độ frame.</td><td>FRAME</td></tr>
+          <tr><td><span class="method delete">DELETE</span></td><td><code>/frames/:id</code></td><td>Xóa frame.</td><td>FRAME</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/frames/:id/comments</code></td><td>List comments trong frame.</td><td>COMMENT, nhưng <code>:id</code> là frame id</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code>/frames/:id/comments</code></td><td>Tạo comment JSON trong frame.</td><td>COMMENT, nhưng <code>:id</code> là frame id</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Applications và project stats</h3>
+      <table>
+        <thead><tr><th>Method</th><th>Path</th><th>Mục đích</th><th>Permission khai báo</th></tr></thead>
+        <tbody>
+          <tr><td><span class="method get">GET</span></td><td><code>/applications</code></td><td>List applications, filter projectId/search/type/status.</td><td>APPLICATION resource nhưng không có <code>:id</code></td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/applications/:id</code></td><td>Chi tiết application.</td><td><code>project:application.read</code> hoặc <code>board:leader</code></td></tr>
+          <tr><td><span class="method patch">PATCH</span></td><td><code>/applications/:id</code></td><td>Cập nhật title/description/materials.</td><td><code>project:application.update</code> hoặc <code>board:leader</code></td></tr>
+          <tr><td><span class="method delete">DELETE</span></td><td><code>/applications/:id</code></td><td>Xóa application.</td><td><code>project:application.delete</code> hoặc <code>board:leader</code></td></tr>
+          <tr><td><span class="method patch">PATCH</span></td><td><code>/applications/:id/status</code></td><td>Cập nhật status, ghi <code>verifyBy</code>.</td><td><code>project:application.approve</code> hoặc <code>board:leader</code></td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code>/project-stats/:id</code></td><td>Chi tiết project stat theo id.</td><td>PROJECT resource nhưng <code>:id</code> là projectStat id</td></tr>
+          <tr><td><span class="method patch">PATCH</span></td><td><code>/project-stats/:id</code></td><td>Cập nhật metrics JSON.</td><td>PROJECT resource nhưng <code>:id</code> là projectStat id</td></tr>
+          <tr><td><span class="method delete">DELETE</span></td><td><code>/project-stats/:id</code></td><td>Xóa project stat.</td><td>PROJECT resource nhưng <code>:id</code> là projectStat id</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="env">
+      <h2>10. Biến môi trường và triển khai</h2>
+      <p>Các biến được phát hiện từ code, không đọc giá trị secret trong file <code>.env</code>.</p>
+      <table>
+        <thead><tr><th>Biến</th><th>Bắt buộc?</th><th>Dùng ở đâu</th></tr></thead>
+        <tbody>
+          <tr><td><code>DATABASE_URL</code></td><td>Có</td><td>Prisma adapter và <code>prisma.config.ts</code>.</td></tr>
+          <tr><td><code>PORT</code></td><td>Không</td><td>Nest listen, fallback 3000.</td></tr>
+          <tr><td><code>WEB_ORIGIN</code></td><td>Có cho auth URL; CORS có fallback</td><td>CORS, verify/reset URL, OAuth redirect.</td></tr>
+          <tr><td><code>NODE_ENV</code></td><td>Có theo code hiện tại</td><td>Quyết định refresh cookie secure.</td></tr>
+          <tr><td><code>ACCESS_TOKEN_SECRET</code></td><td>Có</td><td>Ký/verify access token và Google link state.</td></tr>
+          <tr><td><code>REFRESH_TOKEN_SECRET</code></td><td>Có</td><td>Ký/verify refresh token.</td></tr>
+          <tr><td><code>ACCESS_TOKEN_EXPIRES_IN</code></td><td>Có</td><td>Duration JWT access token, parse bằng <code>ms</code>.</td></tr>
+          <tr><td><code>REFRESH_TOKEN_EXPIRES_IN</code></td><td>Có</td><td>Duration refresh token, parse bằng <code>ms</code>.</td></tr>
+          <tr><td><code>BCRYPT_SALT_ROUNDS</code></td><td>Có</td><td>Hash password.</td></tr>
+          <tr><td><code>EMAIL_VERIFY_EXPIRES_IN</code></td><td>Có</td><td>Hạn verify email token.</td></tr>
+          <tr><td><code>PASSWORD_RESET_EXPIRES_IN</code></td><td>Có</td><td>Hạn reset password token.</td></tr>
+          <tr><td><code>GOOGLE_CLIENT_ID</code></td><td>Có nếu dùng Google</td><td>Google OAuth strategy.</td></tr>
+          <tr><td><code>GOOGLE_CLIENT_SECRET</code></td><td>Có nếu dùng Google</td><td>Google OAuth strategy.</td></tr>
+          <tr><td><code>GOOGLE_CALLBACK_URL</code></td><td>Có nếu dùng Google</td><td>Google OAuth callback.</td></tr>
+          <tr><td><code>GOOGLE_LINK_CALLBACK_URL</code></td><td>Không</td><td>Google link guard, fallback từ Google callback URL.</td></tr>
+          <tr><td><code>APP_NAME</code></td><td>Không</td><td>Tên app trong email.</td></tr>
+          <tr><td><code>SMTP_HOST</code>, <code>SMTP_PORT</code>, <code>SMTP_SECURE</code>, <code>SMTP_USER</code>, <code>SMTP_PASS</code>, <code>MAIL_FROM</code>, <code>SMTP_FROM</code></td><td>Không</td><td>Nodemailer. Nếu thiếu SMTP_HOST thì mail được log/stream transport.</td></tr>
+        </tbody>
+      </table>
+
+      <div class="note">
+        <strong>Swagger:</strong> khi app chạy, xem OpenAPI UI tại <code>/docs</code>. Do app có global prefix <code>/api</code>, các route controller nằm dưới <code>/api</code>, còn Swagger setup hiện gọi trực tiếp <code>SwaggerModule.setup('docs', ...)</code>.
+      </div>
+    </section>
+
+    <section id="risks">
+      <h2>11. Điểm cần chú ý</h2>
+      <div class="danger">
+        <h3>PermissionGuard có giả định rất mạnh về <code>:id</code></h3>
+        <p>
+          <code>PermissionGuard</code> luôn lấy <code>request.params['id']</code> làm id của resource trong metadata.
+          Điều này đúng với endpoint như <code>/projects/:id</code>, <code>/files/:id</code>, <code>/tasks/:id</code>.
+          Nhưng nó dễ sai với endpoint lồng nhau, ví dụ <code>/folders/:id/files</code> khai báo resource FILE
+          trong khi <code>:id</code> thực tế là folder id.
+        </p>
+        <p>
+          Các endpoint có rủi ro tương tự: tạo/list file trong folder, materials/tasks trong file,
+          frames/comments trong task, comments trong frame, list applications không có <code>:id</code>,
+          và <code>/project-stats/:id</code> dùng project stat id nhưng khai báo resource PROJECT.
+          Nên cân nhắc metadata cho param name hoặc permission helper theo parent resource.
+        </p>
+      </div>
+
+      <div class="warning">
+        <h3>Collection endpoint với resource nhưng không có id</h3>
+        <p>
+          <code>GET /applications</code> có <code>@Permissions(... resource: 'APPLICATION')</code>
+          nhưng không có path param <code>:id</code>. Guard sẽ truyền <code>NaN</code> vào logic resource.
+          Điều này có thể dẫn tới lỗi runtime thay vì trả 403/200 như mong muốn.
+        </p>
+      </div>
+
+      <div class="warning">
+        <h3>Route test e2e có thể cũ</h3>
+        <p>
+          E2E test hiện kỳ vọng <code>GET /</code> trả <code>Hello World!</code>. Trong app thật có
+          <code>app.setGlobalPrefix('api')</code>, nên nếu test không set cùng prefix thì test này có thể
+          không phản ánh runtime thực tế.
+        </p>
+      </div>
+
+      <div class="warning">
+        <h3>ProjectStat import là upsert logic nhưng schema chưa unique</h3>
+        <p>
+          <code>ProjectsService.importProjectStats</code> tìm <code>findFirst({ projectId })</code>,
+          update nếu có, create nếu chưa có. Schema chỉ index <code>projectId</code>, chưa unique.
+          Nếu dữ liệu từng có duplicate project stats, logic sẽ chỉ update bản ghi đầu tiên.
+        </p>
+      </div>
+
+      <div class="note">
+        <h3>Pattern code ổn định</h3>
+        <p>
+          Service nhìn chung nhất quán: dùng <code>Logger</code>, <code>handleError</code>,
+          <code>ensureEntity</code>, transaction cho thao tác nhiều bảng, pagination helper,
+          Prisma select để kiểm soát response. Đây là nền tảng tốt để frontend/mobile dựa vào.
+        </p>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

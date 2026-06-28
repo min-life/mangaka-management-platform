@@ -5,6 +5,7 @@ export const FILTER_CHIPS: FilterChip[] = ['All', 'Assigned', 'In Progress', 'Re
 export const TASKS: Task[] = [
   {
     id: '1',
+    projectId: 'dragon-blade',
     priority: 'HIGH',
     title: 'Color Page 14',
     project: 'Dragon Blade',
@@ -17,6 +18,7 @@ export const TASKS: Task[] = [
   },
   {
     id: '2',
+    projectId: 'dragon-blade',
     priority: 'MEDIUM',
     title: 'Review Chapter 12',
     project: 'Dragon Blade',
@@ -28,6 +30,7 @@ export const TASKS: Task[] = [
   },
   {
     id: '3',
+    projectId: 'moonlight-ronin',
     priority: 'LOW',
     title: 'Fix Background Details',
     project: 'Moonlight Ronin',
@@ -38,5 +41,40 @@ export const TASKS: Task[] = [
     ],
     dueLabel: '3 Days',
   },
+  {
+    id: '4',
+    projectId: 'frame-cleaner',
+    priority: 'MEDIUM',
+    title: 'Tune frame detection pass',
+    project: 'Frame Cleaner',
+    status: 'In Progress',
+    assignees: [
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuAWrc_JjD2kZykTe0YSXzT6Q-mGKRg5LkFLvq8bMY-AdExCrnGPKSmJlNY6md2ThFn7EhyubBIvZPomnQndf5Q-D4XDTmcIRqkSFYwRM5RidyknT8bCarY01I_VnHhiS8X0yG1JA87P5wNWtlKjq-yfL38SHtsBPmUANI-PDnp5zduivutIVxXOAC_jmwFGSB__IuAVFuK1-DKma2Jo4DZT0WVexhFUJdY9TmcGF1-a9ewkOMHd3nG_fgAX8VV3P8SpS',
+    ],
+    dueLabel: 'Today',
+  },
+  {
+    id: '5',
+    projectId: 'lettering-queue',
+    priority: 'HIGH',
+    title: 'Review lettering queue batch',
+    project: 'Lettering Queue',
+    status: 'Review',
+    assignees: [
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuABI9U7dhRUL96a6oVOPxRGNov0JEvHPvYv-8MoDkuccz8hhCGzYR5zzY429q-DaS7dI7b2aUo8IQQRek7FjFpbzXwcwZamFMv8lCNWUxpomRBlaoUZrcxTni5Klyt3fazAo0noDWerO2eMSi-amxDEE12faNd_xJ1Uzl4RNOAGNABewoJi2zAGH91hB_PqtE9Cm3d6m2qosZG8p3OiTdpAk-yE6hfDkkwtWwz6p4950L5LP8zDKBGrYEvr2duF644wZkjUbrvLCWvH',
+    ],
+    dueLabel: 'Tomorrow',
+  },
+  {
+    id: '6',
+    projectId: 'night-market',
+    priority: 'LOW',
+    title: 'Clean pilot page thumbnails',
+    project: 'Night Market',
+    status: 'Pending',
+    assignees: [
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuDe5OGJtM4X0kOfB9f5TpiiBBUxbN6DEsWj3lM_rYr6tmw6Pj8l_5SpB2zNvsRR8Z3YbQhtxR1LEV3mvL0lrnciqhkTZHUe31ehxT5qOHyIv6yu2cUIvTt-qjNrgqzC0TzPYLmnD3MO6FI_lPf9591jZwdaI0EfjGmBsJcKLywUGxcsM2VqjE7WpAt6PuxQG8fyxKkLRa-2aHscs4XYCF7Sz02CdqKLhyPCX7m0oVyDfxwrBCgc1t-YrXW6-x1sH9Aa_3aaqneN7yiy',
+    ],
+    dueLabel: '3 Days',
+  },
 ];
-
