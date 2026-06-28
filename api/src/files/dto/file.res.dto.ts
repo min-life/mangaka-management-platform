@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UserResDto } from '../../share/dto';
-import { FolderResDto } from '../../folders/dto';
+import { FolderResDto, SimpleFolderResDto } from '../../folders/dto';
 
 export class PaginationResDto {
   @ApiProperty({ example: 25 })
@@ -16,6 +16,14 @@ export class PaginationResDto {
   totalPages!: number;
 }
 
+export class SimpleFileResDto {
+  @ApiProperty({ example: 5 })
+  id!: number;
+
+  @ApiProperty({ example: 'Chapter 01 Page 1' })
+  title!: string;
+}
+
 export class FileResDto {
   @ApiProperty({ example: 5 })
   id!: number;
@@ -26,8 +34,8 @@ export class FileResDto {
   @ApiPropertyOptional({ example: 'First page of chapter 01.', nullable: true })
   description?: string | null;
 
-  @ApiPropertyOptional({ type: () => FolderResDto, nullable: true })
-  folder?: FolderResDto | null;
+  @ApiPropertyOptional({ type: () => SimpleFolderResDto, nullable: true })
+  folder?: SimpleFolderResDto | null;
 
   @ApiPropertyOptional({ type: UserResDto, nullable: true })
   createdByUser?: UserResDto | null;
@@ -46,8 +54,8 @@ export class MaterialResDto {
   @ApiProperty({ example: 1 })
   id!: number;
 
-  @ApiProperty({ type: FileResDto })
-  file!: FileResDto;
+  @ApiPropertyOptional({ type: () => SimpleFileResDto, nullable: true })
+  file?: SimpleFileResDto | null;
 
   @ApiProperty({
     example: { layers: ['background', 'characters'], colors: ['#FF0000', '#00FF00'] },
@@ -80,6 +88,14 @@ export class MaterialResponseDto {
 export class FilesResponseDto {
   @ApiProperty({ type: [FileResDto] })
   data!: FileResDto[];
+
+  @ApiProperty({ type: PaginationResDto })
+  pagination!: PaginationResDto;
+}
+
+export class MaterialsResponseDto {
+  @ApiProperty({ type: [MaterialResDto] })
+  data!: MaterialResDto[];
 
   @ApiProperty({ type: PaginationResDto })
   pagination!: PaginationResDto;

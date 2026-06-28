@@ -5,7 +5,9 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { PROGRESS_STATUS, Prisma } from '@prisma/client';
+import { PROGRESS_STATUS, Prisma, ACTIVITY_ACTION, ENTITY_TYPE } from '@prisma/client';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ACTIVITY_EVENT_NAME, ActivityEventPayload } from '../share/events/activity.event';
 import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
@@ -19,21 +21,24 @@ const USER_SELECT = {
   },
 };
 
-const PROJECT_SELECT = {
+const PROJECT_BASIC_SELECT = {
   id: true,
   name: true,
-  description: true,
   imageUrl: true,
-  editorBoard: {
+};
+
+const FILE_SELECT = {
+  id: true,
+  title: true,
+  description: true,
+  folder: {
     select: {
       id: true,
-      name: true,
+      title: true,
       description: true,
-      imageUrl: true,
-      createdByUser: USER_SELECT,
-      updatedByUser: USER_SELECT,
-      createdAt: true,
-      updatedAt: true,
+      project: {
+        select: PROJECT_BASIC_SELECT,
+      },
     },
   },
   createdByUser: USER_SELECT,
@@ -42,37 +47,8 @@ const PROJECT_SELECT = {
   updatedAt: true,
 };
 
-const FOLDER_SELECT = {
+export const MATERIAL_LIST_SELECT = {
   id: true,
-  title: true,
-  description: true,
-  project: {
-    select: PROJECT_SELECT,
-  },
-  createdByUser: USER_SELECT,
-  updatedByUser: USER_SELECT,
-  createdAt: true,
-  updatedAt: true,
-};
-
-const FILE_SELECT = {
-  id: true,
-  title: true,
-  description: true,
-  folder: {
-    select: FOLDER_SELECT,
-  },
-  createdByUser: USER_SELECT,
-  updatedByUser: USER_SELECT,
-  createdAt: true,
-  updatedAt: true,
-};
-
-const MATERIAL_SELECT = {
-  id: true,
-  file: {
-    select: FILE_SELECT,
-  },
   materials: true,
   createdByUser: USER_SELECT,
   updatedByUser: USER_SELECT,
@@ -80,11 +56,19 @@ const MATERIAL_SELECT = {
   updatedAt: true,
 };
 
-const TASK_SELECT = {
+const MATERIAL_SELECT = {
+  ...MATERIAL_LIST_SELECT,
+  file: {
+    select: FILE_SELECT,
+  },
+};
+
+export const TASK_LIST_SELECT = {
   id: true,
   title: true,
   description: true,
   status: true,
+  deadline: true,
   parent: {
     select: {
       id: true,
@@ -93,9 +77,6 @@ const TASK_SELECT = {
       status: true,
     },
   },
-  file: {
-    select: FILE_SELECT,
-  },
   assignedByUser: USER_SELECT,
   createdByUser: USER_SELECT,
   updatedByUser: USER_SELECT,
@@ -103,11 +84,21 @@ const TASK_SELECT = {
   updatedAt: true,
 };
 
+const TASK_SELECT = {
+  ...TASK_LIST_SELECT,
+  file: {
+    select: FILE_SELECT,
+  },
+};
+
 @Injectable()
 export class FilesService {
   private readonly logger = new Logger(FilesService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async getFileById(id: number) {
     try {
@@ -158,6 +149,33 @@ export class FilesService {
     }
   }
 
+  async getFileMaterialVersions(fileId: number, pagination?: Pagination) {
+    try {
+      await this.ensureFile(fileId);
+
+      const where: Prisma.FileMaterialWhereInput = { fileId };
+      const { page, limit, skip } = this.buildPagination(pagination);
+
+      const [total, versions] = await this.prisma.$transaction([
+        this.prisma.fileMaterial.count({ where }),
+        this.prisma.fileMaterial.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit,
+          select: MATERIAL_LIST_SELECT,
+        }),
+      ]);
+
+      return {
+        versions,
+        pagination: this.buildPaginationMeta(total, page, limit),
+      };
+    } catch (error) {
+      this.handleError(error, 'Get file material versions fail', ERROR.SVGETFILEMATERIALS);
+    }
+  }
+
   async getFileMaterials(fileId: number) {
     try {
       await this.ensureFile(fileId);
@@ -189,6 +207,7 @@ export class FilesService {
           materials: data.materials as Prisma.InputJsonValue,
           fileId,
           createdBy: data.userId,
+          updatedBy: data.userId,
         },
         select: MATERIAL_SELECT,
       });
@@ -226,7 +245,7 @@ export class FilesService {
           orderBy,
           skip,
           take: limit,
-          select: TASK_SELECT,
+          select: TASK_LIST_SELECT,
         }),
       ]);
 
@@ -245,6 +264,7 @@ export class FilesService {
       title: string;
       description?: string;
       status?: PROGRESS_STATUS;
+      deadline?: Date;
       parentId?: number;
       assignedBy?: number;
       userId: number;
@@ -253,20 +273,107 @@ export class FilesService {
     try {
       await this.ensureFile(fileId);
 
-      return await this.prisma.task.create({
+      const task = await this.prisma.task.create({
         data: {
           title: data.title,
           description: data.description,
           status: data.status || PROGRESS_STATUS.PENDING,
+          deadline: data.deadline,
           parentId: data.parentId,
           fileId,
           assignedBy: data.assignedBy,
           createdBy: data.userId,
+          updatedBy: data.userId,
         },
         select: TASK_SELECT,
       });
+
+      this.eventEmitter.emit(ACTIVITY_EVENT_NAME, {
+        action: ACTIVITY_ACTION.TASK_CREATED,
+        entityType: ENTITY_TYPE.TASK,
+        entityId: task.id,
+        actorId: data.userId,
+        metadata: { title: task.title, assignedBy: task.assignedByUser?.id ?? null },
+      } satisfies ActivityEventPayload);
+
+      return task;
     } catch (error) {
       this.handleError(error, 'Create task fail', ERROR.SVCREATETASK);
+    }
+  }
+
+  async getFileComments(
+    fileId: number,
+    sort?: { field: 'createdAt'; order: 'asc' | 'desc' },
+    pagination?: Pagination,
+  ) {
+    try {
+      await this.ensureFile(fileId);
+
+      const where: Prisma.CommentWhereInput = { fileId };
+      const orderBy: Prisma.CommentOrderByWithRelationInput = sort
+        ? { [sort.field]: sort.order }
+        : { createdAt: 'desc' };
+      const { page, limit, skip } = this.buildPagination(pagination);
+
+      const [total, comments] = await this.prisma.$transaction([
+        this.prisma.comment.count({ where }),
+        this.prisma.comment.findMany({
+          where,
+          orderBy,
+          skip,
+          take: limit,
+          select: {
+            id: true,
+            content: true,
+            fileId: true,
+            createdByUser: {
+              select: { id: true, email: true, displayName: true, avatarUrl: true },
+            },
+            createdAt: true,
+            updatedAt: true,
+          },
+        }),
+      ]);
+
+      return {
+        comments,
+        pagination: this.buildPaginationMeta(total, page, limit),
+      };
+    } catch (error) {
+      this.handleError(error, 'Get file comments fail', 'SVGETFILECOMMENTS');
+    }
+  }
+
+  async createComment(
+    fileId: number,
+    data: {
+      content: unknown;
+      userId: number;
+    },
+  ) {
+    try {
+      await this.ensureFile(fileId);
+
+      return await this.prisma.comment.create({
+        data: {
+          content: data.content as Prisma.InputJsonValue,
+          fileId,
+          createdBy: data.userId,
+        },
+        select: {
+          id: true,
+          content: true,
+          fileId: true,
+          createdByUser: {
+            select: { id: true, email: true, displayName: true, avatarUrl: true },
+          },
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    } catch (error) {
+      this.handleError(error, 'Create comment fail', ERROR.SVCREATECOMMENT);
     }
   }
 

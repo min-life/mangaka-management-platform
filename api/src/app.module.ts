@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { PrismaModule } from './prisma/prisma.module';
@@ -19,11 +20,14 @@ import { MaterialsModule } from './materials/materials.module';
 import { TasksModule } from './tasks/tasks.module';
 import { FramesModule } from './frames/frames.module';
 import { ProjectStatsModule } from './project-stats/project-stats.module';
+import { ActivityLogsModule } from './activity-logs/activity-logs.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
     PrismaModule,
     AuthModule,
+    EventEmitterModule.forRoot(),
     JwtModule.register({
       global: true,
     }),
@@ -39,6 +43,8 @@ import { ProjectStatsModule } from './project-stats/project-stats.module';
     TasksModule,
     FramesModule,
     ProjectStatsModule,
+    ActivityLogsModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [

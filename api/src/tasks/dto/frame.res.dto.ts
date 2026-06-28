@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PaginationResDto } from './task.res.dto';
 import { UserResDto } from '../../share/dto';
-import { TaskResDto } from './task.res.dto';
+import { SimpleTaskResDto } from './task.res.dto';
 
 export class FrameResDto {
   @ApiProperty({ example: 1 })
@@ -19,13 +19,13 @@ export class FrameResDto {
   @ApiProperty({ example: 150.2, type: Number })
   endY!: number;
 
-  @ApiProperty({ type: TaskResDto })
-  task!: TaskResDto;
+  @ApiProperty({ type: () => SimpleTaskResDto })
+  task!: SimpleTaskResDto;
 
-  @ApiPropertyOptional({ type: UserResDto, nullable: true })
+  @ApiPropertyOptional({ type: () => UserResDto, nullable: true })
   createdByUser?: UserResDto | null;
 
-  @ApiPropertyOptional({ type: UserResDto, nullable: true })
+  @ApiPropertyOptional({ type: () => UserResDto, nullable: true })
   updatedByUser?: UserResDto | null;
 
   @ApiProperty({ example: '2026-06-18T03:00:00.000Z' })

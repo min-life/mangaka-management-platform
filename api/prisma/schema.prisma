@@ -25,6 +25,8 @@ enum PROGRESS_STATUS {
 
 enum APPLICATION_STATUS {
   PENDING
+  INTERNAL_APPROVED
+  SUBMITTED
   APPROVE
   REJECT
   CANCELLED
@@ -33,6 +35,49 @@ enum APPLICATION_STATUS {
 enum APPLICATION_TYPE {
   MANUSCRIPT_REVIEW
   PUBLISH_REQUEST
+}
+
+enum VOTE_DECISION {
+  APPROVE
+  REJECT
+  ABSTAIN
+}
+
+enum ACTIVITY_ACTION {
+  MEMBER_INVITED
+  MEMBER_REMOVED
+  ROLE_CHANGED
+  TASK_CREATED
+  TASK_ASSIGNED
+  TASK_UPDATED
+  TASK_COMPLETED
+  TASK_DELETED
+  FOLDER_CREATED
+  FOLDER_MOVED
+  FOLDER_DELETED
+  FILE_CREATED
+  FILE_DELETED
+  MATERIAL_UPLOADED
+  MATERIAL_RESTORED
+  APPLICATION_CREATED
+  APPLICATION_INTERNAL_APPROVED
+  APPLICATION_SUBMITTED
+  APPLICATION_APPROVED
+  APPLICATION_REJECTED
+  COMMENT_CREATED
+  COMMENT_DELETED
+}
+
+enum ENTITY_TYPE {
+  PROJECT
+  EDITOR_BOARD
+  FOLDER
+  FILE
+  MATERIAL
+  TASK
+  FRAME
+  COMMENT
+  APPLICATION
 }
 
 model User {
@@ -94,16 +139,23 @@ model User {
   createdTaskCommentFrames TaskCommentFrame[] @relation("TaskCommentFrameCreatedByUser")
   updatedTaskCommentFrames TaskCommentFrame[] @relation("TaskCommentFrameUpdatedByUser")
 
-  // Relations with taskComment model
-  createdTaskComments TaskComment[] @relation("TaskCommentCreatedByUser")
+  // Relations with Comment model
+  createdComments Comment[] @relation("CommentCreatedByUser")
 
   // Relations with application model
   createdApplications  Application[] @relation("ApplicationCreatedByUser")
   updatedApplications  Application[] @relation("ApplicationUpdatedByUser")
   verifiedApplications Application[] @relation("ApplicationVerifiedByUser")
+  applicationVotes     ApplicationVote[]
 
   // Relations with refreshToken model
   refreshTokens RefreshToken[]
+
+  // Relations with activityLog model
+  activityLogs ActivityLog[]
+
+  // Relations with notification model
+  notifications Notification[]
 
   // Configs
   @@map("users")
@@ -328,6 +380,9 @@ model File {
   // Relations with fileMaterial model
   fileMaterials FileMaterial[]
 
+  // Relations with comment model
+  comments Comment[]
+
   // Relations with task model
   tasks Task[]
 
@@ -362,6 +417,7 @@ model Task {
   title       String
   description String?
   status      PROGRESS_STATUS @default(PENDING)
+  deadline    DateTime?
   parentId    Int?            @map("parent_id")
   fileId      Int             @map("file_id")
   assignedBy  Int?            @map("assigned_by")
@@ -384,6 +440,9 @@ model Task {
 
   // Relations with taskCommentFrame model
   commentFrames TaskCommentFrame[]
+
+  // Relations with comment model
+  comments Comment[]
 
   @@index([fileId])
   @@index([parentId])
@@ -411,31 +470,38 @@ model TaskCommentFrame {
   createdByUser User? @relation("TaskCommentFrameCreatedByUser", fields: [createdBy], references: [id])
   updatedByUser User? @relation("TaskCommentFrameUpdatedByUser", fields: [updatedBy], references: [id])
 
-  // Relations with taskComment model
-  comments TaskComment[]
+  // Relations with comment model
+  comments Comment[]
 
   @@index([taskId])
   // Configs
   @@map("task_comment_frames")
 }
 
-model TaskComment {
-  id        Int      @id @default(autoincrement())
-  content   Json
-  frameId   Int      @map("frame_id")
-  createdBy Int?     @map("created_by")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+model Comment {
+  id            Int      @id @default(autoincrement())
+  content       Json
+  fileId        Int?     @map("file_id")
+  taskId        Int?     @map("task_id")
+  frameId       Int?     @map("frame_id")
+  applicationId Int?     @map("application_id")
+  createdBy     Int?     @map("created_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
 
-  // Relations with frame model
-  frame TaskCommentFrame @relation(fields: [frameId], references: [id], onDelete: Cascade)
+  // Relations
+  file          File?             @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  task          Task?             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  frame         TaskCommentFrame? @relation(fields: [frameId], references: [id], onDelete: Cascade)
+  application   Application?      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  createdByUser User?             @relation("CommentCreatedByUser", fields: [createdBy], references: [id])
 
-  // Relations with user model
-  createdByUser User? @relation("TaskCommentCreatedByUser", fields: [createdBy], references: [id])
-
+  @@index([fileId])
+  @@index([taskId])
   @@index([frameId])
+  @@index([applicationId])
   // Configs
-  @@map("task_comments")
+  @@map("comments")
 }
 
 model Application {
@@ -460,10 +526,35 @@ model Application {
   createdByUser  User? @relation("ApplicationCreatedByUser", fields: [createdBy], references: [id])
   updatedByUser  User? @relation("ApplicationUpdatedByUser", fields: [updatedBy], references: [id])
 
+  // Relations with applicationVote model
+  applicationVotes ApplicationVote[]
+
+  // Relations with comment model
+  comments Comment[]
+
   @@index([projectId])
   @@index([verifyBy])
   // Configs
   @@map("applications")
+}
+
+model ApplicationVote {
+  applicationId Int           @map("application_id")
+  userId        Int           @map("user_id")
+  decision      VOTE_DECISION
+  comment       String?
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at")
+
+  // Relations with application and user models
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([applicationId, userId])
+  @@index([applicationId])
+  @@index([userId])
+  // Configs
+  @@map("application_votes")
 }
 
 model ProjectStat {
@@ -500,3 +591,50 @@ model BlacklistToken {
   // Configs
   @@map("blacklist_tokens")
 }
+
+model ActivityLog {
+  id            Int             @id @default(autoincrement())
+  action        ACTIVITY_ACTION
+  entityType    ENTITY_TYPE     @map("entity_type")
+  entityId      Int             @map("entity_id")
+  projectId     Int?            @map("project_id")
+  editorBoardId Int?            @map("editor_board_id")
+  actorId       Int             @map("actor_id")
+  metadata      Json?
+  createdAt     DateTime        @default(now()) @map("created_at")
+
+  // Relations
+  actor User @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  
+  // Note: We don't strictly bind projectId/editorBoardId with foreign keys 
+  // because we want logs to persist even if the project is deleted, 
+  // or we can use SetNull/Cascade depending on business needs.
+  // We'll leave them as just Int for weak references in the log.
+  
+  notifications Notification[]
+
+  @@index([projectId])
+  @@index([editorBoardId])
+  @@index([actorId])
+  // Configs
+  @@map("activity_logs")
+}
+
+model Notification {
+  id            Int      @id @default(autoincrement())
+  userId        Int      @map("user_id")
+  activityLogId Int      @map("activity_log_id")
+  isRead        Boolean  @default(false) @map("is_read")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activityLog ActivityLog @relation(fields: [activityLogId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([activityLogId])
+  // Configs
+  @@map("notifications")
+}
+

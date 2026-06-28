@@ -1,7 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PROGRESS_STATUS } from '@prisma/client';
 import { UserResDto } from '../../share/dto';
-import { FileResDto } from '../../files/dto';
 
 export class PaginationResDto {
   @ApiProperty({ example: 25 })
@@ -17,6 +16,31 @@ export class PaginationResDto {
   totalPages!: number;
 }
 
+export class SimpleFileResDto {
+  @ApiProperty({ example: 5 })
+  id!: number;
+
+  @ApiProperty({ example: 'Chapter 01 Page 1' })
+  title!: string;
+}
+
+export class SimpleTaskResDto {
+  @ApiProperty({ example: 10 })
+  id!: number;
+
+  @ApiProperty({ example: 'Review page 1' })
+  title!: string;
+
+  @ApiPropertyOptional({ example: 'Check for errors', nullable: true })
+  description?: string | null;
+
+  @ApiProperty({ enum: PROGRESS_STATUS, example: PROGRESS_STATUS.PENDING })
+  status!: PROGRESS_STATUS;
+
+  @ApiPropertyOptional({ example: '2026-06-18T03:00:00.000Z', nullable: true })
+  deadline?: Date | null;
+}
+
 export class TaskResDto {
   @ApiProperty({ example: 10 })
   id!: number;
@@ -30,11 +54,14 @@ export class TaskResDto {
   @ApiProperty({ enum: PROGRESS_STATUS, example: PROGRESS_STATUS.PENDING })
   status!: PROGRESS_STATUS;
 
-  @ApiPropertyOptional({ type: TaskResDto, nullable: true })
-  parent?: TaskResDto | null;
+  @ApiPropertyOptional({ example: '2026-06-18T03:00:00.000Z', nullable: true })
+  deadline?: Date | null;
 
-  @ApiProperty({ type: FileResDto })
-  file!: FileResDto;
+  @ApiPropertyOptional({ type: SimpleTaskResDto, nullable: true })
+  parent?: SimpleTaskResDto | null;
+
+  @ApiProperty({ type: () => SimpleFileResDto })
+  file!: SimpleFileResDto;
 
   @ApiPropertyOptional({ type: UserResDto, nullable: true })
   assignedByUser?: UserResDto | null;
@@ -52,13 +79,6 @@ export class TaskResDto {
   updatedAt!: Date;
 }
 
-export class SimpleFileResDto {
-  @ApiProperty({ example: 5 })
-  id!: number;
-
-  @ApiProperty({ example: 'Chapter 01 Page 1' })
-  title!: string;
-}
 
 export class TaskSummaryResDto {
   @ApiProperty({ example: 10 })
@@ -72,6 +92,9 @@ export class TaskSummaryResDto {
 
   @ApiProperty({ enum: PROGRESS_STATUS, example: PROGRESS_STATUS.PENDING })
   status!: PROGRESS_STATUS;
+
+  @ApiPropertyOptional({ example: '2026-06-18T03:00:00.000Z', nullable: true })
+  deadline?: Date | null;
 
   @ApiPropertyOptional({ example: 5, nullable: true })
   parentId?: number | null;
@@ -97,6 +120,7 @@ export class TaskSummaryResDto {
   @ApiProperty({ example: '2026-06-18T03:00:00.000Z' })
   updatedAt!: Date;
 }
+
 
 export class TaskResponseDto {
   @ApiProperty({ type: TaskResDto })

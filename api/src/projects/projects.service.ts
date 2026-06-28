@@ -13,6 +13,8 @@ import {
   PROGRESS_STATUS,
   SCOPE,
 } from '@prisma/client';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ACTIVITY_EVENT_NAME, ActivityEventPayload } from '../share/events/activity.event';
 import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
@@ -39,18 +41,20 @@ const PROJECT_MEMBER_SELECT = {
   updatedAt: true,
 } satisfies Prisma.UserProjectSelect;
 
-const buildProjectMemberSelect = (projectId: number) => ({
-  ...PROJECT_MEMBER_SELECT,
-  user: {
-    select: {
-      ...PROJECT_MEMBER_SELECT.user.select,
-      _count: {
-        select: {
-          assignedTasks: {
-            where: {
-              file: {
-                folder: {
-                  projectId,
+const buildProjectMemberSelect = (projectId: number) =>
+  ({
+    ...PROJECT_MEMBER_SELECT,
+    user: {
+      select: {
+        ...PROJECT_MEMBER_SELECT.user.select,
+        _count: {
+          select: {
+            assignedTasks: {
+              where: {
+                file: {
+                  folder: {
+                    projectId,
+                  },
                 },
               },
             },
@@ -58,8 +62,7 @@ const buildProjectMemberSelect = (projectId: number) => ({
         },
       },
     },
-  },
-} satisfies Prisma.UserProjectSelect);
+  }) satisfies Prisma.UserProjectSelect;
 
 const EDITOR_BOARD_SELECT = {
   id: true,
@@ -86,13 +89,19 @@ const EDITOR_BOARD_SELECT = {
   updatedAt: true,
 } satisfies Prisma.EditorBoardSelect;
 
+const EDITOR_BOARD_BASIC_SELECT = {
+  id: true,
+  name: true,
+  imageUrl: true,
+} satisfies Prisma.EditorBoardSelect;
+
 const PROJECT_SELECT = {
   id: true,
   name: true,
   description: true,
   imageUrl: true,
   editorBoard: {
-    select: EDITOR_BOARD_SELECT,
+    select: EDITOR_BOARD_BASIC_SELECT,
   },
   createdByUser: {
     select: {
@@ -121,16 +130,18 @@ const PROJECT_WITH_MEMBERS_SELECT = {
   },
 } satisfies Prisma.ProjectSelect;
 
-const APPLICATION_SELECT = {
+const APPLICATION_LIST_SELECT = {
   id: true,
-  project: {
-    select: PROJECT_SELECT,
-  },
   title: true,
-  description: true,
-  materials: true,
   type: true,
   status: true,
+  project: {
+    select: {
+      id: true,
+      name: true,
+      imageUrl: true,
+    },
+  },
   verifiedByUser: {
     select: {
       id: true,
@@ -159,20 +170,10 @@ const APPLICATION_SELECT = {
   updatedAt: true,
 } satisfies Prisma.ApplicationSelect;
 
-const FOLDER_SELECT = {
+const FOLDER_LIST_SELECT = {
   id: true,
   title: true,
   description: true,
-  parent: {
-    select: {
-      id: true,
-      title: true,
-      description: true,
-    },
-  },
-  project: {
-    select: PROJECT_SELECT,
-  },
   createdByUser: {
     select: {
       id: true,
@@ -206,7 +207,10 @@ const PROJECT_STAT_SELECT = {
 export class ProjectsService {
   private readonly logger = new Logger(ProjectsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async createProject(data: {
     name: string;
@@ -510,6 +514,20 @@ export class ProjectsService {
     }
   }
 
+  async leaveProject(projectId: number, userId: number) {
+    try {
+      const project = await this.ensureProject(projectId);
+      if (project.createdBy === userId) {
+        throw new BadRequestException(ERROR.EVLRMPRJOWNER);
+      }
+
+      await this.findProjectMember(projectId, userId);
+      await this.prisma.userProject.deleteMany({ where: { projectId, userId } });
+    } catch (error) {
+      this.handleError(error, 'Leave project fail', ERROR.SVLEAVEPROJECT);
+    }
+  }
+
   async getProjectEditorBoard(projectId: number) {
     try {
       await this.ensureProject(projectId);
@@ -536,6 +554,22 @@ export class ProjectsService {
       });
     } catch (error) {
       this.handleError(error, 'Update project editor board fail', ERROR.SVUPDATEPROJECTBOARD);
+    }
+  }
+
+  async removeProjectEditorBoard(projectId: number, actorId: number) {
+    try {
+      await this.ensureProject(projectId);
+
+      return await this.prisma.project.update({
+        where: { id: projectId },
+        data: {
+          editorBoardId: null,
+          updatedBy: actorId,
+        },
+      });
+    } catch (error) {
+      this.handleError(error, 'Remove project editor board fail', ERROR.SVUPDATEPROJECTBOARD);
     }
   }
 
@@ -566,7 +600,7 @@ export class ProjectsService {
           orderBy,
           skip,
           take: limit,
-          select: APPLICATION_SELECT,
+          select: APPLICATION_LIST_SELECT,
         }),
       ]);
 
@@ -601,7 +635,7 @@ export class ProjectsService {
           createdBy: data.userId,
           updatedBy: data.userId,
         },
-        select: APPLICATION_SELECT,
+        select: APPLICATION_LIST_SELECT,
       });
     } catch (error) {
       this.handleError(error, 'Create project application fail', ERROR.SVCREPROJECTAPPLICATION);
@@ -634,7 +668,7 @@ export class ProjectsService {
           orderBy,
           skip,
           take: limit,
-          select: FOLDER_SELECT,
+          select: FOLDER_LIST_SELECT,
         }),
       ]);
 
@@ -671,7 +705,7 @@ export class ProjectsService {
           createdBy: data.userId,
           updatedBy: data.userId,
         },
-        select: FOLDER_SELECT,
+        select: FOLDER_LIST_SELECT,
       });
     } catch (error) {
       this.handleError(error, 'Create project folder fail', ERROR.SVCREPROJECTFOLDER);

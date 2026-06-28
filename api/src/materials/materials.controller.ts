@@ -1,11 +1,5 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOkResponse,
-  ApiOperation,
-  ApiParam,
-  ApiTags,
-} from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post } from '@nestjs/common';
+import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, Permissions } from '../share/decorators';
 import type { JwtPayload } from '../auth/interfaces';
 import { MaterialsService } from './materials.service';
@@ -70,5 +64,24 @@ export class MaterialsController {
   @Delete(':id')
   async deleteMaterial(@Param('id', ParseIntPipe) id: number) {
     await this.materialsService.deleteMaterial(id);
+  }
+
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['project:material.create', 'board:leader'],
+    resource: 'MATERIAL',
+  })
+  @ApiOperation({ summary: 'Restore a material version to create a new latest version' })
+  @ApiParam({ name: 'id', type: Number, description: 'Material id (the old version to restore)' })
+  @ApiCreatedResponse({ description: 'Material restored successfully', type: MaterialResponseDto })
+  @Post(':id/restore')
+  async restoreMaterial(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    const material = await this.materialsService.restoreMaterial(id, currentUser.userId);
+    return {
+      data: material,
+    };
   }
 }

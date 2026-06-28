@@ -33,11 +33,67 @@ import {
   UpdateTaskReqDto,
 } from './dto';
 
+import {
+  CommentResponseDto,
+  CreateCommentReqDto,
+  QueryCommentsReqDto,
+} from '../frames/dto';
+
 @ApiTags('Tasks')
 @ApiBearerAuth()
 @Controller('tasks')
 export class TasksController {
-  constructor(private readonly tasksService: TasksService) { }
+  constructor(private readonly tasksService: TasksService) {}
+
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['project:read', 'board:leader'],
+    resource: 'COMMENT',
+  })
+  @ApiOperation({ summary: 'Get task comments' })
+  @ApiParam({ name: 'id', type: Number, description: 'Task id' })
+  @ApiOkResponse({
+    description: 'Task comments retrieved successfully',
+    type: CommentsResponseDto,
+  })
+  @Get(':id/comments')
+  async getTaskComments(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: QueryCommentsReqDto,
+  ) {
+    const result = await this.tasksService.getTaskComments(
+      id,
+      query.field && query.order ? { field: query.field, order: query.order } : undefined,
+      query.page && query.limit ? { page: query.page, limit: query.limit } : undefined,
+    );
+    return {
+      data: result.comments,
+      pagination: result.pagination,
+    };
+  }
+
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['project:comment.create', 'board:leader'],
+    resource: 'COMMENT',
+  })
+  @ApiOperation({ summary: 'Create comment for task' })
+  @ApiParam({ name: 'id', type: Number, description: 'Task id' })
+  @ApiCreatedResponse({ description: 'Comment created successfully', type: CommentResponseDto })
+  @Post(':id/comments')
+  async createComment(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() currentUser: JwtPayload,
+    @Body() data: CreateCommentReqDto,
+  ) {
+    const comment = await this.tasksService.createComment(id, {
+      ...data,
+      userId: currentUser.userId,
+    });
+    return {
+      data: comment,
+    };
+  }
 
   @ApiOperation({ summary: 'Get all tasks of current user across all projects' })
   @ApiOkResponse({
@@ -194,28 +250,4 @@ export class TasksController {
     return {
       data: frame,
     };
-  }
-
-  @Permissions({
-    mode: 'ANY',
-    permissions: ['project:read', 'board:leader'],
-    resource: 'COMMENT',
-  })
-  @ApiOperation({ summary: 'Get task comments' })
-  @ApiParam({ name: 'id', type: Number, description: 'Task id' })
-  @ApiOkResponse({
-    description: 'Task comments retrieved successfully',
-    type: CommentsResponseDto,
-  })
-  @Get(':id/comments')
-  async getTaskComments(@Param('id', ParseIntPipe) id: number, @Query() query: QueryFramesReqDto) {
-    const result = await this.tasksService.getTaskComments(
-      id,
-      query.page && query.limit ? { page: query.page, limit: query.limit } : undefined,
-    );
-    return {
-      data: result.comments,
-      pagination: result.pagination,
-    };
-  }
-}
+  }}

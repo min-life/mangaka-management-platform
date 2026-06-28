@@ -7,6 +7,7 @@ import { PermissionsService } from './permissions.service';
 import { PermissionFilterDto } from './dto/permission-filter.dto';
 import { UpdatePermissionDto } from './dto/update-permission.dto';
 import { UserPermissionsResponseDto } from './dto/user-permissions-response.dto';
+import { PermissionResponseDto } from './dto/permission.dto';
 
 @ApiTags('Permissions')
 @ApiBearerAuth()
@@ -15,18 +16,26 @@ export class PermissionsController {
   constructor(private readonly permissionsService: PermissionsService) {}
 
   @Get()
+  @ApiOperation({ summary: 'Get all permissions' })
+  @ApiOkResponse({ type: [PermissionResponseDto] })
   @Permissions({ mode: 'ANY', permissions: ['admin', 'permission:read'] })
   findAll(@Query() query: PermissionFilterDto) {
     return this.permissionsService.findAll(query);
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get a specific permission by ID' })
+  @ApiParam({ name: 'id', type: Number, description: 'Permission ID' })
+  @ApiOkResponse({ type: PermissionResponseDto })
   @Permissions({ mode: 'ANY', permissions: ['admin', 'permission:read'] })
   findOne(@Param('id') id: string) {
     return this.permissionsService.findOne(Number(id));
   }
 
   @Patch(':id')
+  @ApiOperation({ summary: 'Update a specific permission' })
+  @ApiParam({ name: 'id', type: Number, description: 'Permission ID' })
+  @ApiOkResponse({ type: PermissionResponseDto })
   @Permissions({ mode: 'ANY', permissions: ['admin', 'permission:update'] })
   update(@Param('id') id: string, @Body() dto: UpdatePermissionDto) {
     return this.permissionsService.update(Number(id), dto);

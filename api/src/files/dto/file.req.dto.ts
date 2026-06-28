@@ -14,7 +14,9 @@ export class UpdateFileReqDto {
 }
 
 export class CreateMaterialReqDto {
-  @ApiProperty({ example: { layers: ['background', 'characters'], colors: ['#FF0000', '#00FF00'] } })
+  @ApiProperty({
+    example: { layers: ['background', 'characters'], colors: ['#FF0000', '#00FF00'] },
+  })
   materials!: unknown;
 }
 
@@ -31,6 +33,11 @@ export class CreateTaskReqDto {
   @IsOptional()
   @IsEnum(PROGRESS_STATUS)
   status?: PROGRESS_STATUS;
+
+  @ApiPropertyOptional({ example: '2026-06-18T03:00:00.000Z' })
+  @IsOptional()
+  @Type(() => Date)
+  deadline?: Date;
 
   @ApiPropertyOptional({ example: 9, minimum: 1, type: Number })
   @IsOptional()

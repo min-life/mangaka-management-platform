@@ -1,154 +1,2454 @@
-# Luồng Xác thực (Authentication Workflow)
+# Luồng Phối hợp Màn hình (Frontend Flows)
 
-Tài liệu này mô tả chi tiết các API Endpoints liên quan đến xác thực người dùng trong `AuthController` (`api/src/auth/auth.controller.ts`), cùng với cách phối hợp luồng dữ liệu (Flow) giữa các màn hình phía Frontend.
+Tài liệu này mô tả cách Frontend điều hướng và gọi API để mang lại trải nghiệm mượt mà nhất. 
+*(Chi tiết về API Endpoints như Input/Output Schema nằm ở phần "API Endpoints Workflow" bên dưới).*
+
+## 1. Luồng Xác thực (Auth Flow)
+
+### 1.1 Luồng Đăng ký & Kích hoạt
+1. **Đăng ký (`/register`)**: User điền form -> Gọi `POST /api/auth/register`. Thành công sẽ chuyển hướng sang trang báo Check Email.
+2. **Kích hoạt (`/verify-email`)**: User bấm link từ email -> Mở Frontend lấy tham số `token` -> Gọi `POST /api/auth/verify-email`. Kích hoạt thành công chuyển về trang Đăng nhập.
+
+### 1.2 Luồng Đăng nhập & Duy trì phiên
+1. **Đăng nhập (`/login`)**: Gọi `POST /api/auth/login`. Thành công sẽ lưu `accessToken` (Memory/Local Storage). `refreshToken` được giữ trong Cookie HttpOnly.
+2. **Tự động gia hạn (Refresh Token)**: Axios Interceptor bắt lỗi 401. Gọi ngầm `POST /api/auth/refresh` lấy token mới và gọi lại request bị lỗi. Nếu thất bại, văng về trang Đăng nhập.
+
+### 1.3 Luồng Quên & Đặt lại mật khẩu
+1. **Quên pass (`/forgot-password`)**: Gọi `POST /api/auth/forgot`. Luôn chuyển hướng sang trang Check Email để chống dò quét tài khoản.
+2. **Đặt lại pass (`/reset-password`)**: Nhận token từ URL, nhập pass mới -> Gọi `POST /api/auth/reset`. Đổi thành công sẽ tự động đăng xuất các thiết bị khác.
+
+### 1.4 Luồng Đăng nhập Google
+1. **Điều hướng**: Từ `/login`, bấm nút Google -> Redirect Location sang `GET /api/auth/google`.
+2. **Callback**: Google trả về backend -> Backend redirect ngược về Frontend (`/oauth-success`) kèm Access Token.
+
+## 2. Luồng Quản lý Người dùng (Users Flow)
+
+### 2.1 Cá nhân (Profile)
+1. **Xem & Sửa Profile**: Vào `/profile`, gọi `GET /api/users/me`. Khi cập nhật thông tin gọi `PATCH /api/users/me`.
+2. **Đổi mật khẩu**: Gọi `PATCH /api/users/me/password`. Thành công, backend trả về cặp token mới -> Frontend lưu lại ngầm mà không làm văng user.
+3. **Liên kết Google**: Bấm nút -> Chuyển hướng `GET /api/users/me/link-account`. Khi quay lại sẽ hiện Toast thành công/thất bại.
+
+### 2.2 Quản trị viên (Admin)
+1. **Dashboard Users (`/admin/users`)**: Gọi `GET /api/users/stats` để vẽ chart, gọi `GET /api/users` đổ data vào Table.
+2. **Quản lý 1 User**: Vào chi tiết, có thể Khóa (`PATCH /api/users/:id`), phân quyền Role (`PUT /api/users/:id/roles`) hoặc ép đổi pass (`POST /api/users/:id/force-reset-password`).
+
+## 3. Luồng Vai trò & Phân quyền (Roles & Permissions Flow)
+
+### 3.1 Giao diện theo Quyền (Authorization UX)
+1. **Toàn cục**: Load app, gọi `GET /api/permissions/me/sys` để ẩn/hiện các menu hệ thống.
+2. **Trong Dự án/Ban**: Vào dự án gọi `GET /api/permissions/me/projects/:id` để hiện các nút nâng cao (như Xóa dự án, Duyệt đơn) tùy thuộc vào chức danh (Role) trong dự án đó.
+
+### 3.2 Quản trị Roles
+1. **Tạo & Cập nhật**: Vào `/admin/roles`. Cập nhật thông tin gọi `PATCH`, cấp quyền gọi `PUT /api/roles/:id/permissions` (ghi đè toàn bộ mảng ID quyền).
+2. **Xóa Role**: Gọi `DELETE /api/roles/:id`. Lỗi 409 nếu Role đang có người dùng/dự án sử dụng.
+
+## 4. Luồng Dự án (Projects Flow)
+
+### 4.1 Khởi tạo & Xóa
+1. **Tạo**: Bấm tạo, gọi `POST /api/projects`. Người tạo tự động thành Owner dự án.
+2. **Rời/Xóa**: Member có thể tự rời (`DELETE /api/projects/:id/members/me`). Owner không thể rời, chỉ có thể xóa cứng dự án (`DELETE /api/projects/:id`).
+
+### 4.2 Cấu hình Bảng vẽ (Editor Board)
+1. **Gán ban biên tập**: Vào Settings dự án, chọn 1 Ban biên tập -> `POST /api/projects/:id/editor-boards`.
+2. **Tháo gỡ**: Bấm Hủy liên kết -> `DELETE /api/projects/:id/editor-boards`.
+
+### 4.3 Quản lý Thành viên
+1. **Thêm/Sửa/Xóa**: Hiển thị bảng thành viên. Thay đổi dropdown chức danh -> `PATCH /api/projects/:id/members/:userId`. Kích người -> `DELETE /api/projects/:id/members/:userId`.
+
+## 5. Luồng Ban Biên Tập (Editor Boards Flow)
+
+### 5.1 Quản trị Ban
+1. **Tạo & Kích thành viên**: Người tạo tự thành Chủ ban (`isLead = true`). Có thể kích member (`DELETE /api/editor-boards/:id/members/:userId`).
+2. **Bổ nhiệm Trưởng ban**: Bấm menu kebab cạnh tên -> Chọn "Bổ nhiệm Lead" -> `PATCH /api/editor-boards/:id/members/:userId/lead`. Người cũ sẽ tự động giáng chức thành member.
+
+## 6. Luồng Đơn từ & Bỏ phiếu (Applications Flow)
+
+### 6.1 Xét duyệt & Bỏ phiếu (Vote)
+1. **Mở Đơn (`/applications/:id`)**: Thành viên Ban biên tập xem đơn và tài liệu.
+2. **Bỏ phiếu**: Bấm Chấp thuận / Từ chối / Trắng án -> Gọi `POST /api/applications/:id/votes`. (Cho phép bấm lại để đổi phiếu - Upsert).
+
+### 6.2 Quyết định cuối cùng (Finalize)
+1. **Chốt sổ**: Trưởng ban (Lead) xem thống kê vote, ra quyết định cuối. Bấm Duyệt/Trượt -> Gọi `PATCH /api/applications/:id/status`. Đơn chuyển trạng thái và bị khóa.
+
+## 7. Luồng Công việc (Tasks Flow)
+
+### 7.1 Bảng kéo thả (Kanban)
+1. **Kéo thẻ Task**: Từ PENDING sang IN_PROGRESS -> Gọi `PATCH /api/tasks/:id` với `status = INPROGRESS`.
+2. **Lỗi Dependency**: Nếu task cha chưa xong, backend ném lỗi 400 (Mã `EVLSUBTASKDEP`). Frontend bắt lỗi, hiện Toast và kéo thẻ về vị trí cũ.
+3. **Thảo luận**: Bấm vào Task để chat. Gọi API Comment (`GET/POST /api/tasks/:id/comments`).
+
+## 8. Luồng Thư mục & Tập tin (Folders & Files Flow)
+
+### 8.1 Cây thư mục (Folder Tree)
+1. **Xem cây thư mục**: Vào chi tiết dự án, gọi `GET /api/projects/:id/folders`. Hiển thị dưới dạng cây (nested hoặc theo `parentId`).
+2. **Tạo thư mục**: Chọn thư mục cha (hoặc thư mục gốc), gọi `POST /api/projects/:id/folders` kèm `parentId`.
+
+### 8.2 Quản lý File & Material (Phiên bản)
+1. **Tải lên File**: Chọn thư mục, gọi `POST /api/folders/:id/files`. File có thể chứa nhiều Material (phiên bản hình ảnh/tài liệu).
+2. **Khôi phục phiên bản**: Xem lịch sử version (Materials) của một File. Bấm Khôi phục -> Gọi `POST /api/materials/:id/restore` để đưa phiên bản cũ làm bản chính thức hiện tại.
+
+## 9. Luồng Đánh dấu Khung hình (Frames Flow)
+
+### 9.1 Vẽ Frame & Báo cáo lỗi
+1. **Tạo Frame**: User mở một File hình ảnh, khoanh vùng (vẽ bounding box) -> Frontend tính toán tọa độ (x, y, width, height) -> Gọi `POST /api/files/:id/frames`.
+2. **Tương tác**: Click vào vùng đã khoanh để xem chi tiết bình luận, hoặc gắn một Task mới trực tiếp vào vùng đó.
+
+## 10. Luồng Bình luận Đa năng (Universal Comments Flow)
+
+### 10.1 Thảo luận (Files, Tasks, Applications, Frames)
+1. **Hiển thị**: Khi mở bất kỳ đối tượng nào hỗ trợ thảo luận, gọi `GET /api/<module>/:id/comments` (VD: `/api/files/:1/comments`).
+2. **Nhắn tin**: Nhập text và gửi -> Gọi `POST /api/<module>/:id/comments`. Backend tự động gắn đúng `fileId`, `taskId`, v.v. dựa trên endpoint tương ứng.
+
+## 11. Luồng Thống kê (Stats Flow)
+
+### 11.1 Thống kê Dự án
+1. **Xem tiến độ**: Gọi `GET /api/projects/:id/stats` để vẽ các biểu đồ tiến độ, số task hoàn thành, số đơn từ.
 
 ---
 
-## 1. Chi tiết các Endpoints
+# API Endpoints Workflow
 
-### 1.1 Đăng ký (Register)
-- **URL**: `POST /api/auth/register`
-- **Chức năng**: Tạo tài khoản người dùng mới và gửi email xác thực.
-- **Input (Body)**: `RegisterDto` 
-  - `email` (string, valid email)
-  - `password` (string, min 6 ký tự)
-  - `displayName` (string, min 5 ký tự)
-- **Output**: `201 Created` (Không có body trả về).
-- **Lỗi thường gặp**:
-  - `400 Bad Request`: Lỗi định dạng dữ liệu đầu vào.
-  - `409 Conflict`: Email đã tồn tại trong hệ thống.
-- **Ràng buộc**: Hệ thống bắt lỗi ở tầng cơ sở dữ liệu (Unique Constraint) để chống Race Condition. Tài khoản mới tạo có trạng thái `isActive = false` và được gán role mặc định.
+## App
 
-### 1.2 Xác thực Email (Verify Email)
-- **URL**: `POST /api/auth/verify-email`
-- **Chức năng**: Kích hoạt tài khoản người dùng thông qua mã xác thực (Token).
-- **Input (Body)**: `VerifyEmailDto`
-  - `token` (string - lấy từ đường link gửi vào email)
-- **Output**: `200 OK`
-- **Lỗi thường gặp**:
-  - `400 Bad Request`: Token không hợp lệ, đã hết hạn, hoặc đã được sử dụng trước đó.
-- **Ràng buộc**: Token chỉ dùng được 1 lần. Kích hoạt xong, token sẽ bị xóa khỏi hệ thống.
+### Health check endpoint 
+**GET** `/api`
 
-### 1.3 Quên mật khẩu (Forgot Password)
-- **URL**: `POST /api/auth/forgot`
-- **Chức năng**: Gửi email chứa đường dẫn khôi phục mật khẩu.
-- **Input (Body)**: `ForgotPasswordDto`
-  - `email` (string)
-- **Output**: `200 OK` (Luôn trả về thành công để tránh dò quét email).
-- **Ràng buộc**: Không tiết lộ email có thực sự tồn tại trong hệ thống hay không. Nếu email đúng, hệ thống sẽ âm thầm tạo token và gửi thư.
-
-### 1.4 Đặt lại mật khẩu (Reset Password)
-- **URL**: `POST /api/auth/reset`
-- **Chức năng**: Đổi mật khẩu mới dựa vào Token khôi phục mật khẩu.
-- **Input (Body)**: `ResetPasswordDto`
-  - `token` (string - lấy từ đường link gửi vào email)
-  - `password` (string - mật khẩu mới)
-- **Output**: `200 OK`
-- **Lỗi thường gặp**:
-  - `400 Bad Request`: Token hết hạn, không hợp lệ, hoặc mật khẩu mới giống hệt mật khẩu cũ.
-- **Ràng buộc**: Đổi mật khẩu thành công sẽ tự động **đăng xuất tài khoản này khỏi tất cả thiết bị khác** (bằng cách xóa toàn bộ Refresh Token cũ).
-
-### 1.5 Đăng nhập (Login)
-- **URL**: `POST /api/auth/login`
-- **Chức năng**: Đăng nhập bằng Email và Password.
-- **Input (Body)**: `LoginDto`
-  - `email` (string)
-  - `password` (string)
-- **Output**: `200 OK`
-  - Trả về JSON: `{ "accessToken": "..." }`
-  - Trả về Cookie (HttpOnly): `refreshToken`
-- **Lỗi thường gặp**:
-  - `401 Unauthorized`: Sai thông tin đăng nhập.
-- **Ràng buộc**: Tài khoản bắt buộc phải có `isActive = true`. Lỗi tài khoản chưa kích hoạt được gộp chung vào lỗi sai thông tin đăng nhập để chống dò quét trạng thái.
-
-### 1.6 Xin cấp lại Token (Refresh Token)
-- **URL**: `POST /api/auth/refresh`
-- **Chức năng**: Sinh cặp Token mới khi Access Token hết hạn.
-- **Input**: 
-  - Đọc `refreshToken` từ HttpOnly Cookie (ưu tiên) hoặc từ Body.
-- **Output**: `200 OK`
-  - Trả về JSON: `{ "accessToken": "..." }`
-  - Trả về Cookie (HttpOnly): `refreshToken` mới.
-- **Lỗi thường gặp**:
-  - `401 Unauthorized`: Refresh Token không hợp lệ hoặc đã hết hạn.
-- **Ràng buộc**: Áp dụng cơ chế xoay vòng (Refresh Token Rotation). Mỗi Refresh Token chỉ dùng được 1 lần và sẽ bị thay thế bằng Token mới.
-
-### 1.7 Đăng nhập Google (Google OAuth)
-- **URL**: `GET /api/auth/google` và Callback: `GET /api/auth/google/callback`
-- **Chức năng**: Đăng nhập bằng tài khoản Google.
-- **Input**: Redirect URL OAuth từ Google.
-- **Output**: `302 Redirect` về URL thành công của Frontend kèm Cookie `refreshToken` (nếu liên kết thành công). Trả về Access Token qua URL/Cookie tùy cấu hình.
-- **Ràng buộc**: Nếu email Google đã tồn tại trong hệ thống nhưng chưa kích hoạt, hệ thống sẽ tự động liên kết tài khoản.
-
-### 1.8 Đăng xuất (Logout)
-- **URL**: `POST /api/auth/logout`
-- **Chức năng**: Vô hiệu hóa Token và kết thúc phiên đăng nhập.
-- **Input**: 
-  - Lấy Access Token từ Header `Authorization`.
-  - Lấy Refresh Token từ Cookie hoặc Body.
-- **Output**: `204 No Content` (Không có body).
-- **Ràng buộc**: Xóa bỏ Refresh Token hiện tại khỏi DB và đưa Access Token vào bảng Blacklist.
+#### Responses
+- **200**: API is running
 
 ---
 
-## 2. Frontend Flow (Luồng phối hợp các Màn hình)
+## Auth
 
-Dưới đây là cách Frontend gọi API và điều hướng màn hình sao cho UX mượt mà và logic nhất.
+### Register a new user 
+**POST** `/api/auth/register`
 
-### 2.1 Luồng Đăng ký tài khoản (Register Flow)
-1. **Màn hình Đăng ký (`/register`)**:
-   - User điền form. Bấm Submit.
-   - Gọi API `POST /api/auth/register`.
-   - ✅ Nếu thành công: Chuyển hướng (Navigate) sang **Màn hình Thông báo Check Email**.
-   - ❌ Nếu lỗi 409: Hiển thị thông báo "Email đã được sử dụng".
-2. **Hành động ở Email**:
-   - User mở hòm thư, bấm vào nút/link kích hoạt.
-   - Link này trỏ về Frontend, dạng như: `https://domain.com/verify-email?token=xyz...`
-3. **Màn hình Xác thực (`/verify-email`)**:
-   - Trình duyệt load trang. Logic (ví dụ useEffect ở React) lấy tham số `token` trên URL.
-   - Lập tức gọi API `POST /api/auth/verify-email`.
-   - ✅ Thành công: Hiển thị thông báo "Tài khoản kích hoạt thành công" kèm nút bấm chuyển về **Màn hình Đăng nhập**.
-   - ❌ Lỗi 400: Hiển thị thông báo "Link xác thực không hợp lệ, hết hạn hoặc đã được sử dụng".
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | `string` | `Yes` |  |
+| `password` | `string` | `Yes` |  |
+| `displayName` | `string` | `Yes` |  |
 
-### 2.2 Luồng Đăng nhập và Duy trì phiên (Login & Session Flow)
-1. **Màn hình Đăng nhập (`/login`)**:
-   - User điền Email, Password.
-   - Gọi API `POST /api/auth/login`.
-   - ❌ Lỗi 401: Hiển thị lỗi "Thông tin đăng nhập không chính xác".
-   - ✅ Thành công: Frontend lưu `accessToken` vào Memory (hoặc Local Storage tùy chiến lược). Cookie `refreshToken` được trình duyệt tự động giữ và gửi đi trong các request sau.
-   - Chuyển hướng sang **Trang Chủ / Bảng điều khiển (Dashboard)**.
-2. **Phiên hết hạn ngầm (Axios Interceptor)**:
-   - Khi Access Token hết hạn, gọi các API dữ liệu (vd: `/users/me`) sẽ bị lỗi 401.
-   - Frontend Interceptor tự động chặn lỗi 401 lại, gọi ngầm API `POST /api/auth/refresh`.
-   - ✅ Thành công: Lấy `accessToken` mới, gắn vào request bị lỗi ban đầu và gọi lại. User không nhận ra sự gián đoạn.
-   - ❌ Lỗi: Chuyển hướng user về **Màn hình Đăng nhập**, yêu cầu đăng nhập lại.
+#### Responses
+- **201**: User registered successfully
+- **409**: Email already exists
 
-### 2.3 Luồng Quên / Khôi phục mật khẩu (Forgot Password Flow)
-1. **Màn hình Quên mật khẩu (`/forgot-password`)**:
-   - User nhập Email. Gọi `POST /api/auth/forgot`.
-   - ✅ Luôn chuyển hướng sang **Màn hình Thông báo Check Email** (hành động này chống hacker dùng tool dò quét xem email nào có trong hệ thống).
-2. **Hành động ở Email**:
-   - User bấm vào link reset, trỏ về Frontend: `https://domain.com/reset-password?token=xyz...`
-3. **Màn hình Đặt lại mật khẩu (`/reset-password`)**:
-   - Hiển thị form cho nhập Mật khẩu mới và Nhập lại mật khẩu.
-   - Gọi API `POST /api/auth/reset` cùng với tham số `token` từ URL.
-   - ❌ Lỗi 400 (do mật khẩu trùng mật khẩu cũ): Báo "Mật khẩu mới không được giống mật khẩu cũ".
-   - ✅ Thành công: Chuyển hướng về **Màn hình Đăng nhập** kèm dòng thông báo "Đổi mật khẩu thành công, mời đăng nhập".
+---
 
-### 2.4 Luồng Đăng nhập Google (Google OAuth Flow)
-1. **Màn hình Đăng nhập (`/login`)**:
-   - Bấm nút "Login with Google".
-   - Frontend điều hướng thẻ trình duyệt (Location Redirect) thẳng đến URL API: `GET /api/auth/google`.
-2. **Màn hình Xác thực Google**:
-   - User chấp nhận quyền. Google redirect user về Callback của Backend.
-3. **Chuyển về Frontend**:
-   - Backend xử lý liên kết tài khoản xong sẽ redirect ngược lại về một màn hình của Frontend (VD: **Màn hình OAuth Success** `/oauth-success`).
-   - Frontend bóc tách Access Token trên URL (hoặc lấy từ API khác), lưu Access Token.
-   - Tự động chuyển hướng vào **Dashboard**.
+### Verify user email 
+**POST** `/api/auth/verify-email`
 
-### 2.5 Luồng Đăng xuất (Logout Flow)
-1. **Ở bất kỳ màn hình nội bộ nào**:
-   - User bấm nút Đăng xuất (trên Header / Sidebar).
-   - Gọi API `POST /api/auth/logout`.
-   - Frontend xóa sạch `accessToken` ở state / Local Storage.
-   - Điều hướng về **Màn hình Đăng nhập** (`/login`).
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `token` | `string` | `Yes` |  |
+
+#### Responses
+- **200**: Email verified successfully
+- **400**: Invalid, expired, or already used verify email token
+
+---
+
+### Request password reset 
+**POST** `/api/auth/forgot`
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | `string` | `Yes` |  |
+
+#### Responses
+- **200**: Password reset email sent if email exists
+
+---
+
+### Reset password with token 
+**POST** `/api/auth/reset`
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `token` | `string` | `Yes` |  |
+| `password` | `string` | `Yes` |  |
+
+#### Responses
+- **200**: Password reset successfully
+- **400**: Invalid token or new password cannot be the same as old password
+
+---
+
+### Initiate Google OAuth 
+**GET** `/api/auth/google`
+
+#### Responses
+- **200**: Redirects to Google OAuth
+
+---
+
+### Google OAuth callback 
+**GET** `/api/auth/google/callback`
+
+#### Responses
+- **200**: Authentication successful
+
+---
+
+### Login with email and password 
+**POST** `/api/auth/login`
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | `string` | `Yes` |  |
+| `password` | `string` | `Yes` |  |
+
+#### Responses
+- **200**: Login successful
+
+---
+
+### Refresh access token 
+**POST** `/api/auth/refresh`
+
+#### Responses
+- **200**: Token refreshed successfully
+
+---
+
+### Logout user 
+**POST** `/api/auth/logout`
+
+#### Responses
+- **200**: Logout successful
+
+---
+
+## Users
+
+### Get current user profile 
+**GET** `/api/users/me`
+
+#### Responses
+- **200**: User profile retrieved successfully
+
+---
+
+### Update current user profile 
+**PATCH** `/api/users/me`
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `displayName` | `string` | `No` |  |
+| `avatarUrl` | `string` | `No` |  |
+
+#### Responses
+- **200**: Profile updated successfully
+
+---
+
+### Update current user password 
+**PATCH** `/api/users/me/password`
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `currentPassword` | `string` | `Yes` |  |
+| `newPassword` | `string` | `Yes` |  |
+
+#### Responses
+- **200**: Password updated successfully
+
+---
+
+### Initiate Google account linking 
+**GET** `/api/users/me/link-account`
+
+#### Responses
+- **200**: Redirects to Google OAuth
+
+---
+
+### Google account linking callback 
+**GET** `/api/users/me/link-account/callback`
+
+#### Responses
+- **200**: Account linked successfully
+
+---
+
+### Get user statistics (admin only) 
+**GET** `/api/users/stats`
+
+#### Responses
+- **200**: Statistics retrieved successfully
+
+---
+
+### Get all users (admin only) 
+**GET** `/api/users`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `search` | `query` | `No` | `string` |  |
+| `isActive` | `query` | `No` | `boolean` |  |
+| `field` | `query` | `No` | `string` |  |
+| `order` | `query` | `No` | `string` |  |
+| `page` | `query` | `No` | `number` |  |
+| `limit` | `query` | `No` | `number` |  |
+
+#### Responses
+- **200**: Users retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `array` |  |
+  | `pagination` | `string` |  |
+
+
+---
+
+### Create staff user (admin only) 
+**POST** `/api/users`
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | `string` | `Yes` |  |
+| `displayName` | `string` | `No` |  |
+| `avatarUrl` | `string` | `No` |  |
+| `password` | `string` | `No` |  |
+| `roleIds` | `array` | `Yes` |  |
+
+#### Responses
+- **201**: User created successfully
+
+---
+
+### Get user roles 
+**GET** `/api/users/{userId}/roles`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `userId` | `path` | `Yes` | `number` | User ID |
+
+#### Responses
+- **200**: User roles retrieved successfully
+
+---
+
+### Append roles to user 
+**POST** `/api/users/{userId}/roles`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `userId` | `path` | `Yes` | `number` | User ID |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `roleIds` | `array` | `Yes` |  |
+
+#### Responses
+- **200**: Roles appended successfully
+
+---
+
+### Replace user roles 
+**PUT** `/api/users/{userId}/roles`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `userId` | `path` | `Yes` | `number` | User ID |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `roleIds` | `array` | `Yes` |  |
+
+#### Responses
+- **200**: Roles replaced successfully
+
+---
+
+### Get user projects 
+**GET** `/api/users/{userId}/projects`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `userId` | `path` | `Yes` | `number` | User ID |
+
+#### Responses
+- **200**: User projects retrieved successfully
+
+---
+
+### Get user editor boards 
+**GET** `/api/users/{userId}/editor-boards`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `userId` | `path` | `Yes` | `number` | User ID |
+
+#### Responses
+- **200**: User editor boards retrieved successfully
+
+---
+
+### Get user by ID 
+**GET** `/api/users/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | User ID |
+
+#### Responses
+- **200**: User retrieved successfully
+
+---
+
+### Update user 
+**PATCH** `/api/users/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | User ID |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `email` | `string` | `No` |  |
+| `displayName` | `string` | `No` |  |
+| `avatarUrl` | `string` | `No` |  |
+| `password` | `string` | `No` |  |
+| `isActive` | `boolean` | `No` |  |
+
+#### Responses
+- **200**: User updated successfully
+
+---
+
+### Force reset user password (admin only) 
+**POST** `/api/users/{id}/force-reset-password`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | User ID |
+
+#### Responses
+- **200**: Password reset successfully
+
+---
+
+## Roles
+
+### Get all roles 
+**GET** `/api/roles`
+
+#### Responses
+- **200**: Roles retrieved successfully
+
+---
+
+### Create a new role 
+**POST** `/api/roles`
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+
+#### Responses
+- **200**: Role created successfully
+
+---
+
+### Get role by ID 
+**GET** `/api/roles/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Role ID |
+
+#### Responses
+- **200**: Role retrieved successfully
+
+---
+
+### Update role 
+**PATCH** `/api/roles/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Role ID |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+
+#### Responses
+- **200**: Role updated successfully
+
+---
+
+### Delete role 
+**DELETE** `/api/roles/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Role ID |
+
+#### Responses
+- **200**: Role deleted successfully
+
+---
+
+### Get role permissions 
+**GET** `/api/roles/{id}/permissions`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Role ID |
+
+#### Responses
+- **200**: Role permissions retrieved successfully
+
+---
+
+### Replace role permissions 
+**PUT** `/api/roles/{id}/permissions`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Role ID |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+
+#### Responses
+- **200**: Role permissions replaced successfully
+
+---
+
+## Permissions
+
+### Get all permissions 
+**GET** `/api/permissions`
+
+#### Responses
+- **200**: 
+
+---
+
+### Get a specific permission by ID 
+**GET** `/api/permissions/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Permission ID |
+
+#### Responses
+- **200**: 
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+
+
+---
+
+### Update a specific permission 
+**PATCH** `/api/permissions/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Permission ID |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+
+#### Responses
+- **200**: 
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+
+
+---
+
+### Get current user global permissions 
+**GET** `/api/permissions/me/sys`
+
+#### Responses
+- **200**: 
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+
+
+---
+
+### Get current user permissions for a specific project 
+**GET** `/api/permissions/me/projects/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Project ID |
+
+#### Responses
+- **200**: 
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+
+
+---
+
+### Get current user permissions for a specific board 
+**GET** `/api/permissions/me/boards/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Board ID |
+
+#### Responses
+- **200**: 
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+
+
+---
+
+## Projects
+
+### Get projects 
+**GET** `/api/projects`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `name` | `query` | `No` | `string` |  |
+| `me` | `query` | `No` | `boolean` |  |
+| `field` | `query` | `No` | `string` |  |
+| `order` | `query` | `No` | `string` |  |
+| `page` | `query` | `No` | `number` |  |
+| `limit` | `query` | `No` | `number` |  |
+
+#### Responses
+- **200**: Projects retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `array` |  |
+  | `pagination` | `string` |  |
+
+
+---
+
+### Create project 
+**POST** `/api/projects`
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | `string` | `Yes` |  |
+| `editorBoardId` | `number` | `No` |  |
+| `description` | `string` | `No` |  |
+| `imageUrl` | `string` | `No` |  |
+
+#### Responses
+- **201**: Project created successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Get all tasks of current user in a specific project 
+**GET** `/api/projects/{id}/tasks`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Project id |
+| `me` | `query` | `No` | `boolean` |  |
+| `search` | `query` | `No` | `string` |  |
+| `status` | `query` | `No` | `string` |  |
+| `field` | `query` | `No` | `string` |  |
+| `order` | `query` | `No` | `string` |  |
+| `page` | `query` | `No` | `number` |  |
+| `limit` | `query` | `No` | `number` |  |
+
+#### Responses
+- **200**: User tasks in project retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `array` |  |
+  | `pagination` | `string` |  |
+
+
+---
+
+### Get project details 
+**GET** `/api/projects/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Project id |
+
+#### Responses
+- **200**: Project retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Update project 
+**PATCH** `/api/projects/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Project id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | `string` | `No` |  |
+| `editorBoardId` | `number` | `No` |  |
+
+#### Responses
+- **200**: Project updated successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Delete project 
+**DELETE** `/api/projects/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Project id |
+
+#### Responses
+- **200**: Project deleted successfully
+
+---
+
+### Get project members 
+**GET** `/api/projects/{id}/members`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Project id |
+| `search` | `query` | `No` | `string` |  |
+| `field` | `query` | `No` | `string` |  |
+| `order` | `query` | `No` | `string` |  |
+| `page` | `query` | `No` | `number` |  |
+| `limit` | `query` | `No` | `number` |  |
+
+#### Responses
+- **200**: Project members retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `array` |  |
+  | `pagination` | `string` |  |
+
+
+---
+
+### Add members to project 
+**POST** `/api/projects/{id}/members`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Project id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `userIds` | `array` | `Yes` |  |
+| `roleId` | `number` | `Yes` |  |
+
+#### Responses
+- **201**: Members added successfully
+
+---
+
+### Get project member details 
+**GET** `/api/projects/{id}/members/{userId}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Project id |
+| `userId` | `path` | `Yes` | `number` | User id |
+
+#### Responses
+- **200**: Project member retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Update project member role 
+**PATCH** `/api/projects/{id}/members/{userId}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Project id |
+| `userId` | `path` | `Yes` | `number` | User id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `roleId` | `number` | `Yes` |  |
+
+#### Responses
+- **200**: Project member updated successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Remove member from project 
+**DELETE** `/api/projects/{id}/members/{userId}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Project id |
+| `userId` | `path` | `Yes` | `number` | User id |
+
+#### Responses
+- **200**: Project member removed successfully
+
+---
+
+### Leave project 
+**DELETE** `/api/projects/{id}/members/me`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Project id |
+
+#### Responses
+- **200**: Successfully left the project
+
+---
+
+### Get project editor board 
+**GET** `/api/projects/{id}/editor-boards`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Project id |
+
+#### Responses
+- **200**: Project editor board retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `object` |  |
+
+
+---
+
+### Set project editor board 
+**POST** `/api/projects/{id}/editor-boards`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Project id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `editorBoardId` | `number` | `Yes` |  |
+
+#### Responses
+- **200**: Project editor board updated successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Remove project editor board 
+**DELETE** `/api/projects/{id}/editor-boards`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Project id |
+
+#### Responses
+- **200**: Project editor board removed successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Get project applications 
+**GET** `/api/projects/{id}/applications`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Project id |
+| `search` | `query` | `No` | `string` |  |
+| `type` | `query` | `No` | `string` |  |
+| `status` | `query` | `No` | `string` |  |
+| `field` | `query` | `No` | `string` |  |
+| `order` | `query` | `No` | `string` |  |
+| `page` | `query` | `No` | `number` |  |
+| `limit` | `query` | `No` | `number` |  |
+
+#### Responses
+- **200**: Project applications retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `array` |  |
+  | `pagination` | `string` |  |
+
+
+---
+
+### Create project application 
+**POST** `/api/projects/{id}/applications`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Project id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `title` | `string` | `Yes` |  |
+| `description` | `string` | `No` |  |
+| `materials` | `object` | `Yes` |  |
+| `type` | `string` | `Yes` |  |
+
+#### Responses
+- **201**: Project application created successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Get project folders 
+**GET** `/api/projects/{id}/folders`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Project id |
+| `search` | `query` | `No` | `string` |  |
+| `parentId` | `query` | `No` | `number` |  |
+| `field` | `query` | `No` | `string` |  |
+| `order` | `query` | `No` | `string` |  |
+| `page` | `query` | `No` | `number` |  |
+| `limit` | `query` | `No` | `number` |  |
+
+#### Responses
+- **200**: Project folders retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `array` |  |
+  | `pagination` | `string` |  |
+
+
+---
+
+### Create project folder 
+**POST** `/api/projects/{id}/folders`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Project id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `title` | `string` | `Yes` |  |
+| `description` | `string` | `No` |  |
+| `parentId` | `number` | `No` |  |
+
+#### Responses
+- **201**: Project folder created successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Get project stats 
+**GET** `/api/projects/{id}/stats`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Project id |
+
+#### Responses
+- **200**: Project stats retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Import project stats 
+**POST** `/api/projects/{id}/stats`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Project id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `metrics` | `object` | `Yes` |  |
+
+#### Responses
+- **201**: Project stats imported successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+## Editor Boards
+
+### Create editor board 
+**POST** `/api/editor-boards`
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | `string` | `Yes` |  |
+| `description` | `string` | `No` |  |
+| `imageUrl` | `string` | `No` |  |
+
+#### Responses
+- **201**: Editor board created successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Get editor boards 
+**GET** `/api/editor-boards`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `name` | `query` | `No` | `string` |  |
+| `me` | `query` | `No` | `boolean` |  |
+| `field` | `query` | `No` | `string` |  |
+| `order` | `query` | `No` | `string` |  |
+| `page` | `query` | `No` | `number` |  |
+| `limit` | `query` | `No` | `number` |  |
+
+#### Responses
+- **200**: Editor boards retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `array` |  |
+  | `pagination` | `string` |  |
+
+
+---
+
+### Get editor board details 
+**GET** `/api/editor-boards/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Editor board id |
+
+#### Responses
+- **200**: Editor board retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Delete editor board 
+**DELETE** `/api/editor-boards/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Editor board id |
+
+#### Responses
+- **200**: Editor board deleted successfully
+
+---
+
+### Update editor board 
+**PATCH** `/api/editor-boards/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Editor board id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | `string` | `No` |  |
+| `description` | `string` | `No` |  |
+| `imageUrl` | `string` | `No` |  |
+
+#### Responses
+- **200**: Editor board updated successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Add members to editor board 
+**POST** `/api/editor-boards/{id}/members`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Editor board id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `userIds` | `array` | `Yes` |  |
+
+#### Responses
+- **201**: Members added successfully
+
+---
+
+### Get editor board members 
+**GET** `/api/editor-boards/{id}/members`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Editor board id |
+| `search` | `query` | `No` | `string` |  |
+| `field` | `query` | `No` | `string` |  |
+| `order` | `query` | `No` | `string` |  |
+| `page` | `query` | `No` | `number` |  |
+| `limit` | `query` | `No` | `number` |  |
+
+#### Responses
+- **200**: Editor board members retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `array` |  |
+  | `pagination` | `string` |  |
+
+
+---
+
+### Get editor board member details 
+**GET** `/api/editor-boards/{id}/members/{userId}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Editor board id |
+| `userId` | `path` | `Yes` | `number` | User id |
+
+#### Responses
+- **200**: Editor board member retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Remove member from editor board 
+**DELETE** `/api/editor-boards/{id}/members/{userId}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Editor board id |
+| `userId` | `path` | `Yes` | `number` | User id |
+
+#### Responses
+- **200**: Member removed successfully
+
+---
+
+### Leave editor board 
+**DELETE** `/api/editor-boards/{id}/members/me`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Editor board id |
+
+#### Responses
+- **200**: Successfully left the board
+
+---
+
+### Set editor board member as lead 
+**PATCH** `/api/editor-boards/{id}/members/{userId}/lead`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Editor board id |
+| `userId` | `path` | `Yes` | `number` | User id |
+
+#### Responses
+- **200**: Editor board member updated successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Get editor board projects 
+**GET** `/api/editor-boards/{id}/projects`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Editor board id |
+| `search` | `query` | `No` | `string` |  |
+| `field` | `query` | `No` | `string` |  |
+| `order` | `query` | `No` | `string` |  |
+| `page` | `query` | `No` | `number` |  |
+| `limit` | `query` | `No` | `number` |  |
+
+#### Responses
+- **200**: Editor board projects retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `array` |  |
+  | `pagination` | `string` |  |
+
+
+---
+
+### Add projects to editor board 
+**POST** `/api/editor-boards/{id}/projects`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Editor board id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `projectIds` | `array` | `Yes` |  |
+
+#### Responses
+- **200**: Projects added successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Get editor board applications 
+**GET** `/api/editor-boards/{id}/applications`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Editor board id |
+| `search` | `query` | `No` | `string` |  |
+| `field` | `query` | `No` | `string` |  |
+| `order` | `query` | `No` | `string` |  |
+| `page` | `query` | `No` | `number` |  |
+| `limit` | `query` | `No` | `number` |  |
+
+#### Responses
+- **200**: Editor board applications retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `array` |  |
+  | `pagination` | `string` |  |
+
+
+---
+
+## Applications
+
+### Get application comments 
+**GET** `/api/applications/{id}/comments`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Application id |
+| `field` | `query` | `No` | `string` |  |
+| `order` | `query` | `No` | `string` |  |
+| `page` | `query` | `No` | `number` |  |
+| `limit` | `query` | `No` | `number` |  |
+
+#### Responses
+- **200**: Application comments retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `array` |  |
+  | `pagination` | `string` |  |
+
+
+---
+
+### Create comment for application 
+**POST** `/api/applications/{id}/comments`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Application id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `content` | `object` | `Yes` |  |
+
+#### Responses
+- **201**: Comment created successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Get applications 
+**GET** `/api/applications`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `projectId` | `query` | `No` | `number` |  |
+| `search` | `query` | `No` | `string` |  |
+| `type` | `query` | `No` | `string` |  |
+| `status` | `query` | `No` | `string` |  |
+| `field` | `query` | `No` | `string` |  |
+| `order` | `query` | `No` | `string` |  |
+| `page` | `query` | `No` | `number` |  |
+| `limit` | `query` | `No` | `number` |  |
+
+#### Responses
+- **200**: Applications retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `array` |  |
+  | `pagination` | `string` |  |
+
+
+---
+
+### Get application details 
+**GET** `/api/applications/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Application id |
+
+#### Responses
+- **200**: Application retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Update application 
+**PATCH** `/api/applications/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Application id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `title` | `string` | `No` |  |
+| `description` | `string` | `No` |  |
+| `materials` | `object` | `No` |  |
+
+#### Responses
+- **200**: Application updated successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Delete application 
+**DELETE** `/api/applications/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Application id |
+
+#### Responses
+- **200**: Application deleted successfully
+
+---
+
+### Update application status 
+**PATCH** `/api/applications/{id}/status`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Application id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `status` | `string` | `Yes` |  |
+
+#### Responses
+- **200**: Application status updated successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Get application votes 
+**GET** `/api/applications/{id}/votes`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Application id |
+
+#### Responses
+- **200**: Application votes retrieved successfully
+
+---
+
+### Cast a vote on application 
+**POST** `/api/applications/{id}/votes`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Application id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `decision` | `string` | `Yes` |  |
+| `comment` | `string` | `No` |  |
+
+#### Responses
+- **200**: Vote casted successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `applicationId` | `number` |  |
+  | `userId` | `number` |  |
+  | `decision` | `string` |  |
+  | `comment` | `object` |  |
+  | `createdAt` | `string` |  |
+  | `updatedAt` | `string` |  |
+  | `user` | `string` |  |
+
+
+---
+
+## Folders
+
+### Get folder details 
+**GET** `/api/folders/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Folder id |
+
+#### Responses
+- **200**: Folder retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Update folder 
+**PATCH** `/api/folders/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Folder id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `title` | `string` | `No` |  |
+| `description` | `string` | `No` |  |
+
+#### Responses
+- **200**: Folder updated successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Delete folder 
+**DELETE** `/api/folders/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Folder id |
+
+#### Responses
+- **200**: Folder deleted successfully
+
+---
+
+### Get folder files 
+**GET** `/api/folders/{id}/files`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Folder id |
+| `search` | `query` | `No` | `string` |  |
+| `field` | `query` | `No` | `string` |  |
+| `order` | `query` | `No` | `string` |  |
+| `page` | `query` | `No` | `number` |  |
+| `limit` | `query` | `No` | `number` |  |
+
+#### Responses
+- **200**: Folder files retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `array` |  |
+  | `pagination` | `string` |  |
+
+
+---
+
+### Create file in folder 
+**POST** `/api/folders/{id}/files`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Folder id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `title` | `string` | `Yes` |  |
+| `description` | `string` | `No` |  |
+
+#### Responses
+- **201**: File created successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Get folder children 
+**GET** `/api/folders/{id}/children`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Folder id |
+| `search` | `query` | `No` | `string` |  |
+| `field` | `query` | `No` | `string` |  |
+| `order` | `query` | `No` | `string` |  |
+| `page` | `query` | `No` | `number` |  |
+| `limit` | `query` | `No` | `number` |  |
+
+#### Responses
+- **200**: Folder children retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `array` |  |
+  | `pagination` | `string` |  |
+
+
+---
+
+### Create child folder 
+**POST** `/api/folders/{id}/children`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Folder id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `title` | `string` | `Yes` |  |
+| `description` | `string` | `No` |  |
+
+#### Responses
+- **201**: Child folder created successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+## Files
+
+### Get file comments 
+**GET** `/api/files/{id}/comments`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | File id |
+| `field` | `query` | `No` | `string` |  |
+| `order` | `query` | `No` | `string` |  |
+| `page` | `query` | `No` | `number` |  |
+| `limit` | `query` | `No` | `number` |  |
+
+#### Responses
+- **200**: File comments retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `array` |  |
+  | `pagination` | `string` |  |
+
+
+---
+
+### Create comment for file 
+**POST** `/api/files/{id}/comments`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | File id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `content` | `object` | `Yes` |  |
+
+#### Responses
+- **201**: Comment created successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Get file details 
+**GET** `/api/files/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | File id |
+
+#### Responses
+- **200**: File retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Update file 
+**PATCH** `/api/files/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | File id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `title` | `string` | `No` |  |
+| `description` | `string` | `No` |  |
+
+#### Responses
+- **200**: File updated successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Delete file 
+**DELETE** `/api/files/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | File id |
+
+#### Responses
+- **200**: File deleted successfully
+
+---
+
+### Get file material versions 
+**GET** `/api/files/{id}/versions`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | File id |
+| `page` | `query` | `No` | `number` |  |
+| `limit` | `query` | `No` | `number` |  |
+
+#### Responses
+- **200**: File material versions retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `array` |  |
+  | `pagination` | `string` |  |
+
+
+---
+
+### Get file materials 
+**GET** `/api/files/{id}/materials`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | File id |
+
+#### Responses
+- **200**: File materials retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Create material for file 
+**POST** `/api/files/{id}/materials`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | File id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `materials` | `object` | `Yes` |  |
+
+#### Responses
+- **201**: Material created successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Get file tasks 
+**GET** `/api/files/{id}/tasks`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | File id |
+| `search` | `query` | `No` | `string` |  |
+| `status` | `query` | `No` | `string` |  |
+| `field` | `query` | `No` | `string` |  |
+| `order` | `query` | `No` | `string` |  |
+| `page` | `query` | `No` | `number` |  |
+| `limit` | `query` | `No` | `number` |  |
+
+#### Responses
+- **200**: File tasks retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `array` |  |
+  | `pagination` | `string` |  |
+
+
+---
+
+### Create task for file 
+**POST** `/api/files/{id}/tasks`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | File id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `title` | `string` | `Yes` |  |
+| `description` | `string` | `No` |  |
+| `status` | `string` | `No` |  |
+| `deadline` | `string` | `No` |  |
+| `parentId` | `number` | `No` |  |
+| `assignedBy` | `number` | `No` |  |
+
+#### Responses
+- **201**: Task created successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+## Materials
+
+### Get material details 
+**GET** `/api/materials/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Material id |
+
+#### Responses
+- **200**: Material retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Update material 
+**PATCH** `/api/materials/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Material id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `materials` | `object` | `Yes` |  |
+
+#### Responses
+- **200**: Material updated successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Delete material 
+**DELETE** `/api/materials/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Material id |
+
+#### Responses
+- **200**: Material deleted successfully
+
+---
+
+### Restore a material version to create a new latest version 
+**POST** `/api/materials/{id}/restore`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Material id (the old version to restore) |
+
+#### Responses
+- **201**: Material restored successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+## Tasks
+
+### Get task comments 
+**GET** `/api/tasks/{id}/comments`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Task id |
+| `field` | `query` | `No` | `string` |  |
+| `order` | `query` | `No` | `string` |  |
+| `page` | `query` | `No` | `number` |  |
+| `limit` | `query` | `No` | `number` |  |
+
+#### Responses
+- **200**: Task comments retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `array` |  |
+  | `pagination` | `string` |  |
+
+
+---
+
+### Create comment for task 
+**POST** `/api/tasks/{id}/comments`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Task id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `content` | `object` | `Yes` |  |
+
+#### Responses
+- **201**: Comment created successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Get all tasks of current user across all projects 
+**GET** `/api/tasks`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `me` | `query` | `No` | `boolean` |  |
+| `search` | `query` | `No` | `string` |  |
+| `status` | `query` | `No` | `string` |  |
+| `field` | `query` | `No` | `string` |  |
+| `order` | `query` | `No` | `string` |  |
+| `page` | `query` | `No` | `number` |  |
+| `limit` | `query` | `No` | `number` |  |
+
+#### Responses
+- **200**: User tasks retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `array` |  |
+  | `pagination` | `string` |  |
+
+
+---
+
+### Get task details 
+**GET** `/api/tasks/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Task id |
+
+#### Responses
+- **200**: Task retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Update task 
+**PATCH** `/api/tasks/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Task id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `title` | `string` | `No` |  |
+| `description` | `string` | `No` |  |
+| `status` | `string` | `No` |  |
+| `deadline` | `string` | `No` |  |
+| `parentId` | `number` | `No` |  |
+| `assignedBy` | `number` | `No` |  |
+
+#### Responses
+- **200**: Task updated successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Delete task 
+**DELETE** `/api/tasks/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Task id |
+
+#### Responses
+- **200**: Task deleted successfully
+
+---
+
+### Get task children 
+**GET** `/api/tasks/{id}/children`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Task id |
+| `search` | `query` | `No` | `string` |  |
+| `status` | `query` | `No` | `string` |  |
+| `field` | `query` | `No` | `string` |  |
+| `order` | `query` | `No` | `string` |  |
+| `page` | `query` | `No` | `number` |  |
+| `limit` | `query` | `No` | `number` |  |
+
+#### Responses
+- **200**: Task children retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `array` |  |
+  | `pagination` | `string` |  |
+
+
+---
+
+### Get task frames 
+**GET** `/api/tasks/{id}/frames`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Task id |
+| `field` | `query` | `No` | `string` |  |
+| `order` | `query` | `No` | `string` |  |
+| `page` | `query` | `No` | `number` |  |
+| `limit` | `query` | `No` | `number` |  |
+
+#### Responses
+- **200**: Task frames retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `array` |  |
+  | `pagination` | `string` |  |
+
+
+---
+
+### Create frame for task 
+**POST** `/api/tasks/{id}/frames`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Task id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `startX` | `number` | `Yes` |  |
+| `startY` | `number` | `Yes` |  |
+| `endX` | `number` | `Yes` |  |
+| `endY` | `number` | `Yes` |  |
+
+#### Responses
+- **201**: Frame created successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+## Frames
+
+### Get frame details 
+**GET** `/api/frames/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Frame id |
+
+#### Responses
+- **200**: Frame retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Update frame 
+**PATCH** `/api/frames/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Frame id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `startX` | `number` | `No` |  |
+| `startY` | `number` | `No` |  |
+| `endX` | `number` | `No` |  |
+| `endY` | `number` | `No` |  |
+
+#### Responses
+- **200**: Frame updated successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Delete frame 
+**DELETE** `/api/frames/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Frame id |
+
+#### Responses
+- **200**: Frame deleted successfully
+
+---
+
+### Get frame comments 
+**GET** `/api/frames/{id}/comments`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Frame id |
+| `field` | `query` | `No` | `string` |  |
+| `order` | `query` | `No` | `string` |  |
+| `page` | `query` | `No` | `number` |  |
+| `limit` | `query` | `No` | `number` |  |
+
+#### Responses
+- **200**: Frame comments retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `array` |  |
+  | `pagination` | `string` |  |
+
+
+---
+
+### Create comment for frame 
+**POST** `/api/frames/{id}/comments`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Frame id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `content` | `object` | `Yes` |  |
+
+#### Responses
+- **201**: Comment created successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+## Project Stats
+
+### Get project stat details 
+**GET** `/api/project-stats/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Project stat id |
+
+#### Responses
+- **200**: Project stat retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Update project stat 
+**PATCH** `/api/project-stats/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Project stat id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `metrics` | `object` | `Yes` |  |
+
+#### Responses
+- **200**: Project stat updated successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `string` |  |
+
+
+---
+
+### Delete project stat 
+**DELETE** `/api/project-stats/{id}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Project stat id |
+
+#### Responses
+- **200**: Project stat deleted successfully
+
+---
+
+## Notifications
+
+### Get current user notifications 
+**GET** `/api/notifications`
+
+#### Responses
+- **200**: 
+
+---
+

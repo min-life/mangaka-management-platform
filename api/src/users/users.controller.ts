@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   Param,
   Patch,
@@ -55,8 +54,22 @@ export class UsersController {
   @ApiOperation({ summary: 'Update current user password' })
   @ApiOkResponse({ description: 'Password updated successfully' })
   @Patch('me/password')
-  updatePassword(@CurrentUser() currentUser: JwtPayload, @Body() body: UpdatePasswordDto) {
-    return this.usersService.updatePassword(currentUser.userId, body);
+  async updatePassword(
+    @CurrentUser() currentUser: JwtPayload,
+    @Body() body: UpdatePasswordDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.usersService.updatePassword(currentUser.userId, body);
+    if (!result) return;
+
+    response.cookie('refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      expires: result.refreshTokenExpiresAt,
+    });
+
+    return { data: { accessToken: result.accessToken } };
   }
 
   @ApiOperation({ summary: 'Initiate Google account linking' })
@@ -79,6 +92,14 @@ export class UsersController {
   ) {
     const redirectUrl = await this.usersService.linkGoogleAccount(state, googleUser);
     return response.redirect(redirectUrl);
+  }
+
+  @ApiOperation({ summary: 'Get user statistics (admin only)' })
+  @ApiOkResponse({ description: 'Statistics retrieved successfully' })
+  @Get('stats')
+  @Permissions({ mode: 'ANY', permissions: ['admin'] })
+  getStats() {
+    return this.usersService.getStats();
   }
 
   @ApiOperation({ summary: 'Get all users (admin only)' })
@@ -169,12 +190,12 @@ export class UsersController {
     return this.usersService.update(Number(id), { ...body, updatedBy: currentUser.userId });
   }
 
-  @ApiOperation({ summary: 'Delete user' })
+  @ApiOperation({ summary: 'Force reset user password (admin only)' })
   @ApiParam({ name: 'id', type: Number, description: 'User ID' })
-  @ApiOkResponse({ description: 'User deleted successfully' })
-  @Delete(':id')
-  @Permissions({ mode: 'ANY', permissions: ['admin', 'user:delete'] })
-  delete(@Param('id') id: string) {
-    return this.usersService.delete(Number(id));
+  @ApiOkResponse({ description: 'Password reset successfully' })
+  @Post(':id/force-reset-password')
+  @Permissions({ mode: 'ANY', permissions: ['admin'] })
+  forceResetPassword(@Param('id') id: string) {
+    return this.usersService.forceResetPassword(Number(id));
   }
 }

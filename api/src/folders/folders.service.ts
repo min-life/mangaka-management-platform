@@ -19,23 +19,31 @@ const USER_SELECT = {
   },
 };
 
-const PROJECT_SELECT = {
+const PROJECT_BASIC_SELECT = {
   id: true,
   name: true,
-  description: true,
   imageUrl: true,
+};
+
+const PROJECT_SELECT = {
+  ...PROJECT_BASIC_SELECT,
+  description: true,
   editorBoard: {
     select: {
       id: true,
       name: true,
       description: true,
       imageUrl: true,
-      createdByUser: USER_SELECT,
-      updatedByUser: USER_SELECT,
-      createdAt: true,
-      updatedAt: true,
     },
   },
+  createdAt: true,
+  updatedAt: true,
+};
+
+export const FOLDER_LIST_SELECT = {
+  id: true,
+  title: true,
+  description: true,
   createdByUser: USER_SELECT,
   updatedByUser: USER_SELECT,
   createdAt: true,
@@ -43,9 +51,7 @@ const PROJECT_SELECT = {
 };
 
 const FOLDER_SELECT = {
-  id: true,
-  title: true,
-  description: true,
+  ...FOLDER_LIST_SELECT,
   parent: {
     select: {
       id: true,
@@ -54,8 +60,14 @@ const FOLDER_SELECT = {
     },
   },
   project: {
-    select: PROJECT_SELECT,
+    select: PROJECT_BASIC_SELECT,
   },
+};
+
+export const FILE_LIST_SELECT = {
+  id: true,
+  title: true,
+  description: true,
   createdByUser: USER_SELECT,
   updatedByUser: USER_SELECT,
   createdAt: true,
@@ -63,16 +75,17 @@ const FOLDER_SELECT = {
 };
 
 const FILE_SELECT = {
-  id: true,
-  title: true,
-  description: true,
+  ...FILE_LIST_SELECT,
   folder: {
-    select: FOLDER_SELECT,
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      project: {
+        select: PROJECT_BASIC_SELECT,
+      },
+    },
   },
-  createdByUser: USER_SELECT,
-  updatedByUser: USER_SELECT,
-  createdAt: true,
-  updatedAt: true,
 };
 
 @Injectable()
@@ -157,7 +170,7 @@ export class FoldersService {
           orderBy,
           skip,
           take: limit,
-          select: FILE_SELECT,
+          select: FILE_LIST_SELECT,
         }),
       ]);
 
@@ -187,6 +200,7 @@ export class FoldersService {
           description: data.description,
           folderId,
           createdBy: data.userId,
+          updatedBy: data.userId,
         },
         select: FILE_SELECT,
       });
@@ -222,7 +236,7 @@ export class FoldersService {
           orderBy,
           skip,
           take: limit,
-          select: FOLDER_SELECT,
+          select: FOLDER_LIST_SELECT,
         }),
       ]);
 
