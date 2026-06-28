@@ -1,11 +1,5 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOkResponse,
-  ApiOperation,
-  ApiParam,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { Permissions } from '../share/decorators';
 import { ProjectStatsService } from './project-stats.service';
 import { ProjectStatResponseDto, UpdateProjectStatReqDto } from './dto';

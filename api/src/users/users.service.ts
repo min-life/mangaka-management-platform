@@ -12,9 +12,15 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { Prisma, SCOPE } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
-import { requireEnv, requireNumberEnv } from '../share/helpers/env';
+import {
+  requireDurationEnv,
+  requireDurationStringEnv,
+  requireEnv,
+  requireNumberEnv,
+} from '../share/helpers/env';
 import { serializeRole } from '../share/utils/role-serializer';
 import { Resource, Permission, GoogleUser } from '../auth/interfaces';
 import { Pagination } from '../share/interfaces';
@@ -24,6 +30,9 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
 const BCRYPT_SALT_ROUNDS = requireNumberEnv('BCRYPT_SALT_ROUNDS');
+const ACCESS_TOKEN_EXPIRES_IN = requireDurationStringEnv('ACCESS_TOKEN_EXPIRES_IN');
+const REFRESH_TOKEN_EXPIRES_IN = requireDurationStringEnv('REFRESH_TOKEN_EXPIRES_IN');
+const REFRESH_TOKEN_EXPIRES_IN_MS = requireDurationEnv('REFRESH_TOKEN_EXPIRES_IN');
 
 @Injectable()
 export class UsersService {
@@ -49,7 +58,7 @@ export class UsersService {
         }),
         ...(filter?.isActive !== undefined && { isActive: filter.isActive }),
       };
-      
+
       const field = sort?.field || 'createdAt';
       const order = sort?.order || 'desc';
       const { page, limit, skip } = this.buildPagination(pagination);
@@ -73,7 +82,7 @@ export class UsersService {
         pagination: this.buildPaginationMeta(total, page, limit),
       };
     } catch (error) {
-      this.handleError(error, 'Get all users fail', ERROR.SVGETPROJECTMEMBERS);
+      this.handleError(error, 'Get all users fail', ERROR.SVGETUSERS);
     }
   }
 
@@ -97,7 +106,7 @@ export class UsersService {
         },
       };
     } catch (error) {
-      this.handleError(error, 'Get user fail', ERROR.SVGETPROJECTMEMBER);
+      this.handleError(error, 'Get user fail', ERROR.SVGETUSER);
     }
   }
 
@@ -108,11 +117,6 @@ export class UsersService {
   async createStaffUser(currentUserId: number, dto: CreateStaffUserDto) {
     try {
       const email = dto.email.trim().toLowerCase();
-      const existingUser = await this.prisma.user.findUnique({ where: { email } });
-
-      if (existingUser) {
-        throw new ConflictException(ERROR.CFLEMAIL);
-      }
 
       const roleIds = await this.validateSysRoles(dto.roleIds);
       const password = dto.password
@@ -141,8 +145,11 @@ export class UsersService {
       });
 
       return { data: this.serializeUser(user) };
-    } catch (error) {
-      this.handleError(error, 'Create staff user fail', ERROR.SVADDPROJECTMEMBER);
+    } catch (error: any) {
+      if (error?.code === 'P2002') {
+        throw new ConflictException(ERROR.CFLEMAIL);
+      }
+      this.handleError(error, 'Create staff user fail', ERROR.SVCREATEUSER);
     }
   }
 
@@ -167,7 +174,7 @@ export class UsersService {
       return { data: this.serializeUser(user) };
     } catch (error) {
       this.handleUserUniqueConflict(error);
-      this.handleError(error, 'Update user fail', ERROR.SVUPDATEPROJECTMEMBER);
+      this.handleError(error, 'Update user fail', ERROR.SVUPDATEUSER);
     }
   }
 
@@ -184,7 +191,7 @@ export class UsersService {
 
       return { data: this.serializeUser(user) };
     } catch (error) {
-      this.handleError(error, 'Update profile fail', ERROR.SVUPDATEPROJECTMEMBER);
+      this.handleError(error, 'Update profile fail', ERROR.SVUPDATEUSER);
     }
   }
 
@@ -201,6 +208,11 @@ export class UsersService {
         throw new UnauthorizedException(ERROR.EVLCURRENTPASSWORD);
       }
 
+      const isSamePassword = await bcrypt.compare(dto.newPassword, user.password);
+      if (isSamePassword) {
+        throw new BadRequestException(ERROR.EVLSAMEPASSWORD);
+      }
+
       await this.prisma.$transaction([
         this.prisma.user.update({
           where: { id: userId },
@@ -212,19 +224,62 @@ export class UsersService {
         this.prisma.refreshToken.deleteMany({ where: { userId } }),
       ]);
 
-      return { data: { success: true } };
+      const accessToken = await this.jwtService.signAsync(
+        { userId, email: user.email, jti: randomUUID() },
+        { secret: requireEnv('ACCESS_TOKEN_SECRET'), expiresIn: ACCESS_TOKEN_EXPIRES_IN as any },
+      );
+
+      const refreshTokenExpiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_IN_MS);
+      const refreshToken = await this.jwtService.signAsync(
+        { userId, email: user.email },
+        { secret: requireEnv('REFRESH_TOKEN_SECRET'), expiresIn: REFRESH_TOKEN_EXPIRES_IN as any },
+      );
+
+      await this.prisma.refreshToken.create({
+        data: { token: refreshToken, userId, expiresAt: refreshTokenExpiresAt },
+      });
+
+      return { accessToken, refreshToken, refreshTokenExpiresAt };
     } catch (error) {
-      this.handleError(error, 'Update password fail', ERROR.SVUPDATEPROJECTMEMBER);
+      this.handleError(error, 'Update password fail', ERROR.SVUPDATEUSER);
     }
   }
 
-  async delete(userId: number) {
+  async getStats() {
+    try {
+      const [total, active, inactive] = await Promise.all([
+        this.prisma.user.count(),
+        this.prisma.user.count({ where: { isActive: true } }),
+        this.prisma.user.count({ where: { isActive: false } }),
+      ]);
+
+      return { data: { total, active, inactive } };
+    } catch (error) {
+      this.handleError(error, 'Get users stats fail', ERROR.SVGETUSERS);
+    }
+  }
+
+  async forceResetPassword(userId: number) {
     try {
       await this.ensureUser(userId);
-      await this.prisma.user.delete({ where: { id: userId } });
-      return { data: { success: true } };
+
+      const newPassword = randomUUID().slice(0, 10);
+      const hashedPassword = await bcrypt.hash(newPassword, BCRYPT_SALT_ROUNDS);
+
+      await this.prisma.$transaction([
+        this.prisma.user.update({
+          where: { id: userId },
+          data: {
+            password: hashedPassword,
+            updatedBy: userId,
+          },
+        }),
+        this.prisma.refreshToken.deleteMany({ where: { userId } }),
+      ]);
+
+      return { data: { newPassword } };
     } catch (error) {
-      this.handleError(error, 'Delete user fail', ERROR.SVREMOVEPROJECTMEMBER);
+      this.handleError(error, 'Force reset password fail', ERROR.SVUPDATEUSER);
     }
   }
 
@@ -240,7 +295,7 @@ export class UsersService {
 
       return { data: userRoles.map((userRole) => serializeRole(userRole.role)) };
     } catch (error) {
-      this.handleError(error, 'Get user roles fail', ERROR.SVGETBOARDMEMBERS);
+      this.handleError(error, 'Get user roles fail', ERROR.SVGETUSERROLES);
     }
   }
 
@@ -256,7 +311,7 @@ export class UsersService {
 
       return { data: { success: true } };
     } catch (error) {
-      this.handleError(error, 'Append user roles fail', ERROR.SVADDBOARDMEMBER);
+      this.handleError(error, 'Append user roles fail', ERROR.SVADDUSERROLES);
     }
   }
 
@@ -278,7 +333,7 @@ export class UsersService {
 
       return { data: { success: true } };
     } catch (error) {
-      this.handleError(error, 'Replace user roles fail', ERROR.SVUPDBOARDMEMBER);
+      this.handleError(error, 'Replace user roles fail', ERROR.SVUPDATEUSERROLES);
     }
   }
 
@@ -476,7 +531,7 @@ export class UsersService {
   }
 
   private async getBoardPermission(userId: number, editorBoardId: number): Promise<Permission[]> {
-    let permissions = [] as Permission[];
+    const permissions = [] as Permission[];
     // Check if user is a board member
     // If not, throw 403 error
     const userEditorBoard = await this.prisma.userEditorBoard.findUnique({
@@ -683,34 +738,47 @@ export class UsersService {
   private async getCommentPermission(userId: number, commentId: number): Promise<Permission[]> {
     let permissions = [] as Permission[];
     // Get projectId from commentId
-    const comment = await this.prisma.taskComment.findUnique({
+    const comment = await this.prisma.comment.findUnique({
       where: { id: commentId },
       select: {
+        file: { select: { folder: { select: { projectId: true } } } },
+        task: { select: { file: { select: { folder: { select: { projectId: true } } } } } },
         frame: {
           select: {
             task: { select: { file: { select: { folder: { select: { projectId: true } } } } } },
           },
         },
+        application: { select: { projectId: true } },
       },
     });
     if (!comment) {
       throw new NotFoundException(ERROR.NFCOMMENT);
     }
 
+    const projectId =
+      comment.file?.folder.projectId ||
+      comment.task?.file.folder.projectId ||
+      comment.frame?.task.file.folder.projectId ||
+      comment.application?.projectId;
+
+    if (!projectId) {
+      throw new ForbiddenException();
+    }
+
     // Check if user is a project member
     // If not, throw 403 error
-    const isMember = await this.isProjectMember(userId, comment.frame.task.file.folder.projectId);
+    const isMember = await this.isProjectMember(userId, projectId);
     if (!isMember) {
       throw new ForbiddenException();
     }
 
     // If yes, get permission
     permissions = permissions.concat(
-      await this.getProjectOwnerPermission(userId, comment.frame.task.file.folder.projectId),
+      await this.getProjectOwnerPermission(userId, projectId),
     );
     if (permissions.length === 0) {
       permissions = permissions.concat(
-        await this.getProjectMemberPermission(userId, comment.frame.task.file.folder.projectId),
+        await this.getProjectMemberPermission(userId, projectId),
       );
     }
 
@@ -725,32 +793,48 @@ export class UsersService {
     // Get application from applicationId
     const application = await this.prisma.application.findUnique({
       where: { id: applicationId },
-      select: { projectId: true },
+      select: { projectId: true, project: { select: { editorBoardId: true } } },
     });
     if (!application) {
       throw new NotFoundException(ERROR.NFAPPLICATION);
     }
 
-    // Check if user is a project member
-    // If not, throw 403 error
     const isMember = await this.isProjectMember(userId, application.projectId);
-    if (!isMember) {
+
+    let isBoardMember = false;
+    let boardPermissions: Permission[] = [];
+    if (application.project.editorBoardId) {
+      try {
+        boardPermissions = await this.getBoardPermission(userId, application.project.editorBoardId);
+        isBoardMember = true;
+      } catch (error) {
+        if (!(error instanceof ForbiddenException)) {
+          throw error;
+        }
+      }
+    }
+
+    if (!isMember && !isBoardMember) {
       throw new ForbiddenException();
     }
 
-    // If yes, get permission based on project permissions
-    permissions = permissions.concat(
-      await this.getProjectOwnerPermission(userId, application.projectId),
-    );
-    if (permissions.length === 0) {
+    if (isMember) {
       permissions = permissions.concat(
-        await this.getProjectMemberPermission(userId, application.projectId),
+        await this.getProjectOwnerPermission(userId, application.projectId),
       );
+      if (permissions.length === 0) {
+        permissions = permissions.concat(
+          await this.getProjectMemberPermission(userId, application.projectId),
+        );
+      }
+      // Add application permissions based on role
+      if (permissions.includes('project:owner')) {
+        permissions.push('project:application.approve');
+      }
     }
 
-    // Add application permissions based on role
-    if (permissions.includes('project:owner')) {
-      permissions.push('project:application.approve');
+    if (isBoardMember) {
+      permissions = permissions.concat(boardPermissions);
     }
 
     return permissions;
@@ -770,7 +854,7 @@ export class UsersService {
     userId: number,
     projectId: number,
   ): Promise<Permission[]> {
-    let permissions = [] as Permission[];
+    const permissions = [] as Permission[];
     const project = await this.prisma.project.findUnique({ where: { id: projectId } });
     if (project?.createdBy === userId) {
       permissions.push('project:owner');

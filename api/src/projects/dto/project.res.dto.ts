@@ -42,6 +42,28 @@ export class EditorBoardResDto {
   updatedAt!: Date;
 }
 
+export class EditorBoardBasicResDto {
+  @ApiProperty({ example: 1 })
+  id!: number;
+
+  @ApiProperty({ example: 'Weekly Manga Review Board' })
+  name!: string;
+
+  @ApiPropertyOptional({ example: 'https://example.com/board.png', nullable: true })
+  imageUrl?: string | null;
+}
+
+export class ProjectBasicResDto {
+  @ApiProperty({ example: 10 })
+  id!: number;
+
+  @ApiProperty({ example: 'One-shot Chapter 01' })
+  name!: string;
+
+  @ApiPropertyOptional({ example: 'https://example.com/image.jpg', nullable: true })
+  imageUrl?: string | null;
+}
+
 export class ProjectResDto {
   @ApiProperty({ example: 10 })
   id!: number;
@@ -55,8 +77,8 @@ export class ProjectResDto {
   @ApiPropertyOptional({ example: 'https://example.com/project.png', nullable: true })
   imageUrl?: string | null;
 
-  @ApiPropertyOptional({ type: EditorBoardResDto, nullable: true })
-  editorBoard?: EditorBoardResDto | null;
+  @ApiPropertyOptional({ type: EditorBoardBasicResDto, nullable: true })
+  editorBoard?: EditorBoardBasicResDto | null;
 
   @ApiPropertyOptional({ type: UserResDto, nullable: true })
   createdByUser?: UserResDto | null;
@@ -69,6 +91,17 @@ export class ProjectResDto {
 
   @ApiProperty({ example: '2026-06-18T03:00:00.000Z' })
   updatedAt!: Date;
+}
+
+export class SimpleProjectFolderResDto {
+  @ApiProperty({ example: 4 })
+  id!: number;
+
+  @ApiProperty({ example: 'Draft pages' })
+  title!: string;
+
+  @ApiPropertyOptional({ example: 'Initial rough sketches.', nullable: true })
+  description?: string | null;
 }
 
 export class RoleResDto {
@@ -134,8 +167,8 @@ export class ProjectApplicationResDto {
   @ApiProperty({ example: 7 })
   id!: number;
 
-  @ApiProperty({ type: ProjectResDto })
-  project!: ProjectResDto;
+  @ApiProperty({ type: ProjectBasicResDto })
+  project!: ProjectBasicResDto;
 
   @ApiProperty({ example: 'Publish request for chapter 01' })
   title!: string;
@@ -178,11 +211,11 @@ export class ProjectFolderResDto {
   @ApiPropertyOptional({ example: 'Initial rough sketches.', nullable: true })
   description?: string | null;
 
-  @ApiPropertyOptional({ type: ProjectFolderResDto, nullable: true })
-  parent?: ProjectFolderResDto | null;
+  @ApiPropertyOptional({ type: () => SimpleProjectFolderResDto, nullable: true })
+  parent?: SimpleProjectFolderResDto | null;
 
-  @ApiProperty({ type: ProjectResDto })
-  project!: ProjectResDto;
+  @ApiProperty({ type: ProjectBasicResDto })
+  project!: ProjectBasicResDto;
 
   @ApiPropertyOptional({ type: UserResDto, nullable: true })
   createdByUser?: UserResDto | null;

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   HttpException,
   Injectable,
   InternalServerErrorException,
@@ -10,93 +11,62 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
 
-const PROJECT_SELECT = {
+const USER_BASIC_SELECT = {
+  id: true,
+  email: true,
+  displayName: true,
+  avatarUrl: true,
+};
+
+const PROJECT_BASIC_SELECT = {
   id: true,
   name: true,
-  description: true,
   imageUrl: true,
+};
+
+const PROJECT_DETAIL_SELECT = {
+  ...PROJECT_BASIC_SELECT,
+  description: true,
   editorBoard: {
     select: {
       id: true,
       name: true,
       description: true,
       imageUrl: true,
-      createdByUser: {
-        select: {
-          id: true,
-          email: true,
-          displayName: true,
-          avatarUrl: true,
-        },
-      },
-      updatedByUser: {
-        select: {
-          id: true,
-          email: true,
-          displayName: true,
-          avatarUrl: true,
-        },
-      },
-      createdAt: true,
-      updatedAt: true,
-    },
-  },
-  createdByUser: {
-    select: {
-      id: true,
-      email: true,
-      displayName: true,
-      avatarUrl: true,
-    },
-  },
-  updatedByUser: {
-    select: {
-      id: true,
-      email: true,
-      displayName: true,
-      avatarUrl: true,
     },
   },
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.ProjectSelect;
 
-const APPLICATION_SELECT = {
+const APPLICATION_LIST_SELECT = {
   id: true,
-  project: {
-    select: PROJECT_SELECT,
-  },
   title: true,
-  description: true,
-  materials: true,
   type: true,
   status: true,
+  project: {
+    select: PROJECT_BASIC_SELECT,
+  },
   verifiedByUser: {
-    select: {
-      id: true,
-      email: true,
-      displayName: true,
-      avatarUrl: true,
-    },
+    select: USER_BASIC_SELECT,
   },
   createdByUser: {
-    select: {
-      id: true,
-      email: true,
-      displayName: true,
-      avatarUrl: true,
-    },
+    select: USER_BASIC_SELECT,
   },
   updatedByUser: {
-    select: {
-      id: true,
-      email: true,
-      displayName: true,
-      avatarUrl: true,
-    },
+    select: USER_BASIC_SELECT,
   },
   createdAt: true,
   updatedAt: true,
+} satisfies Prisma.ApplicationSelect;
+
+const APPLICATION_SELECT = {
+  ...APPLICATION_LIST_SELECT,
+  description: true,
+  materials: true,
+  project: {
+    select: PROJECT_BASIC_SELECT,
+  },
 } satisfies Prisma.ApplicationSelect;
 
 @Injectable()
@@ -134,7 +104,7 @@ export class ApplicationsService {
           orderBy,
           skip,
           take: limit,
-          select: APPLICATION_SELECT,
+          select: APPLICATION_LIST_SELECT,
         }),
       ]);
 
@@ -206,7 +176,16 @@ export class ApplicationsService {
     },
   ) {
     try {
-      await this.ensureApplication(id);
+      const application = await this.ensureApplication(id);
+
+      if (data.status === APPLICATION_STATUS.SUBMITTED) {
+        if (
+          application.status !== APPLICATION_STATUS.INTERNAL_APPROVED &&
+          application.status !== APPLICATION_STATUS.SUBMITTED
+        ) {
+          throw new BadRequestException(ERROR.EVLINTERNALAPPROVAL);
+        }
+      }
 
       return await this.prisma.application.update({
         where: { id },
@@ -218,6 +197,150 @@ export class ApplicationsService {
       });
     } catch (error) {
       this.handleError(error, 'Update application status fail', ERROR.SVUPDATEAPPLICATION);
+    }
+  }
+
+  async getVotes(applicationId: number) {
+    try {
+      await this.ensureApplication(applicationId);
+
+      const votes = await this.prisma.applicationVote.findMany({
+        where: { applicationId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              displayName: true,
+              avatarUrl: true,
+            },
+          },
+        },
+        orderBy: { updatedAt: 'desc' },
+      });
+
+      return { data: votes };
+    } catch (error) {
+      this.handleError(error, 'Get application votes fail', ERROR.SVGETVOTES);
+    }
+  }
+
+  async castVote(
+    applicationId: number,
+    userId: number,
+    decision: import('@prisma/client').VOTE_DECISION,
+    comment?: string,
+  ) {
+    try {
+      await this.ensureApplication(applicationId);
+
+      const vote = await this.prisma.applicationVote.upsert({
+        where: {
+          applicationId_userId: {
+            applicationId,
+            userId,
+          },
+        },
+        update: {
+          decision,
+          comment,
+        },
+        create: {
+          applicationId,
+          userId,
+          decision,
+          comment,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              displayName: true,
+              avatarUrl: true,
+            },
+          },
+        },
+      });
+
+      return { data: vote };
+    } catch (error) {
+      this.handleError(error, 'Cast application vote fail', ERROR.SVVOTE);
+    }
+  }
+
+  async getApplicationComments(
+    applicationId: number,
+    sort?: { field: 'createdAt'; order: 'asc' | 'desc' },
+    pagination?: Pagination,
+  ) {
+    try {
+      await this.ensureApplication(applicationId);
+
+      const where: Prisma.CommentWhereInput = { applicationId };
+      const orderBy: Prisma.CommentOrderByWithRelationInput = sort
+        ? { [sort.field]: sort.order }
+        : { createdAt: 'desc' };
+      const { page, limit, skip } = this.buildPagination(pagination);
+
+      const [total, comments] = await this.prisma.$transaction([
+        this.prisma.comment.count({ where }),
+        this.prisma.comment.findMany({
+          where,
+          orderBy,
+          skip,
+          take: limit,
+          select: {
+            id: true,
+            content: true,
+            applicationId: true,
+            createdByUser: {
+              select: { id: true, email: true, displayName: true, avatarUrl: true },
+            },
+            createdAt: true,
+            updatedAt: true,
+          },
+        }),
+      ]);
+
+      return {
+        comments,
+        pagination: this.buildPaginationMeta(total, page, limit),
+      };
+    } catch (error) {
+      this.handleError(error, 'Get application comments fail', 'SVGETAPPCOMMENTS');
+    }
+  }
+
+  async createComment(
+    applicationId: number,
+    data: {
+      content: unknown;
+      userId: number;
+    },
+  ) {
+    try {
+      await this.ensureApplication(applicationId);
+
+      return await this.prisma.comment.create({
+        data: {
+          content: data.content as Prisma.InputJsonValue,
+          applicationId,
+          createdBy: data.userId,
+        },
+        select: {
+          id: true,
+          content: true,
+          applicationId: true,
+          createdByUser: {
+            select: { id: true, email: true, displayName: true, avatarUrl: true },
+          },
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    } catch (error) {
+      this.handleError(error, 'Create comment fail', 'SVCREATECOMMENT');
     }
   }
 

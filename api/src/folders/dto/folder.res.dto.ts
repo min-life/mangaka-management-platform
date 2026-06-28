@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UserResDto } from '../../share/dto';
-import { ProjectResDto } from '../../projects/dto';
+import { ProjectBasicResDto } from '../../projects/dto';
 
 export class PaginationResDto {
   @ApiProperty({ example: 25 })
@@ -16,6 +16,17 @@ export class PaginationResDto {
   totalPages!: number;
 }
 
+export class SimpleFolderResDto {
+  @ApiProperty({ example: 4 })
+  id!: number;
+
+  @ApiProperty({ example: 'Draft pages' })
+  title!: string;
+
+  @ApiPropertyOptional({ example: 'Initial rough sketches.', nullable: true })
+  description?: string | null;
+}
+
 export class FolderResDto {
   @ApiProperty({ example: 4 })
   id!: number;
@@ -26,11 +37,11 @@ export class FolderResDto {
   @ApiPropertyOptional({ example: 'Initial rough sketches.', nullable: true })
   description?: string | null;
 
-  @ApiPropertyOptional({ type: FolderResDto, nullable: true })
-  parent?: FolderResDto | null;
+  @ApiPropertyOptional({ type: SimpleFolderResDto, nullable: true })
+  parent?: SimpleFolderResDto | null;
 
-  @ApiPropertyOptional({ type: () => ProjectResDto, nullable: true })
-  project?: ProjectResDto | null;
+  @ApiPropertyOptional({ type: () => ProjectBasicResDto, nullable: true })
+  project?: ProjectBasicResDto | null;
 
   @ApiPropertyOptional({ type: UserResDto, nullable: true })
   createdByUser?: UserResDto | null;

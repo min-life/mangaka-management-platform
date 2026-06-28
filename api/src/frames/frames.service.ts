@@ -10,6 +10,37 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
 
+const USER_SELECT = {
+  select: {
+    id: true,
+    email: true,
+    displayName: true,
+    avatarUrl: true,
+  },
+};
+
+const FRAME_SELECT = {
+  id: true,
+  startX: true,
+  startY: true,
+  endX: true,
+  endY: true,
+  taskId: true,
+  createdByUser: USER_SELECT,
+  updatedByUser: USER_SELECT,
+  createdAt: true,
+  updatedAt: true,
+};
+
+const COMMENT_SELECT = {
+  id: true,
+  content: true,
+  frameId: true,
+  createdByUser: USER_SELECT,
+  createdAt: true,
+  updatedAt: true,
+};
+
 @Injectable()
 export class FramesService {
   private readonly logger = new Logger(FramesService.name);
@@ -46,6 +77,7 @@ export class FramesService {
           endY: data.endY,
           updatedBy: data.userId,
         },
+        select: FRAME_SELECT,
       });
     } catch (error) {
       this.handleError(error, 'Update frame fail', ERROR.SVUPDATEFRAME);
@@ -69,19 +101,20 @@ export class FramesService {
     try {
       await this.ensureFrame(frameId);
 
-      const where: Prisma.TaskCommentWhereInput = { frameId };
-      const orderBy: Prisma.TaskCommentOrderByWithRelationInput = sort
+      const where: Prisma.CommentWhereInput = { frameId };
+      const orderBy: Prisma.CommentOrderByWithRelationInput = sort
         ? { [sort.field]: sort.order }
         : { createdAt: 'desc' };
       const { page, limit, skip } = this.buildPagination(pagination);
 
       const [total, comments] = await this.prisma.$transaction([
-        this.prisma.taskComment.count({ where }),
-        this.prisma.taskComment.findMany({
+        this.prisma.comment.count({ where }),
+        this.prisma.comment.findMany({
           where,
           orderBy,
           skip,
           take: limit,
+          select: COMMENT_SELECT,
         }),
       ]);
 
@@ -104,12 +137,13 @@ export class FramesService {
     try {
       await this.ensureFrame(frameId);
 
-      return await this.prisma.taskComment.create({
+      return await this.prisma.comment.create({
         data: {
           content: data.content as Prisma.InputJsonValue,
           frameId,
           createdBy: data.userId,
         },
+        select: COMMENT_SELECT,
       });
     } catch (error) {
       this.handleError(error, 'Create comment fail', ERROR.SVCREATECOMMENT);
@@ -136,7 +170,10 @@ export class FramesService {
   }
 
   private async ensureFrame(id: number) {
-    const frame = await this.prisma.taskCommentFrame.findUnique({ where: { id } });
+    const frame = await this.prisma.taskCommentFrame.findUnique({
+      where: { id },
+      select: FRAME_SELECT,
+    });
     if (!frame) {
       throw new NotFoundException(ERROR.NFFRAME);
     }

@@ -297,6 +297,22 @@ export class ProjectsController {
 
   @Permissions({
     mode: 'ANY',
+    permissions: ['project:read'],
+    resource: 'PROJECT',
+  })
+  @ApiOperation({ summary: 'Leave project' })
+  @ApiParam({ name: 'id', type: Number, description: 'Project id' })
+  @ApiOkResponse({ description: 'Successfully left the project' })
+  @Delete(':id/members/me')
+  async leaveProject(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    await this.projectsService.leaveProject(id, currentUser.userId);
+  }
+
+  @Permissions({
+    mode: 'ANY',
     permissions: ['project:owner', 'project:read'],
     resource: 'PROJECT',
   })
@@ -336,6 +352,28 @@ export class ProjectsController {
       data.editorBoardId,
       currentUser.userId,
     );
+    return {
+      data: project,
+    };
+  }
+
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['project:owner', 'project:update'],
+    resource: 'PROJECT',
+  })
+  @ApiOperation({ summary: 'Remove project editor board' })
+  @ApiParam({ name: 'id', type: Number, description: 'Project id' })
+  @ApiOkResponse({
+    description: 'Project editor board removed successfully',
+    type: ProjectResponseDto,
+  })
+  @Delete(':id/editor-boards')
+  async removeProjectEditorBoard(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    const project = await this.projectsService.removeProjectEditorBoard(id, currentUser.userId);
     return {
       data: project,
     };

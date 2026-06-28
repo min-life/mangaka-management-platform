@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   HttpException,
   Injectable,
   InternalServerErrorException,
@@ -6,6 +7,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PROGRESS_STATUS, Prisma } from '@prisma/client';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ACTIVITY_EVENT_NAME, ActivityEventPayload } from '../share/events/activity.event';
 import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
@@ -19,87 +22,26 @@ const USER_SELECT = {
   },
 };
 
-const FOLDER_SELECT = {
-  id: true,
-  title: true,
-  description: true,
-  project: {
-    select: {
-      id: true,
-      name: true,
-      description: true,
-      imageUrl: true,
-      editorBoard: {
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          imageUrl: true,
-          createdByUser: USER_SELECT,
-          updatedByUser: USER_SELECT,
-          createdAt: true,
-          updatedAt: true,
-        },
-      },
-      createdByUser: USER_SELECT,
-      updatedByUser: USER_SELECT,
-      createdAt: true,
-      updatedAt: true,
-    },
-  },
-  createdByUser: USER_SELECT,
-  updatedByUser: USER_SELECT,
-  createdAt: true,
-  updatedAt: true,
-};
-
-const FILE_SELECT = {
-  id: true,
-  title: true,
-  description: true,
-  folder: {
-    select: FOLDER_SELECT,
-  },
-  createdByUser: USER_SELECT,
-  updatedByUser: USER_SELECT,
-  createdAt: true,
-  updatedAt: true,
-};
-
 const TASK_SELECT = {
   id: true,
   title: true,
   description: true,
   status: true,
-  parent: {
-    select: {
-      id: true,
-      title: true,
-      description: true,
-      status: true,
-    },
-  },
-  file: {
-    select: FILE_SELECT,
-  },
-  assignedByUser: USER_SELECT,
-  createdByUser: USER_SELECT,
-  updatedByUser: USER_SELECT,
-  createdAt: true,
-  updatedAt: true,
-};
-
-const TASK_LIST_SELECT = {
-  id: true,
-  title: true,
-  description: true,
-  status: true,
+  deadline: true,
   parentId: true,
   fileId: true,
   file: {
     select: {
       id: true,
       title: true,
+    },
+  },
+  parent: {
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      status: true,
     },
   },
   assignedByUser: USER_SELECT,
@@ -142,7 +84,10 @@ const COMMENT_SELECT = {
 export class TasksService {
   private readonly logger = new Logger(TasksService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async getTaskById(id: number) {
     try {
@@ -165,13 +110,26 @@ export class TasksService {
       title?: string;
       description?: string;
       status?: PROGRESS_STATUS;
+      deadline?: Date;
       parentId?: number;
       assignedBy?: number;
       userId: number;
     },
   ) {
     try {
-      await this.ensureTask(id);
+      const task = await this.ensureTask(id);
+
+      // Subtask dependency validation:
+      // A subtask cannot change status from PENDING until parent task is DONE
+      if (data.status && data.status !== PROGRESS_STATUS.PENDING && task.parentId) {
+        const parentTask = await this.prisma.task.findUnique({
+          where: { id: task.parentId },
+          select: { status: true },
+        });
+        if (parentTask && parentTask.status !== PROGRESS_STATUS.DONE) {
+          throw new BadRequestException(ERROR.EVLSUBTASKDEP);
+        }
+      }
 
       return await this.prisma.task.update({
         where: { id },
@@ -179,6 +137,7 @@ export class TasksService {
           title: data.title,
           description: data.description,
           status: data.status,
+          deadline: data.deadline,
           parentId: data.parentId,
           assignedBy: data.assignedBy,
           updatedBy: data.userId,
@@ -228,7 +187,7 @@ export class TasksService {
           orderBy,
           skip,
           take: limit,
-          select: TASK_LIST_SELECT,
+          select: TASK_SELECT,
         }),
       ]);
 
@@ -304,40 +263,6 @@ export class TasksService {
     }
   }
 
-  async getTaskComments(taskId: number, pagination?: Pagination) {
-    try {
-      await this.ensureTask(taskId);
-
-      const frames = await this.prisma.taskCommentFrame.findMany({
-        where: { taskId },
-        select: { id: true },
-      });
-
-      const frameIds = frames.map((f) => f.id);
-
-      const where: Prisma.TaskCommentWhereInput = { frameId: { in: frameIds } };
-      const { page, limit, skip } = this.buildPagination(pagination);
-
-      const [total, comments] = await this.prisma.$transaction([
-        this.prisma.taskComment.count({ where }),
-        this.prisma.taskComment.findMany({
-          where,
-          orderBy: { createdAt: 'desc' },
-          skip,
-          take: limit,
-          select: COMMENT_SELECT,
-        }),
-      ]);
-
-      return {
-        comments,
-        pagination: this.buildPaginationMeta(total, page, limit),
-      };
-    } catch (error) {
-      this.handleError(error, 'Get task comments fail', ERROR.SVGETTASKCOMMENTS);
-    }
-  }
-
   async getMyTasks(
     userId: number,
     filter?: {
@@ -365,7 +290,7 @@ export class TasksService {
           orderBy,
           skip,
           take: limit,
-          select: TASK_LIST_SELECT,
+          select: TASK_SELECT,
         }),
       ]);
 
@@ -375,6 +300,81 @@ export class TasksService {
       };
     } catch (error) {
       this.handleError(error, 'Get my tasks fail', ERROR.SVGETTASK);
+    }
+  }
+
+  async getTaskComments(
+    taskId: number,
+    sort?: { field: 'createdAt'; order: 'asc' | 'desc' },
+    pagination?: Pagination,
+  ) {
+    try {
+      await this.ensureTask(taskId);
+
+      const where: Prisma.CommentWhereInput = { taskId };
+      const orderBy: Prisma.CommentOrderByWithRelationInput = sort
+        ? { [sort.field]: sort.order }
+        : { createdAt: 'desc' };
+      const { page, limit, skip } = this.buildPagination(pagination);
+
+      const [total, comments] = await this.prisma.$transaction([
+        this.prisma.comment.count({ where }),
+        this.prisma.comment.findMany({
+          where,
+          orderBy,
+          skip,
+          take: limit,
+          select: {
+            id: true,
+            content: true,
+            taskId: true,
+            createdByUser: {
+              select: { id: true, email: true, displayName: true, avatarUrl: true },
+            },
+            createdAt: true,
+            updatedAt: true,
+          },
+        }),
+      ]);
+
+      return {
+        comments,
+        pagination: this.buildPaginationMeta(total, page, limit),
+      };
+    } catch (error) {
+      this.handleError(error, 'Get task comments fail', 'SVGETTASKCOMMENTS');
+    }
+  }
+
+  async createComment(
+    taskId: number,
+    data: {
+      content: unknown;
+      userId: number;
+    },
+  ) {
+    try {
+      await this.ensureTask(taskId);
+
+      return await this.prisma.comment.create({
+        data: {
+          content: data.content as Prisma.InputJsonValue,
+          taskId,
+          createdBy: data.userId,
+        },
+        select: {
+          id: true,
+          content: true,
+          taskId: true,
+          createdByUser: {
+            select: { id: true, email: true, displayName: true, avatarUrl: true },
+          },
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    } catch (error) {
+      this.handleError(error, 'Create comment fail', 'SVCREATECOMMENT');
     }
   }
 

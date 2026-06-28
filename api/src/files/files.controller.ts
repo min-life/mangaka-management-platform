@@ -25,16 +25,74 @@ import {
   CreateTaskReqDto,
   FileResponseDto,
   MaterialResponseDto,
+  MaterialsResponseDto,
   QueryFileTasksReqDto,
+  QueryFileVersionsReqDto,
   UpdateFileReqDto,
 } from './dto';
 import { TaskResponseDto, TasksResponseDto } from '../tasks/dto';
+import {
+  CommentResponseDto,
+  CommentsResponseDto,
+  CreateCommentReqDto,
+  QueryCommentsReqDto,
+} from '../frames/dto';
 
 @ApiTags('Files')
 @ApiBearerAuth()
 @Controller('files')
 export class FilesController {
   constructor(private readonly filesService: FilesService) {}
+
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['project:read', 'board:leader'],
+    resource: 'COMMENT',
+  })
+  @ApiOperation({ summary: 'Get file comments' })
+  @ApiParam({ name: 'id', type: Number, description: 'File id' })
+  @ApiOkResponse({
+    description: 'File comments retrieved successfully',
+    type: CommentsResponseDto,
+  })
+  @Get(':id/comments')
+  async getFileComments(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: QueryCommentsReqDto,
+  ) {
+    const result = await this.filesService.getFileComments(
+      id,
+      query.field && query.order ? { field: query.field, order: query.order } : undefined,
+      query.page && query.limit ? { page: query.page, limit: query.limit } : undefined,
+    );
+    return {
+      data: result.comments,
+      pagination: result.pagination,
+    };
+  }
+
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['project:comment.create', 'board:leader'],
+    resource: 'COMMENT',
+  })
+  @ApiOperation({ summary: 'Create comment for file' })
+  @ApiParam({ name: 'id', type: Number, description: 'File id' })
+  @ApiCreatedResponse({ description: 'Comment created successfully', type: CommentResponseDto })
+  @Post(':id/comments')
+  async createComment(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() currentUser: JwtPayload,
+    @Body() data: CreateCommentReqDto,
+  ) {
+    const comment = await this.filesService.createComment(id, {
+      ...data,
+      userId: currentUser.userId,
+    });
+    return {
+      data: comment,
+    };
+  }
 
   @Permissions({
     mode: 'ANY',
@@ -89,6 +147,32 @@ export class FilesController {
   @Delete(':id')
   async deleteFile(@Param('id', ParseIntPipe) id: number) {
     await this.filesService.deleteFile(id);
+  }
+
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['project:read', 'board:leader'],
+    resource: 'MATERIAL',
+  })
+  @ApiOperation({ summary: 'Get file material versions' })
+  @ApiParam({ name: 'id', type: Number, description: 'File id' })
+  @ApiOkResponse({
+    description: 'File material versions retrieved successfully',
+    type: MaterialsResponseDto,
+  })
+  @Get(':id/versions')
+  async getFileMaterialVersions(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: QueryFileVersionsReqDto,
+  ) {
+    const result = await this.filesService.getFileMaterialVersions(
+      id,
+      query.page && query.limit ? { page: query.page, limit: query.limit } : undefined,
+    );
+    return {
+      data: result.versions,
+      pagination: result.pagination,
+    };
   }
 
   @Permissions({

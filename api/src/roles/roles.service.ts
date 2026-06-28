@@ -29,7 +29,7 @@ export class RolesService {
 
       return { data: roles.map(serializeRole) };
     } catch (error) {
-      this.handleError(error, 'Get roles fail', ERROR.SVGETBOARDS);
+      this.handleError(error, 'Get roles fail', ERROR.SVGETROLES);
     }
   }
 
@@ -38,7 +38,7 @@ export class RolesService {
       const role = await this.ensureRole(roleId);
       return { data: serializeRole(role) };
     } catch (error) {
-      this.handleError(error, 'Get role fail', ERROR.SVGETBOARD);
+      this.handleError(error, 'Get role fail', ERROR.SVGETROLE);
     }
   }
 
@@ -125,11 +125,14 @@ export class RolesService {
         throw new ConflictException(ERROR.CFLROLEASSIGNED);
       }
 
-      await this.prisma.role.delete({ where: { id: roleId } });
+      await this.prisma.$transaction(async (tx) => {
+        await tx.rolePermission.deleteMany({ where: { roleId } });
+        await tx.role.delete({ where: { id: roleId } });
+      });
 
       return { data: { success: true } };
     } catch (error) {
-      this.handleError(error, 'Delete role fail', ERROR.SVDELETEBOARD);
+      this.handleError(error, 'Delete role fail', ERROR.SVDELETEROLE);
     }
   }
 
@@ -149,7 +152,7 @@ export class RolesService {
         ),
       };
     } catch (error) {
-      this.handleError(error, 'Get role permissions fail', ERROR.SVGETBOARDMEMBERS);
+      this.handleError(error, 'Get role permissions fail', ERROR.SVGETROLEPERMISSIONS);
     }
   }
 
@@ -185,7 +188,7 @@ export class RolesService {
 
       return { data: { success: true } };
     } catch (error) {
-      this.handleError(error, 'Replace role permissions fail', ERROR.SVUPDBOARDMEMBER);
+      this.handleError(error, 'Replace role permissions fail', ERROR.SVUPDATEROLEPERMISSIONS);
     }
   }
 

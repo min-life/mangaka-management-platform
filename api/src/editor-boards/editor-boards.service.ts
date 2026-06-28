@@ -7,7 +7,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { APPLICATION_TYPE, Prisma } from '@prisma/client';
+import { APPLICATION_STATUS, APPLICATION_TYPE, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
@@ -43,23 +43,22 @@ const PROJECT_SELECT = {
   name: true,
   description: true,
   imageUrl: true,
-  editorBoard: {
-    select: EDITOR_BOARD_SELECT,
-  },
   createdByUser: USER_SELECT,
   updatedByUser: USER_SELECT,
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.ProjectSelect;
 
-const APPLICATION_SELECT = {
+const APPLICATION_LIST_SELECT = {
   id: true,
   project: {
-    select: PROJECT_SELECT,
+    select: {
+      id: true,
+      name: true,
+      imageUrl: true,
+    },
   },
   title: true,
-  description: true,
-  materials: true,
   type: true,
   status: true,
   verifiedByUser: USER_SELECT,
@@ -75,12 +74,19 @@ export class EditorBoardsService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async createEditorBoard(data: { name: string; userId: number }) {
+  async createEditorBoard(data: {
+    name: string;
+    description?: string;
+    imageUrl?: string;
+    userId: number;
+  }) {
     try {
       const board = await this.prisma.$transaction(async (prisma) => {
         const newBoard = await prisma.editorBoard.create({
           data: {
             name: data.name,
+            description: data.description,
+            imageUrl: data.imageUrl,
             createdBy: data.userId,
             updatedBy: data.userId,
           },
@@ -91,6 +97,7 @@ export class EditorBoardsService {
           data: {
             userId: data.userId,
             editorBoardId: newBoard.id,
+            isLead: true,
           },
         });
 
@@ -171,21 +178,37 @@ export class EditorBoardsService {
   async deleteBoard(id: number) {
     try {
       await this.ensureBoard(id);
-      await this.prisma.editorBoard.delete({
-        where: { id },
-      });
+      await this.prisma.$transaction([
+        this.prisma.project.updateMany({
+          where: { editorBoardId: id },
+          data: { editorBoardId: null },
+        }),
+        this.prisma.editorBoard.delete({
+          where: { id },
+        }),
+      ]);
     } catch (error) {
       this.handleError(error, 'Delete editor board fail', ERROR.SVDELETEBOARD);
     }
   }
 
-  async updateBoard(id: number, data: { name?: string; userId: number }) {
+  async updateBoard(
+    id: number,
+    data: {
+      name?: string;
+      description?: string;
+      imageUrl?: string;
+      userId: number;
+    },
+  ) {
     try {
       await this.ensureBoard(id);
       const board = await this.prisma.editorBoard.update({
         where: { id },
         data: {
           name: data.name,
+          description: data.description,
+          imageUrl: data.imageUrl,
           updatedBy: data.userId,
         },
         select: EDITOR_BOARD_SELECT,
@@ -302,6 +325,27 @@ export class EditorBoardsService {
     }
   }
 
+  async leaveBoard(editorBoardId: number, userId: number) {
+    try {
+      const board = await this.ensureBoard(editorBoardId);
+      if (board.createdBy === userId) {
+        throw new BadRequestException(ERROR.EVLRMOWNER);
+      }
+
+      await this.findBoardMember(editorBoardId, userId);
+      await this.prisma.userEditorBoard.delete({
+        where: {
+          userId_editorBoardId: {
+            editorBoardId,
+            userId,
+          },
+        },
+      });
+    } catch (error) {
+      this.handleError(error, 'Leave board fail', ERROR.SVLEAVEBOARD);
+    }
+  }
+
   async setToLead(editorBoardId: number, userId: number) {
     try {
       await this.findBoardMember(editorBoardId, userId);
@@ -415,6 +459,7 @@ export class EditorBoardsService {
       const where: Prisma.ApplicationWhereInput = {
         project: { editorBoardId },
         type: APPLICATION_TYPE.PUBLISH_REQUEST,
+        status: { in: [APPLICATION_STATUS.SUBMITTED, APPLICATION_STATUS.APPROVE, APPLICATION_STATUS.REJECT] },
         ...(filter?.search && {
           title: { contains: filter.search, mode: 'insensitive' },
         }),
@@ -431,7 +476,7 @@ export class EditorBoardsService {
           orderBy,
           take: limit,
           skip,
-          select: APPLICATION_SELECT,
+          select: APPLICATION_LIST_SELECT,
         }),
       ]);
 

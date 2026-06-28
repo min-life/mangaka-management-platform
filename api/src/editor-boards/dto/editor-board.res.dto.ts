@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { APPLICATION_STATUS, APPLICATION_TYPE } from '@prisma/client';
+
 import { UserResDto } from '../../share/dto';
-import { ProjectResDto } from '../../projects/dto';
+import { ProjectBasicResDto, ProjectResDto } from '../../projects/dto';
 import { ApplicationResDto } from '../../applications/dto';
 
 export class PaginationResDto {
@@ -56,8 +56,8 @@ export class BoardMemberResDto {
 }
 
 export class BoardProjectResDto {
-  @ApiProperty({ type: ProjectResDto })
-  project!: ProjectResDto;
+  @ApiProperty({ type: ProjectBasicResDto })
+  project!: ProjectBasicResDto;
 }
 
 export class BoardApplicationResDto {

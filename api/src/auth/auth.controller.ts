@@ -1,6 +1,5 @@
 import { Body, Controller, Get, Headers, HttpCode, Post, Res, UseGuards } from '@nestjs/common';
 import {
-  ApiBearerAuth,
   ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
@@ -32,7 +31,7 @@ const REFRESH_COOKIE_OPTIONS = {
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
+  constructor(private readonly authService: AuthService) {}
 
   @Public()
   @ApiOperation({ summary: 'Register a new user' })
@@ -63,7 +62,9 @@ export class AuthController {
   @Public()
   @ApiOperation({ summary: 'Reset password with token' })
   @ApiOkResponse({ description: 'Password reset successfully' })
-  @ApiBadRequestResponse({ description: 'Invalid token or new password cannot be the same as old password' })
+  @ApiBadRequestResponse({
+    description: 'Invalid token or new password cannot be the same as old password',
+  })
   @Post('reset')
   resetPassword(@Body() body: ResetPasswordDto) {
     return this.authService.resetPassword(body);

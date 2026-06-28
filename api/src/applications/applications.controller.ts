@@ -1,12 +1,15 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Query } from '@nestjs/common';
 import {
-  ApiBearerAuth,
-  ApiCreatedResponse,
-  ApiOkResponse,
-  ApiOperation,
-  ApiParam,
-  ApiTags,
-} from '@nestjs/swagger';
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Query,
+  Post,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, Permissions } from '../share/decorators';
 import type { JwtPayload } from '../auth/interfaces';
 import { ApplicationsService } from './applications.service';
@@ -16,13 +19,73 @@ import {
   QueryApplicationsReqDto,
   UpdateApplicationReqDto,
   UpdateApplicationStatusReqDto,
+  ApplicationVoteResponseDto,
+  VoteApplicationReqDto,
 } from './dto';
+
+import {
+  CommentResponseDto,
+  CommentsResponseDto,
+  CreateCommentReqDto,
+  QueryCommentsReqDto,
+} from '../frames/dto';
+import { ApiCreatedResponse } from '@nestjs/swagger';
 
 @ApiTags('Applications')
 @ApiBearerAuth()
 @Controller('applications')
 export class ApplicationsController {
   constructor(private readonly applicationsService: ApplicationsService) {}
+
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['project:read', 'board:leader'],
+    resource: 'COMMENT',
+  })
+  @ApiOperation({ summary: 'Get application comments' })
+  @ApiParam({ name: 'id', type: Number, description: 'Application id' })
+  @ApiOkResponse({
+    description: 'Application comments retrieved successfully',
+    type: CommentsResponseDto,
+  })
+  @Get(':id/comments')
+  async getApplicationComments(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: QueryCommentsReqDto,
+  ) {
+    const result = await this.applicationsService.getApplicationComments(
+      id,
+      query.field && query.order ? { field: query.field, order: query.order } : undefined,
+      query.page && query.limit ? { page: query.page, limit: query.limit } : undefined,
+    );
+    return {
+      data: result.comments,
+      pagination: result.pagination,
+    };
+  }
+
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['project:comment.create', 'board:leader'],
+    resource: 'COMMENT',
+  })
+  @ApiOperation({ summary: 'Create comment for application' })
+  @ApiParam({ name: 'id', type: Number, description: 'Application id' })
+  @ApiCreatedResponse({ description: 'Comment created successfully', type: CommentResponseDto })
+  @Post(':id/comments')
+  async createComment(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() currentUser: JwtPayload,
+    @Body() data: CreateCommentReqDto,
+  ) {
+    const comment = await this.applicationsService.createComment(id, {
+      ...data,
+      userId: currentUser.userId,
+    });
+    return {
+      data: comment,
+    };
+  }
 
   @Permissions({
     mode: 'ANY',
@@ -131,5 +194,48 @@ export class ApplicationsController {
     return {
       data: application,
     };
+  }
+
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['project:application.read', 'board:leader', 'board:member', 'board:owner'],
+    resource: 'APPLICATION',
+  })
+  @ApiOperation({ summary: 'Get application votes' })
+  @ApiParam({ name: 'id', type: Number, description: 'Application id' })
+  @ApiOkResponse({
+    description: 'Application votes retrieved successfully',
+    type: [ApplicationVoteResponseDto],
+  })
+  @Get(':id/votes')
+  async getApplicationVotes(@Param('id', ParseIntPipe) id: number) {
+    const votes = await this.applicationsService.getVotes(id);
+    return votes;
+  }
+
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['board:leader', 'board:member', 'board:owner'],
+    resource: 'APPLICATION',
+  })
+  @ApiOperation({ summary: 'Cast a vote on application' })
+  @ApiParam({ name: 'id', type: Number, description: 'Application id' })
+  @ApiOkResponse({
+    description: 'Vote casted successfully',
+    type: ApplicationVoteResponseDto,
+  })
+  @Post(':id/votes')
+  async castApplicationVote(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() currentUser: JwtPayload,
+    @Body() data: VoteApplicationReqDto,
+  ) {
+    const vote = await this.applicationsService.castVote(
+      id,
+      currentUser.userId,
+      data.decision,
+      data.comment,
+    );
+    return vote;
   }
 }

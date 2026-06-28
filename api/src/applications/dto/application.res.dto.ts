@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { APPLICATION_STATUS, APPLICATION_TYPE } from '@prisma/client';
 import { UserResDto } from '../../share/dto';
-import { ProjectResDto } from '../../projects/dto';
+import { ProjectBasicResDto, ProjectResDto } from '../../projects/dto';
 
 export class PaginationResDto {
   @ApiProperty({ example: 25 })
@@ -21,8 +21,8 @@ export class ApplicationResDto {
   @ApiProperty({ example: 7 })
   id!: number;
 
-  @ApiProperty({ type: ProjectResDto })
-  project!: ProjectResDto;
+  @ApiProperty({ type: ProjectBasicResDto })
+  project!: ProjectBasicResDto;
 
   @ApiProperty({ example: 'Publish request for chapter 01' })
   title!: string;
@@ -30,8 +30,8 @@ export class ApplicationResDto {
   @ApiPropertyOptional({ example: 'Please review before publishing.', nullable: true })
   description?: string | null;
 
-  @ApiProperty({ example: [{ fileId: 1, page: 1 }] })
-  materials!: unknown;
+  @ApiPropertyOptional({ example: [{ fileId: 1, page: 1 }], nullable: true })
+  materials?: unknown | null;
 
   @ApiProperty({ enum: APPLICATION_TYPE, example: APPLICATION_TYPE.PUBLISH_REQUEST })
   type!: APPLICATION_TYPE;

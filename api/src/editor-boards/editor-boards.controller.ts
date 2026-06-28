@@ -233,6 +233,19 @@ export class EditorBoardsController {
 
   @Permissions({
     mode: 'ANY',
+    permissions: ['board:leader', 'board:member', 'board:owner'],
+    resource: 'BOARD',
+  })
+  @ApiOperation({ summary: 'Leave editor board' })
+  @ApiParam({ name: 'id', type: Number, description: 'Editor board id' })
+  @ApiOkResponse({ description: 'Successfully left the board' })
+  @Delete(':id/members/me')
+  async leaveBoard(@Param('id', ParseIntPipe) id: number, @CurrentUser() currentUser: JwtPayload) {
+    await this.editorBoardsService.leaveBoard(id, currentUser.userId);
+  }
+
+  @Permissions({
+    mode: 'ANY',
     permissions: ['board:owner'],
     resource: 'BOARD',
   })

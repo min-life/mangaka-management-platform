@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PROGRESS_STATUS } from '@prisma/client';
@@ -18,6 +18,11 @@ export class UpdateTaskReqDto {
   @IsOptional()
   @IsEnum(PROGRESS_STATUS)
   status?: PROGRESS_STATUS;
+
+  @ApiPropertyOptional({ example: '2026-06-18T03:00:00.000Z' })
+  @IsOptional()
+  @Type(() => Date)
+  deadline?: Date;
 
   @ApiPropertyOptional({ example: 9, minimum: 1, type: Number })
   @IsOptional()

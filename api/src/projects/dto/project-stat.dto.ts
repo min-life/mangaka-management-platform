@@ -1,11 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { ProjectBasicResDto } from './project.res.dto';
 
 export class ProjectStatResDto {
   @ApiProperty({ example: 1 })
   id!: number;
 
-  @ApiProperty({ example: 5 })
-  projectId!: number;
+  @ApiProperty({ type: ProjectBasicResDto })
+  project!: ProjectBasicResDto;
 
   @ApiProperty({ example: { totalTasks: 100, completedTasks: 50, progress: 50 } })
   metrics!: unknown;

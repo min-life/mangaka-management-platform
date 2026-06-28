@@ -6,4 +6,14 @@ export class UpdateBoardReqDto {
   @IsOptional()
   @IsString()
   name?: string;
+
+  @ApiPropertyOptional({ example: 'Board for weekly manga reviews', nullable: true })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({ example: 'https://example.com/board.png', nullable: true })
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
 }
