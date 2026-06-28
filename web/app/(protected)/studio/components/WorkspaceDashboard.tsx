@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ChevronDown,
@@ -109,10 +109,18 @@ function formatUserName(user?: { displayName?: string | null; email?: string } |
 
 export function WorkspaceDashboard() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('projects');
   const [apiProjects, setApiProjects] = useState<ProjectResponse[]>([]);
   const [apiBoards, setApiBoards] = useState<EditorBoardResponse[]>([]);
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'editorBoards' || tab === 'myTasks' || tab === 'projects') {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
   const [isLoadingBoards, setIsLoadingBoards] = useState(true);
   const [projectError, setProjectError] = useState<string | null>(null);
