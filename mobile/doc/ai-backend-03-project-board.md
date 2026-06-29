@@ -19,6 +19,8 @@ Implication for AI:
 - Creator is project owner because `Project.createdBy === userId`.
 - Creator is also a project member because backend creates `UserProject`.
 - If no default PRJ role exists, project creation fails.
+- `CreateProjectReqDto` nhận `name`, `editorBoardId?`, `description?`, `imageUrl?`.
+- `PATCH /api/projects/:id` hiện chỉ nhận/cập nhật `name` và `editorBoardId`; không cập nhật `description`/`imageUrl` theo DTO hiện tại.
 
 ### List projects
 
@@ -43,6 +45,8 @@ page
 limit
 ```
 
+Response project hiện có `imageUrl`, `editorBoard`, `createdByUser`, `updatedByUser`, `createdAt`, `updatedAt` và trong một số endpoint có thêm `userProjects`.
+
 ### Project detail/update/delete
 
 | Endpoint | Required idea |
@@ -60,12 +64,16 @@ limit
 | `GET /api/projects/:id/members/:userId` | Get one member. |
 | `PATCH /api/projects/:id/members/:userId` | Replace member role. |
 | `DELETE /api/projects/:id/members/:userId` | Remove member, except owner. |
+| `DELETE /api/projects/:id/members/me` | Current user leaves project, except owner. |
 
 Important backend behavior:
 
 - `roleId` must be a role with `scope=PRJ`.
 - Add/update member deletes existing membership rows for that user/project, then creates a new row.
 - Owner cannot be removed from project through remove member endpoint.
+- Owner cannot leave project through leave endpoint.
+- Project member list trả thêm `numberOfTasks`.
+- Project member detail trả thêm `taskOverview` gồm `total`, `pending`, `inprogress`, `review`, `done`.
 
 ### Project editor board
 
@@ -73,8 +81,35 @@ Important backend behavior:
 | --- | --- |
 | `GET /api/projects/:id/editor-boards` | Get board attached to project. |
 | `POST /api/projects/:id/editor-boards` | Set `editorBoardId` on project. |
+| `DELETE /api/projects/:id/editor-boards` | Remove board khỏi project bằng cách set `editorBoardId=null`. |
 
 Project can also be attached from board side with `POST /api/editor-boards/:id/projects`.
+
+`POST /api/projects/:id/editor-boards` body:
+
+```json
+{
+  "editorBoardId": 1
+}
+```
+
+`editorBoardId` trong `PATCH /api/projects/:id` có thể là `null` theo DTO, nhưng endpoint remove board rõ nghĩa hơn cho UI detach board.
+
+### Current user's tasks in project
+
+Endpoint:
+
+```text
+GET /api/projects/:id/tasks?me=true
+```
+
+Use this for "my tasks in this project".
+
+Important backend behavior:
+
+- Nếu `me` khác `true` hoặc thiếu `me`, backend trả list rỗng với pagination mặc định.
+- Filter hỗ trợ `search`, `status`.
+- Sort hỗ trợ `field=title|createdAt`, `order=asc|desc`.
 
 ## Editor board flow
 
@@ -92,6 +127,8 @@ Implication:
 
 - Creator gets `board:owner` because `EditorBoard.createdBy === userId`.
 - Creator is also a board member.
+- DTO/service create/update board hiện nhận `name`, `description?`, `imageUrl?`.
+- Creator membership được tạo với `isLead=true`, nên owner đồng thời là lead trong membership row.
 
 ### List boards
 
@@ -104,6 +141,16 @@ Default behavior:
 With `me=true`:
 
 - Returns boards created by current user.
+
+Board list trả thêm `numberOfProjects`.
+
+### Board detail/update/delete
+
+| Endpoint | Meaning |
+| --- | --- |
+| `GET /api/editor-boards/:id` | Get board detail. |
+| `PATCH /api/editor-boards/:id` | Update `name`, `description?`, `imageUrl?`. |
+| `DELETE /api/editor-boards/:id` | Delete board. Service first sets linked projects' `editorBoardId` to `null`, then deletes the board. |
 
 ### Board permissions
 
@@ -121,12 +168,14 @@ With `me=true`:
 | `GET /api/editor-boards/:id/members` | Owner/leader/member lists board members. |
 | `GET /api/editor-boards/:id/members/:userId` | Owner/leader/member gets one board member. |
 | `DELETE /api/editor-boards/:id/members/:userId` | Owner removes member, except owner. |
+| `DELETE /api/editor-boards/:id/members/me` | Current user leaves board, except owner. |
 | `PATCH /api/editor-boards/:id/members/:userId/lead` | Owner sets one lead. |
 
 Important backend behavior:
 
 - Add members uses `skipDuplicates`.
 - Removing board owner is blocked.
+- Board owner cannot leave through leave endpoint.
 - Setting lead resets all board members to `isLead=false`, then sets selected user to `true`.
 - The backend logic therefore supports one lead per board.
 
@@ -142,6 +191,7 @@ Important backend behavior:
 - Backend ensures all project IDs exist.
 - Backend rejects projects already attached to a different board.
 - Backend allows projects already attached to this same board.
+- `POST /api/editor-boards/:id/projects` trả kết quả Prisma `updateMany`, thường là `{ count: number }` trong `data`.
 
 ### Board applications
 
@@ -152,9 +202,12 @@ Returns only applications where:
 ```text
 project.editorBoardId = board id
 application.type = PUBLISH_REQUEST
+application.status in SUBMITTED | APPROVE | REJECT
 ```
 
 This is the board-side review queue for publish requests.
+
+Board application queue hỗ trợ `search`, `field=title|createdAt`, `order`, `page`, `limit`. Endpoint này không có `type` filter vì service luôn ép `PUBLISH_REQUEST`, và không hiện application mới ở trạng thái `PENDING` hoặc `INTERNAL_APPROVED`.
 
 ## AI rules for project/board work
 
@@ -165,4 +218,3 @@ This is the board-side review queue for publish requests.
 - Board owner is protected from removal.
 - If building UI, derive available actions from permission endpoints instead of hardcoding role labels.
 - If showing board publish queue, use board applications endpoint, not all applications endpoint.
-

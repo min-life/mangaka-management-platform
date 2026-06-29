@@ -5,6 +5,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import BottomNavBar from '@/src/components/shared/BottomNavBar';
 import { Colors } from '@/src/constants/colors';
 import { getProjectApplications } from '@/src/constants/applicationsData';
+import { EDITOR_BOARDS } from '@/src/constants/editorBoardsData';
 import { PROJECTS } from '@/src/constants/projectsData';
 import { RootStackParamList } from '@/src/navigation/types';
 
@@ -19,6 +20,9 @@ type ProjectDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'Proj
 export default function ProjectDetailScreen({ navigation, route }: ProjectDetailScreenProps) {
   const project = PROJECTS.find((item) => item.id === route.params.projectId);
   const projectApplications = getProjectApplications(route.params.projectId);
+  const editorBoard = EDITOR_BOARDS.find((board) =>
+    board.projectIds.includes(route.params.projectId),
+  );
 
   if (!project) {
     return (
@@ -61,6 +65,16 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
       iconColor: '#FFFFFF',
       iconBg: Colors.accent,
       onPress: () => navigation.navigate('Tasks', { projectId: project.id }),
+    },
+    {
+      label: 'Editor Board',
+      icon: 'groups',
+      iconColor: '#FFFFFF',
+      iconBg: '#14B8A6',
+      onPress: () =>
+        editorBoard
+          ? navigation.navigate('EditorBoardDetail', { boardId: editorBoard.id })
+          : navigation.navigate('EditorBoards'),
     },
     {
       label: 'Contribute',

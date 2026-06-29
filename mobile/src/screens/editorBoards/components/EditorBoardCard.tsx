@@ -21,48 +21,45 @@ export default function EditorBoardCard({ board, onPress }: EditorBoardCardProps
 
   return (
     <TouchableOpacity
-      activeOpacity={0.82}
+      activeOpacity={0.78}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`Open ${board.name}`}
-      className="rounded-xl p-4"
+      className="overflow-hidden rounded-2xl"
       style={{
         backgroundColor: Colors.surface,
         borderWidth: 1,
-        borderColor: Colors.borderSubtle,
+        borderColor: Colors.borderFaint,
       }}
     >
-      <View className="flex-row items-start gap-3">
-        <View
-          className="h-11 w-11 items-center justify-center rounded-xl"
-          style={{ backgroundColor: Colors.iconBg }}
-        >
-          <MaterialIcon name="groups" color={Colors.accent} size={24} />
-        </View>
-        <View className="flex-1 gap-2">
-          <View className="flex-row items-start justify-between gap-2">
-            <Text className="flex-1 text-[16px] font-bold" style={{ color: Colors.text }}>
+      <View
+        className="h-[150px] w-full items-center justify-center"
+        style={{ backgroundColor: Colors.iconBg }}
+      >
+        <MaterialIcon name="groups" color={Colors.accent} size={42} />
+      </View>
+
+      <View className="px-4 py-4">
+        <View className="flex-row items-start gap-3">
+          <View className="flex-1">
+            <Text className="text-[18px] font-bold" style={{ color: Colors.text }} numberOfLines={1}>
               {board.name}
             </Text>
-            <BoardRoleBadge role={board.currentUserRole} />
+            <Text
+              className="mt-1 text-[13px] font-semibold"
+              style={{ color: 'rgba(237,241,251,0.72)' }}
+              numberOfLines={1}
+            >
+              {memberCount} members - {board.projectIds.length} projects
+            </Text>
           </View>
-          <Text className="text-[13px] leading-5" style={{ color: Colors.textMuted }} numberOfLines={2}>
-            {board.description}
-          </Text>
+          <BoardRoleBadge role={board.currentUserRole} />
         </View>
-      </View>
-      <View className="mt-4 flex-row justify-between">
-        <Text className="text-[12px]" style={{ color: Colors.textMuted }}>
-          {memberCount} members
-        </Text>
-        <Text className="text-[12px]" style={{ color: Colors.textMuted }}>
-          {board.projectIds.length} projects
-        </Text>
-        <Text className="text-[12px]" style={{ color: Colors.statusReview }}>
-          {pendingCount} pending
+
+        <Text className="mt-2 text-[12px]" style={{ color: Colors.textMuted }} numberOfLines={1}>
+          {pendingCount} pending - {board.updatedAtLabel}
         </Text>
       </View>
     </TouchableOpacity>
   );
 }
-

@@ -8,12 +8,14 @@ import { FrameAnnotation } from '@/src/types/taskDetail';
 interface TaskPreviewSectionProps {
   imageUri?: string;
   selectedFrame?: FrameAnnotation | null;
+  showStatusBadge?: boolean;
   status?: string;
 }
 
 export default function TaskPreviewSection({
   imageUri = TASK_INFO.previewImageUri,
   selectedFrame,
+  showStatusBadge = true,
   status = TASK_INFO.status,
 }: TaskPreviewSectionProps) {
   return (
@@ -23,6 +25,7 @@ export default function TaskPreviewSection({
           imageUri={imageUri}
           status={status}
           selectedFrame={selectedFrame}
+          showStatusBadge={showStatusBadge}
         />
       </View>
 

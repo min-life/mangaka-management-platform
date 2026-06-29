@@ -48,6 +48,10 @@ Project bỏ sung thêm editorboard
 
 
 Public = Application
+Application có 2 loại
+    - bản thảo tay: tanto duyệt
+    - hoàn thành gửi cho editor board
+
 
 
 Detail Project 

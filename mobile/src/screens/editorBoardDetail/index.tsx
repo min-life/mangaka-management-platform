@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import React, { useMemo } from 'react';
+import { ScrollView, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import BottomNavBar from '@/src/components/shared/BottomNavBar';
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
 import {
@@ -11,73 +12,79 @@ import {
 } from '@/src/constants/editorBoardsData';
 import { PROJECTS } from '@/src/constants/projectsData';
 import { RootStackParamList } from '@/src/navigation/types';
-import ApplicationCard from '@/src/screens/applications/components/ApplicationCard';
-
 import {
-  BoardMemberRow,
-  BoardProjectRow,
-  BoardRoleBadge,
-  BoardTab,
-  BoardTabBar,
-  EditorBoardTopBar,
-} from '@/src/screens/editorBoards/components';
+  ProjectDetailMenuItem,
+  ProjectDetailTopBar,
+} from '@/src/screens/projectDetail/components';
 
 type EditorBoardDetailScreenProps = NativeStackScreenProps<
   RootStackParamList,
   'EditorBoardDetail'
 >;
 
-function MetricCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: number | string;
-}) {
-  return (
-    <View
-      className="flex-1 rounded-xl p-3"
-      style={{
-        backgroundColor: Colors.surface,
-        borderWidth: 1,
-        borderColor: Colors.borderSubtle,
-      }}
-    >
-      <Text className="text-[20px] font-bold" style={{ color: Colors.text }}>
-        {value}
-      </Text>
-      <Text className="mt-1 text-[12px]" style={{ color: Colors.textMuted }}>
-        {label}
-      </Text>
-    </View>
-  );
+function getBoardInitials(name: string) {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
 }
 
-function BoardActionButton({
-  icon,
-  label,
-  onPress,
+function EditorBoardDetailHero({
+  description,
+  leadName,
+  name,
+  role,
+  updatedAtLabel,
 }: {
-  icon: string;
-  label: string;
-  onPress?: () => void;
+  description: string;
+  leadName?: string;
+  name: string;
+  role: string;
+  updatedAtLabel: string;
 }) {
+  const subtitle = leadName ? `${role} - Lead: ${leadName}` : role;
+
   return (
-    <TouchableOpacity
-      activeOpacity={0.78}
-      onPress={onPress}
-      className="flex-1 items-center gap-2 rounded-xl p-3"
-      style={{
-        backgroundColor: Colors.surface,
-        borderWidth: 1,
-        borderColor: Colors.borderSubtle,
-      }}
-    >
-      <MaterialIcon name={icon} color={Colors.accent} size={22} />
-      <Text className="text-center text-[12px] font-bold" style={{ color: Colors.text }}>
-        {label}
-      </Text>
-    </TouchableOpacity>
+    <View className="pb-6">
+      <View
+        className="h-[260px] items-center justify-center overflow-hidden"
+        style={{ backgroundColor: Colors.iconBg }}
+      >
+        <View
+          className="h-28 w-28 items-center justify-center rounded-3xl"
+          style={{
+            backgroundColor: Colors.overlayLight,
+            borderWidth: 1,
+            borderColor: Colors.borderFaint,
+          }}
+        >
+          <MaterialIcon name="groups" color={Colors.accent} size={54} />
+        </View>
+        <Text className="mt-4 text-[22px] font-black" style={{ color: Colors.text }}>
+          {getBoardInitials(name)}
+        </Text>
+      </View>
+
+      <View className="px-4">
+        <Text
+          className="mt-5 text-[31px] font-black leading-tight"
+          style={{ color: Colors.text }}
+          numberOfLines={2}
+        >
+          {name}
+        </Text>
+
+        <Text className="mt-3 text-[14px] leading-6" style={{ color: Colors.textMuted }}>
+          {description}
+        </Text>
+
+        <Text className="mt-4 text-[13px] leading-5" style={{ color: Colors.textFaint }}>
+          {subtitle} - {updatedAtLabel}
+        </Text>
+      </View>
+    </View>
   );
 }
 
@@ -85,7 +92,6 @@ export default function EditorBoardDetailScreen({
   navigation,
   route,
 }: EditorBoardDetailScreenProps) {
-  const [activeTab, setActiveTab] = useState<BoardTab>('Overview');
   const board = findEditorBoard(route.params.boardId);
 
   const members = useMemo(() => (board ? getBoardMembers(board) : []), [board]);
@@ -101,9 +107,9 @@ export default function EditorBoardDetailScreen({
   if (!board) {
     return (
       <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
-        <EditorBoardTopBar onBack={() => navigation.goBack()} title="Editor Board" />
+        <ProjectDetailTopBar onBack={() => navigation.goBack()} />
         <View className="flex-1 items-center justify-center px-6">
-          <Text className="text-center text-[15px] font-bold" style={{ color: Colors.text }}>
+          <Text className="text-center text-[15px] font-medium" style={{ color: Colors.text }}>
             Editor board not found
           </Text>
         </View>
@@ -113,186 +119,82 @@ export default function EditorBoardDetailScreen({
 
   const lead = members.find((member) => member.id === board.leadMemberId);
 
+  const menuItems = [
+    {
+      label: 'Project',
+      count: boardProjects.length,
+      icon: 'folder',
+      iconColor: '#FFFFFF',
+      iconBg: Colors.accent,
+      onPress:
+        boardProjects.length === 1
+          ? () => navigation.navigate('ProjectDetail', { projectId: boardProjects[0].id })
+          : undefined,
+    },
+    {
+      label: 'Members',
+      count: members.length,
+      icon: 'group_add',
+      iconColor: '#FFFFFF',
+      iconBg: '#DB2777',
+    },
+    {
+      label: 'Application',
+      count: publishRequests.length,
+      icon: 'apps',
+      iconColor: '#FFFFFF',
+      iconBg: '#22C55E',
+      onPress:
+        publishRequests.length === 1
+          ? () =>
+              navigation.navigate('ApplicationDetail', {
+                applicationId: publishRequests[0].id,
+                projectId: publishRequests[0].projectId,
+              })
+          : undefined,
+    },
+  ];
+
   return (
     <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
-      <EditorBoardTopBar
-        actionIcon="more_vert"
-        onBack={() => navigation.goBack()}
-        subtitle={board.currentUserRole}
-        title={board.name}
-      />
+      <ProjectDetailTopBar onBack={() => navigation.goBack()} />
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}
+        contentContainerStyle={{ paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
       >
+        <EditorBoardDetailHero
+          description={board.description}
+          leadName={lead?.name}
+          name={board.name}
+          role={board.currentUserRole}
+          updatedAtLabel={board.updatedAtLabel}
+        />
+
         <View
-          className="mt-4 rounded-xl p-4"
           style={{
-            backgroundColor: Colors.surface,
-            borderWidth: 1,
-            borderColor: Colors.borderSubtle,
+            borderTopWidth: 1,
+            borderBottomWidth: 1,
+            borderColor: Colors.borderFaint,
           }}
         >
-          <View className="flex-row items-start justify-between gap-3">
-            <View className="flex-1">
-              <Text className="text-[22px] font-bold" style={{ color: Colors.text }}>
-                {board.name}
-              </Text>
-              <Text className="mt-2 text-[14px] leading-6" style={{ color: Colors.textMuted }}>
-                {board.description}
-              </Text>
-            </View>
-            <BoardRoleBadge role={board.currentUserRole} />
-          </View>
-
-          <View className="mt-4 flex-row gap-3">
-            <MetricCard label="Members" value={members.length} />
-            <MetricCard label="Projects" value={boardProjects.length} />
-            <MetricCard
-              label="Pending"
-              value={publishRequests.filter((item) => item.status === 'PENDING').length}
+          {menuItems.map((item, index) => (
+            <ProjectDetailMenuItem
+              key={item.label}
+              icon={item.icon}
+              iconColor={item.iconColor}
+              iconBg={item.iconBg}
+              label={item.label}
+              count={item.count}
+              onPress={item.onPress}
+              isLast={index === menuItems.length - 1}
             />
-          </View>
+          ))}
         </View>
-
-        <BoardTabBar activeTab={activeTab} onChange={setActiveTab} />
-
-        {activeTab === 'Overview' && (
-          <View className="mt-5 gap-4">
-            <View
-              className="rounded-xl p-4"
-              style={{
-                backgroundColor: Colors.surface,
-                borderWidth: 1,
-                borderColor: Colors.borderSubtle,
-              }}
-            >
-              <Text className="text-[11px] font-bold uppercase" style={{ color: Colors.textMuted }}>
-                Board lead
-              </Text>
-              <View className="mt-3 flex-row items-center gap-3">
-                <View
-                  className="h-10 w-10 items-center justify-center rounded-lg"
-                  style={{ backgroundColor: Colors.iconBg }}
-                >
-                  <Text className="text-[12px] font-bold" style={{ color: Colors.accent }}>
-                    {lead?.initials ?? 'NA'}
-                  </Text>
-                </View>
-                <View className="flex-1">
-                  <Text className="text-[14px] font-bold" style={{ color: Colors.text }}>
-                    {lead?.name ?? 'No lead assigned'}
-                  </Text>
-                  <Text className="mt-0.5 text-[12px]" style={{ color: Colors.textMuted }}>
-                    {lead?.email ?? 'Set a lead to process publish requests'}
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            <View className="flex-row gap-3">
-              <BoardActionButton icon="group_add" label="Add member" />
-              <BoardActionButton
-                icon="folder"
-                label="Attach project"
-                onPress={() => navigation.navigate('EditorBoardAttachProject', { boardId: board.id })}
-              />
-              <BoardActionButton icon="apps" label="Publish queue" onPress={() => setActiveTab('Publish')} />
-            </View>
-          </View>
-        )}
-
-        {activeTab === 'Projects' && (
-          <View className="mt-5 gap-3">
-            <View className="flex-row items-center justify-between">
-              <Text
-                className="text-[11px] font-bold uppercase"
-                style={{ color: Colors.textMuted, letterSpacing: 1 }}
-              >
-                Board projects
-              </Text>
-              <TouchableOpacity
-                activeOpacity={0.72}
-                onPress={() => navigation.navigate('EditorBoardAttachProject', { boardId: board.id })}
-                className="flex-row items-center gap-1 rounded-full px-3 py-1.5"
-                style={{ backgroundColor: Colors.overlayLight }}
-              >
-                <MaterialIcon name="add" color={Colors.accent} size={16} />
-                <Text className="text-[12px] font-bold" style={{ color: Colors.accent }}>
-                  Attach
-                </Text>
-              </TouchableOpacity>
-            </View>
-            {boardProjects.map((project) => (
-              <BoardProjectRow
-                key={project.id}
-                project={project}
-                onPress={() => navigation.navigate('ProjectDetail', { projectId: project.id })}
-              />
-            ))}
-          </View>
-        )}
-
-        {activeTab === 'Members' && (
-          <View className="mt-5 gap-3">
-            <View className="flex-row items-center justify-between">
-              <Text
-                className="text-[11px] font-bold uppercase"
-                style={{ color: Colors.textMuted, letterSpacing: 1 }}
-              >
-                Board members
-              </Text>
-              <TouchableOpacity
-                activeOpacity={0.72}
-                className="flex-row items-center gap-1 rounded-full px-3 py-1.5"
-                style={{ backgroundColor: Colors.overlayLight }}
-              >
-                <MaterialIcon name="group_add" color={Colors.accent} size={16} />
-                <Text className="text-[12px] font-bold" style={{ color: Colors.accent }}>
-                  Add
-                </Text>
-              </TouchableOpacity>
-            </View>
-            {members.map((member) => (
-              <BoardMemberRow key={member.id} member={member} />
-            ))}
-          </View>
-        )}
-
-        {activeTab === 'Publish' && (
-          <View className="mt-5 gap-3">
-            <View className="flex-row items-center justify-between">
-              <Text
-                className="text-[11px] font-bold uppercase"
-                style={{ color: Colors.textMuted, letterSpacing: 1 }}
-              >
-                Publish requests
-              </Text>
-              <Text className="text-[12px]" style={{ color: Colors.textFaint }}>
-                {publishRequests.length} items
-              </Text>
-            </View>
-            {publishRequests.map((application) => (
-              <ApplicationCard
-                key={application.id}
-                application={application}
-                contextLabel={
-                  PROJECTS.find((project) => project.id === application.projectId)?.name
-                }
-                onPress={() =>
-                  navigation.navigate('ApplicationDetail', {
-                    applicationId: application.id,
-                    projectId: application.projectId,
-                  })
-                }
-              />
-            ))}
-          </View>
-        )}
       </ScrollView>
+
+      <BottomNavBar activeTab="home" />
     </View>
   );
 }
-

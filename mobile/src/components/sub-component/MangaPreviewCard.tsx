@@ -8,6 +8,7 @@ interface MangaPreviewCardProps {
   imageUri: string;
   status: string;
   selectedFrame?: FrameAnnotation | null;
+  showStatusBadge?: boolean;
 }
 
 /**
@@ -19,6 +20,7 @@ export default function MangaPreviewCard({
   imageUri,
   status,
   selectedFrame,
+  showStatusBadge = true,
 }: MangaPreviewCardProps) {
   const pulse = useRef(new Animated.Value(1)).current;
   const frameOpacity = useRef(new Animated.Value(0)).current;
@@ -140,24 +142,25 @@ export default function MangaPreviewCard({
         </Animated.View>
       )}
 
-      {/* ── Status badge — top right, pulsing ──────────────────── */}
-      <Animated.View
-        className="absolute top-4 right-4"
-        style={{ opacity: pulse }}
-      >
-        <View
-          className="flex-row items-center gap-1 px-3 py-1.5 rounded-full"
-          style={{ backgroundColor: Colors.statusReview }}
+      {showStatusBadge && (
+        <Animated.View
+          className="absolute top-4 right-4"
+          style={{ opacity: pulse }}
         >
-          <MaterialIcon name="visibility" color={Colors.bg} size={14} />
-          <Text
-            className="text-[11px] font-bold uppercase tracking-tight"
-            style={{ color: Colors.bg }}
+          <View
+            className="flex-row items-center gap-1 px-3 py-1.5 rounded-full"
+            style={{ backgroundColor: Colors.statusReview }}
           >
-            {status}
-          </Text>
-        </View>
-      </Animated.View>
+            <MaterialIcon name="visibility" color={Colors.bg} size={14} />
+            <Text
+              className="text-[11px] font-bold uppercase tracking-tight"
+              style={{ color: Colors.bg }}
+            >
+              {status}
+            </Text>
+          </View>
+        </Animated.View>
+      )}
     </View>
   );
 }

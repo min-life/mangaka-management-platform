@@ -16,7 +16,6 @@ export type RootStackParamList = {
   ApplicationCreate: { projectId: string };
   EditorBoards: undefined;
   EditorBoardDetail: { boardId: string };
-  EditorBoardCreate: undefined;
   EditorBoardAttachProject: { boardId: string };
   Resources: { projectId: string };
   ResourceFolderDetail: { projectId: string; folderId: string };

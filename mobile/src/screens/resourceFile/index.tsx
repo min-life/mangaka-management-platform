@@ -8,24 +8,25 @@ import {
   findResourceNode,
   getProjectResourceTree,
 } from '@/src/constants/resourcesData';
-import {
-  COMMENTS,
-  CONTRIBUTORS,
-  FRAMES,
-  TASK_INFO,
-} from '@/src/constants/taskDetailData';
 import { RootStackParamList } from '@/src/navigation/types';
-import { FrameAnnotation, ReviewTab } from '@/src/types/taskDetail';
+import {
+  ResourceFileMaterialVersion,
+  ResourceFileTask,
+  ResourceTaskFrame,
+} from '@/src/types/resources';
 
 import {
-  ActionTab,
   C,
-  DiscussionTab,
-  OverviewTab,
-  ReviewTabBar,
   TaskDetailTopBar,
   TaskPreviewSection,
 } from '@/src/screens/taskDetail/components';
+import {
+  MaterialsPanel,
+  OverviewPanel,
+  ResourceFileTab,
+  ResourceFileTabBar,
+  TasksPanel,
+} from './components/ResourceFilePanels';
 
 type ResourceFileScreenProps = NativeStackScreenProps<RootStackParamList, 'ResourceFile'>;
 
@@ -49,21 +50,51 @@ export default function ResourceFileScreen({
   navigation,
   route,
 }: ResourceFileScreenProps) {
-  const [activeTab, setActiveTab] = useState<ReviewTab>('Overview');
+  const [activeTab, setActiveTab] = useState<ResourceFileTab>('Overview');
   const [comment, setComment] = useState('');
-  const [selectedFrame, setSelectedFrame] = useState<FrameAnnotation | null>(null);
   const root = getProjectResourceTree(route.params.projectId);
   const file = findResourceFile(root, route.params.fileId);
   const parentNode = findResourceNode(root, route.params.parentFolderId);
   const parentName = parentNode?.type === 'folder' ? parentNode.name : 'Resource';
+  const versions = file?.materialVersions ?? [];
+  const tasks = file?.tasks ?? [];
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(
+    versions[0]?.id ?? null,
+  );
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(
+    tasks[0]?.id ?? null,
+  );
+  const [selectedFrame, setSelectedFrame] = useState<ResourceTaskFrame | null>(
+    tasks[0]?.frames[0] ?? null,
+  );
 
   const description = useMemo(
     () => (file ? buildFileDescription(file.content, file.language) : ''),
     [file],
   );
 
-  const handleSelectFrame = (frame: FrameAnnotation) => {
+  const selectedVersion = versions.find((version) => version.id === selectedVersionId) ?? versions[0];
+  const previewImageUri = selectedVersion?.materials.imageUri ?? file?.previewImageUri;
+
+  const handleSelectFrame = (frame: ResourceTaskFrame) => {
     setSelectedFrame((prev) => (prev?.id === frame.id ? null : frame));
+  };
+
+  const handleSelectTask = (task: ResourceFileTask | null) => {
+    if (task === null) {
+      setSelectedTaskId(null);
+      setSelectedFrame(null);
+      return;
+    }
+    setSelectedTaskId(task.id);
+    setSelectedFrame(task.frames[0] ?? null);
+    setActiveTab('Tasks');
+  };
+
+  const handleSelectVersion = (version: ResourceFileMaterialVersion) => {
+    setSelectedVersionId(version.id);
+    setSelectedFrame(null);
+    setActiveTab('Materials');
   };
 
   if (!file) {
@@ -97,35 +128,38 @@ export default function ResourceFileScreen({
         showsVerticalScrollIndicator={false}
       >
         <TaskPreviewSection
-          imageUri={TASK_INFO.previewImageUri}
+          imageUri={previewImageUri}
           selectedFrame={selectedFrame}
-          status="In Review"
+          showStatusBadge={false}
+          status={selectedVersion ? 'Material Preview' : 'File Preview'}
         />
 
-        <ReviewTabBar activeTab={activeTab} onTabChange={setActiveTab} />
+        <ResourceFileTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
         {activeTab === 'Overview' && (
-          <OverviewTab
-            contributors={CONTRIBUTORS}
+          <OverviewPanel
             description={description}
+            fileContent={file.content}
           />
         )}
 
-        {activeTab === 'Discussion' && (
-          <DiscussionTab
+        {activeTab === 'Tasks' && (
+          <TasksPanel
             comment={comment}
-            comments={COMMENTS}
-            frames={FRAMES}
             onCommentChange={setComment}
-            selectedFrame={selectedFrame}
             onSelectFrame={handleSelectFrame}
+            onSelectTask={handleSelectTask}
+            selectedFrame={selectedFrame}
+            selectedTaskId={selectedTaskId}
+            tasks={tasks}
           />
         )}
 
-        {activeTab === 'Action' && (
-          <ActionTab
-            approveLabel="Approve File"
-            rejectLabel="Reject File"
+        {activeTab === 'Materials' && (
+          <MaterialsPanel
+            selectedVersionId={selectedVersion?.id ?? null}
+            versions={versions}
+            onSelectVersion={handleSelectVersion}
           />
         )}
       </ScrollView>

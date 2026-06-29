@@ -13,7 +13,6 @@ import ApplicationDetailScreen from '@/src/screens/applicationDetail';
 import ApplicationCreateScreen from '@/src/screens/applicationCreate';
 import EditorBoardsScreen from '@/src/screens/editorBoards';
 import EditorBoardDetailScreen from '@/src/screens/editorBoardDetail';
-import EditorBoardCreateScreen from '@/src/screens/editorBoardCreate';
 import EditorBoardAttachProjectScreen from '@/src/screens/editorBoardAttachProject';
 import ResourcesScreen from '@/src/screens/resources';
 import ResourceFolderDetailScreen from '@/src/screens/resourceFolderDetail';
@@ -58,7 +57,6 @@ export default function RootNavigator() {
         <Stack.Screen name="ApplicationCreate" component={ApplicationCreateScreen} />
         <Stack.Screen name="EditorBoards" component={EditorBoardsScreen} />
         <Stack.Screen name="EditorBoardDetail" component={EditorBoardDetailScreen} />
-        <Stack.Screen name="EditorBoardCreate" component={EditorBoardCreateScreen} />
         <Stack.Screen name="EditorBoardAttachProject" component={EditorBoardAttachProjectScreen} />
         <Stack.Screen name="Resources" component={ResourcesScreen} />
         <Stack.Screen name="ResourceFolderDetail" component={ResourceFolderDetailScreen} />

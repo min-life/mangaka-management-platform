@@ -68,12 +68,6 @@ export default function ApplicationsScreen({ navigation, route }: ApplicationsSc
   return (
     <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
       <ApplicationTopBar
-        actionIcon="add"
-        onActionPress={() =>
-          navigation.navigate('ApplicationCreate', {
-            projectId: projectId ?? PROJECTS[0].id,
-          })
-        }
         onBack={() => navigation.goBack()}
         subtitle={project?.name ?? 'My Projects'}
         title="Applications"

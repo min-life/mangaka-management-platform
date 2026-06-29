@@ -1,6 +1,9 @@
 import {
   ProjectResourceTree,
   ResourceFileNode,
+  ResourceFileTask,
+  ResourceTaskComment,
+  ResourceTaskFrame,
   ResourceFolderNode,
   ResourceNode,
 } from '@/src/types/resources';
@@ -10,6 +13,248 @@ interface PageSeed {
   name: string;
   description: string;
   content: string;
+}
+
+const STATUS_ROTATION: ResourceFileTask['status'][] = [
+  'PENDING',
+  'INPROGRESS',
+  'REVIEW',
+  'DONE',
+];
+
+function buildPageImageUri(seed: string, version = 'latest') {
+  return `https://picsum.photos/seed/${seed}-${version}/900/1200`;
+}
+
+function makeFrame(
+  id: string,
+  name: string,
+  description: string,
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number,
+): ResourceTaskFrame {
+  return {
+    id,
+    name,
+    description,
+    startX,
+    startY,
+    endX,
+    endY,
+    x: startX,
+    y: startY,
+    width: endX - startX,
+    height: endY - startY,
+  };
+}
+
+function makeComment(
+  id: string,
+  frameId: string,
+  author: string,
+  authorRole: string,
+  initials: string,
+  time: string,
+  text: string,
+  mention?: string,
+): ResourceTaskComment {
+  return {
+    id,
+    frameId,
+    author,
+    authorRole,
+    initials,
+    time,
+    body: text,
+    mention,
+    content: {
+      text,
+      mentions: mention ? [mention] : [],
+      attachments: [],
+    },
+  };
+}
+
+function makePageTasks(projectId: string, fileId: string, page: PageSeed): ResourceFileTask[] {
+  const taskKey = `${projectId}-${page.id}`;
+  const cleanupFrames = [
+    makeFrame(
+      `${taskKey}-frame-ink-1`,
+      'Panel ink cleanup',
+      'Review contour weight and clean stray ink around the main figure.',
+      7,
+      8,
+      58,
+      34,
+    ),
+    makeFrame(
+      `${taskKey}-frame-tone-2`,
+      'Screentone balance',
+      'Reduce dense tone so the speech area remains readable.',
+      12,
+      42,
+      88,
+      66,
+    ),
+  ];
+  const letteringFrames = [
+    makeFrame(
+      `${taskKey}-frame-letter-1`,
+      'Speech bubble check',
+      'Check translation fit and bubble tail direction.',
+      55,
+      6,
+      93,
+      24,
+    ),
+    makeFrame(
+      `${taskKey}-frame-sfx-2`,
+      'SFX placement',
+      'Keep sound effect readable without covering the action line.',
+      18,
+      70,
+      82,
+      92,
+    ),
+  ];
+
+  return [
+    {
+      id: `${taskKey}-task-cleanup`,
+      fileId,
+      title: `Clean up ${page.name}`,
+      description: page.description,
+      status: STATUS_ROTATION[page.id.length % STATUS_ROTATION.length],
+      deadline: '2026-07-02T17:00:00.000Z',
+      assignedBy: 'user-ren-editor',
+      assignedByName: 'Ren Editor',
+      createdBy: 'user-kaito-yamamoto',
+      createdByName: 'Kaito Yamamoto',
+      updatedBy: 'user-ren-editor',
+      updatedByName: 'Ren Editor',
+      createdAt: '2026-06-24T09:00:00.000Z',
+      updatedAt: '2026-06-28T05:00:00.000Z',
+      frames: cleanupFrames,
+      comments: [
+        makeComment(
+          `${taskKey}-comment-ink-1`,
+          cleanupFrames[0].id,
+          'Kaito Yamamoto',
+          'LEAD ARTIST',
+          'KY',
+          '2 hours ago',
+          'Viền nhân vật ở panel này cần dày hơn một chút để tách khỏi nền.',
+          '@Ren_Editor',
+        ),
+        makeComment(
+          `${taskKey}-comment-tone-1`,
+          cleanupFrames[1].id,
+          'Ren Editor',
+          'CONTENT EDITOR',
+          'RE',
+          '1 hour ago',
+          'Mình sẽ giảm density vùng này trước khi gửi bản review tiếp theo.',
+        ),
+      ],
+    },
+    {
+      id: `${taskKey}-task-lettering`,
+      fileId,
+      title: `Lettering pass for ${page.name}`,
+      description: 'Review dialogue, SFX placement, and bubble spacing for this manga page.',
+      status: page.id.includes('002') ? 'DONE' : 'REVIEW',
+      deadline: '2026-07-03T12:00:00.000Z',
+      assignedBy: 'user-yumi-tanaka',
+      assignedByName: 'Yumi Tanaka',
+      createdBy: 'user-ren-editor',
+      createdByName: 'Ren Editor',
+      updatedBy: 'user-yumi-tanaka',
+      updatedByName: 'Yumi Tanaka',
+      createdAt: '2026-06-25T10:30:00.000Z',
+      updatedAt: '2026-06-28T03:20:00.000Z',
+      frames: letteringFrames,
+      comments: [
+        makeComment(
+          `${taskKey}-comment-letter-1`,
+          letteringFrames[0].id,
+          'Yumi Tanaka',
+          'LETTERER',
+          'YT',
+          '3 hours ago',
+          'Bubble này hơi sát viền panel, nên kéo vào trong khoảng 4px.',
+          '@Kaito',
+        ),
+        makeComment(
+          `${taskKey}-comment-sfx-1`,
+          letteringFrames[1].id,
+          'Ren Editor',
+          'CONTENT EDITOR',
+          'RE',
+          '45 minutes ago',
+          'SFX ổn, chỉ cần tránh che motion line chính.',
+        ),
+      ],
+    },
+  ];
+}
+
+function makeMaterialVersions(projectId: string, fileId: string, page: PageSeed) {
+  const seed = `${projectId}-${page.id}`;
+
+  return [
+    {
+      id: `${fileId}-material-v3`,
+      fileId,
+      materials: {
+        title: 'Version 03 - Review render',
+        note: 'Latest review render with updated tones and lettering.',
+        imageUri: buildPageImageUri(seed, 'v3'),
+        layers: ['background', 'characters', 'screentone', 'lettering'],
+        pages: [{ index: 1, url: buildPageImageUri(seed, 'v3') }],
+        editorState: { activeLayer: 'lettering', zoom: 0.84 },
+      },
+      createdBy: 'user-ren-editor',
+      createdByName: 'Ren Editor',
+      updatedBy: 'user-ren-editor',
+      updatedByName: 'Ren Editor',
+      createdAt: '2026-06-28T05:00:00.000Z',
+      updatedAt: '2026-06-28T05:00:00.000Z',
+    },
+    {
+      id: `${fileId}-material-v2`,
+      fileId,
+      materials: {
+        title: 'Version 02 - Tone pass',
+        note: 'Screentone pass before final lettering adjustments.',
+        imageUri: buildPageImageUri(seed, 'v2'),
+        layers: ['background', 'characters', 'screentone'],
+        pages: [{ index: 1, url: buildPageImageUri(seed, 'v2') }],
+        editorState: { activeLayer: 'screentone', zoom: 0.76 },
+      },
+      createdBy: 'user-kaito-yamamoto',
+      createdByName: 'Kaito Yamamoto',
+      createdAt: '2026-06-27T14:20:00.000Z',
+      updatedAt: '2026-06-27T14:20:00.000Z',
+    },
+    {
+      id: `${fileId}-material-v1`,
+      fileId,
+      materials: {
+        title: 'Version 01 - Rough layout',
+        note: 'Initial page layout from the chapter storyboard.',
+        imageUri: buildPageImageUri(seed, 'v1'),
+        layers: ['rough', 'panel-layout'],
+        pages: [{ index: 1, url: buildPageImageUri(seed, 'v1') }],
+        editorState: { activeLayer: 'rough', zoom: 0.68 },
+      },
+      createdBy: 'user-page-team',
+      createdByName: 'Page Team',
+      createdAt: '2026-06-24T08:45:00.000Z',
+      updatedAt: '2026-06-24T08:45:00.000Z',
+    },
+  ];
 }
 
 interface ChapterSeed {
@@ -237,8 +482,11 @@ Spirit merchant offers the first bargain.
 ];
 
 function makePage(projectId: string, chapterId: string, page: PageSeed): ResourceFileNode {
+  const fileId = `${projectId}-${page.id}`;
+  const materialVersions = makeMaterialVersions(projectId, fileId, page);
+
   return {
-    id: `${projectId}-${page.id}`,
+    id: fileId,
     name: page.name,
     type: 'file',
     folderId: `${projectId}-${chapterId}`,
@@ -248,6 +496,9 @@ function makePage(projectId: string, chapterId: string, page: PageSeed): Resourc
     createdByName: 'Page Team',
     createdAt: '2026-06-20T09:00:00.000Z',
     updatedAt: '2026-06-28T05:00:00.000Z',
+    previewImageUri: materialVersions[0].materials.imageUri,
+    materialVersions,
+    tasks: makePageTasks(projectId, fileId, page),
   };
 }
 
