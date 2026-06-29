@@ -19,6 +19,7 @@ import {
   QueryApplicationsReqDto,
   UpdateApplicationReqDto,
   UpdateApplicationStatusReqDto,
+  ApplicationMaterialReqDto,
   ApplicationVoteResponseDto,
   VoteApplicationReqDto,
 } from './dto';
@@ -40,7 +41,7 @@ export class ApplicationsController {
   @Permissions({
     mode: 'ANY',
     permissions: ['project:read', 'board:leader'],
-    resource: 'COMMENT',
+    resource: 'APPLICATION',
   })
   @ApiOperation({ summary: 'Get application comments' })
   @ApiParam({ name: 'id', type: Number, description: 'Application id' })
@@ -67,7 +68,7 @@ export class ApplicationsController {
   @Permissions({
     mode: 'ANY',
     permissions: ['project:comment.create', 'board:leader'],
-    resource: 'COMMENT',
+    resource: 'APPLICATION',
   })
   @ApiOperation({ summary: 'Create comment for application' })
   @ApiParam({ name: 'id', type: Number, description: 'Application id' })
@@ -237,5 +238,62 @@ export class ApplicationsController {
       data.comment,
     );
     return vote;
+  }
+
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['project:application.update', 'board:leader'],
+    resource: 'APPLICATION',
+  })
+  @ApiOperation({ summary: 'Add a material item to application' })
+  @ApiParam({ name: 'id', type: Number, description: 'Application id' })
+  @ApiOkResponse({ description: 'Application updated successfully', type: ApplicationResponseDto })
+  @Post(':id/materials/add')
+  async addApplicationMaterialItem(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() currentUser: JwtPayload,
+    @Body() data: ApplicationMaterialReqDto,
+  ) {
+    const application = await this.applicationsService.addApplicationMaterial(id, currentUser.userId, data.materialItem);
+    return { data: application };
+  }
+
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['project:application.update', 'board:leader'],
+    resource: 'APPLICATION',
+  })
+  @ApiOperation({ summary: 'Update a material item in application' })
+  @ApiParam({ name: 'id', type: Number, description: 'Application id' })
+  @ApiParam({ name: 'index', type: Number, description: 'Index of the material to update' })
+  @ApiOkResponse({ description: 'Application updated successfully', type: ApplicationResponseDto })
+  @Patch(':id/materials/:index')
+  async updateApplicationMaterialItem(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('index', ParseIntPipe) index: number,
+    @CurrentUser() currentUser: JwtPayload,
+    @Body() data: ApplicationMaterialReqDto,
+  ) {
+    const application = await this.applicationsService.updateApplicationMaterial(id, currentUser.userId, index, data.materialItem);
+    return { data: application };
+  }
+
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['project:application.update', 'board:leader'],
+    resource: 'APPLICATION',
+  })
+  @ApiOperation({ summary: 'Delete a material item from application' })
+  @ApiParam({ name: 'id', type: Number, description: 'Application id' })
+  @ApiParam({ name: 'index', type: Number, description: 'Index of the material to delete' })
+  @ApiOkResponse({ description: 'Application updated successfully', type: ApplicationResponseDto })
+  @Delete(':id/materials/:index')
+  async deleteApplicationMaterialItem(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('index', ParseIntPipe) index: number,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    const application = await this.applicationsService.deleteApplicationMaterial(id, currentUser.userId, index);
+    return { data: application };
   }
 }

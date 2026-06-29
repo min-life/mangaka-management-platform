@@ -14,10 +14,8 @@ export class UpdateFileReqDto {
 }
 
 export class CreateMaterialReqDto {
-  @ApiProperty({
-    example: { layers: ['background', 'characters'], colors: ['#FF0000', '#00FF00'] },
-  })
-  materials!: unknown;
+  @ApiProperty({ type: 'array', items: { type: 'string', format: 'binary' }, description: 'The files to upload' })
+  files!: any[];
 }
 
 export class CreateTaskReqDto {

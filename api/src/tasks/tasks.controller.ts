@@ -33,11 +33,7 @@ import {
   UpdateTaskReqDto,
 } from './dto';
 
-import {
-  CommentResponseDto,
-  CreateCommentReqDto,
-  QueryCommentsReqDto,
-} from '../frames/dto';
+import { CommentResponseDto, CreateCommentReqDto, QueryCommentsReqDto } from '../frames/dto';
 
 @ApiTags('Tasks')
 @ApiBearerAuth()
@@ -48,7 +44,7 @@ export class TasksController {
   @Permissions({
     mode: 'ANY',
     permissions: ['project:read', 'board:leader'],
-    resource: 'COMMENT',
+    resource: 'TASK',
   })
   @ApiOperation({ summary: 'Get task comments' })
   @ApiParam({ name: 'id', type: Number, description: 'Task id' })
@@ -75,7 +71,7 @@ export class TasksController {
   @Permissions({
     mode: 'ANY',
     permissions: ['project:comment.create', 'board:leader'],
-    resource: 'COMMENT',
+    resource: 'TASK',
   })
   @ApiOperation({ summary: 'Create comment for task' })
   @ApiParam({ name: 'id', type: Number, description: 'Task id' })
@@ -208,7 +204,7 @@ export class TasksController {
   @Permissions({
     mode: 'ANY',
     permissions: ['project:read', 'board:leader'],
-    resource: 'FRAME',
+    resource: 'TASK',
   })
   @ApiOperation({ summary: 'Get task frames' })
   @ApiParam({ name: 'id', type: Number, description: 'Task id' })
@@ -232,7 +228,7 @@ export class TasksController {
   @Permissions({
     mode: 'ANY',
     permissions: ['project:frame.create', 'board:leader'],
-    resource: 'FRAME',
+    resource: 'TASK',
   })
   @ApiOperation({ summary: 'Create frame for task' })
   @ApiParam({ name: 'id', type: Number, description: 'Task id' })
@@ -250,4 +246,5 @@ export class TasksController {
     return {
       data: frame,
     };
-  }}
+  }
+}

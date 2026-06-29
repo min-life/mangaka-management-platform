@@ -84,8 +84,9 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 2. **Tạo thư mục**: Chọn thư mục cha (hoặc thư mục gốc), gọi `POST /api/projects/:id/folders` kèm `parentId`.
 
 ### 8.2 Quản lý File & Material (Phiên bản)
-1. **Tải lên File**: Chọn thư mục, gọi `POST /api/folders/:id/files`. File có thể chứa nhiều Material (phiên bản hình ảnh/tài liệu).
-2. **Khôi phục phiên bản**: Xem lịch sử version (Materials) của một File. Bấm Khôi phục -> Gọi `POST /api/materials/:id/restore` để đưa phiên bản cũ làm bản chính thức hiện tại.
+1. **Tải lên File/Material (Upload)**: Khi người dùng muốn cập nhật/thêm bản vẽ mới cho File, Frontend cần khởi tạo một đối tượng `FormData`, dùng `formData.append('file', fileObject)` để đính kèm file vật lý, sau đó gọi `POST /api/files/:id/materials` (sử dụng Content-Type `multipart/form-data`).
+2. **Phản hồi Upload**: Backend sẽ tải file lên AWS S3 và tự động lưu URL vào CSDL. Nếu thành công (✅), giao diện sẽ hiển thị Toast thành công và load lại danh sách Materials. Nếu thất bại hoặc file quá 500MB (❌), hiển thị Toast thông báo lỗi từ backend.
+3. **Khôi phục phiên bản**: Xem lịch sử version (Materials) của một File. Bấm Khôi phục -> Gọi `POST /api/materials/:id/restore` để đưa phiên bản cũ làm bản chính thức hiện tại.
 
 ## 9. Luồng Đánh dấu Khung hình (Frames Flow)
 
@@ -1916,9 +1917,12 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 #### Request Body
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `materials` | `object` | `Yes` |  |
+| `file` | `binary` | `Yes` | File vật lý (Hỗ trợ ảnh, pdf, psd, tối đa 500MB) truyền dưới dạng `multipart/form-data` |
 
 #### Responses
+- **201**: Material created successfully (Uploaded to AWS S3 & Saved to DB)
+- **400**: File type not allowed or File too large
+- **500**: Lỗi `SVCREATEMATERIAL` khi server upload lên AWS S3 thất bại.
 - **201**: Material created successfully
   
   **Response Schema:**
@@ -2444,11 +2448,73 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 
 ## Notifications
 
-### Get current user notifications 
-**GET** `/api/notifications`
+### 1. Chi tiết các Endpoints
 
-#### Responses
-- **200**: 
+#### Get current user notifications
+- **URL**: `GET /api/notifications`
+- **Chức năng**: Lấy danh sách các thông báo của người dùng hiện tại, bao gồm chi tiết của `ActivityLog` và `Actor` (người tạo ra hành động).
+- **Input**: Không yêu cầu (Lấy `userId` từ JWT).
+- **Output**: JSON chứa mảng `Notification` `200 OK`.
+- **Ràng buộc**: Yêu cầu xác thực JWT.
+
+#### Mark a notification as read
+- **URL**: `PATCH /api/notifications/{id}/read`
+- **Chức năng**: Đánh dấu một thông báo cụ thể là đã đọc.
+- **Input**: 
+  - `id` (Path param): ID của thông báo.
+- **Output**: JSON chứa thông báo đã được cập nhật `200 OK`.
+- **Lỗi thường gặp**: `500 Internal Server Error` (nếu thông báo không tồn tại hoặc không thuộc về người dùng hiện tại).
+- **Ràng buộc**: Thông báo phải thuộc về `userId` đang truy cập.
+
+#### Mark all notifications as read
+- **URL**: `PATCH /api/notifications/read-all`
+- **Chức năng**: Đánh dấu tất cả thông báo của người dùng hiện tại là đã đọc.
+- **Input**: Không yêu cầu.
+- **Output**: JSON `{ "success": true }` `200 OK`.
+- **Ràng buộc**: Áp dụng cho tất cả thông báo chưa đọc (`isRead: false`) của user hiện tại.
+
+### 2. Frontend Flow (Luồng phối hợp các Màn hình)
+
+- **Trang hiện tại**: Bất kỳ trang nào có biểu tượng "Chuông" (thông báo) trên Navbar.
+- **Hành động của người dùng**:
+  1. Khi người dùng truy cập trang lần đầu, hệ thống gọi `GET /api/notifications` để lấy danh sách thông báo và số lượng chưa đọc.
+  2. Người dùng nhấn vào biểu tượng "Chuông" để mở menu thông báo.
+  3. Khi click vào một thông báo chưa đọc, hệ thống gọi `PATCH /api/notifications/{id}/read`.
+  4. Nếu click "Đánh dấu tất cả là đã đọc", hệ thống gọi `PATCH /api/notifications/read-all`.
+- **Phản hồi của Frontend**:
+  - `Thành công (✅)`: Giao diện giảm số lượng thông báo chưa đọc xuống. CSS của thông báo sẽ chuyển từ in đậm (chưa đọc) sang bình thường.
+  - Ngoài ra, Frontend cần kết nối WebSocket (`socket.on('notification:new')`) qua namespace `/realtime` để realtime nhận thông báo mới và tự động cập nhật list/toast mà không cần reload trang.
 
 ---
 
+## Activity Logs
+
+### 1. Chi tiết các Endpoints
+
+#### Get activity logs with pagination and filters
+- **URL**: `GET /api/activity-logs`
+- **Chức năng**: Lấy danh sách lịch sử hoạt động (Activity Logs). Hỗ trợ phân trang và lọc theo dự án, bảng biên tập hoặc tài khoản thực hiện.
+- **Input**:
+  - `page` (Query, optional): Trang hiện tại (Mặc định: 1).
+  - `limit` (Query, optional): Số lượng item trên một trang (Mặc định: 20).
+  - `projectId` (Query, optional): Lọc theo ID dự án.
+  - `editorBoardId` (Query, optional): Lọc theo ID bảng biên tập.
+  - `actorId` (Query, optional): Lọc theo ID người thực hiện.
+- **Output**: JSON `200 OK`.
+  ```json
+  {
+    "data": [...],
+    "meta": { "total": 100, "page": 1, "limit": 20, "totalPages": 5 }
+  }
+  ```
+- **Ràng buộc**: Yêu cầu xác thực JWT. Người dùng phải có một trong các quyền `['project:read', 'board:leader', 'board:member', 'board:owner']`.
+
+### 2. Frontend Flow (Luồng phối hợp các Màn hình)
+
+- **Trang hiện tại**: Màn hình Chi tiết Dự án (Project Details) hoặc Chi tiết Bảng (Board Details) - Tab "Lịch sử hoạt động" (Activity).
+- **Hành động của người dùng**:
+  1. Khi mở tab Activity, Frontend gọi `GET /api/activity-logs?projectId=X` (hoặc `editorBoardId=Y`) để tải danh sách các hoạt động gần nhất.
+  2. Khi scroll xuống cuối danh sách, Frontend gọi tiếp API với `page` tăng lên để load more.
+- **Phản hồi của Frontend**:
+  - `Thành công (✅)`: Render danh sách dạng Timeline hiển thị nội dung `Ai (actor)` đã làm `hành động gì (action)` vào `lúc nào (createdAt)`.
+  - Để cập nhật thời gian thực, Frontend cần `socket.emit('project:subscribe', { projectId: X })` khi vào trang, và lắng nghe `socket.on('activity:new')`. Khi nhận sự kiện này, prepend (thêm vào đầu) activity mới vào danh sách hiện tại. Khi rời trang, gọi `socket.emit('project:unsubscribe')`.

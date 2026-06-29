@@ -93,7 +93,7 @@ export class FramesController {
   @Permissions({
     mode: 'ANY',
     permissions: ['project:read', 'board:leader'],
-    resource: 'COMMENT',
+    resource: 'FRAME',
   })
   @ApiOperation({ summary: 'Get frame comments' })
   @ApiParam({ name: 'id', type: Number, description: 'Frame id' })
@@ -120,7 +120,7 @@ export class FramesController {
   @Permissions({
     mode: 'ANY',
     permissions: ['project:comment.create', 'board:leader'],
-    resource: 'COMMENT',
+    resource: 'FRAME',
   })
   @ApiOperation({ summary: 'Create comment for frame' })
   @ApiParam({ name: 'id', type: Number, description: 'Frame id' })

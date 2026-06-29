@@ -15,7 +15,8 @@ export type Resource =
   | 'TASK'
   | 'FRAME'
   | 'COMMENT'
-  | 'APPLICATION';
+  | 'APPLICATION'
+  | 'PROJECT_STAT';
 export type Permission =
   | 'admin'
   | 'user:read'

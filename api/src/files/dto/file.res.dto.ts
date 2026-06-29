@@ -58,7 +58,19 @@ export class MaterialResDto {
   file?: SimpleFileResDto | null;
 
   @ApiProperty({
-    example: { layers: ['background', 'characters'], colors: ['#FF0000', '#00FF00'] },
+    example: [
+      {
+        url: 'https://...',
+        downloadUrl: 'https://...',
+        originalName: 'image.png',
+        size: 1024,
+        mimeType: 'image/png',
+        width: 1920,
+        height: 1080,
+        ratio: 1.77,
+        isThumbnail: true,
+      }
+    ]
   })
   materials!: unknown;
 

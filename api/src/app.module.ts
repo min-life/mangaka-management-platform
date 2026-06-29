@@ -22,6 +22,7 @@ import { FramesModule } from './frames/frames.module';
 import { ProjectStatsModule } from './project-stats/project-stats.module';
 import { ActivityLogsModule } from './activity-logs/activity-logs.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { RealtimeModule } from './realtime/realtime.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     ProjectStatsModule,
     ActivityLogsModule,
     NotificationsModule,
+    RealtimeModule,
   ],
   controllers: [AppController],
   providers: [

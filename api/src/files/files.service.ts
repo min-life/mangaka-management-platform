@@ -5,12 +5,15 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { PROGRESS_STATUS, Prisma, ACTIVITY_ACTION, ENTITY_TYPE } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ACTIVITY_EVENT_NAME, ActivityEventPayload } from '../share/events/activity.event';
 import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
+import { AwsS3Service } from '../share/services/aws-s3.service';
+import sizeOf from 'image-size';
 
 const USER_SELECT = {
   select: {
@@ -98,6 +101,7 @@ export class FilesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly awsS3Service: AwsS3Service,
   ) {}
 
   async getFileById(id: number) {
@@ -167,8 +171,29 @@ export class FilesService {
         }),
       ]);
 
+      const signedVersions = await Promise.all(
+        versions.map(async (version) => {
+          const materialsData = version.materials as any[];
+          if (Array.isArray(materialsData)) {
+            await Promise.all(
+              materialsData.map(async (materialData) => {
+                if (materialData?.url) {
+                  const [url, downloadUrl] = await Promise.all([
+                    this.awsS3Service.getPresignedUrl(materialData.url),
+                    this.awsS3Service.getPresignedUrl(materialData.url, 3600, materialData.originalName),
+                  ]);
+                  materialData.url = url;
+                  materialData.downloadUrl = downloadUrl;
+                }
+              })
+            );
+          }
+          return version;
+        }),
+      );
+
       return {
-        versions,
+        versions: signedVersions,
         pagination: this.buildPaginationMeta(total, page, limit),
       };
     } catch (error) {
@@ -186,6 +211,24 @@ export class FilesService {
         select: MATERIAL_SELECT,
       });
 
+      if (material) {
+        const materialsData = material.materials as any[];
+        if (Array.isArray(materialsData)) {
+          await Promise.all(
+            materialsData.map(async (materialData) => {
+              if (materialData?.url) {
+                const [url, downloadUrl] = await Promise.all([
+                  this.awsS3Service.getPresignedUrl(materialData.url),
+                  this.awsS3Service.getPresignedUrl(materialData.url, 3600, materialData.originalName),
+                ]);
+                materialData.url = url;
+                materialData.downloadUrl = downloadUrl;
+              }
+            })
+          );
+        }
+      }
+
       return material;
     } catch (error) {
       this.handleError(error, 'Get file materials fail', ERROR.SVGETFILEMATERIALS);
@@ -195,16 +238,54 @@ export class FilesService {
   async createMaterial(
     fileId: number,
     data: {
-      materials: unknown;
+      files: Array<Express.Multer.File>;
       userId: number;
     },
   ) {
     try {
       await this.ensureFile(fileId);
 
+      let hasThumbnail = false;
+      const materialsData = await Promise.all(
+        data.files.map(async (file) => {
+          // Upload file to S3
+          const ext = file.originalname.split('.').pop();
+          const key = `materials/${fileId}/${randomUUID()}.${ext}`;
+          const url = await this.awsS3Service.uploadFile(file, key);
+
+          const materialObj: any = {
+            url,
+            originalName: file.originalname,
+            size: file.size,
+            mimeType: file.mimetype,
+          };
+
+          // Try to extract dimensions
+          try {
+            const dimensions = sizeOf(file.buffer);
+            if (dimensions && dimensions.width && dimensions.height) {
+              materialObj.width = dimensions.width;
+              materialObj.height = dimensions.height;
+              materialObj.ratio = Number((dimensions.width / dimensions.height).toFixed(3));
+              
+              if (!hasThumbnail) {
+                materialObj.isThumbnail = true;
+                hasThumbnail = true;
+              } else {
+                materialObj.isThumbnail = false;
+              }
+            }
+          } catch (e) {
+            // Not an image or unsupported format, ignore dimensions
+          }
+
+          return materialObj;
+        })
+      );
+
       return await this.prisma.fileMaterial.create({
         data: {
-          materials: data.materials as Prisma.InputJsonValue,
+          materials: materialsData as Prisma.InputJsonArray,
           fileId,
           createdBy: data.userId,
           updatedBy: data.userId,

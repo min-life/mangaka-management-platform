@@ -7,8 +7,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  ACTIVITY_ACTION,
   APPLICATION_STATUS,
   APPLICATION_TYPE,
+  ENTITY_TYPE,
   Prisma,
   PROGRESS_STATUS,
   SCOPE,
@@ -210,7 +212,7 @@ export class ProjectsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
-  ) {}
+  ) { }
 
   async createProject(data: {
     name: string;
@@ -371,6 +373,17 @@ export class ProjectsService {
           })),
         });
       });
+
+      this.eventEmitter.emit(ACTIVITY_EVENT_NAME, {
+        action: ACTIVITY_ACTION.MEMBER_INVITED,
+        entityType: ENTITY_TYPE.PROJECT,
+        entityId: projectId,
+        projectId: projectId,
+        actorId,
+        metadata: {
+          invitedUserIds: uniqueUserIds,
+        },
+      } as ActivityEventPayload);
     } catch (error) {
       this.handleError(error, 'Add project member fail', ERROR.SVADDPROJECTMEMBER);
     }

@@ -476,8 +476,11 @@ export class UsersService {
       if (!resource || !resourceId) {
         permissions = permissions.concat(await this.getGlobalPermission(userId));
       }
-
-      switch (resource) {
+      if (resource) {
+        if (!resourceId || isNaN(resourceId)) {
+          throw new ForbiddenException();
+        }
+        switch (resource) {
         case 'BOARD':
           permissions = permissions.concat(await this.getBoardPermission(userId, resourceId!));
           break;
@@ -507,6 +510,12 @@ export class UsersService {
             await this.getApplicationPermission(userId, resourceId!),
           );
           break;
+        case 'PROJECT_STAT':
+          permissions = permissions.concat(
+            await this.getProjectStatPermission(userId, resourceId!),
+          );
+          break;
+        }
       }
 
       return permissions;
@@ -898,6 +907,36 @@ export class UsersService {
     }
 
     return role;
+  }
+
+  private async getProjectStatPermission(
+    userId: number,
+    projectStatId: number,
+  ): Promise<Permission[]> {
+    let permissions = [] as Permission[];
+    const projectStat = await this.prisma.projectStat.findUnique({
+      where: { id: projectStatId },
+      select: { projectId: true },
+    });
+    if (!projectStat) {
+      throw new NotFoundException(ERROR.NFPROJECTSTAT);
+    }
+
+    const isMember = await this.isProjectMember(userId, projectStat.projectId);
+    if (!isMember) {
+      throw new ForbiddenException();
+    }
+
+    permissions = permissions.concat(
+      await this.getProjectOwnerPermission(userId, projectStat.projectId),
+    );
+    if (permissions.length === 0) {
+      permissions = permissions.concat(
+        await this.getProjectMemberPermission(userId, projectStat.projectId),
+      );
+    }
+
+    return permissions;
   }
 
   private handleUserUniqueConflict(error: unknown) {

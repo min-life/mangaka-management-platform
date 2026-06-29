@@ -29,4 +29,36 @@ export class NotificationsService {
       throw new InternalServerErrorException('Get notifications fail');
     }
   }
+  async markAsRead(id: number, userId: number) {
+    try {
+      const notification = await this.prisma.notification.findUnique({ where: { id } });
+      if (!notification || notification.userId !== userId) {
+        throw new InternalServerErrorException('Notification not found');
+      }
+
+      const updated = await this.prisma.notification.update({
+        where: { id },
+        data: { isRead: true },
+      });
+
+      return { data: updated };
+    } catch (error) {
+      this.logger.error('Mark notification as read fail', error);
+      throw new InternalServerErrorException('Mark notification as read fail');
+    }
+  }
+
+  async markAllAsRead(userId: number) {
+    try {
+      await this.prisma.notification.updateMany({
+        where: { userId, isRead: false },
+        data: { isRead: true },
+      });
+
+      return { success: true };
+    } catch (error) {
+      this.logger.error('Mark all notifications as read fail', error);
+      throw new InternalServerErrorException('Mark all notifications as read fail');
+    }
+  }
 }

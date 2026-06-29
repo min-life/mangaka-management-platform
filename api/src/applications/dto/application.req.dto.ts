@@ -13,7 +13,20 @@ export class UpdateApplicationReqDto {
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional({ example: [{ fileId: 1, page: 2 }] })
+  @ApiPropertyOptional({ 
+    example: [
+      {
+        url: 'https://...',
+        originalName: 'image.png',
+        size: 1024,
+        mimeType: 'image/png',
+        width: 1920,
+        height: 1080,
+        ratio: 1.77,
+        isThumbnail: true,
+      }
+    ] 
+  })
   @IsOptional()
   materials?: unknown;
 }
@@ -22,4 +35,20 @@ export class UpdateApplicationStatusReqDto {
   @ApiProperty({ enum: APPLICATION_STATUS, example: APPLICATION_STATUS.APPROVE })
   @IsEnum(APPLICATION_STATUS)
   status!: APPLICATION_STATUS;
+}
+
+export class ApplicationMaterialReqDto {
+  @ApiProperty({ 
+    example: {
+      url: 'https://...',
+      originalName: 'image.png',
+      size: 1024,
+      mimeType: 'image/png',
+      width: 1920,
+      height: 1080,
+      ratio: 1.77,
+      isThumbnail: true,
+    }
+  })
+  materialItem!: any;
 }

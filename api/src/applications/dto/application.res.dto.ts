@@ -30,7 +30,21 @@ export class ApplicationResDto {
   @ApiPropertyOptional({ example: 'Please review before publishing.', nullable: true })
   description?: string | null;
 
-  @ApiPropertyOptional({ example: [{ fileId: 1, page: 1 }], nullable: true })
+  @ApiPropertyOptional({ 
+    example: [
+      {
+        url: 'https://...',
+        originalName: 'image.png',
+        size: 1024,
+        mimeType: 'image/png',
+        width: 1920,
+        height: 1080,
+        ratio: 1.77,
+        isThumbnail: true,
+      }
+    ], 
+    nullable: true 
+  })
   materials?: unknown | null;
 
   @ApiProperty({ enum: APPLICATION_TYPE, example: APPLICATION_TYPE.PUBLISH_REQUEST })

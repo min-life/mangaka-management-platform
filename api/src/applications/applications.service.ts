@@ -159,6 +159,70 @@ export class ApplicationsService {
     }
   }
 
+  async addApplicationMaterial(id: number, userId: number, materialItem: any) {
+    try {
+      const application = await this.ensureApplication(id);
+      const materialsArray = [...((application.materials as any[]) || [])];
+      
+      materialsArray.push(materialItem);
+
+      return await this.prisma.application.update({
+        where: { id },
+        data: {
+          materials: materialsArray as Prisma.InputJsonArray,
+          updatedBy: userId,
+        },
+        select: APPLICATION_SELECT,
+      });
+    } catch (error) {
+      this.handleError(error, 'Add application material fail', ERROR.SVUPDATEAPPLICATION);
+    }
+  }
+
+  async updateApplicationMaterial(id: number, userId: number, index: number, materialItem: any) {
+    try {
+      const application = await this.ensureApplication(id);
+      const materialsArray = [...((application.materials as any[]) || [])];
+      
+      if (index >= 0 && index < materialsArray.length) {
+        materialsArray[index] = { ...materialsArray[index], ...materialItem };
+      }
+
+      return await this.prisma.application.update({
+        where: { id },
+        data: {
+          materials: materialsArray as Prisma.InputJsonArray,
+          updatedBy: userId,
+        },
+        select: APPLICATION_SELECT,
+      });
+    } catch (error) {
+      this.handleError(error, 'Update application material fail', ERROR.SVUPDATEAPPLICATION);
+    }
+  }
+
+  async deleteApplicationMaterial(id: number, userId: number, index: number) {
+    try {
+      const application = await this.ensureApplication(id);
+      const materialsArray = [...((application.materials as any[]) || [])];
+      
+      if (index >= 0 && index < materialsArray.length) {
+        materialsArray.splice(index, 1);
+      }
+
+      return await this.prisma.application.update({
+        where: { id },
+        data: {
+          materials: materialsArray as Prisma.InputJsonArray,
+          updatedBy: userId,
+        },
+        select: APPLICATION_SELECT,
+      });
+    } catch (error) {
+      this.handleError(error, 'Delete application material fail', ERROR.SVUPDATEAPPLICATION);
+    }
+  }
+
   async deleteApplication(id: number) {
     try {
       await this.ensureApplication(id);

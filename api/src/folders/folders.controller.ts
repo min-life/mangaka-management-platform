@@ -35,7 +35,7 @@ import { FileResponseDto, FilesResponseDto } from '../files/dto';
 @ApiBearerAuth()
 @Controller('folders')
 export class FoldersController {
-  constructor(private readonly foldersService: FoldersService) {}
+  constructor(private readonly foldersService: FoldersService) { }
 
   @Permissions({
     mode: 'ANY',
@@ -95,7 +95,7 @@ export class FoldersController {
   @Permissions({
     mode: 'ANY',
     permissions: ['project:read', 'board:leader'],
-    resource: 'FILE',
+    resource: 'FOLDER',
   })
   @ApiOperation({ summary: 'Get folder files' })
   @ApiParam({ name: 'id', type: Number, description: 'Folder id' })
@@ -122,8 +122,8 @@ export class FoldersController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:file.create', 'board:leader'],
-    resource: 'FILE',
+    permissions: ['project:file.create', 'project:owner'],
+    resource: 'FOLDER',
   })
   @ApiOperation({ summary: 'Create file in folder' })
   @ApiParam({ name: 'id', type: Number, description: 'Folder id' })
