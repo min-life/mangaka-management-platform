@@ -8,12 +8,12 @@ import { ProjectStatResponseDto, UpdateProjectStatReqDto } from './dto';
 @ApiBearerAuth()
 @Controller('project-stats')
 export class ProjectStatsController {
-  constructor(private readonly projectStatsService: ProjectStatsService) {}
+  constructor(private readonly projectStatsService: ProjectStatsService) { }
 
   @Permissions({
     mode: 'ANY',
     permissions: ['project:read', 'board:leader'],
-    resource: 'PROJECT',
+    resource: 'PROJECT_STAT',
   })
   @ApiOperation({ summary: 'Get project stat details' })
   @ApiParam({ name: 'id', type: Number, description: 'Project stat id' })
@@ -32,7 +32,7 @@ export class ProjectStatsController {
   @Permissions({
     mode: 'ANY',
     permissions: ['project:update', 'board:leader'],
-    resource: 'PROJECT',
+    resource: 'PROJECT_STAT',
   })
   @ApiOperation({ summary: 'Update project stat' })
   @ApiParam({ name: 'id', type: Number, description: 'Project stat id' })
@@ -51,7 +51,7 @@ export class ProjectStatsController {
   @Permissions({
     mode: 'ANY',
     permissions: ['project:delete', 'board:leader'],
-    resource: 'PROJECT',
+    resource: 'PROJECT_STAT',
   })
   @ApiOperation({ summary: 'Delete project stat' })
   @ApiParam({ name: 'id', type: Number, description: 'Project stat id' })

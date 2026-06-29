@@ -85,7 +85,7 @@ export class ProjectsController {
   @Permissions({
     mode: 'ANY',
     permissions: ['project:read', 'board:leader'],
-    resource: 'TASK',
+    resource: 'PROJECT',
   })
   @ApiOperation({ summary: 'Get all tasks of current user in a specific project' })
   @ApiParam({ name: 'id', type: Number, description: 'Project id' })

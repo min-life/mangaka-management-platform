@@ -13,7 +13,20 @@ export class CreateProjectApplicationReqDto {
   @IsString()
   description?: string;
 
-  @ApiProperty({ example: [{ fileId: 1, page: 1 }] })
+  @ApiProperty({ 
+    example: [
+      {
+        url: 'https://...',
+        originalName: 'image.png',
+        size: 1024,
+        mimeType: 'image/png',
+        width: 1920,
+        height: 1080,
+        ratio: 1.77,
+        isThumbnail: true,
+      }
+    ] 
+  })
   @IsNotEmpty()
   materials!: unknown;
 

@@ -9,7 +9,7 @@ export class PermissionGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly userService: UsersService,
-  ) {}
+  ) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
@@ -30,6 +30,9 @@ export class PermissionGuard implements CanActivate {
     const { userId } = request?.user as JwtPayload;
     const resource = permissionMetadata.resource as Resource | undefined;
     const resourceId = request?.params?.['id'] as number | undefined;
+
+    console.log(resource, resourceId);
+
     const userPermissions = await this.userService.getUserPermissions(
       userId,
       resource,

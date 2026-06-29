@@ -8,15 +8,23 @@ import {
   Patch,
   Post,
   Query,
+  UseInterceptors,
+  UploadedFiles,
+  MaxFileSizeValidator,
+  ParseFilePipe,
+  FileTypeValidator,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
   ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { CurrentUser, Permissions } from '../share/decorators';
 import type { JwtPayload } from '../auth/interfaces';
 import { FilesService } from './files.service';
@@ -42,12 +50,12 @@ import {
 @ApiBearerAuth()
 @Controller('files')
 export class FilesController {
-  constructor(private readonly filesService: FilesService) {}
+  constructor(private readonly filesService: FilesService) { }
 
   @Permissions({
     mode: 'ANY',
     permissions: ['project:read', 'board:leader'],
-    resource: 'COMMENT',
+    resource: 'FILE',
   })
   @ApiOperation({ summary: 'Get file comments' })
   @ApiParam({ name: 'id', type: Number, description: 'File id' })
@@ -74,7 +82,7 @@ export class FilesController {
   @Permissions({
     mode: 'ANY',
     permissions: ['project:comment.create', 'board:leader'],
-    resource: 'COMMENT',
+    resource: 'FILE',
   })
   @ApiOperation({ summary: 'Create comment for file' })
   @ApiParam({ name: 'id', type: Number, description: 'File id' })
@@ -152,7 +160,7 @@ export class FilesController {
   @Permissions({
     mode: 'ANY',
     permissions: ['project:read', 'board:leader'],
-    resource: 'MATERIAL',
+    resource: 'FILE',
   })
   @ApiOperation({ summary: 'Get file material versions' })
   @ApiParam({ name: 'id', type: Number, description: 'File id' })
@@ -177,8 +185,8 @@ export class FilesController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:read', 'board:leader'],
-    resource: 'MATERIAL',
+    permissions: ['project:read', 'project:owner'],
+    resource: 'FILE',
   })
   @ApiOperation({ summary: 'Get file materials' })
   @ApiParam({ name: 'id', type: Number, description: 'File id' })
@@ -196,20 +204,31 @@ export class FilesController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:material.create', 'board:leader'],
-    resource: 'MATERIAL',
+    permissions: ['project:material.create', 'project:owner'],
+    resource: 'FILE',
   })
   @ApiOperation({ summary: 'Create material for file' })
   @ApiParam({ name: 'id', type: Number, description: 'File id' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: CreateMaterialReqDto })
   @ApiCreatedResponse({ description: 'Material created successfully', type: MaterialResponseDto })
   @Post(':id/materials')
+  @UseInterceptors(FilesInterceptor('files', 20))
   async createMaterial(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() currentUser: JwtPayload,
-    @Body() data: CreateMaterialReqDto,
+    @UploadedFiles(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 524288000 }), // 500MB
+          new FileTypeValidator({ fileType: /(jpg|jpeg|png|gif|webp|pdf|photoshop)$/i }),
+        ],
+      }),
+    )
+    files: Array<Express.Multer.File>,
   ) {
     const material = await this.filesService.createMaterial(id, {
-      ...data,
+      files,
       userId: currentUser.userId,
     });
     return {
@@ -220,7 +239,7 @@ export class FilesController {
   @Permissions({
     mode: 'ANY',
     permissions: ['project:read', 'board:leader'],
-    resource: 'TASK',
+    resource: 'FILE',
   })
   @ApiOperation({ summary: 'Get file tasks' })
   @ApiParam({ name: 'id', type: Number, description: 'File id' })
@@ -245,7 +264,7 @@ export class FilesController {
   @Permissions({
     mode: 'ANY',
     permissions: ['project:task.create', 'board:leader'],
-    resource: 'TASK',
+    resource: 'FILE',
   })
   @ApiOperation({ summary: 'Create task for file' })
   @ApiParam({ name: 'id', type: Number, description: 'File id' })
