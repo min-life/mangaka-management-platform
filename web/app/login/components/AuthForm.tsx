@@ -63,6 +63,10 @@ export function AuthForm({
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<LoginErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const apiBaseUrl = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api').replace(
+    /\/$/,
+    '',
+  );
   const oauthError =
     searchParams.get('error') === 'oauth_email_exists'
       ? 'This email is already registered. Please sign in with your email and password.'
@@ -102,7 +106,7 @@ export function AuthForm({
         form:
           message === 'Please verify your email before logging in'
             ? 'Please verify your email before logging in.'
-            : message ?? 'Unable to sign in. Please check your email and password.',
+            : (message ?? 'Unable to sign in. Please check your email and password.'),
       });
     } finally {
       setIsSubmitting(false);
@@ -179,16 +183,10 @@ export function AuthForm({
         ))}
 
         {errors.form || oauthError ? (
-          <div className={authErrorClassName}>
-            {errors.form ?? oauthError}
-          </div>
+          <div className={authErrorClassName}>{errors.form ?? oauthError}</div>
         ) : null}
 
-        <Button
-          className={authPrimaryButtonClassName}
-          disabled={isSubmitting}
-          type="submit"
-        >
+        <Button className={authPrimaryButtonClassName} disabled={isSubmitting} type="submit">
           {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : null}
           {submitLabel}
         </Button>
