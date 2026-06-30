@@ -513,7 +513,7 @@ export class ProjectsService {
     }
   }
 
-  async removeProjectMember(projectId: number, userId: number) {
+  async removeProjectMember(projectId: number, userId: number, actorId: number) {
     try {
       const project = await this.ensureProject(projectId);
       if (project.createdBy === userId) {
@@ -522,6 +522,17 @@ export class ProjectsService {
 
       await this.findProjectMember(projectId, userId);
       await this.prisma.userProject.deleteMany({ where: { projectId, userId } });
+
+      this.eventEmitter.emit(ACTIVITY_EVENT_NAME, {
+        action: ACTIVITY_ACTION.MEMBER_REMOVED,
+        entityType: ENTITY_TYPE.PROJECT,
+        entityId: projectId,
+        projectId: projectId,
+        actorId,
+        metadata: {
+          removedUserId: userId,
+        },
+      } satisfies ActivityEventPayload);
     } catch (error) {
       this.handleError(error, 'Remove project member fail', ERROR.SVREMOVEPROJECTMEMBER);
     }
@@ -637,8 +648,8 @@ export class ProjectsService {
     },
   ) {
     try {
-      await this.ensureProject(projectId);
-      return await this.prisma.application.create({
+      const project = await this.ensureProject(projectId);
+      const application = await this.prisma.application.create({
         data: {
           projectId,
           title: data.title,
@@ -650,6 +661,20 @@ export class ProjectsService {
         },
         select: APPLICATION_LIST_SELECT,
       });
+
+      this.eventEmitter.emit(ACTIVITY_EVENT_NAME, {
+        action: ACTIVITY_ACTION.APPLICATION_CREATED,
+        entityType: ENTITY_TYPE.APPLICATION,
+        entityId: application.id,
+        projectId,
+        actorId: data.userId,
+        metadata: {
+          title: application.title,
+          projectOwnerId: project.createdBy,
+        },
+      } satisfies ActivityEventPayload);
+
+      return application;
     } catch (error) {
       this.handleError(error, 'Create project application fail', ERROR.SVCREPROJECTAPPLICATION);
     }

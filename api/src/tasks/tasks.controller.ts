@@ -43,7 +43,7 @@ export class TasksController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:read', 'board:leader'],
+    permissions: ['project:read', 'project:owner'],
     resource: 'TASK',
   })
   @ApiOperation({ summary: 'Get task comments' })
@@ -70,7 +70,7 @@ export class TasksController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:comment.create', 'board:leader'],
+    permissions: ['project:comment.create', 'project:owner'],
     resource: 'TASK',
   })
   @ApiOperation({ summary: 'Create comment for task' })
@@ -123,7 +123,7 @@ export class TasksController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:read', 'board:leader'],
+    permissions: ['project:read', 'project:owner'],
     resource: 'TASK',
   })
   @ApiOperation({ summary: 'Get task details' })
@@ -142,7 +142,7 @@ export class TasksController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:task.update', 'board:leader'],
+    permissions: ['project:task.update', 'project:owner'],
     resource: 'TASK',
   })
   @ApiOperation({ summary: 'Update task' })
@@ -165,7 +165,7 @@ export class TasksController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:task.delete', 'board:leader'],
+    permissions: ['project:task.delete', 'project:owner'],
     resource: 'TASK',
   })
   @ApiOperation({ summary: 'Delete task' })
@@ -178,7 +178,7 @@ export class TasksController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:read', 'board:leader'],
+    permissions: ['project:read', 'project:owner'],
     resource: 'TASK',
   })
   @ApiOperation({ summary: 'Get task children' })
@@ -203,7 +203,7 @@ export class TasksController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:read', 'board:leader'],
+    permissions: ['project:read', 'project:owner'],
     resource: 'TASK',
   })
   @ApiOperation({ summary: 'Get task frames' })
@@ -227,7 +227,7 @@ export class TasksController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:frame.create', 'board:leader'],
+    permissions: ['project:frame.create', 'project:owner'],
     resource: 'TASK',
   })
   @ApiOperation({ summary: 'Create frame for task' })

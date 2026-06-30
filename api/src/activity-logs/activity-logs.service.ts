@@ -52,20 +52,30 @@ export class ActivityLogsService {
       const usersToNotify = new Set<number>();
 
       // 1. Task Created / Assigned
-      if ((payload.action === ACTIVITY_ACTION.TASK_CREATED || payload.action === ACTIVITY_ACTION.TASK_ASSIGNED) && payload.metadata && typeof payload.metadata === 'object' && 'assignedBy' in payload.metadata) {
-        if (payload.metadata.assignedBy !== payload.actorId) {
-          usersToNotify.add(payload.metadata.assignedBy as number);
+      if ((payload.action === ACTIVITY_ACTION.TASK_CREATED || payload.action === ACTIVITY_ACTION.TASK_ASSIGNED) && payload.metadata && typeof payload.metadata === 'object' && 'assignedTo' in payload.metadata) {
+        if (payload.metadata.assignedTo !== payload.actorId && payload.metadata.assignedTo !== null) {
+          usersToNotify.add(payload.metadata.assignedTo as number);
         }
       }
 
-      // 2. Task Updated (Status change, etc)
-      if (payload.action === ACTIVITY_ACTION.TASK_UPDATED && payload.metadata && typeof payload.metadata === 'object' && 'assigneeId' in payload.metadata) {
-        if (payload.metadata.assigneeId !== payload.actorId) {
+      // 2. Task Updated or Completed (Status change, etc)
+      if ((payload.action === ACTIVITY_ACTION.TASK_UPDATED || payload.action === ACTIVITY_ACTION.TASK_COMPLETED) && payload.metadata && typeof payload.metadata === 'object') {
+        if ('assigneeId' in payload.metadata && payload.metadata.assigneeId !== payload.actorId && payload.metadata.assigneeId !== null) {
           usersToNotify.add(payload.metadata.assigneeId as number);
         }
+        if ('creatorId' in payload.metadata && payload.metadata.creatorId !== payload.actorId && payload.metadata.creatorId !== null) {
+          usersToNotify.add(payload.metadata.creatorId as number);
+        }
       }
 
-      // 3. Application Status changes
+      // 3. Application Created
+      if (payload.action === ACTIVITY_ACTION.APPLICATION_CREATED && payload.metadata && typeof payload.metadata === 'object' && 'projectOwnerId' in payload.metadata) {
+        if (payload.metadata.projectOwnerId !== payload.actorId && payload.metadata.projectOwnerId !== null) {
+          usersToNotify.add(payload.metadata.projectOwnerId as number);
+        }
+      }
+
+      // 4. Application Status changes
       if (
         (payload.action === ACTIVITY_ACTION.APPLICATION_INTERNAL_APPROVED ||
          payload.action === ACTIVITY_ACTION.APPLICATION_SUBMITTED ||
@@ -73,28 +83,51 @@ export class ActivityLogsService {
          payload.action === ACTIVITY_ACTION.APPLICATION_REJECTED) && 
         payload.metadata && typeof payload.metadata === 'object' && 'creatorId' in payload.metadata
       ) {
-        if (payload.metadata.creatorId !== payload.actorId) {
+        if (payload.metadata.creatorId !== payload.actorId && payload.metadata.creatorId !== null) {
           usersToNotify.add(payload.metadata.creatorId as number);
         }
       }
 
-      // 4. Comment Created
-      if (payload.action === ACTIVITY_ACTION.COMMENT_CREATED && payload.metadata && typeof payload.metadata === 'object' && 'mentionedUserIds' in payload.metadata) {
-        const mentionedIds = payload.metadata.mentionedUserIds as number[];
-        if (Array.isArray(mentionedIds)) {
-          mentionedIds.forEach(id => {
-            if (id !== payload.actorId) usersToNotify.add(id);
-          });
+      // 5. Comment Created
+      if (payload.action === ACTIVITY_ACTION.COMMENT_CREATED && payload.metadata && typeof payload.metadata === 'object') {
+        if ('mentionedUserIds' in payload.metadata) {
+          const mentionedIds = payload.metadata.mentionedUserIds as number[];
+          if (Array.isArray(mentionedIds)) {
+            mentionedIds.forEach(id => {
+              if (id !== payload.actorId && id !== null) usersToNotify.add(id);
+            });
+          }
+        }
+        // Task Comment
+        if ('assigneeId' in payload.metadata && payload.metadata.assigneeId !== payload.actorId && payload.metadata.assigneeId !== null) {
+          usersToNotify.add(payload.metadata.assigneeId as number);
+        }
+        if ('creatorId' in payload.metadata && payload.metadata.creatorId !== payload.actorId && payload.metadata.creatorId !== null) {
+          usersToNotify.add(payload.metadata.creatorId as number);
+        }
+        // Application Comment
+        if ('applicantId' in payload.metadata && payload.metadata.applicantId !== payload.actorId && payload.metadata.applicantId !== null) {
+          usersToNotify.add(payload.metadata.applicantId as number);
+        }
+        if ('projectOwnerId' in payload.metadata && payload.metadata.projectOwnerId !== payload.actorId && payload.metadata.projectOwnerId !== null) {
+          usersToNotify.add(payload.metadata.projectOwnerId as number);
         }
       }
 
-      // 5. Member Invited
+      // 6. Member Invited
       if (payload.action === ACTIVITY_ACTION.MEMBER_INVITED && payload.metadata && typeof payload.metadata === 'object' && 'invitedUserIds' in payload.metadata) {
         const invitedIds = payload.metadata.invitedUserIds as number[];
         if (Array.isArray(invitedIds)) {
           invitedIds.forEach(id => {
-            if (id !== payload.actorId) usersToNotify.add(id);
+            if (id !== payload.actorId && id !== null) usersToNotify.add(id);
           });
+        }
+      }
+
+      // 7. Member Removed
+      if (payload.action === ACTIVITY_ACTION.MEMBER_REMOVED && payload.metadata && typeof payload.metadata === 'object' && 'removedUserId' in payload.metadata) {
+        if (payload.metadata.removedUserId !== payload.actorId && payload.metadata.removedUserId !== null) {
+          usersToNotify.add(payload.metadata.removedUserId as number);
         }
       }
 

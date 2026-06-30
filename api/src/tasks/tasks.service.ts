@@ -6,7 +6,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { PROGRESS_STATUS, Prisma } from '@prisma/client';
+import { PROGRESS_STATUS, Prisma, ACTIVITY_ACTION, ENTITY_TYPE } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ACTIVITY_EVENT_NAME, ActivityEventPayload } from '../share/events/activity.event';
 import { PrismaService } from '../prisma/prisma.service';
@@ -131,7 +131,7 @@ export class TasksService {
         }
       }
 
-      return await this.prisma.task.update({
+      const updatedTask = await this.prisma.task.update({
         where: { id },
         data: {
           title: data.title,
@@ -144,6 +144,43 @@ export class TasksService {
         },
         select: TASK_SELECT,
       });
+
+      const fileWithFolder = await this.prisma.file.findUnique({
+        where: { id: updatedTask.fileId },
+        include: { folder: true },
+      });
+
+      if (data.assignedBy !== undefined && data.assignedBy !== task.assignedBy) {
+        this.eventEmitter.emit(ACTIVITY_EVENT_NAME, {
+          action: ACTIVITY_ACTION.TASK_ASSIGNED,
+          entityType: ENTITY_TYPE.TASK,
+          entityId: updatedTask.id,
+          projectId: fileWithFolder?.folder?.projectId ?? null,
+          actorId: data.userId,
+          metadata: {
+            title: updatedTask.title,
+            assignedTo: updatedTask.assignedByUser?.id,
+          },
+        } satisfies ActivityEventPayload);
+      }
+
+      if (data.status !== undefined && data.status !== task.status) {
+        this.eventEmitter.emit(ACTIVITY_EVENT_NAME, {
+          action: data.status === PROGRESS_STATUS.DONE ? ACTIVITY_ACTION.TASK_COMPLETED : ACTIVITY_ACTION.TASK_UPDATED,
+          entityType: ENTITY_TYPE.TASK,
+          entityId: updatedTask.id,
+          projectId: fileWithFolder?.folder?.projectId ?? null,
+          actorId: data.userId,
+          metadata: {
+            title: updatedTask.title,
+            status: updatedTask.status,
+            assigneeId: updatedTask.assignedByUser?.id,
+            creatorId: updatedTask.createdByUser?.id,
+          },
+        } satisfies ActivityEventPayload);
+      }
+
+      return updatedTask;
     } catch (error) {
       this.handleError(error, 'Update task fail', ERROR.SVUPDATETASK);
     }
@@ -356,7 +393,12 @@ export class TasksService {
     try {
       await this.ensureTask(taskId);
 
-      return await this.prisma.comment.create({
+      const taskObj = await this.prisma.task.findUnique({
+        where: { id: taskId },
+        include: { file: { include: { folder: true } } },
+      });
+
+      const comment = await this.prisma.comment.create({
         data: {
           content: data.content as Prisma.InputJsonValue,
           taskId,
@@ -373,6 +415,23 @@ export class TasksService {
           updatedAt: true,
         },
       });
+
+      this.eventEmitter.emit(ACTIVITY_EVENT_NAME, {
+        action: ACTIVITY_ACTION.COMMENT_CREATED,
+        entityType: ENTITY_TYPE.COMMENT,
+        entityId: comment.id,
+        projectId: taskObj?.file?.folder?.projectId ?? null,
+        actorId: data.userId,
+        metadata: {
+          taskId,
+          taskTitle: taskObj?.title,
+          assigneeId: taskObj?.assignedBy,
+          creatorId: taskObj?.createdBy,
+          mentionedUserIds: [],
+        },
+      } satisfies ActivityEventPayload);
+
+      return comment;
     } catch (error) {
       this.handleError(error, 'Create comment fail', 'SVCREATECOMMENT');
     }

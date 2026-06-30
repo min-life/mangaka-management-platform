@@ -6,8 +6,10 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { APPLICATION_STATUS, APPLICATION_TYPE, Prisma } from '@prisma/client';
+import { APPLICATION_STATUS, APPLICATION_TYPE, Prisma, ACTIVITY_ACTION, ENTITY_TYPE } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ACTIVITY_EVENT_NAME, ActivityEventPayload } from '../share/events/activity.event';
 import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
 
@@ -73,7 +75,10 @@ const APPLICATION_SELECT = {
 export class ApplicationsService {
   private readonly logger = new Logger(ApplicationsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async getApplications(
     filter?: {
@@ -251,7 +256,7 @@ export class ApplicationsService {
         }
       }
 
-      return await this.prisma.application.update({
+      const updatedApp = await this.prisma.application.update({
         where: { id },
         data: {
           status: data.status,
@@ -259,6 +264,25 @@ export class ApplicationsService {
         },
         select: APPLICATION_SELECT,
       });
+
+      let action: ACTIVITY_ACTION = ACTIVITY_ACTION.APPLICATION_SUBMITTED;
+      if (data.status === APPLICATION_STATUS.APPROVE) action = ACTIVITY_ACTION.APPLICATION_APPROVED;
+      else if (data.status === APPLICATION_STATUS.REJECT) action = ACTIVITY_ACTION.APPLICATION_REJECTED;
+      else if (data.status === APPLICATION_STATUS.INTERNAL_APPROVED) action = ACTIVITY_ACTION.APPLICATION_INTERNAL_APPROVED;
+
+      this.eventEmitter.emit(ACTIVITY_EVENT_NAME, {
+        action,
+        entityType: ENTITY_TYPE.APPLICATION,
+        entityId: updatedApp.id,
+        projectId: application.projectId,
+        actorId: data.userId,
+        metadata: {
+          title: application.title,
+          creatorId: application.createdBy,
+        },
+      } satisfies ActivityEventPayload);
+
+      return updatedApp;
     } catch (error) {
       this.handleError(error, 'Update application status fail', ERROR.SVUPDATEAPPLICATION);
     }
@@ -384,9 +408,13 @@ export class ApplicationsService {
     },
   ) {
     try {
-      await this.ensureApplication(applicationId);
+      const application = await this.ensureApplication(applicationId);
+      const project = await this.prisma.project.findUnique({
+        where: { id: application.projectId },
+        select: { createdBy: true },
+      });
 
-      return await this.prisma.comment.create({
+      const comment = await this.prisma.comment.create({
         data: {
           content: data.content as Prisma.InputJsonValue,
           applicationId,
@@ -403,6 +431,22 @@ export class ApplicationsService {
           updatedAt: true,
         },
       });
+
+      this.eventEmitter.emit(ACTIVITY_EVENT_NAME, {
+        action: ACTIVITY_ACTION.COMMENT_CREATED,
+        entityType: ENTITY_TYPE.COMMENT,
+        entityId: comment.id,
+        projectId: application.projectId,
+        actorId: data.userId,
+        metadata: {
+          applicationId,
+          applicationTitle: application.title,
+          applicantId: application.createdBy,
+          projectOwnerId: project?.createdBy,
+        },
+      } satisfies ActivityEventPayload);
+
+      return comment;
     } catch (error) {
       this.handleError(error, 'Create comment fail', 'SVCREATECOMMENT');
     }

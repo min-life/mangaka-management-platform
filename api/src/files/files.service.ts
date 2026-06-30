@@ -369,10 +369,16 @@ export class FilesService {
         select: TASK_SELECT,
       });
 
+      const fileWithFolder = await this.prisma.file.findUnique({
+        where: { id: fileId },
+        include: { folder: true },
+      });
+
       this.eventEmitter.emit(ACTIVITY_EVENT_NAME, {
         action: ACTIVITY_ACTION.TASK_CREATED,
         entityType: ENTITY_TYPE.TASK,
         entityId: task.id,
+        projectId: fileWithFolder?.folder?.projectId ?? null,
         actorId: data.userId,
         metadata: { title: task.title, assignedBy: task.assignedByUser?.id ?? null },
       } satisfies ActivityEventPayload);
