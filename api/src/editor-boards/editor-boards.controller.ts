@@ -163,8 +163,9 @@ export class EditorBoardsController {
   async addMembersToBoard(
     @Param('id', ParseIntPipe) id: number,
     @Body() data: AddBoardMembersReqDto,
+    @CurrentUser() currentUser: JwtPayload,
   ) {
-    await this.editorBoardsService.addMembersToBoard(id, data.userIds);
+    await this.editorBoardsService.addMembersToBoard(id, data.userIds, currentUser.userId);
   }
 
   @Permissions({
@@ -231,8 +232,9 @@ export class EditorBoardsController {
   async removeBoardMember(
     @Param('id', ParseIntPipe) id: number,
     @Param('userId', ParseIntPipe) userId: number,
+    @CurrentUser() currentUser: JwtPayload,
   ) {
-    await this.editorBoardsService.removeBoardMember(id, userId);
+    await this.editorBoardsService.removeBoardMember(id, userId, currentUser.userId);
   }
 
   @Permissions({

@@ -295,8 +295,9 @@ export class ProjectsController {
   async removeProjectMember(
     @Param('id', ParseIntPipe) id: number,
     @Param('userId', ParseIntPipe) userId: number,
+    @CurrentUser() currentUser: JwtPayload,
   ) {
-    await this.projectsService.removeProjectMember(id, userId);
+    await this.projectsService.removeProjectMember(id, userId, currentUser.userId);
   }
 
   @Permissions({

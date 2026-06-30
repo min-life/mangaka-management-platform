@@ -54,7 +54,7 @@ export class FilesController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:read', 'board:leader'],
+    permissions: ['project:read', 'project:owner'],
     resource: 'FILE',
   })
   @ApiOperation({ summary: 'Get file comments' })
@@ -81,7 +81,7 @@ export class FilesController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:comment.create', 'board:leader'],
+    permissions: ['project:comment.create', 'project:owner'],
     resource: 'FILE',
   })
   @ApiOperation({ summary: 'Create comment for file' })
@@ -104,7 +104,7 @@ export class FilesController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:read', 'board:leader'],
+    permissions: ['project:read', 'project:owner'],
     resource: 'FILE',
   })
   @ApiOperation({ summary: 'Get file details' })
@@ -123,7 +123,7 @@ export class FilesController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:file.update', 'board:leader'],
+    permissions: ['project:file.update', 'project:owner'],
     resource: 'FILE',
   })
   @ApiOperation({ summary: 'Update file' })
@@ -146,7 +146,7 @@ export class FilesController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:file.delete', 'board:leader'],
+    permissions: ['project:file.delete', 'project:owner'],
     resource: 'FILE',
   })
   @ApiOperation({ summary: 'Delete file' })
@@ -159,7 +159,7 @@ export class FilesController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:read', 'board:leader'],
+    permissions: ['project:read', 'project:owner'],
     resource: 'FILE',
   })
   @ApiOperation({ summary: 'Get file material versions' })
@@ -238,7 +238,7 @@ export class FilesController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:read', 'board:leader'],
+    permissions: ['project:read', 'project:owner'],
     resource: 'FILE',
   })
   @ApiOperation({ summary: 'Get file tasks' })
@@ -263,7 +263,7 @@ export class FilesController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:task.create', 'board:leader'],
+    permissions: ['project:task.create', 'project:owner'],
     resource: 'FILE',
   })
   @ApiOperation({ summary: 'Create task for file' })

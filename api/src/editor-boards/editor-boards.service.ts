@@ -11,6 +11,9 @@ import { APPLICATION_STATUS, APPLICATION_TYPE, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ACTIVITY_EVENT_NAME, ActivityEventPayload } from '../share/events/activity.event';
+import { ACTIVITY_ACTION, ENTITY_TYPE } from '@prisma/client';
 import type { FilterBoards, OrderBoards } from './interfaces/get-editor-boards.interface';
 
 const USER_SELECT = {
@@ -72,7 +75,10 @@ const APPLICATION_LIST_SELECT = {
 export class EditorBoardsService {
   private readonly logger = new Logger(EditorBoardsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async createEditorBoard(data: {
     name: string;
@@ -219,7 +225,7 @@ export class EditorBoardsService {
     }
   }
 
-  async addMembersToBoard(editorBoardId: number, userIds: number[]) {
+  async addMembersToBoard(editorBoardId: number, userIds: number[], actorId: number) {
     try {
       await this.ensureBoard(editorBoardId);
 
@@ -238,6 +244,17 @@ export class EditorBoardsService {
         })),
         skipDuplicates: true,
       });
+
+      this.eventEmitter.emit(ACTIVITY_EVENT_NAME, {
+        action: ACTIVITY_ACTION.MEMBER_INVITED,
+        entityType: ENTITY_TYPE.EDITOR_BOARD,
+        entityId: editorBoardId,
+        editorBoardId,
+        actorId,
+        metadata: {
+          invitedUserIds: uniqueUserIds,
+        },
+      } satisfies ActivityEventPayload);
     } catch (error) {
       this.handleError(error, 'Add member to editor board fail', ERROR.SVADDBOARDMEMBER);
     }
@@ -297,7 +314,7 @@ export class EditorBoardsService {
     }
   }
 
-  async removeBoardMember(editorBoardId: number, userId: number) {
+  async removeBoardMember(editorBoardId: number, userId: number, actorId: number) {
     try {
       await this.ensureBoard(editorBoardId);
 
@@ -320,6 +337,17 @@ export class EditorBoardsService {
           },
         },
       });
+
+      this.eventEmitter.emit(ACTIVITY_EVENT_NAME, {
+        action: ACTIVITY_ACTION.MEMBER_REMOVED,
+        entityType: ENTITY_TYPE.EDITOR_BOARD,
+        entityId: editorBoardId,
+        editorBoardId,
+        actorId,
+        metadata: {
+          removedUserId: userId,
+        },
+      } satisfies ActivityEventPayload);
     } catch (error) {
       this.handleError(error, 'Remove board member fail', ERROR.SVREMOVEBOARDMEMBER);
     }
