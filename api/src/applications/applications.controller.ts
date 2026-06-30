@@ -36,7 +36,7 @@ import { ApiCreatedResponse } from '@nestjs/swagger';
 @ApiBearerAuth()
 @Controller('applications')
 export class ApplicationsController {
-  constructor(private readonly applicationsService: ApplicationsService) {}
+  constructor(private readonly applicationsService: ApplicationsService) { }
 
   @Permissions({
     mode: 'ANY',
@@ -88,11 +88,6 @@ export class ApplicationsController {
     };
   }
 
-  @Permissions({
-    mode: 'ANY',
-    permissions: ['project:application.read', 'board:leader'],
-    resource: 'APPLICATION',
-  })
   @ApiOperation({ summary: 'Get applications' })
   @ApiOkResponse({
     description: 'Applications retrieved successfully',
