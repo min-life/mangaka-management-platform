@@ -7,8 +7,28 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const configuredOrigins = (process.env.WEB_ORIGIN ?? 'http://localhost:3001')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
   app.enableCors({
-    origin: process.env.WEB_ORIGIN ?? 'http://localhost:3001',
+    origin(origin, callback) {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      const isConfiguredOrigin = configuredOrigins.includes(origin);
+      const isLocalDevOrigin = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(
+        origin,
+      );
+      const isLanDevOrigin = /^https?:\/\/(10|172\.(1[6-9]|2\d|3[0-1])|192\.168)\.\d+\.\d+\.\d+(:\d+)?$/.test(
+        origin,
+      );
+
+      callback(null, isConfiguredOrigin || isLocalDevOrigin || isLanDevOrigin);
+    },
     credentials: true,
   });
   app.useGlobalPipes(

@@ -1,0 +1,108 @@
+import React, { useCallback, useEffect, useState } from 'react';
+import { ScrollView, View } from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+
+import ApiStateView from '@/src/components/shared/ApiStateView';
+import BottomNavBar from '@/src/components/shared/BottomNavBar';
+import { Colors } from '@/src/constants/colors';
+import { RootStackParamList } from '@/src/navigation/types';
+import { fetchProjectBundle } from '@/src/services/projectApi';
+import { fetchTasks } from '@/src/services/taskApi';
+import {
+  CreateTaskFab,
+  FilterChip,
+  FilterChipBar,
+  TaskCard,
+  TasksSearchBar,
+  TasksSectionHeader,
+  TasksTopBar,
+} from './components';
+import { Task } from './components/types';
+
+type TasksScreenProps = NativeStackScreenProps<RootStackParamList, 'Tasks'>;
+
+export default function TasksScreen({ navigation, route }: TasksScreenProps) {
+  const [activeFilter, setActiveFilter] = useState<FilterChip>('All');
+  const [search, setSearch] = useState('');
+  const projectId = route.params?.projectId;
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [projectName, setProjectName] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const loadTasks = useCallback(async () => {
+    setIsLoading(true);
+    setErrorMessage('');
+
+    try {
+      const [tasksResult, projectResult] = await Promise.all([
+        fetchTasks({ projectId, search: search.trim() || undefined }),
+        projectId ? fetchProjectBundle(projectId).catch(() => null) : Promise.resolve(null),
+      ]);
+      setTasks(tasksResult.tasks);
+      setProjectName(projectResult?.project.name ?? null);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải tasks.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [projectId, search]);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      void loadTasks();
+    }, 250);
+
+    return () => clearTimeout(timeout);
+  }, [loadTasks]);
+
+  const filteredTasks = tasks.filter((t) => {
+    const matchFilter =
+      activeFilter === 'All' ||
+      activeFilter === 'Assigned' ||
+      t.status === activeFilter;
+
+    return matchFilter;
+  });
+
+  return (
+    <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
+      <TasksTopBar
+        onBack={() => navigation.goBack()}
+        title={projectName ? `${projectName} Tasks` : 'Tasks'}
+      />
+
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <TasksSearchBar search={search} onSearchChange={setSearch} />
+        <FilterChipBar activeFilter={activeFilter} onFilterChange={setActiveFilter} />
+        {isLoading ? (
+          <ApiStateView type="loading" />
+        ) : errorMessage ? (
+          <ApiStateView type="error" message={errorMessage} onRetry={loadTasks} />
+        ) : (
+          <>
+            <TasksSectionHeader
+              count={filteredTasks.length}
+              title={projectName ? 'Project Tasks' : 'My Tasks'}
+            />
+
+            {filteredTasks.map((task) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                onPress={() => navigation.navigate('TaskDetail', { taskId: task.id })}
+              />
+            ))}
+          </>
+        )}
+      </ScrollView>
+
+      <CreateTaskFab />
+      <BottomNavBar activeTab="inbox" />
+    </View>
+  );
+}
