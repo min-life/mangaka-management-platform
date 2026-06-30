@@ -25,7 +25,10 @@ import {
   X,
 } from 'lucide-react';
 
-import { StudioSidebar, type StudioSidebarItem } from '@/app/(protected)/studio/components/StudioSidebar';
+import {
+  StudioSidebar,
+  type StudioSidebarItem,
+} from '@/app/(protected)/studio/components/StudioSidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -477,7 +480,9 @@ function MemberDetailDrawer({
                 </p>
                 <div className="mt-3 flex items-center justify-between text-sm">
                   <span className="text-[#C8C8C8]">Lead privileges</span>
-                  <span className={member.isLead ? 'font-semibold text-emerald-300' : 'text-[#C8C8C8]'}>
+                  <span
+                    className={member.isLead ? 'font-semibold text-emerald-300' : 'text-[#C8C8C8]'}
+                  >
                     {member.isLead ? 'Enabled' : 'Disabled'}
                   </span>
                 </div>
@@ -639,19 +644,32 @@ export function EditorialMembersManagementPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button className="relative rounded-lg p-2 text-[#B8BEC8] transition hover:bg-[#2F3742] hover:text-white" type="button">
+            <button
+              className="relative rounded-lg p-2 text-[#B8BEC8] transition hover:bg-[#2F3742] hover:text-white"
+              type="button"
+            >
               <Bell className="size-5" />
               <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full border border-[#222831] bg-[#FFD369]" />
             </button>
-            <button className="rounded-lg p-2 text-[#B8BEC8] transition hover:bg-[#2F3742] hover:text-white" type="button">
+            <button
+              className="rounded-lg p-2 text-[#B8BEC8] transition hover:bg-[#2F3742] hover:text-white"
+              type="button"
+            >
               <Settings className="size-5" />
             </button>
             <div className="mx-2 h-8 w-px bg-[#434A55]" />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-4 rounded-xl px-2 py-1.5 transition hover:bg-[#2F3742]" type="button">
+                <button
+                  className="flex items-center gap-4 rounded-xl px-2 py-1.5 transition hover:bg-[#2F3742]"
+                  type="button"
+                >
                   {user?.avatarUrl ? (
-                    <img alt={displayName} className="h-9 w-9 rounded-full border border-[#FFD369] object-cover" src={user.avatarUrl} />
+                    <img
+                      alt={displayName}
+                      className="h-9 w-9 rounded-full border border-[#FFD369] object-cover"
+                      src={user.avatarUrl}
+                    />
                   ) : (
                     <span className="grid h-9 w-9 place-items-center rounded-full border border-[#FFD369] bg-[#101820] text-xs font-black text-white">
                       {initials}
@@ -664,7 +682,10 @@ export function EditorialMembersManagementPage() {
                   <ChevronDown className="size-4 text-[#8B93A5]" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-72 border-[#393E46] bg-[#222831] text-white">
+              <DropdownMenuContent
+                align="end"
+                className="w-72 border-[#393E46] bg-[#222831] text-white"
+              >
                 <DropdownMenuLabel className="py-3">
                   <div className="flex items-center gap-4">
                     <span className="grid h-10 w-10 place-items-center rounded-full border border-[#FFD369] bg-[#101820] text-xs font-black text-white">
@@ -687,7 +708,10 @@ export function EditorialMembersManagementPage() {
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator className="bg-[#393E46]" />
-                <DropdownMenuItem className="cursor-pointer text-red-400 focus:bg-[#2F3742] focus:text-red-400" onClick={logout}>
+                <DropdownMenuItem
+                  className="cursor-pointer text-red-400 focus:bg-[#2F3742] focus:text-red-400"
+                  onClick={logout}
+                >
                   <LogOut className="mr-2 size-4" />
                   Logout
                 </DropdownMenuItem>
@@ -711,7 +735,10 @@ export function EditorialMembersManagementPage() {
                 <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
                   Status
                 </span>
-                <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}>
+                <Select
+                  value={statusFilter}
+                  onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}
+                >
                   <SelectTrigger className="h-10 w-[160px] rounded-[4px] border-[#50555D] bg-[#161c25] text-xs text-[#dde3ef]">
                     <SelectValue />
                   </SelectTrigger>
@@ -743,7 +770,10 @@ export function EditorialMembersManagementPage() {
               { icon: ShieldCheck, label: 'Board Leads', value: summary?.leadMembers ?? 0 },
               { icon: CircleGauge, label: 'Review Load*', value: summary?.reviewLoad ?? 0 },
             ].map((item) => (
-              <article className="rounded-[8px] border border-[#50555D] bg-[#1a2029] p-5" key={item.label}>
+              <article
+                className="rounded-[8px] border border-[#50555D] bg-[#1a2029] p-5"
+                key={item.label}
+              >
                 <div className="flex items-center justify-between">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
                     {item.label}
@@ -814,11 +844,15 @@ export function EditorialMembersManagementPage() {
                             <Badge className="rounded-[4px] border-[#50555D] bg-[#202832] px-2 py-1 text-[11px] font-semibold text-white">
                               {member.roleTitle}*
                             </Badge>
-                            {member.isLead ? <ShieldCheck className="size-4 text-[#FFD369]" /> : null}
+                            {member.isLead ? (
+                              <ShieldCheck className="size-4 text-[#FFD369]" />
+                            ) : null}
                           </div>
                         </TableCell>
                         <TableCell className="px-4 py-4">
-                          <Badge className={`rounded-[4px] px-2 py-1 text-[11px] font-semibold ${statusClassNames[member.status]}`}>
+                          <Badge
+                            className={`rounded-[4px] px-2 py-1 text-[11px] font-semibold ${statusClassNames[member.status]}`}
+                          >
                             {statusLabels[member.status]}*
                           </Badge>
                         </TableCell>
@@ -840,8 +874,14 @@ export function EditorialMembersManagementPage() {
                                 <MoreVertical className="size-5" />
                               </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="min-w-44 border-[#39424f] bg-[#151c25] text-white">
-                              <DropdownMenuItem className="gap-2 focus:bg-[#303842] focus:text-white" onClick={() => setSelectedMember(member)}>
+                            <DropdownMenuContent
+                              align="end"
+                              className="min-w-44 border-[#39424f] bg-[#151c25] text-white"
+                            >
+                              <DropdownMenuItem
+                                className="gap-2 focus:bg-[#303842] focus:text-white"
+                                onClick={() => setSelectedMember(member)}
+                              >
                                 <User className="size-4" />
                                 View Details
                               </DropdownMenuItem>
@@ -868,7 +908,10 @@ export function EditorialMembersManagementPage() {
                     ))
                   ) : (
                     <TableRow className="border-[#50555D]">
-                      <TableCell className="px-4 py-10 text-center text-sm text-[#C8C8C8]" colSpan={6}>
+                      <TableCell
+                        className="px-4 py-10 text-center text-sm text-[#C8C8C8]"
+                        colSpan={6}
+                      >
                         No editorial members found.
                       </TableCell>
                     </TableRow>
@@ -883,14 +926,19 @@ export function EditorialMembersManagementPage() {
               </div>
               <div className="mt-5 grid gap-4">
                 {activities.map((activity) => (
-                  <article className="rounded-[6px] border border-[#39424f] bg-[#101820] p-4" key={activity.id}>
+                  <article
+                    className="rounded-[6px] border border-[#39424f] bg-[#101820] p-4"
+                    key={activity.id}
+                  >
                     <div className="flex items-start gap-3">
                       <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-[4px] bg-[#303842] text-[#FFD369]">
                         <CircleGauge className="size-4" />
                       </span>
                       <div>
                         <p className="text-sm font-semibold text-white">{activity.title}</p>
-                        <p className="mt-1 text-xs leading-5 text-[#C8C8C8]">{activity.description}</p>
+                        <p className="mt-1 text-xs leading-5 text-[#C8C8C8]">
+                          {activity.description}
+                        </p>
                         <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#8b94a1]">
                           {activity.memberName} / {formatDate(activity.timestamp)}
                         </p>
