@@ -46,12 +46,16 @@ import {
 } from './dto';
 import { TasksResponseDto } from '../tasks/dto';
 import { QueryMyTasksReqDto } from '../tasks/dto';
-
+import { ActivityLogsService } from '../activity-logs/activity-logs.service';
+import { QueryActivityLogsReqDto } from '../activity-logs/dto';
 @ApiTags('Projects')
 @ApiBearerAuth()
 @Controller('projects')
 export class ProjectsController {
-  constructor(private readonly projectsService: ProjectsService) {}
+  constructor(
+    private readonly projectsService: ProjectsService,
+    private readonly activityLogsService: ActivityLogsService,
+  ) {}
 
   @ApiOperation({ summary: 'Get projects' })
   @ApiOkResponse({ description: 'Projects retrieved successfully', type: ProjectsResponseDto })
@@ -328,6 +332,25 @@ export class ProjectsController {
     return {
       data: board,
     };
+  }
+
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['project:owner', 'project:read'],
+    resource: 'PROJECT',
+  })
+  @ApiOperation({ summary: 'Get activity logs for a project' })
+  @ApiParam({ name: 'id', type: Number, description: 'Project id' })
+  @ApiOkResponse({ description: 'Project activity logs retrieved successfully' })
+  @Get(':id/activity-logs')
+  async getProjectActivityLogs(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: QueryActivityLogsReqDto,
+  ) {
+    return await this.activityLogsService.getActivityLogs({
+      ...query,
+      projectId: id,
+    });
   }
 
   @Permissions({

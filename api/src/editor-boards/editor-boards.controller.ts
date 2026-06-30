@@ -37,12 +37,16 @@ import {
   QueryBoardsReqDto,
   UpdateBoardReqDto,
 } from './dto';
-
+import { ActivityLogsService } from '../activity-logs/activity-logs.service';
+import { QueryActivityLogsReqDto } from '../activity-logs/dto';
 @ApiTags('Editor Boards')
 @ApiBearerAuth()
 @Controller('editor-boards')
 export class EditorBoardsController {
-  constructor(private readonly editorBoardsService: EditorBoardsService) {}
+  constructor(
+    private readonly editorBoardsService: EditorBoardsService,
+    private readonly activityLogsService: ActivityLogsService,
+  ) {}
 
   @ApiOperation({ summary: 'Create editor board' })
   @ApiCreatedResponse({
@@ -343,5 +347,24 @@ export class EditorBoardsController {
       data: applications.applications,
       pagination: applications.pagination,
     };
+  }
+
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['board:leader', 'board:member', 'board:owner'],
+    resource: 'BOARD',
+  })
+  @ApiOperation({ summary: 'Get activity logs for an editor board' })
+  @ApiParam({ name: 'id', type: Number, description: 'Editor board id' })
+  @ApiOkResponse({ description: 'Editor board activity logs retrieved successfully' })
+  @Get(':id/activity-logs')
+  async getBoardActivityLogs(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: QueryActivityLogsReqDto,
+  ) {
+    return await this.activityLogsService.getActivityLogs({
+      ...query,
+      editorBoardId: id,
+    });
   }
 }

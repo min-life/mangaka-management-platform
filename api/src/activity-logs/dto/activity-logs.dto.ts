@@ -16,22 +16,4 @@ export class QueryActivityLogsReqDto {
   @IsNumber()
   @Min(1)
   limit?: number;
-
-  @ApiPropertyOptional({ example: 1, description: 'Filter by Project ID' })
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  projectId?: number;
-
-  @ApiPropertyOptional({ example: 2, description: 'Filter by Editor Board ID' })
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  editorBoardId?: number;
-
-  @ApiPropertyOptional({ example: 3, description: 'Filter by specific actor ID' })
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  actorId?: number;
 }
