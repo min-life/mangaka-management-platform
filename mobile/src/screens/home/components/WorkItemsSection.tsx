@@ -4,12 +4,14 @@ import { View } from 'react-native';
 import WorkItemRow from '@/src/components/sub-component/WorkItemRow';
 import { Colors } from '@/src/constants/colors';
 import { WORK_ITEMS } from '@/src/constants/homeData';
+import { WorkItem } from '@/src/types/home';
 
 interface WorkItemsSectionProps {
   onApplicationsPress: () => void;
   onEditorBoardsPress: () => void;
   onTasksPress: () => void;
   onProjectsPress: () => void;
+  workItems?: WorkItem[];
 }
 
 export default function WorkItemsSection({
@@ -17,6 +19,7 @@ export default function WorkItemsSection({
   onEditorBoardsPress,
   onTasksPress,
   onProjectsPress,
+  workItems = WORK_ITEMS,
 }: WorkItemsSectionProps) {
   return (
     <View
@@ -27,11 +30,11 @@ export default function WorkItemsSection({
         borderColor: Colors.borderSubtle,
       }}
     >
-      {WORK_ITEMS.map((item, index) => (
+      {workItems.map((item, index) => (
         <WorkItemRow
           key={item.id}
           item={item}
-          isLast={index === WORK_ITEMS.length - 1}
+          isLast={index === workItems.length - 1}
           onPress={
             item.id === 'tasks'
               ? onTasksPress

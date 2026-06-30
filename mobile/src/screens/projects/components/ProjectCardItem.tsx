@@ -1,6 +1,7 @@
 import React from 'react';
 import { Image, Text, TouchableOpacity, View } from 'react-native';
 
+import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
 import { ProjectItem } from '@/src/types/projects';
 
@@ -20,16 +21,19 @@ export default function ProjectCardItem({ project, onPress }: ProjectCardItemPro
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`${project.name}, created by ${project.createdByName}, ${dateRange}`}
-      className="overflow-hidden rounded-2xl"
+      className="overflow-hidden rounded-xl"
       style={{
-        backgroundColor: Colors.surface,
-        borderWidth: 1,
-        borderColor: Colors.borderFaint,
+        width: '48%',
       }}
     >
       <View
-        className="h-[150px] w-full items-center justify-center"
-        style={{ backgroundColor: project.avatarBg }}
+        className="w-full items-center justify-center overflow-hidden rounded-xl"
+        style={{
+          aspectRatio: 0.68,
+          backgroundColor: project.avatarBg,
+          borderWidth: 1,
+          borderColor: Colors.borderFaint,
+        }}
       >
         {project.coverUri ? (
           <Image
@@ -44,18 +48,30 @@ export default function ProjectCardItem({ project, onPress }: ProjectCardItemPro
         )}
       </View>
 
-      <View className="px-4 py-4">
-        <Text className="text-[18px] font-bold" style={{ color: Colors.text }} numberOfLines={1}>
+      <View className="pt-3">
+        <Text className="text-[15px] font-bold" style={{ color: Colors.text }} numberOfLines={1}>
           {project.name}
         </Text>
-        <Text
-          className="mt-1 text-[13px] font-semibold"
-          style={{ color: 'rgba(237,241,251,0.72)' }}
-          numberOfLines={1}
-        >
-          {project.createdByName}
-        </Text>
-        <Text className="mt-1 text-[12px]" style={{ color: Colors.textMuted }} numberOfLines={1}>
+        <View className="mt-1 flex-row items-center justify-between gap-2">
+          <Text
+            className="flex-1 text-[12px] font-semibold"
+            style={{ color: 'rgba(237,241,251,0.72)' }}
+            numberOfLines={1}
+          >
+            {project.createdByName}
+          </Text>
+          <View className="flex-row items-center gap-1">
+            <MaterialIcon name="star" color={Colors.accent} size={14} />
+            <Text
+              className="text-[12px] font-semibold"
+              style={{ color: Colors.text, fontVariant: ['tabular-nums'] }}
+              numberOfLines={1}
+            >
+              {project.stars}
+            </Text>
+          </View>
+        </View>
+        <Text className="mt-1 text-[11px]" style={{ color: Colors.textMuted }} numberOfLines={1}>
           {dateRange}
         </Text>
       </View>

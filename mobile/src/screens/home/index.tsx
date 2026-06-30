@@ -1,10 +1,13 @@
-import React, { useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
+import ApiStateView from '@/src/components/shared/ApiStateView';
 import { RootStackNavProp } from '@/src/navigation/types';
 import { Colors } from '@/src/constants/colors';
 import BottomNavBar from '@/src/components/shared/BottomNavBar';
+import { fetchHomeSummary } from '@/src/services/homeApi';
+import { ActivityItem, WorkItem } from '@/src/types/home';
 import HomeSectionTitle from './components/HomeSectionTitle';
 import HomeTopBar from './components/HomeTopBar';
 import TodayActivitySection from './components/TodayActivitySection';
@@ -13,6 +16,29 @@ import WorkItemsSection from './components/WorkItemsSection';
 export default function HomeScreen() {
   const navigation = useNavigation<RootStackNavProp>();
   const scrollY = useRef(new Animated.Value(0)).current;
+  const [workItems, setWorkItems] = useState<WorkItem[]>([]);
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const loadHome = useCallback(async () => {
+    setIsLoading(true);
+    setErrorMessage('');
+
+    try {
+      const result = await fetchHomeSummary();
+      setWorkItems(result.workItems);
+      setActivities(result.activities);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải Home.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadHome();
+  }, [loadHome]);
 
   const headerBg = scrollY.interpolate({
     inputRange: [0, 20],
@@ -35,13 +61,22 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         <HomeSectionTitle />
-        <WorkItemsSection
-          onApplicationsPress={() => navigation.navigate('Applications')}
-          onEditorBoardsPress={() => navigation.navigate('EditorBoards')}
-          onTasksPress={() => navigation.navigate('Tasks')}
-          onProjectsPress={() => navigation.navigate('Projects')}
-        />
-        <TodayActivitySection />
+        {isLoading ? (
+          <ApiStateView type="loading" />
+        ) : errorMessage ? (
+          <ApiStateView type="error" message={errorMessage} onRetry={loadHome} />
+        ) : (
+          <>
+            <WorkItemsSection
+              workItems={workItems}
+              onApplicationsPress={() => navigation.navigate('Applications')}
+              onEditorBoardsPress={() => navigation.navigate('EditorBoards')}
+              onTasksPress={() => navigation.navigate('Tasks')}
+              onProjectsPress={() => navigation.navigate('Projects')}
+            />
+            <TodayActivitySection activities={activities} />
+          </>
+        )}
       </Animated.ScrollView>
 
       <BottomNavBar

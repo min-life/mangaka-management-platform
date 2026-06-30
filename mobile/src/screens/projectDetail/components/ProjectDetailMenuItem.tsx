@@ -9,6 +9,7 @@ interface ProjectDetailMenuItemProps {
   iconColor: string;
   iconBg: string;
   label: string;
+  subtitle?: string;
   count?: number;
   isLast?: boolean;
   onPress?: () => void;
@@ -20,6 +21,7 @@ export default function ProjectDetailMenuItem({
   iconColor,
   iconBg,
   label,
+  subtitle,
   count,
   isLast = false,
   onPress,
@@ -48,9 +50,24 @@ export default function ProjectDetailMenuItem({
           borderBottomColor: Colors.borderFaint,
         }}
       >
-        <Text className="flex-1 text-[15px] font-medium" style={{ color: Colors.text }}>
-          {label}
-        </Text>
+        <View className="flex-1 pr-3">
+          <Text
+            className="text-[15px] font-medium"
+            style={{ color: Colors.text }}
+            numberOfLines={1}
+          >
+            {label}
+          </Text>
+          {subtitle && (
+            <Text
+              className="mt-0.5 text-[12px]"
+              style={{ color: Colors.textMuted }}
+              numberOfLines={1}
+            >
+              {subtitle}
+            </Text>
+          )}
+        </View>
 
         {count !== undefined && (
           <Text

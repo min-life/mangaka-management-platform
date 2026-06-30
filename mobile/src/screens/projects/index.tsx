@@ -1,11 +1,13 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
+import ApiStateView from '@/src/components/shared/ApiStateView';
 import BottomNavBar from '@/src/components/shared/BottomNavBar';
 import { Colors } from '@/src/constants/colors';
-import { PROJECTS } from '@/src/constants/projectsData';
 import { RootStackNavProp } from '@/src/navigation/types';
+import { fetchProjects } from '@/src/services/projectApi';
+import { ProjectItem } from '@/src/types/projects';
 
 import {
   ProjectCardItem,
@@ -24,22 +26,39 @@ export default function ProjectsScreen() {
   const [search, setSearch] = useState('');
   const [activeType, setActiveType] = useState<ProjectTypeFilterValue>('All');
   const [viewMode, setViewMode] = useState<ProjectViewMode>('list');
+  const [projects, setProjects] = useState<ProjectItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const loadProjects = useCallback(async () => {
+    setIsLoading(true);
+    setErrorMessage('');
+
+    try {
+      const result = await fetchProjects({ name: search.trim() || undefined });
+      setProjects(result.projects);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải projects.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [search]);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      void loadProjects();
+    }, 250);
+
+    return () => clearTimeout(timeout);
+  }, [loadProjects]);
 
   const filteredProjects = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
-
-    return PROJECTS.filter((project) => {
-      const matchesSearch =
-        normalizedSearch.length === 0 ||
-        project.name.toLowerCase().includes(normalizedSearch) ||
-        project.owner.toLowerCase().includes(normalizedSearch) ||
-        project.language.toLowerCase().includes(normalizedSearch);
-
+    return projects.filter((project) => {
       const matchesType = activeType === 'All' || project.type === activeType;
 
-      return matchesSearch && matchesType;
+      return matchesType;
     });
-  }, [activeType, search]);
+  }, [activeType, projects]);
 
   return (
     <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
@@ -61,35 +80,45 @@ export default function ProjectsScreen() {
           </View>
         </View>
 
-        <View
-          className={viewMode === 'card' ? 'gap-4 px-4 pt-1' : undefined}
-          style={
-            viewMode === 'list'
-              ? { borderTopWidth: 1, borderTopColor: Colors.borderFaint }
-              : undefined
-          }
-        >
-          {filteredProjects.length > 0 ? (
-            filteredProjects.map((project, index) =>
-              viewMode === 'list' ? (
-                <ProjectListItem
-                  key={project.id}
-                  project={project}
-                  isLast={index === filteredProjects.length - 1}
-                  onPress={() => navigation.navigate('ProjectDetail', { projectId: project.id })}
-                />
-              ) : (
-                <ProjectCardItem
-                  key={project.id}
-                  project={project}
-                  onPress={() => navigation.navigate('ProjectDetail', { projectId: project.id })}
-                />
-              ),
-            )
-          ) : (
-            <ProjectsEmptyState />
-          )}
-        </View>
+        {isLoading ? (
+          <ApiStateView type="loading" />
+        ) : errorMessage ? (
+          <ApiStateView type="error" message={errorMessage} onRetry={loadProjects} />
+        ) : (
+          <View
+            className={
+              viewMode === 'card'
+                ? 'flex-row flex-wrap justify-between gap-y-5 px-4 pt-1'
+                : undefined
+            }
+            style={
+              viewMode === 'list'
+                ? { borderTopWidth: 1, borderTopColor: Colors.borderFaint }
+                : undefined
+            }
+          >
+            {filteredProjects.length > 0 ? (
+              filteredProjects.map((project, index) =>
+                viewMode === 'list' ? (
+                  <ProjectListItem
+                    key={project.id}
+                    project={project}
+                    isLast={index === filteredProjects.length - 1}
+                    onPress={() => navigation.navigate('ProjectDetail', { projectId: project.id })}
+                  />
+                ) : (
+                  <ProjectCardItem
+                    key={project.id}
+                    project={project}
+                    onPress={() => navigation.navigate('ProjectDetail', { projectId: project.id })}
+                  />
+                ),
+              )
+            ) : (
+              <ProjectsEmptyState />
+            )}
+          </View>
+        )}
       </ScrollView>
 
       <BottomNavBar activeTab="home" />

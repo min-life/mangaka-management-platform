@@ -45,3 +45,10 @@ export function getPageCount(folder: ResourceFolderNode): number {
     return total + getPageCount(node);
   }, 0);
 }
+
+export function getMaterialVersionCount(folder: ResourceFolderNode): number {
+  return folder.children.reduce((total, node) => {
+    if (node.type === 'file') return total + (node.materialVersions?.length ?? 0);
+    return total + getMaterialVersionCount(node);
+  }, 0);
+}

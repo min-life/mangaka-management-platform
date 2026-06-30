@@ -19,8 +19,13 @@ export type RootStackParamList = {
   EditorBoardAttachProject: { boardId: string };
   Resources: { projectId: string };
   ResourceFolderDetail: { projectId: string; folderId: string };
-  ResourceFile: { projectId: string; fileId: string; parentFolderId: string };
-  TaskDetail: undefined;
+  ResourceFile: {
+    projectId: string;
+    fileId: string;
+    parentFolderId: string;
+    initialTab?: 'Overview' | 'Tasks' | 'Materials';
+  };
+  TaskDetail: { taskId: string } | undefined;
   Profile: undefined;
   Notifications: undefined;
 };

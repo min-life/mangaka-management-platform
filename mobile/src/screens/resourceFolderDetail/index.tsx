@@ -1,18 +1,13 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import ApiStateView from '@/src/components/shared/ApiStateView';
 import BottomNavBar from '@/src/components/shared/BottomNavBar';
 import { Colors } from '@/src/constants/colors';
-import { PROJECTS } from '@/src/constants/projectsData';
-import {
-  findResourceFolder,
-  getFolderChildren,
-  getFolderFiles,
-  getProjectResourceTree,
-} from '@/src/constants/resourcesData';
 import { RootStackParamList } from '@/src/navigation/types';
-import { ResourceNode } from '@/src/types/resources';
+import { fetchFolderBundle } from '@/src/services/resourceApi';
+import { ResourceFolderNode, ResourceNode } from '@/src/types/resources';
 import { ProjectDetailTopBar } from '@/src/screens/projectDetail/components';
 import {
   ResourceDetailRow,
@@ -29,14 +24,29 @@ export default function ResourceFolderDetailScreen({
   navigation,
   route,
 }: ResourceFolderDetailScreenProps) {
-  const project = PROJECTS.find((item) => item.id === route.params.projectId);
-  const root = getProjectResourceTree(route.params.projectId);
-  const folder = findResourceFolder(root, route.params.folderId);
+  const [folder, setFolder] = useState<ResourceFolderNode | null>(null);
+  const [folderItems, setFolderItems] = useState<ResourceNode[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const folderItems = useMemo<ResourceNode[]>(() => {
-    if (!folder) return [];
-    return [...getFolderChildren(folder), ...getFolderFiles(folder)];
-  }, [folder]);
+  const loadFolder = useCallback(async () => {
+    setIsLoading(true);
+    setErrorMessage('');
+
+    try {
+      const bundle = await fetchFolderBundle(route.params.folderId);
+      setFolder(bundle.folder);
+      setFolderItems(bundle.items);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải folder.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [route.params.folderId]);
+
+  useEffect(() => {
+    void loadFolder();
+  }, [loadFolder]);
 
   const handleNodePress = (node: ResourceNode) => {
     if (node.type === 'folder') {
@@ -54,15 +64,24 @@ export default function ResourceFolderDetailScreen({
     });
   };
 
-  if (!project || !folder) {
+  if (isLoading) {
     return (
       <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
         <ProjectDetailTopBar onBack={() => navigation.goBack()} />
-        <View className="flex-1 items-center justify-center px-6">
-          <Text className="text-center text-[15px] font-medium" style={{ color: Colors.text }}>
-            Resource folder not found
-          </Text>
-        </View>
+        <ApiStateView type="loading" />
+      </View>
+    );
+  }
+
+  if (errorMessage || !folder) {
+    return (
+      <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
+        <ProjectDetailTopBar onBack={() => navigation.goBack()} />
+        <ApiStateView
+          type="error"
+          message={errorMessage || 'Resource folder not found'}
+          onRetry={loadFolder}
+        />
       </View>
     );
   }

@@ -1,19 +1,17 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import ApiStateView from '@/src/components/shared/ApiStateView';
 import { Colors } from '@/src/constants/colors';
-import {
-  findResourceFile,
-  findResourceNode,
-  getProjectResourceTree,
-} from '@/src/constants/resourcesData';
 import { RootStackParamList } from '@/src/navigation/types';
 import {
   ResourceFileMaterialVersion,
+  ResourceFileNode,
   ResourceFileTask,
   ResourceTaskFrame,
 } from '@/src/types/resources';
+import { fetchFolderBundle, fetchResourceFileBundle } from '@/src/services/resourceApi';
 
 import {
   C,
@@ -50,23 +48,45 @@ export default function ResourceFileScreen({
   navigation,
   route,
 }: ResourceFileScreenProps) {
-  const [activeTab, setActiveTab] = useState<ResourceFileTab>('Overview');
+  const [activeTab, setActiveTab] = useState<ResourceFileTab>(
+    route.params.initialTab ?? 'Overview',
+  );
   const [comment, setComment] = useState('');
-  const root = getProjectResourceTree(route.params.projectId);
-  const file = findResourceFile(root, route.params.fileId);
-  const parentNode = findResourceNode(root, route.params.parentFolderId);
-  const parentName = parentNode?.type === 'folder' ? parentNode.name : 'Resource';
+  const [file, setFile] = useState<ResourceFileNode | null>(null);
+  const [parentName, setParentName] = useState('Resource');
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [selectedFrame, setSelectedFrame] = useState<ResourceTaskFrame | null>(null);
+
+  const loadFile = useCallback(async () => {
+    setIsLoading(true);
+    setErrorMessage('');
+
+    try {
+      const [nextFile, parentBundle] = await Promise.all([
+        fetchResourceFileBundle(route.params.fileId),
+        fetchFolderBundle(route.params.parentFolderId).catch(() => null),
+      ]);
+      setFile(nextFile);
+      setParentName(parentBundle?.folder.name ?? 'Resource');
+      setSelectedVersionId(nextFile.materialVersions?.[0]?.id ?? null);
+      setSelectedTaskId(nextFile.tasks?.[0]?.id ?? null);
+      setSelectedFrame(nextFile.tasks?.[0]?.frames[0] ?? null);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải file.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [route.params.fileId, route.params.parentFolderId]);
+
+  useEffect(() => {
+    void loadFile();
+  }, [loadFile]);
+
   const versions = file?.materialVersions ?? [];
   const tasks = file?.tasks ?? [];
-  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(
-    versions[0]?.id ?? null,
-  );
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(
-    tasks[0]?.id ?? null,
-  );
-  const [selectedFrame, setSelectedFrame] = useState<ResourceTaskFrame | null>(
-    tasks[0]?.frames[0] ?? null,
-  );
 
   const description = useMemo(
     () => (file ? buildFileDescription(file.content, file.language) : ''),
@@ -97,7 +117,16 @@ export default function ResourceFileScreen({
     setActiveTab('Materials');
   };
 
-  if (!file) {
+  if (isLoading) {
+    return (
+      <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
+        <TaskDetailTopBar subtitle="Resource" title="File" onBack={() => navigation.goBack()} />
+        <ApiStateView type="loading" />
+      </View>
+    );
+  }
+
+  if (errorMessage || !file) {
     return (
       <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
         <TaskDetailTopBar
@@ -105,11 +134,7 @@ export default function ResourceFileScreen({
           title="File"
           onBack={() => navigation.goBack()}
         />
-        <View className="flex-1 items-center justify-center px-6">
-          <Text className="text-center text-[16px] font-bold" style={{ color: Colors.text }}>
-            File not found
-          </Text>
-        </View>
+        <ApiStateView type="error" message={errorMessage || 'File not found'} onRetry={loadFile} />
       </View>
     );
   }

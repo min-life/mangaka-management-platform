@@ -16,10 +16,16 @@ export default function ActionTab({
 }: ActionTabProps) {
   return (
     <View className="mt-6 gap-3">
-      {/* Approve */}
+      <Text
+        className="text-[11px] font-bold uppercase"
+        style={{ color: C.textMuted, letterSpacing: 1.1 }}
+      >
+        Actions
+      </Text>
+
       <TouchableOpacity
         activeOpacity={0.85}
-        className="w-full h-14 rounded-xl items-center justify-center flex-row gap-2"
+        className="h-14 w-full flex-row items-center justify-center gap-2 rounded-xl"
         style={{ backgroundColor: C.accent }}
       >
         <MaterialIcon name="check_circle" color="#222831" size={22} />
@@ -28,10 +34,9 @@ export default function ActionTab({
         </Text>
       </TouchableOpacity>
 
-      {/* Reject */}
       <TouchableOpacity
         activeOpacity={0.85}
-        className="w-full h-14 rounded-xl items-center justify-center flex-row gap-2"
+        className="h-14 w-full flex-row items-center justify-center gap-2 rounded-xl"
         style={{ backgroundColor: C.error }}
       >
         <MaterialIcon name="cancel" color={C.onError} size={22} />

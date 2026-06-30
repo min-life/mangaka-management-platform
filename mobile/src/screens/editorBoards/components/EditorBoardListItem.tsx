@@ -3,7 +3,6 @@ import { Text, TouchableOpacity, View } from 'react-native';
 
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
-import { getBoardMembers, getBoardPublishRequests } from '@/src/constants/editorBoardsData';
 import { EditorBoardItem } from '@/src/types/editorBoards';
 
 import BoardRoleBadge from './BoardRoleBadge';
@@ -19,10 +18,7 @@ export default function EditorBoardListItem({
   isLast,
   onPress,
 }: EditorBoardListItemProps) {
-  const memberCount = getBoardMembers(board).length;
-  const pendingCount = getBoardPublishRequests(board).filter(
-    (application) => application.status === 'PENDING',
-  ).length;
+  const memberCount = board.memberIds.length;
 
   return (
     <TouchableOpacity
@@ -58,7 +54,7 @@ export default function EditorBoardListItem({
           {memberCount} members - {board.projectIds.length} projects
         </Text>
         <Text className="mt-1 text-[12px]" style={{ color: Colors.textMuted }} numberOfLines={1}>
-          {pendingCount} pending - {board.updatedAtLabel}
+          {board.updatedAtLabel}
         </Text>
       </View>
     </TouchableOpacity>

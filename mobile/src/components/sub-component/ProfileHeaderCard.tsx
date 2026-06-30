@@ -5,13 +5,25 @@ import { PROFILE_USER, PROFILE_STATS } from '@/src/constants/profileData';
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
 
 interface ProfileHeaderCardProps {
+  avatarUri?: string | null;
+  email?: string;
+  name?: string | null;
   onSettingsPress?: () => void;
 }
 
 /**
  * ProfileHeaderCard — Avatar, tên, email, role/studio + stats (Tasks, Reviews, Projects)
  */
-export default function ProfileHeaderCard({ onSettingsPress }: ProfileHeaderCardProps) {
+export default function ProfileHeaderCard({
+  avatarUri,
+  email,
+  name,
+  onSettingsPress,
+}: ProfileHeaderCardProps) {
+  const displayName = name || PROFILE_USER.name;
+  const displayEmail = email || PROFILE_USER.email;
+  const displayAvatar = avatarUri || PROFILE_USER.avatarUri;
+
   return (
     <View
       className="rounded-[22px] p-5"
@@ -29,7 +41,7 @@ export default function ProfileHeaderCard({ onSettingsPress }: ProfileHeaderCard
           style={{ borderWidth: 2, borderColor: Colors.surface }}
         >
           <Image
-            source={{ uri: PROFILE_USER.avatarUri }}
+            source={{ uri: displayAvatar }}
             className="w-full h-full"
             resizeMode="cover"
           />
@@ -38,10 +50,10 @@ export default function ProfileHeaderCard({ onSettingsPress }: ProfileHeaderCard
         {/* Name / email / badge */}
         <View className="flex-1">
           <Text className="text-[18px] font-semibold" style={{ color: Colors.text }}>
-            {PROFILE_USER.name}
+            {displayName}
           </Text>
           <Text className="text-[14px] mt-0.5" style={{ color: Colors.textMuted }}>
-            {PROFILE_USER.email}
+            {displayEmail}
           </Text>
 
           {/* Role + Studio */}

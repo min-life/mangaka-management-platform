@@ -5,7 +5,7 @@ import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
 import { ResourceNode } from '@/src/types/resources';
 
-import { getPageCount } from './resourceFormatters';
+import { getMaterialVersionCount, getPageCount } from './resourceFormatters';
 
 interface ResourceDetailRowProps {
   node: ResourceNode;
@@ -19,8 +19,13 @@ export default function ResourceDetailRow({
   onPress,
 }: ResourceDetailRowProps) {
   const isChapter = node.type === 'folder';
+  const materialCount = isChapter
+    ? getMaterialVersionCount(node)
+    : node.materialVersions?.length ?? 0;
   const helperText = isChapter
-    ? `${getPageCount(node)} page${getPageCount(node) === 1 ? '' : 's'}`
+    ? `${getPageCount(node)} page${
+        getPageCount(node) === 1 ? '' : 's'
+      } - ${materialCount} material versions`
     : node.description ?? node.language;
 
   return (
@@ -70,9 +75,21 @@ export default function ResourceDetailRow({
             {isChapter ? 'Chapter' : 'Manga page'}
           </Text>
 
-          <Text className="mt-2 text-[13px] leading-5" style={{ color: Colors.textMuted }} numberOfLines={2}>
+          <Text
+            className="mt-2 text-[13px] leading-5"
+            style={{ color: Colors.textMuted }}
+            numberOfLines={2}
+          >
             {helperText}
           </Text>
+          {!isChapter && (
+            <View className="mt-2 flex-row items-center gap-1.5">
+              <MaterialIcon name="file" color={Colors.statusDone} size={15} />
+              <Text className="text-[12px] font-semibold" style={{ color: Colors.textFaint }}>
+                {materialCount} material version{materialCount === 1 ? '' : 's'}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
     </TouchableOpacity>

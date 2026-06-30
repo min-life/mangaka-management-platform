@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
@@ -11,49 +11,58 @@ interface FilterOption<T extends string> {
 
 interface ApplicationFilterSelectProps<T extends string> {
   activeValue: T;
+  accessibilityLabel: string;
+  icon: string;
+  isOpen: boolean;
   options: Array<FilterOption<T>>;
   onChange: (value: T) => void;
+  onOpenChange: (isOpen: boolean) => void;
 }
 
 export default function ApplicationFilterSelect<T extends string>({
   activeValue,
+  accessibilityLabel,
+  icon,
+  isOpen,
   options,
   onChange,
+  onOpenChange,
 }: ApplicationFilterSelectProps<T>) {
-  const [isOpen, setIsOpen] = useState(false);
   const activeOption = options.find((option) => option.value === activeValue) ?? options[0];
+  const isFiltered = activeValue !== options[0]?.value;
 
   return (
-    <View>
+    <View className="items-end" style={{ position: 'relative', zIndex: isOpen ? 30 : 1 }}>
       <TouchableOpacity
         activeOpacity={0.76}
-        onPress={() => setIsOpen((value) => !value)}
+        onPress={() => onOpenChange(!isOpen)}
         accessibilityRole="button"
-        accessibilityLabel="Select application filter"
-        className="h-12 flex-row items-center rounded-xl px-4"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityValue={{ text: activeOption.label }}
+        className="h-12 w-12 items-center justify-center rounded-xl"
         style={{
-          backgroundColor: Colors.surface,
+          backgroundColor: isFiltered ? Colors.surfaceContainer : Colors.surface,
           borderWidth: 1,
-          borderColor: Colors.borderSubtle,
+          borderColor: isOpen || isFiltered ? Colors.accent : Colors.borderFaint,
         }}
       >
-        <Text className="flex-1 text-[13px] font-semibold" style={{ color: Colors.text }} numberOfLines={1}>
-          {activeOption.label}
-        </Text>
-        <MaterialIcon
-          name={isOpen ? 'expand_less' : 'expand_more'}
-          color={Colors.textMuted}
-          size={22}
-        />
+        <MaterialIcon name={icon} color={isFiltered ? Colors.text : Colors.textFaint} size={20} />
+        {isFiltered && (
+          <View
+            className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full"
+            style={{ backgroundColor: Colors.accent }}
+          />
+        )}
       </TouchableOpacity>
 
       {isOpen && (
         <View
-          className="mt-2 overflow-hidden rounded-xl"
+          className="absolute right-0 top-14 w-48 overflow-hidden rounded-xl"
           style={{
             backgroundColor: Colors.surface,
             borderWidth: 1,
             borderColor: Colors.borderSubtle,
+            boxShadow: '0 8px 22px rgba(0, 0, 0, 0.28)',
           }}
         >
           {options.map((option, index) => {
@@ -65,7 +74,7 @@ export default function ApplicationFilterSelect<T extends string>({
                 activeOpacity={0.72}
                 onPress={() => {
                   onChange(option.value);
-                  setIsOpen(false);
+                  onOpenChange(false);
                 }}
                 accessibilityRole="button"
                 accessibilityState={{ selected: isActive }}

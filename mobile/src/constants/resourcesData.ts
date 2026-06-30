@@ -1,6 +1,7 @@
 import {
   ProjectResourceTree,
   ResourceFileNode,
+  ResourceFileMaterialVersion,
   ResourceFileTask,
   ResourceTaskComment,
   ResourceTaskFrame,
@@ -13,6 +14,13 @@ interface PageSeed {
   name: string;
   description: string;
   content: string;
+}
+
+export interface ProjectMaterialFile {
+  file: ResourceFileNode;
+  folderId: string;
+  latestVersion: ResourceFileMaterialVersion;
+  versionCount: number;
 }
 
 const STATUS_ROTATION: ResourceFileTask['status'][] = [
@@ -571,6 +579,31 @@ export function getProjectRootFolders(projectId: string): ResourceFolderNode[] {
   return getProjectResourceTree(projectId).children.filter(
     (node): node is ResourceFolderNode => node.type === 'folder' && node.parentId === null,
   );
+}
+
+function collectMaterialFiles(folder: ResourceFolderNode, result: ProjectMaterialFile[]) {
+  for (const node of folder.children) {
+    if (node.type === 'folder') {
+      collectMaterialFiles(node, result);
+      continue;
+    }
+
+    const versions = node.materialVersions ?? [];
+    if (versions.length > 0) {
+      result.push({
+        file: node,
+        folderId: node.folderId ?? folder.id,
+        latestVersion: versions[0],
+        versionCount: versions.length,
+      });
+    }
+  }
+}
+
+export function getProjectMaterialFiles(projectId: string): ProjectMaterialFile[] {
+  const result: ProjectMaterialFile[] = [];
+  collectMaterialFiles(getProjectResourceTree(projectId), result);
+  return result;
 }
 
 export function findResourceNode(

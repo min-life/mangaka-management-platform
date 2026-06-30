@@ -1,13 +1,13 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import ApiStateView from '@/src/components/shared/ApiStateView';
 import BottomNavBar from '@/src/components/shared/BottomNavBar';
 import { Colors } from '@/src/constants/colors';
-import { getProjectApplications } from '@/src/constants/applicationsData';
-import { EDITOR_BOARDS } from '@/src/constants/editorBoardsData';
-import { PROJECTS } from '@/src/constants/projectsData';
 import { RootStackParamList } from '@/src/navigation/types';
+import { fetchProjectBundle } from '@/src/services/projectApi';
+import { ProjectItem } from '@/src/types/projects';
 
 import {
   ProjectDetailHero,
@@ -18,21 +18,48 @@ import {
 type ProjectDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'ProjectDetail'>;
 
 export default function ProjectDetailScreen({ navigation, route }: ProjectDetailScreenProps) {
-  const project = PROJECTS.find((item) => item.id === route.params.projectId);
-  const projectApplications = getProjectApplications(route.params.projectId);
-  const editorBoard = EDITOR_BOARDS.find((board) =>
-    board.projectIds.includes(route.params.projectId),
-  );
+  const [project, setProject] = useState<ProjectItem | null>(null);
+  const [boardId, setBoardId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  if (!project) {
+  const loadProject = useCallback(async () => {
+    setIsLoading(true);
+    setErrorMessage('');
+
+    try {
+      const bundle = await fetchProjectBundle(route.params.projectId);
+      setProject(bundle.project);
+      setBoardId(bundle.board ? String(bundle.board.id) : null);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải project.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [route.params.projectId]);
+
+  useEffect(() => {
+    void loadProject();
+  }, [loadProject]);
+
+  if (isLoading) {
     return (
       <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
         <ProjectDetailTopBar onBack={() => navigation.goBack()} />
-        <View className="flex-1 items-center justify-center px-6">
-          <Text className="text-center text-[15px] font-medium" style={{ color: Colors.text }}>
-            Project not found
-          </Text>
-        </View>
+        <ApiStateView type="loading" />
+      </View>
+    );
+  }
+
+  if (errorMessage || !project) {
+    return (
+      <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
+        <ProjectDetailTopBar onBack={() => navigation.goBack()} />
+        <ApiStateView
+          type="error"
+          message={errorMessage || 'Project not found'}
+          onRetry={loadProject}
+        />
       </View>
     );
   }
@@ -40,6 +67,7 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
   const menuItems = [
     {
       label: 'Resource',
+      subtitle: `${project.files} files - ${project.materials} materials`,
       count: project.files,
       icon: 'folder',
       iconColor: '#FFFFFF',
@@ -48,7 +76,11 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
     },
     {
       label: 'Application',
-      count: projectApplications.length,
+      count:
+        project.applications.pending +
+        project.applications.approved +
+        project.applications.rejected +
+        project.applications.cancelled,
       icon: 'apps',
       iconColor: '#FFFFFF',
       iconBg: Colors.statusProgress,
@@ -68,12 +100,14 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
     },
     {
       label: 'Editor Board',
+      subtitle: project.editorBoard,
+      count: boardId ? 1 : 0,
       icon: 'groups',
       iconColor: '#FFFFFF',
       iconBg: '#14B8A6',
       onPress: () =>
-        editorBoard
-          ? navigation.navigate('EditorBoardDetail', { boardId: editorBoard.id })
+        boardId
+          ? navigation.navigate('EditorBoardDetail', { boardId })
           : navigation.navigate('EditorBoards'),
     },
     {
@@ -85,6 +119,7 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
     },
     {
       label: 'Report',
+      subtitle: `${project.stats.completionRate}% complete - ${project.stats.lastUpdated}`,
       icon: 'assessment',
       iconColor: '#FFFFFF',
       iconBg: '#8B5CF6',
@@ -124,6 +159,7 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
               iconColor={item.iconColor}
               iconBg={item.iconBg}
               label={item.label}
+              subtitle={item.subtitle}
               count={item.count}
               onPress={item.onPress}
               trailingIcon={item.trailingIcon}

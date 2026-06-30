@@ -1,21 +1,25 @@
-import React, { useMemo } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import ApiStateView from '@/src/components/shared/ApiStateView';
 import BottomNavBar from '@/src/components/shared/BottomNavBar';
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
-import {
-  findEditorBoard,
-  getBoardMembers,
-  getBoardPublishRequests,
-} from '@/src/constants/editorBoardsData';
-import { PROJECTS } from '@/src/constants/projectsData';
 import { RootStackParamList } from '@/src/navigation/types';
+import { fetchEditorBoardBundle } from '@/src/services/editorBoardApi';
+import {
+  ApplicationStatusBadge,
+  ApplicationTypeBadge,
+} from '@/src/screens/applications/components';
+import { BoardMemberRow, BoardProjectRow } from '@/src/screens/editorBoards/components';
 import {
   ProjectDetailMenuItem,
   ProjectDetailTopBar,
 } from '@/src/screens/projectDetail/components';
+import { ApplicationItem } from '@/src/types/applications';
+import { EditorBoardItem, EditorBoardMember } from '@/src/types/editorBoards';
+import { ProjectItem } from '@/src/types/projects';
 
 type EditorBoardDetailScreenProps = NativeStackScreenProps<
   RootStackParamList,
@@ -88,36 +92,135 @@ function EditorBoardDetailHero({
   );
 }
 
+function SectionTitle({ title, count }: { title: string; count: number }) {
+  return (
+    <View className="flex-row items-center justify-between px-4 pb-3 pt-6">
+      <Text
+        className="text-[13px] font-bold uppercase"
+        style={{ color: Colors.textMuted, letterSpacing: 1 }}
+      >
+        {title}
+      </Text>
+      <Text className="text-[12px] font-bold" style={{ color: Colors.textFaint }}>
+        {count}
+      </Text>
+    </View>
+  );
+}
+
+function PublishRequestRow({
+  application,
+  onPress,
+}: {
+  application: ApplicationItem;
+  onPress: () => void;
+}) {
+  return (
+    <View className="px-4">
+      <View
+        className="rounded-xl p-4"
+        style={{
+          backgroundColor: Colors.surface,
+          borderWidth: 1,
+          borderColor: Colors.borderSubtle,
+        }}
+      >
+        <View className="flex-row items-start justify-between gap-3">
+          <View className="flex-1 gap-2">
+            <ApplicationTypeBadge type={application.type} />
+            <Text
+              className="text-[15px] font-bold"
+              style={{ color: Colors.text }}
+              numberOfLines={2}
+            >
+              {application.title}
+            </Text>
+          </View>
+          <ApplicationStatusBadge status={application.status} />
+        </View>
+        <Text
+          className="mt-3 text-[13px] leading-5"
+          style={{ color: Colors.textMuted }}
+          numberOfLines={2}
+        >
+          {application.description}
+        </Text>
+        <TouchableOpacity
+          activeOpacity={0.75}
+          onPress={onPress}
+          accessibilityRole="button"
+          accessibilityLabel={`Open application ${application.title}`}
+          className="mt-4 flex-row items-center justify-between rounded-lg px-3 py-2"
+          style={{ backgroundColor: Colors.overlayLight }}
+        >
+          <View className="flex-row items-center gap-2">
+            <MaterialIcon name="apps" color={Colors.accent} size={18} />
+            <Text className="text-[13px] font-bold" style={{ color: Colors.text }}>
+              Open application
+            </Text>
+          </View>
+          <MaterialIcon name="chevron_right" color={Colors.textFaint} size={21} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
 export default function EditorBoardDetailScreen({
   navigation,
   route,
 }: EditorBoardDetailScreenProps) {
-  const board = findEditorBoard(route.params.boardId);
+  const [board, setBoard] = useState<EditorBoardItem | null>(null);
+  const [members, setMembers] = useState<EditorBoardMember[]>([]);
+  const [boardProjects, setBoardProjects] = useState<ProjectItem[]>([]);
+  const [publishRequests, setPublishRequests] = useState<ApplicationItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const members = useMemo(() => (board ? getBoardMembers(board) : []), [board]);
-  const boardProjects = useMemo(
-    () => (board ? PROJECTS.filter((project) => board.projectIds.includes(project.id)) : []),
-    [board],
-  );
-  const publishRequests = useMemo(
-    () => (board ? getBoardPublishRequests(board) : []),
-    [board],
-  );
+  const loadBoard = useCallback(async () => {
+    setIsLoading(true);
+    setErrorMessage('');
 
-  if (!board) {
+    try {
+      const bundle = await fetchEditorBoardBundle(route.params.boardId);
+      setBoard(bundle.board);
+      setMembers(bundle.members);
+      setBoardProjects(bundle.projects);
+      setPublishRequests(bundle.applications);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải editor board.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [route.params.boardId]);
+
+  useEffect(() => {
+    void loadBoard();
+  }, [loadBoard]);
+
+  if (isLoading) {
     return (
       <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
         <ProjectDetailTopBar onBack={() => navigation.goBack()} />
-        <View className="flex-1 items-center justify-center px-6">
-          <Text className="text-center text-[15px] font-medium" style={{ color: Colors.text }}>
-            Editor board not found
-          </Text>
-        </View>
+        <ApiStateView type="loading" />
       </View>
     );
   }
 
-  const lead = members.find((member) => member.id === board.leadMemberId);
+  if (errorMessage || !board) {
+    return (
+      <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
+        <ProjectDetailTopBar onBack={() => navigation.goBack()} />
+        <ApiStateView
+          type="error"
+          message={errorMessage || 'Editor board not found'}
+          onRetry={loadBoard}
+        />
+      </View>
+    );
+  }
+
+  const lead = members.find((member) => member.role === 'Lead');
 
   const menuItems = [
     {
@@ -189,6 +292,40 @@ export default function EditorBoardDetailScreen({
               count={item.count}
               onPress={item.onPress}
               isLast={index === menuItems.length - 1}
+            />
+          ))}
+        </View>
+
+        <SectionTitle title="Projects" count={boardProjects.length} />
+        <View className="gap-3 px-4">
+          {boardProjects.map((project) => (
+            <BoardProjectRow
+              key={project.id}
+              project={project}
+              onPress={() => navigation.navigate('ProjectDetail', { projectId: project.id })}
+            />
+          ))}
+        </View>
+
+        <SectionTitle title="Members" count={members.length} />
+        <View className="gap-3 px-4">
+          {members.map((member) => (
+            <BoardMemberRow key={member.id} member={member} />
+          ))}
+        </View>
+
+        <SectionTitle title="Publish Requests" count={publishRequests.length} />
+        <View className="gap-3">
+          {publishRequests.map((application) => (
+            <PublishRequestRow
+              key={application.id}
+              application={application}
+              onPress={() =>
+                navigation.navigate('ApplicationDetail', {
+                  applicationId: application.id,
+                  projectId: application.projectId,
+                })
+              }
             />
           ))}
         </View>

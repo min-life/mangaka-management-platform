@@ -7,6 +7,7 @@ import { ResourceFolderNode } from '@/src/types/resources';
 
 import {
   getDirectChapterCount,
+  getMaterialVersionCount,
   getPageCount,
   getResourceDateRange,
 } from './resourceFormatters';
@@ -49,6 +50,7 @@ export default function ResourceFolderDetailHero({
 }: ResourceFolderDetailHeroProps) {
   const chapterCount = getDirectChapterCount(folder);
   const pageCount = getPageCount(folder);
+  const materialCount = getMaterialVersionCount(folder);
   const isArc = folder.parentId === null;
 
   return (
@@ -85,6 +87,7 @@ export default function ResourceFolderDetailHero({
       <View className="mt-5 flex-row gap-3">
         <DetailMetric icon="folder" label="Chapters" value={chapterCount} />
         <DetailMetric icon="image" label="Pages" value={pageCount} />
+        <DetailMetric icon="file" label="Materials" value={materialCount} />
       </View>
     </View>
   );

@@ -3,6 +3,7 @@ import { Text, TextInput, View } from 'react-native';
 
 import CommentBubble from '@/src/components/sub-component/CommentBubble';
 import FrameListPanel from '@/src/components/sub-component/FrameListPanel';
+import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { COMMENTS, FRAMES } from '@/src/constants/taskDetailData';
 import { Comment, FrameAnnotation } from '@/src/types/taskDetail';
 import { Colors } from '@/src/constants/colors';
@@ -26,59 +27,56 @@ export default function DiscussionTab({
   selectedFrame,
   onSelectFrame,
 }: DiscussionTabProps) {
-  // Lọc comments theo frame đang chọn
   const visibleComments = selectedFrame
     ? comments.filter((c) => c.frameId === selectedFrame.id)
-    : [];
+    : comments;
 
   return (
-    <View className="mt-6 gap-5">
-      {/* ── Tiêu đề section ──────────────────────────────────── */}
-      <Text
-        className="text-[11px] font-bold uppercase tracking-widest"
-        style={{ color: Colors.textMuted, letterSpacing: 1.2 }}
+    <View className="mt-6 gap-4">
+      <View
+        className="gap-4 rounded-xl p-4"
+        style={{
+          backgroundColor: 'rgba(255,255,255,0.035)',
+          borderWidth: 1,
+          borderColor: C.border,
+        }}
       >
-        Annotation Frames
-      </Text>
+        <View className="flex-row items-center justify-between">
+          <Text
+            className="text-[12px] font-bold uppercase"
+            style={{ color: C.textMuted, letterSpacing: 1.1 }}
+          >
+            Frames
+          </Text>
+          <Text className="text-[12px]" style={{ color: C.textFaint }}>
+            Tap a frame to focus
+          </Text>
+        </View>
 
-      {/* ── Danh sách frame ──────────────────────────────────── */}
-      <FrameListPanel
-        comments={comments}
-        frames={frames}
-        selectedFrameId={selectedFrame?.id ?? null}
-        onSelectFrame={onSelectFrame}
-      />
+        <FrameListPanel
+          comments={comments}
+          frames={frames}
+          selectedFrameId={selectedFrame?.id ?? null}
+          onSelectFrame={onSelectFrame}
+        />
 
-      {/* ── Comments của frame đang chọn ─────────────────────── */}
-      {selectedFrame && (
-        <View className="gap-4">
-          {/* Divider + label */}
-          <View className="flex-row items-center gap-3 mt-2">
-            <View style={{ flex: 1, height: 1, backgroundColor: Colors.borderFaint }} />
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: '700',
-                color: '#EF4444',
-                letterSpacing: 0.8,
-                textTransform: 'uppercase',
-              }}
-            >
-              {selectedFrame.name}
+        <View className="gap-3">
+          <View className="flex-row items-center gap-2">
+            <MaterialIcon name="comment" color={C.accent} size={18} />
+            <Text className="text-[13px] font-bold uppercase" style={{ color: C.text }}>
+              {selectedFrame?.name ?? 'Discussion'}
             </Text>
-            <View style={{ flex: 1, height: 1, backgroundColor: Colors.borderFaint }} />
           </View>
 
-          {/* Comments */}
           {visibleComments.length > 0 ? (
-            <View className="gap-4">
+            <View className="gap-3">
               {visibleComments.map((commentItem) => (
                 <CommentBubble key={commentItem.id} comment={commentItem} />
               ))}
             </View>
           ) : (
             <View
-              className="items-center py-6 rounded-xl"
+              className="items-center rounded-xl py-6"
               style={{
                 backgroundColor: Colors.surface,
                 borderWidth: 1,
@@ -91,7 +89,6 @@ export default function DiscussionTab({
             </View>
           )}
 
-          {/* Comment input */}
           <View
             className="flex-row items-center gap-3 rounded-xl px-4 py-2"
             style={{
@@ -101,7 +98,7 @@ export default function DiscussionTab({
             }}
           >
             <View
-              className="w-8 h-8 rounded-full items-center justify-center"
+              className="h-8 w-8 items-center justify-center rounded-full"
               style={{ backgroundColor: C.surfaceHighest }}
             >
               <Text className="text-[10px] font-bold" style={{ color: C.text }}>
@@ -111,15 +108,19 @@ export default function DiscussionTab({
             <TextInput
               value={comment}
               onChangeText={onCommentChange}
-              placeholder={`Nhận xét về "${selectedFrame.name}"…`}
+              placeholder={
+                selectedFrame
+                  ? `Nhận xét về "${selectedFrame.name}"...`
+                  : 'Trao đổi với team về task này...'
+              }
               placeholderTextColor={C.textFaint}
-              className="flex-1 text-sm py-2 "
+              className="flex-1 py-2 text-sm"
               style={{ color: C.text }}
               multiline
             />
           </View>
         </View>
-      )}
+      </View>
     </View>
   );
 }

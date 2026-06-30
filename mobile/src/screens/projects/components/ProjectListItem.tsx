@@ -19,7 +19,7 @@ export default function ProjectListItem({ project, isLast, onPress }: ProjectLis
     <TouchableOpacity
       activeOpacity={0.78}
       onPress={onPress}
-      className="flex-row px-4 py-3"
+      className="h-[96px] flex-row px-4 py-3"
       accessibilityRole="button"
       accessibilityLabel={`${project.name}, created by ${project.createdByName}, ${dateRange}`}
       style={{
@@ -28,8 +28,12 @@ export default function ProjectListItem({ project, isLast, onPress }: ProjectLis
       }}
     >
       <View
-        className="h-[76px] w-[76px] items-center justify-center overflow-hidden rounded-xl"
-        style={{ backgroundColor: project.avatarBg }}
+        className="h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-lg"
+        style={{
+          backgroundColor: project.avatarBg,
+          borderWidth: 1,
+          borderColor: Colors.borderFaint,
+        }}
       >
         {project.coverUri ? (
           <Image
@@ -44,7 +48,7 @@ export default function ProjectListItem({ project, isLast, onPress }: ProjectLis
         )}
       </View>
 
-      <View className="ml-4 flex-1 justify-center">
+      <View className="ml-4 flex-1 justify-center overflow-hidden">
         <Text className="text-[16px] font-bold" style={{ color: Colors.text }} numberOfLines={1}>
           {project.name}
         </Text>

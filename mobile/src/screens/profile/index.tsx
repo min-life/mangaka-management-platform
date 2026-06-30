@@ -1,18 +1,40 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
+import ApiStateView from '@/src/components/shared/ApiStateView';
 import { RootStackNavProp } from '@/src/navigation/types';
 import { Colors } from '@/src/constants/colors';
 import { ACCOUNT_MENU_ITEMS } from '@/src/constants/profileData';
 import BottomNavBar from '@/src/components/shared/BottomNavBar';
 import { logout } from '@/src/services/authApi';
 import { clearAccessToken, getAccessToken } from '@/src/services/tokenStorage';
+import { fetchMe } from '@/src/services/userApi';
 import { ProfileHeaderSection, ProfileMenuSection, ProfileTopBar } from './components';
 
 export default function ProfileScreen() {
   const navigation = useNavigation<RootStackNavProp>();
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [user, setUser] = useState<Awaited<ReturnType<typeof fetchMe>> | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const loadProfile = useCallback(async () => {
+    setIsLoading(true);
+    setErrorMessage('');
+
+    try {
+      setUser(await fetchMe());
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải profile.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadProfile();
+  }, [loadProfile]);
 
   const performSignOut = async () => {
     if (isSigningOut) return;
@@ -52,7 +74,17 @@ export default function ProfileScreen() {
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100, gap: 12 }}
         showsVerticalScrollIndicator={false}
       >
-        <ProfileHeaderSection />
+        {isLoading ? (
+          <ApiStateView type="loading" />
+        ) : errorMessage ? (
+          <ApiStateView type="error" message={errorMessage} onRetry={loadProfile} />
+        ) : (
+          <ProfileHeaderSection
+            avatarUri={user?.avatarUrl}
+            email={user?.email}
+            name={user?.displayName}
+          />
+        )}
 
         <ProfileMenuSection
           title="Account"

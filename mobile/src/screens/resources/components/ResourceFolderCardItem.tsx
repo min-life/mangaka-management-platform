@@ -7,6 +7,7 @@ import { ResourceFolderNode } from '@/src/types/resources';
 
 import {
   getDirectChapterCount,
+  getMaterialVersionCount,
   getPageCount,
   getResourceDateRange,
   getResourceInitials,
@@ -24,6 +25,7 @@ export default function ResourceFolderCardItem({
   const dateRange = getResourceDateRange(folder);
   const chapterCount = getDirectChapterCount(folder);
   const pageCount = getPageCount(folder);
+  const materialCount = getMaterialVersionCount(folder);
 
   return (
     <TouchableOpacity
@@ -83,6 +85,12 @@ export default function ResourceFolderCardItem({
             <MaterialIcon name="image" color={Colors.statusProgress} size={17} />
             <Text className="ml-1.5 text-[12px] font-semibold" style={{ color: Colors.text }}>
               {pageCount} page{pageCount === 1 ? '' : 's'}
+            </Text>
+          </View>
+          <View className="ml-4 flex-row items-center">
+            <MaterialIcon name="file" color={Colors.statusDone} size={17} />
+            <Text className="ml-1.5 text-[12px] font-semibold" style={{ color: Colors.text }}>
+              {materialCount} version{materialCount === 1 ? '' : 's'}
             </Text>
           </View>
         </View>

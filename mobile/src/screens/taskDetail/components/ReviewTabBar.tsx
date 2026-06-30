@@ -14,19 +14,20 @@ interface ReviewTabBarProps {
 
 export default function ReviewTabBar({ activeTab, onTabChange }: ReviewTabBarProps) {
   return (
-    <View className="flex-row mt-6" style={{ borderBottomWidth: 1, borderBottomColor: C.border }}>
+    <View className="mt-6 flex-row" style={{ borderBottomWidth: 1, borderBottomColor: C.border }}>
       {TABS.map((tab) => {
         const isActive = activeTab === tab;
         return (
           <TouchableOpacity
             key={tab}
+            activeOpacity={0.78}
             onPress={() => onTabChange(tab)}
-            className="flex-1 py-3 items-center"
-            style={isActive ? { borderBottomWidth: 2, borderBottomColor: C.accent } : {}}
+            className="flex-1 items-center py-3"
+            style={isActive ? { borderBottomWidth: 2, borderBottomColor: C.accent } : undefined}
           >
             <Text
-              className="text-xs font-bold uppercase tracking-wider"
-              style={{ color: isActive ? C.accent : C.textMuted, opacity: isActive ? 1 : 0.6 }}
+              className="text-xs font-bold uppercase"
+              style={{ color: isActive ? C.accent : C.textMuted }}
             >
               {tab}
             </Text>
@@ -36,4 +37,3 @@ export default function ReviewTabBar({ activeTab, onTabChange }: ReviewTabBarPro
     </View>
   );
 }
-
