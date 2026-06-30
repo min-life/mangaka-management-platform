@@ -88,7 +88,7 @@ export class ProjectsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:read', 'board:leader'],
+    permissions: ['project:read', 'project:owner'],
     resource: 'PROJECT',
   })
   @ApiOperation({ summary: 'Get all tasks of current user in a specific project' })
@@ -513,7 +513,7 @@ export class ProjectsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:read', 'board:leader'],
+    permissions: ['project:read', 'project:owner'],
     resource: 'PROJECT',
   })
   @ApiOperation({ summary: 'Get project stats' })
@@ -532,7 +532,7 @@ export class ProjectsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:update', 'board:leader'],
+    permissions: ['project:update', 'project:owner'],
     resource: 'PROJECT',
   })
   @ApiOperation({ summary: 'Import project stats' })

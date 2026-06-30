@@ -39,7 +39,7 @@ export class FoldersController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:read', 'board:leader'],
+    permissions: ['project:read', 'project:owner'],
     resource: 'FOLDER',
   })
   @ApiOperation({ summary: 'Get folder details' })
@@ -58,7 +58,7 @@ export class FoldersController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:folder.update', 'board:leader'],
+    permissions: ['project:folder.update', 'project:owner'],
     resource: 'FOLDER',
   })
   @ApiOperation({ summary: 'Update folder' })
@@ -81,7 +81,7 @@ export class FoldersController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:folder.delete', 'board:leader'],
+    permissions: ['project:folder.delete', 'project:owner'],
     resource: 'FOLDER',
   })
   @ApiOperation({ summary: 'Delete folder' })
@@ -94,7 +94,7 @@ export class FoldersController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:read', 'board:leader'],
+    permissions: ['project:read', 'project:owner'],
     resource: 'FOLDER',
   })
   @ApiOperation({ summary: 'Get folder files' })
@@ -145,7 +145,7 @@ export class FoldersController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:read', 'board:leader'],
+    permissions: ['project:read', 'project:owner'],
     resource: 'FOLDER',
   })
   @ApiOperation({ summary: 'Get folder children' })
@@ -173,7 +173,7 @@ export class FoldersController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:folder.create', 'board:leader'],
+    permissions: ['project:folder.create', 'project:owner'],
     resource: 'FOLDER',
   })
   @ApiOperation({ summary: 'Create child folder' })

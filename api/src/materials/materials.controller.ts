@@ -36,7 +36,7 @@ export class MaterialsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:read', 'board:leader'],
+    permissions: ['project:read', 'project:owner'],
     resource: 'MATERIAL',
   })
   @ApiOperation({ summary: 'Get material details' })
@@ -55,7 +55,7 @@ export class MaterialsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:material.update', 'board:leader'],
+    permissions: ['project:material.update', 'project:owner'],
     resource: 'MATERIAL',
   })
   @ApiOperation({ summary: 'Update material' })
@@ -78,7 +78,7 @@ export class MaterialsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:material.delete', 'board:leader'],
+    permissions: ['project:material.delete', 'project:owner'],
     resource: 'MATERIAL',
   })
   @ApiOperation({ summary: 'Delete material' })
@@ -91,7 +91,7 @@ export class MaterialsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:material.create', 'board:leader'],
+    permissions: ['project:material.create', 'project:owner'],
     resource: 'MATERIAL',
   })
   @ApiOperation({ summary: 'Restore a material version to create a new latest version' })
@@ -110,7 +110,7 @@ export class MaterialsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:material.update', 'board:leader'],
+    permissions: ['project:material.update', 'project:owner'],
     resource: 'MATERIAL',
   })
   @ApiOperation({ summary: 'Add files to an existing material version (creates a new version)' })
@@ -140,7 +140,7 @@ export class MaterialsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:material.update', 'board:leader'],
+    permissions: ['project:material.update', 'project:owner'],
     resource: 'MATERIAL',
   })
   @ApiOperation({ summary: 'Delete a file item from a material (creates a new version)' })
@@ -161,7 +161,7 @@ export class MaterialsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:material.update', 'board:leader'],
+    permissions: ['project:material.update', 'project:owner'],
     resource: 'MATERIAL',
   })
   @ApiOperation({ summary: 'Set a file item as thumbnail (creates a new version)' })
