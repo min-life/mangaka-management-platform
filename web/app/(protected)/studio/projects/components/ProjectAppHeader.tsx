@@ -133,9 +133,14 @@ export function ProjectAppHeader({ projectId, projectName }: ProjectAppHeaderPro
               <p className="mt-1 truncate text-xs font-bold text-[#8b94a1]">{email}</p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator className="bg-[#39424f]" />
-            <DropdownMenuItem className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold focus:bg-[#303842] focus:text-white">
-              <User className="size-4" />
-              My Profile
+            <DropdownMenuItem
+              asChild
+              className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold focus:bg-[#303842] focus:text-white"
+            >
+              <Link href="/user-profile">
+                <User className="size-4" />
+                My Profile
+              </Link>
             </DropdownMenuItem>
             <DropdownMenuItem
               asChild

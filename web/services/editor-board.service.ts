@@ -1,4 +1,5 @@
 import api from '@/lib/api';
+import type { ProjectResponse } from './project.service';
 
 export type CreateEditorBoardPayload = {
   description?: string;
@@ -19,6 +20,10 @@ export type UserSummaryResponse = {
   id: number;
 };
 
+export type BoardMemberResponse = UserSummaryResponse & {
+  isLead: boolean;
+};
+
 export type EditorBoardResponse = {
   createdAt: string;
   createdBy?: number | null;
@@ -30,6 +35,7 @@ export type EditorBoardResponse = {
   updatedAt: string;
   updatedBy?: number | null;
   updatedByUser?: UserSummaryResponse | null;
+  numberOfProjects?: number;
   _count?: {
     projects: number;
   };
@@ -49,6 +55,20 @@ type PaginationResponse = {
 type EditorBoardsResponse = {
   data?: EditorBoardResponse[];
   pagination?: PaginationResponse;
+};
+
+type BoardProjectsResponse = {
+  data?: ProjectResponse[];
+  pagination?: PaginationResponse;
+};
+
+type BoardMembersResponse = {
+  data?: BoardMemberResponse[];
+  pagination?: PaginationResponse;
+};
+
+export type AddBoardMembersPayload = {
+  userIds: number[];
 };
 
 export async function createEditorBoard(payload: CreateEditorBoardPayload) {
@@ -89,4 +109,55 @@ export async function updateEditorBoard(boardId: number, payload: UpdateEditorBo
 
 export async function deleteEditorBoard(boardId: number) {
   await api.delete(`/editor-boards/${boardId}`);
+}
+
+export async function getEditorBoardProjects(boardId: number | string) {
+  const response = await api.get<BoardProjectsResponse, BoardProjectsResponse>(
+    `/editor-boards/${boardId}/projects`,
+  );
+
+  return {
+    pagination: response.pagination,
+    projects: response.data ?? [],
+  };
+}
+
+export async function getEditorBoardMembers(
+  boardId: number | string,
+  params?: {
+    field?: 'displayName' | 'email';
+    limit?: number;
+    order?: 'asc' | 'desc';
+    page?: number;
+    search?: string;
+  },
+) {
+  const response = await api.get<BoardMembersResponse, BoardMembersResponse>(
+    `/editor-boards/${boardId}/members`,
+    { params },
+  );
+
+  return {
+    members: response.data ?? [],
+    pagination: response.pagination,
+  };
+}
+
+export async function addEditorBoardMembers(
+  boardId: number | string,
+  payload: AddBoardMembersPayload,
+) {
+  await api.post(`/editor-boards/${boardId}/members`, payload);
+}
+
+export async function removeEditorBoardMember(boardId: number | string, userId: number) {
+  await api.delete(`/editor-boards/${boardId}/members/${userId}`);
+}
+
+export async function setEditorBoardMemberLead(boardId: number | string, userId: number) {
+  const response = await api.patch<ApiResponse<BoardMemberResponse>, ApiResponse<BoardMemberResponse>>(
+    `/editor-boards/${boardId}/members/${userId}/lead`,
+  );
+
+  return response.data ?? (response as BoardMemberResponse);
 }

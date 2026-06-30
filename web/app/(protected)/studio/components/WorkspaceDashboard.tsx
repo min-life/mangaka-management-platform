@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ChevronDown,
@@ -109,10 +109,18 @@ function formatUserName(user?: { displayName?: string | null; email?: string } |
 
 export function WorkspaceDashboard() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('projects');
   const [apiProjects, setApiProjects] = useState<ProjectResponse[]>([]);
   const [apiBoards, setApiBoards] = useState<EditorBoardResponse[]>([]);
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'editorBoards' || tab === 'myTasks' || tab === 'projects') {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
   const [isLoadingBoards, setIsLoadingBoards] = useState(true);
   const [projectError, setProjectError] = useState<string | null>(null);
@@ -151,7 +159,7 @@ export function WorkspaceDashboard() {
         name: board.name,
         description: board.description ?? 'No description',
         image: board.imageUrl,
-        projectCount: board._count?.projects ?? 0,
+        projectCount: board.numberOfProjects ?? board._count?.projects ?? 0,
         createdBy: formatUserName(board.createdByUser),
         updated: formatUpdatedAt(board.updatedAt),
       })),
@@ -355,7 +363,10 @@ export function WorkspaceDashboard() {
               <Can any={['admin', 'project:create']}>
                 <CreateProjectDialog
                   editorBoards={apiBoards}
-                  onCreated={() => void loadProjects()}
+                  onCreated={() => {
+                    void loadProjects();
+                    void loadEditorBoards();
+                  }}
                 />
               </Can>
             </>
@@ -499,7 +510,10 @@ export function WorkspaceDashboard() {
                     key={board.id}
                   >
                     <TableCell className="px-5">
-                      <div className="flex items-center gap-4">
+                      <Link
+                        className="flex items-center gap-4 rounded-[4px] outline-none transition-opacity hover:opacity-85 focus-visible:ring-2 focus-visible:ring-[#FFD369]"
+                        href={`/studio/editor-boards/${board.boardId}/projects`}
+                      >
                         {board.image ? (
                           <img
                             alt=""
@@ -519,7 +533,7 @@ export function WorkspaceDashboard() {
                           <p className="text-sm font-black leading-5 text-white">{board.name}</p>
                           <p className="mt-1 text-xs font-bold text-[#aeb7c2]">{board.id}</p>
                         </div>
-                      </div>
+                      </Link>
                     </TableCell>
                     <TableCell className="text-xs font-bold text-white">
                       {board.createdBy}
