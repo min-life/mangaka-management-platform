@@ -137,6 +137,7 @@ const APPLICATION_LIST_SELECT = {
   title: true,
   type: true,
   status: true,
+  parentFolderId: true,
   project: {
     select: {
       id: true,
@@ -645,10 +646,22 @@ export class ProjectsService {
       materials: unknown;
       type: APPLICATION_TYPE;
       userId: number;
+      parentFolderId?: number;
     },
   ) {
     try {
       const project = await this.ensureProject(projectId);
+
+      if (data.type === APPLICATION_TYPE.CREATE_CHAPTER) {
+        if (!data.parentFolderId) {
+          throw new BadRequestException('parentFolderId is required for CREATE_CHAPTER application');
+        }
+        const parentFolder = await this.ensureProjectFolder(projectId, data.parentFolderId);
+        if (parentFolder.parentId !== null) {
+          throw new BadRequestException('Cannot create a subfolder under a Chapter (maximum depth is 2)');
+        }
+      }
+
       const application = await this.prisma.application.create({
         data: {
           projectId,
@@ -656,6 +669,7 @@ export class ProjectsService {
           description: data.description,
           materials: data.materials as Prisma.InputJsonValue,
           type: data.type,
+          parentFolderId: data.parentFolderId || null,
           createdBy: data.userId,
           updatedBy: data.userId,
         },
@@ -682,7 +696,7 @@ export class ProjectsService {
 
   async getProjectFolders(
     projectId: number,
-    filter?: { search?: string; parentId?: number },
+    filter?: { search?: string; parentId?: number; type?: 'ARC' | 'CHAPTER' },
     order?: { field: 'title' | 'createdAt'; order: 'asc' | 'desc' },
     pagination?: Pagination,
   ) {
@@ -693,6 +707,8 @@ export class ProjectsService {
         projectId,
         ...(filter?.search && { title: { contains: filter.search, mode: 'insensitive' } }),
         ...(filter?.parentId && { parentId: filter.parentId }),
+        ...(filter?.type === 'ARC' && { parentId: null }),
+        ...(filter?.type === 'CHAPTER' && { parentId: { not: null } }),
       };
       const orderBy: Prisma.FolderOrderByWithRelationInput = order
         ? { [order.field]: order.order }
@@ -731,7 +747,10 @@ export class ProjectsService {
     try {
       await this.ensureProject(projectId);
       if (data.parentId) {
-        await this.ensureProjectFolder(projectId, data.parentId);
+        const parentFolder = await this.ensureProjectFolder(projectId, data.parentId);
+        if (parentFolder.parentId !== null) {
+          throw new BadRequestException('Cannot create a subfolder under a Chapter (maximum depth is 2)');
+        }
       }
 
       return await this.prisma.folder.create({

@@ -283,7 +283,7 @@ export class FilesService {
         })
       );
 
-      return await this.prisma.fileMaterial.create({
+      const material = await this.prisma.fileMaterial.create({
         data: {
           materials: materialsData as Prisma.InputJsonArray,
           fileId,
@@ -292,6 +292,22 @@ export class FilesService {
         },
         select: MATERIAL_SELECT,
       });
+
+      const fileWithFolder = await this.prisma.file.findUnique({
+        where: { id: fileId },
+        include: { folder: true },
+      });
+
+      this.eventEmitter.emit(ACTIVITY_EVENT_NAME, {
+        action: ACTIVITY_ACTION.MATERIAL_UPLOADED,
+        entityType: ENTITY_TYPE.MATERIAL,
+        entityId: material.id,
+        projectId: fileWithFolder?.folder?.projectId ?? null,
+        fileId: fileId,
+        actorId: data.userId,
+      } satisfies ActivityEventPayload);
+
+      return material;
     } catch (error) {
       this.handleError(error, 'Create material fail', ERROR.SVCREATEMATERIAL);
     }
@@ -379,6 +395,7 @@ export class FilesService {
         entityType: ENTITY_TYPE.TASK,
         entityId: task.id,
         projectId: fileWithFolder?.folder?.projectId ?? null,
+        fileId: fileId,
         actorId: data.userId,
         metadata: { title: task.title, assignedBy: task.assignedByUser?.id ?? null },
       } satisfies ActivityEventPayload);
@@ -442,7 +459,7 @@ export class FilesService {
     try {
       await this.ensureFile(fileId);
 
-      return await this.prisma.comment.create({
+      const comment = await this.prisma.comment.create({
         data: {
           content: data.content as Prisma.InputJsonValue,
           fileId,
@@ -459,6 +476,22 @@ export class FilesService {
           updatedAt: true,
         },
       });
+
+      const fileWithFolder = await this.prisma.file.findUnique({
+        where: { id: fileId },
+        include: { folder: true },
+      });
+
+      this.eventEmitter.emit(ACTIVITY_EVENT_NAME, {
+        action: ACTIVITY_ACTION.COMMENT_CREATED,
+        entityType: ENTITY_TYPE.COMMENT,
+        entityId: comment.id,
+        projectId: fileWithFolder?.folder?.projectId ?? null,
+        fileId: fileId,
+        actorId: data.userId,
+      } satisfies ActivityEventPayload);
+
+      return comment;
     } catch (error) {
       this.handleError(error, 'Create comment fail', ERROR.SVCREATECOMMENT);
     }

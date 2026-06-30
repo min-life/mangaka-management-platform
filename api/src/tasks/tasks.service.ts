@@ -156,6 +156,7 @@ export class TasksService {
           entityType: ENTITY_TYPE.TASK,
           entityId: updatedTask.id,
           projectId: fileWithFolder?.folder?.projectId ?? null,
+          fileId: updatedTask.fileId,
           actorId: data.userId,
           metadata: {
             title: updatedTask.title,
@@ -170,6 +171,7 @@ export class TasksService {
           entityType: ENTITY_TYPE.TASK,
           entityId: updatedTask.id,
           projectId: fileWithFolder?.folder?.projectId ?? null,
+          fileId: updatedTask.fileId,
           actorId: data.userId,
           metadata: {
             title: updatedTask.title,
@@ -421,6 +423,7 @@ export class TasksService {
         entityType: ENTITY_TYPE.COMMENT,
         entityId: comment.id,
         projectId: taskObj?.file?.folder?.projectId ?? null,
+        fileId: taskObj?.file?.id ?? null,
         actorId: data.userId,
         metadata: {
           taskId,

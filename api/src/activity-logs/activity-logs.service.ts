@@ -35,6 +35,7 @@ export class ActivityLogsService {
           entityId: payload.entityId,
           projectId: payload.projectId,
           editorBoardId: payload.editorBoardId,
+          fileId: payload.fileId,
           actorId: payload.actorId,
           metadata: payload.metadata ?? Prisma.DbNull,
         },
@@ -156,6 +157,7 @@ export class ActivityLogsService {
     limit?: number;
     projectId?: number;
     editorBoardId?: number;
+    fileId?: number;
     actorId?: number;
   }) {
     const page = query.page || 1;
@@ -172,6 +174,9 @@ export class ActivityLogsService {
     }
     if (query.actorId) {
       where.actorId = query.actorId;
+    }
+    if (query.fileId) {
+      where.fileId = query.fileId;
     }
 
     try {

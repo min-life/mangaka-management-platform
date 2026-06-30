@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { APPLICATION_TYPE } from '@prisma/client';
-import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, IsNumber } from 'class-validator';
 
 export class CreateProjectApplicationReqDto {
   @ApiProperty({ example: 'Publish request for chapter 01' })
@@ -33,4 +33,9 @@ export class CreateProjectApplicationReqDto {
   @ApiProperty({ enum: APPLICATION_TYPE, example: APPLICATION_TYPE.PUBLISH_REQUEST })
   @IsEnum(APPLICATION_TYPE)
   type!: APPLICATION_TYPE;
+
+  @ApiPropertyOptional({ example: 1, description: 'Parent folder ID for CREATE_CHAPTER type' })
+  @IsOptional()
+  @IsNumber()
+  parentFolderId?: number;
 }

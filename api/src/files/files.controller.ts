@@ -27,6 +27,8 @@ import {
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { CurrentUser, Permissions } from '../share/decorators';
 import type { JwtPayload } from '../auth/interfaces';
+import { ActivityLogsService } from '../activity-logs/activity-logs.service';
+import { QueryActivityLogsReqDto } from '../activity-logs/dto';
 import { FilesService } from './files.service';
 import {
   CreateMaterialReqDto,
@@ -50,7 +52,10 @@ import {
 @ApiBearerAuth()
 @Controller('files')
 export class FilesController {
-  constructor(private readonly filesService: FilesService) { }
+  constructor(
+    private readonly filesService: FilesService,
+    private readonly activityLogsService: ActivityLogsService,
+  ) { }
 
   @Permissions({
     mode: 'ANY',
@@ -282,5 +287,24 @@ export class FilesController {
     return {
       data: task,
     };
+  }
+
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['project:read', 'project:owner'],
+    resource: 'FILE',
+  })
+  @ApiOperation({ summary: 'Get file activity logs' })
+  @ApiParam({ name: 'id', type: Number, description: 'File id' })
+  @ApiOkResponse({ description: 'File activity logs retrieved successfully' })
+  @Get(':id/activity-logs')
+  async getFileActivityLogs(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: QueryActivityLogsReqDto,
+  ) {
+    return await this.activityLogsService.getActivityLogs({
+      ...query,
+      fileId: id,
+    });
   }
 }

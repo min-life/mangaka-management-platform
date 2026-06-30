@@ -475,7 +475,7 @@ export class ProjectsController {
   ) {
     const folders = await this.projectsService.getProjectFolders(
       id,
-      { search: query.search, parentId: query.parentId },
+      { search: query.search, parentId: query.parentId, type: query.type },
       query.field && query.order ? { field: query.field, order: query.order } : undefined,
       query.page && query.limit ? { page: query.page, limit: query.limit } : undefined,
     );
@@ -485,31 +485,6 @@ export class ProjectsController {
     };
   }
 
-  @Permissions({
-    mode: 'ANY',
-    permissions: ['project:owner', 'project:folder.create'],
-    resource: 'PROJECT',
-  })
-  @ApiOperation({ summary: 'Create project folder' })
-  @ApiParam({ name: 'id', type: Number, description: 'Project id' })
-  @ApiCreatedResponse({
-    description: 'Project folder created successfully',
-    type: ProjectFolderResponseDto,
-  })
-  @Post(':id/folders')
-  async createProjectFolder(
-    @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() currentUser: JwtPayload,
-    @Body() data: CreateProjectFolderReqDto,
-  ) {
-    const folder = await this.projectsService.createProjectFolder(id, {
-      ...data,
-      userId: currentUser.userId,
-    });
-    return {
-      data: folder,
-    };
-  }
 
   @Permissions({
     mode: 'ANY',

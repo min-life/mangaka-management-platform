@@ -35,6 +35,8 @@ enum APPLICATION_STATUS {
 enum APPLICATION_TYPE {
   MANUSCRIPT_REVIEW
   PUBLISH_REQUEST
+  CREATE_ARC
+  CREATE_CHAPTER
 }
 
 enum VOTE_DECISION {
@@ -354,6 +356,9 @@ model Folder {
   // Relations with file model
   files File[]
 
+  // Relations with application model
+  parentFolderApplications Application[] @relation("ApplicationParentFolder")
+
   @@index([projectId])
   @@index([parentId])
   // Configs
@@ -518,6 +523,9 @@ model Application {
   createdAt   DateTime           @default(now()) @map("created_at")
   updatedAt   DateTime           @default(now()) @updatedAt @map("updated_at")
 
+  parentFolderId Int?               @map("parent_folder_id")
+  parentFolder   Folder?            @relation("ApplicationParentFolder", fields: [parentFolderId], references: [id], onDelete: SetNull)
+
   // Relations with project model
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
@@ -599,6 +607,7 @@ model ActivityLog {
   entityId      Int             @map("entity_id")
   projectId     Int?            @map("project_id")
   editorBoardId Int?            @map("editor_board_id")
+  fileId        Int?            @map("file_id")
   actorId       Int             @map("actor_id")
   metadata      Json?
   createdAt     DateTime        @default(now()) @map("created_at")
@@ -615,6 +624,7 @@ model ActivityLog {
 
   @@index([projectId])
   @@index([editorBoardId])
+  @@index([fileId])
   @@index([actorId])
   // Configs
   @@map("activity_logs")
