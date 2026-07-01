@@ -30,9 +30,6 @@ import {
   writeStoredFolderCover,
 } from './file-folder-utils';
 import {
-  buildDemoProductionFolders,
-  buildFallbackFiles,
-  FILES_LOCAL_STORAGE_KEY,
   type FileExplorerItem,
 } from './file-ui';
 
@@ -57,7 +54,6 @@ function mapApiFileToExplorerItem(file: ProjectFileResponse, folderId: number): 
     description: file.description,
     folderId: file.folderId ?? file.folder?.id ?? folderId,
     id: file.id,
-    isFallback: false,
     status: 'PENDING',
     taskCount: 0,
     title: file.title,
@@ -103,7 +99,7 @@ export function FilesClient({ projectId }: FilesClientProps) {
         }),
       );
       const apiFolders = [...rootFolders, ...childFolderGroups.flat()];
-      const productionFolders = buildDemoProductionFolders(projectId, apiFolders);
+      const productionFolders = apiFolders;
       const apiFilesByFolder = await Promise.all(
         apiFolders.map(async (folder) => {
           try {
@@ -118,16 +114,7 @@ export function FilesClient({ projectId }: FilesClientProps) {
 
       setFolders(productionFolders);
       setFolderCovers(readStoredFolderCovers(projectId));
-      setFiles((currentFiles) => {
-        const storedFiles = window.sessionStorage.getItem(FILES_LOCAL_STORAGE_KEY);
-        const localFiles = storedFiles
-          ? (JSON.parse(storedFiles) as FileExplorerItem[]).filter(
-              (file) =>
-                file.folderId && productionFolders.some((folder) => folder.id === file.folderId),
-            )
-          : currentFiles.filter((file) => file.id <= -1000);
-        return [...apiFiles, ...buildFallbackFiles(productionFolders), ...localFiles];
-      });
+      setFiles(apiFiles);
     } catch {
       setFolders([]);
       setFiles([]);
@@ -340,10 +327,10 @@ export function FilesClient({ projectId }: FilesClientProps) {
       <div className="mt-4 flex items-center justify-between border-y border-[#26303b] bg-[#151c25] px-4 py-2">
         <div className="flex items-center gap-2 text-xs font-bold text-[#aeb7c2]">
           <Database className="size-4 text-[#FFD369]" />
-          Folders use live API data. File records, materials, and tasks marked * use UI fallback.
+          Folders and files use live API data.
         </div>
         <Badge className="rounded-[3px] border border-[#6c5516] bg-[#30270d] text-[#ffd35b]">
-          API-aware MVP
+          Production Ready
         </Badge>
       </div>
 

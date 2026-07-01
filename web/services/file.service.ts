@@ -74,6 +74,7 @@ export type FileVersionsResponse = {
 export async function getFileMaterialVersions(fileId: number | string) {
   const response = await api.get<FileVersionsResponse, FileVersionsResponse>(
     `/files/${fileId}/versions`,
+    { params: { page: 1, limit: 100 } },
   );
   return response;
 }
@@ -81,6 +82,7 @@ export async function getFileMaterialVersions(fileId: number | string) {
 export async function getFileMaterials(fileId: number | string) {
   const response = await api.get<{ data: FileVersionResponse[] }, { data: FileVersionResponse[] }>(
     `/files/${fileId}/materials`,
+    { params: { page: 1, limit: 100 } },
   );
   return response.data ?? [];
 }
@@ -133,3 +135,43 @@ export async function createFileComment(fileId: number | string, content: string
   });
   return response.data;
 }
+
+export type ActivityLogActor = {
+  id: number;
+  displayName: string | null;
+  avatarUrl: string | null;
+  email: string;
+};
+
+export type ActivityLogResponse = {
+  id: number;
+  action: string;
+  entityType: string;
+  entityId: number;
+  projectId?: number | null;
+  editorBoardId?: number | null;
+  fileId?: number | null;
+  actorId: number;
+  metadata?: any;
+  createdAt: string;
+  actor?: ActivityLogActor | null;
+};
+
+export type FileActivityLogsResponse = {
+  data: ActivityLogResponse[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+};
+
+export async function getFileActivityLogs(fileId: number | string, page = 1, limit = 20) {
+  const response = await api.get<FileActivityLogsResponse, FileActivityLogsResponse>(
+    `/files/${fileId}/activity-logs`,
+    { params: { page, limit } }
+  );
+  return response;
+}
+

@@ -43,11 +43,11 @@ import {
   updateEditorBoard,
   type EditorBoardResponse,
 } from '@/services/editor-board.service';
+import { getMyTasks } from '@/services/task.service';
 
 import { CreateBoardDialog } from './CreateBoardDialog';
 import { CreateProjectDialog } from './CreateProjectDialog';
 import { WorkspaceHeader } from './WorkspaceHeader';
-import { projectRows as fallbackProjectRows, taskRows } from '../const/workspace-dashboard-data';
 
 const statusClassName: Record<string, string> = {
   INKING: 'border-[#4a4f55] bg-[#20282b] text-[#f2f6f4]',
@@ -114,6 +114,7 @@ export function WorkspaceDashboard() {
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('projects');
   const [apiProjects, setApiProjects] = useState<ProjectResponse[]>([]);
   const [apiBoards, setApiBoards] = useState<EditorBoardResponse[]>([]);
+  const [apiTasks, setApiTasks] = useState<any[]>([]);
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -123,20 +124,20 @@ export function WorkspaceDashboard() {
   }, [searchParams]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
   const [isLoadingBoards, setIsLoadingBoards] = useState(true);
+  const [isLoadingTasks, setIsLoadingTasks] = useState(true);
   const [projectError, setProjectError] = useState<string | null>(null);
   const [boardError, setBoardError] = useState<string | null>(null);
+  const [taskError, setTaskError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [activeActionId, setActiveActionId] = useState<string | null>(null);
   const isProjectsTab = activeTab === 'projects';
   const projectRows = useMemo(
     () =>
-      apiProjects.map((project, index) => {
-        const fallbackProject = fallbackProjectRows[index % fallbackProjectRows.length];
-
+      apiProjects.map((project) => {
         return {
           editorBoard: project.editorBoard?.name ?? 'No board',
           id: `PRJ-${project.id}`,
-          image: project.imageUrl ?? fallbackProject.image,
+          image: project.imageUrl ?? '',
           description: project.description ?? 'No description',
           memberCount: project.userProjects?.length ?? 0,
           name: project.name,
@@ -166,6 +167,30 @@ export function WorkspaceDashboard() {
     [apiBoards],
   );
   const boardTotal = boardRows.length;
+
+  const mappedTasks = useMemo(
+    () =>
+      apiTasks.map((t) => {
+        const assigneeName = t.assignedByUser?.displayName || t.assignedByUser?.email || 'Unassigned';
+        const assigneeInitials = assigneeName.slice(0, 2).toUpperCase();
+        return {
+          id: t.id,
+          title: t.title,
+          file: t.file?.title || `File #${t.fileId}`,
+          project: t.file?.project?.name || 'Project',
+          assignee: {
+            color: '#0ea5e9',
+            initials: assigneeInitials,
+            name: assigneeName,
+          },
+          status: t.status,
+          due: t.deadline ? new Date(t.deadline).toLocaleDateString() : 'No due date',
+          updated: formatUpdatedAt(t.updatedAt),
+        };
+      }),
+    [apiTasks],
+  );
+
   const headerContent = {
     editorBoards: {
       meta: isLoadingBoards ? 'Loading Boards' : `${boardTotal} Editor Boards`,
@@ -173,7 +198,7 @@ export function WorkspaceDashboard() {
       title: 'Editor Boards',
     },
     myTasks: {
-      meta: `${taskRows.length} Assigned Tasks`,
+      meta: isLoadingTasks ? 'Loading Tasks' : `${apiTasks.length} Assigned Tasks`,
       subtitle: 'Track your cross-project assignments, reviews, and production handoffs.',
       title: 'My Tasks',
     },
@@ -214,10 +239,26 @@ export function WorkspaceDashboard() {
     }
   }, []);
 
+  const loadTasks = useCallback(async () => {
+    setIsLoadingTasks(true);
+    setTaskError(null);
+
+    try {
+      const result = await getMyTasks({ me: true });
+      setApiTasks(result);
+    } catch {
+      setTaskError('Unable to load tasks.');
+      setApiTasks([]);
+    } finally {
+      setIsLoadingTasks(false);
+    }
+  }, []);
+
   useEffect(() => {
     queueMicrotask(() => {
       void loadProjects();
       void loadEditorBoards();
+      void loadTasks();
     });
   }, [loadEditorBoards, loadProjects]);
 
@@ -441,7 +482,7 @@ export function WorkspaceDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {taskRows.map((task) => (
+                {mappedTasks.map((task) => (
                   <TableRow
                     className="h-[72px] border-l-4 border-l-transparent border-r-0 border-t-0 border-b-[#393E46] bg-[#0b1118] hover:border-l-[#FFD369] hover:bg-[#202832]"
                     key={task.id}

@@ -27,7 +27,6 @@ import { CreateTaskDialog } from './CreateTaskDialog';
 import { TaskKanban } from './TaskKanban';
 import { TaskTable } from './TaskTable';
 import {
-  readTaskOverrides,
   type TaskWorkspaceItem,
   type TaskStatus,
 } from './task-ui';
@@ -157,7 +156,6 @@ export function TasksClient({ projectId }: TasksClientProps) {
               fileId: file.id,
               fileTitle: file.title,
               id: String(t.id),
-              isFallback: false,
               isMine: /current|sarah/i.test(assigneeName),
               previewUrl,
               priority: 'MEDIUM',
@@ -177,21 +175,7 @@ export function TasksClient({ projectId }: TasksClientProps) {
       const tasksArrays = await Promise.all(tasksPromises);
       const allTasks = tasksArrays.flat();
 
-      // Merge with overrides to keep state consistency
-      const overrides = readTaskOverrides();
-      const mergedTasks = allTasks.map((t) => {
-        const override = overrides[t.id];
-        if (override) {
-          return {
-            ...t,
-            submissions: override.submissions || [],
-            status: override.status || t.status,
-          };
-        }
-        return t;
-      });
-
-      setTasks(mergedTasks);
+      setTasks(allTasks);
     } catch {
       setError('Unable to load tasks.');
     } finally {

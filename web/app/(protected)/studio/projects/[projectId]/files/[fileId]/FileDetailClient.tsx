@@ -11,11 +11,14 @@ import {
 import Link from 'next/link';
 import {
   ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
   FileQuestion,
   FileText,
   History,
   Layers3,
   Maximize2,
+  MessageCircle,
   MessageSquare,
   Minus,
   Plus,
@@ -33,12 +36,6 @@ import { updateTask, createTaskFrame, getTaskFrames } from '@/services/task.serv
 
 import { CreateFileReviewDialog } from '../CreateFileReviewDialog';
 import {
-  buildDemoProductionFolders,
-  buildFallbackFiles,
-  fallbackFileVersions,
-  fallbackMaterials,
-  FILE_UI_PREVIEW_ALL_ACTIONS,
-  FILES_LOCAL_STORAGE_KEY,
   fileStatusClassName,
   fileStatusLabels,
   formatFileDate,
@@ -56,10 +53,6 @@ import { FileTasksPanel } from './FileTasksPanel';
 import { FocusedTaskWorkspace } from './FocusedTaskWorkspace';
 import { VersionHistoryDrawer } from './VersionHistoryDrawer';
 import {
-  fallbackProjectTasks,
-  readStoredTasks,
-  readTaskOverrides,
-  writeTaskOverride,
   type TaskWorkspaceItem,
 } from '../../tasks/task-ui';
 
@@ -117,6 +110,7 @@ type FileDetailClientProps = {
 
 export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetailClientProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
+  const lastProcessedTaskIdRef = useRef<string | null | undefined>(undefined);
   const [file, setFile] = useState<FileExplorerItem | null>(null);
   const [folders, setFolders] = useState<ProjectFolderResponse[]>([]);
   const [tasks, setTasks] = useState<FileTaskItem[]>([]);
@@ -143,6 +137,12 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
   const [selectedVersionForMaterials, setSelectedVersionForMaterials] = useState<FileVersionItem | null>(null);
   const [mobileTasksOpen, setMobileTasksOpen] = useState(false);
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
+  const [zoom, setZoom] = useState(100);
+  const [rotation, setRotation] = useState(0);
+  const [comparisonOpacity, setComparisonOpacity] = useState(50);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
   const [members, setMembers] = useState<{ id: number; name: string }[]>([]);
 
   const loadFile = useCallback(async () => {
@@ -151,7 +151,7 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
 
     try {
       const folderResult = await getProjectFolders(projectId);
-      const productionFolders = buildDemoProductionFolders(projectId, folderResult.folders);
+      const productionFolders = folderResult.folders;
       setFolders(productionFolders);
 
       try {
@@ -166,28 +166,9 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
         console.error('Failed to load project members:', err);
       }
 
-      if (fileId < 0) {
-        let localFiles: FileExplorerItem[] = [];
-        const storedFiles = window.sessionStorage.getItem(FILES_LOCAL_STORAGE_KEY);
-
-        if (storedFiles) {
-          try {
-            localFiles = JSON.parse(storedFiles) as FileExplorerItem[];
-          } catch {
-            localFiles = [];
-          }
-        }
-
-        const fallbackFile = [...buildFallbackFiles(productionFolders), ...localFiles].find(
-          (candidate) => candidate.id === fileId,
-        );
-
-        if (!fallbackFile) {
-          throw new Error('Fallback file not found');
-        }
-
-        setFile(fallbackFile);
-        setVersions(fallbackFileVersions);
+      if (isNaN(Number(fileId)) || fileId < 0) {
+        setError('File was not found in the current project workspace.');
+        setIsLoading(false);
         return;
       }
 
@@ -249,7 +230,59 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
             }
           }
 
-          const cleanDesc = t.description ? t.description.replace(/\s*\[version:v\d+\]/g, '') : '';
+          // Parse submissions and clean description
+          const rawDesc = t.description || '';
+          const submissions: any[] = [];
+          const submissionRegex = /\[Note:\s*([\s\S]*?)\](?:\s*\[version:(v\d+)\])?/g;
+          let match;
+
+          while ((match = submissionRegex.exec(rawDesc)) !== null) {
+            const note = match[1].trim();
+            const versionTag = match[2];
+            let previewUrl = undefined;
+            let assetName = 'submission.png';
+            if (versionTag) {
+              const matchVer = dbVersions.find(v => `v${v.version}` === versionTag);
+              if (matchVer) {
+                previewUrl = matchVer.previewUrl;
+                assetName = `submission-${versionTag}.png`;
+              }
+            } else if (dbVersions.length > 0) {
+              previewUrl = dbVersions[0].previewUrl;
+              assetName = `submission-v${dbVersions[0].version}.png`;
+            }
+
+            submissions.push({
+              id: `sub-${t.id}-${submissions.length + 1}`,
+              assetName,
+              note,
+              previewUrl,
+              status: 'PENDING_REVIEW',
+              submittedAt: t.updatedAt ? formatFileDate(t.updatedAt) : 'Submitted',
+              submittedBy: t.assignedByUser?.displayName || t.assignedByUser?.email || 'Assignee',
+            });
+          }
+
+          if (submissions.length > 0) {
+            const latest = submissions[submissions.length - 1];
+            if (t.status === 'DONE') {
+              latest.status = 'APPROVED';
+            } else if (t.status === 'INPROGRESS') {
+              latest.status = 'CHANGES_REQUESTED';
+            } else if (t.status === 'REVIEW') {
+              latest.status = 'PENDING_REVIEW';
+            }
+            for (let i = 0; i < submissions.length - 1; i++) {
+              submissions[i].status = 'CHANGES_REQUESTED';
+            }
+            // Sort newest first so that the latest submission is auto-selected
+            submissions.reverse();
+          }
+
+          const cleanDesc = rawDesc
+            .replace(/\[Note:\s*([\s\S]*?)\]/g, '')
+            .replace(/\[version:(v\d+)\]/g, '')
+            .trim();
 
           return {
             assignedTo: t.assignedByUser?.displayName || t.assignedByUser?.email || 'Unassigned',
@@ -259,7 +292,15 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
             status: t.status,
             title: t.title,
             targetVersion: taskVersion,
+            submissions,
+            parent: t.parent ? {
+              id: String(t.parent.id),
+              title: t.parent.title,
+              description: t.parent.description ?? null,
+              status: t.parent.status,
+            } : null,
           };
+
         });
         dbTasks = await Promise.all(tasksWithFramesPromises);
       } catch (err) {
@@ -348,7 +389,6 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
         description: response.description,
         folderId: response.folderId,
         id: response.id,
-        isFallback: false,
         previewUrl: currentVersionPreview || undefined,
         status: fileStatus,
         taskCount: dbTasks.length,
@@ -368,13 +408,19 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
       void loadFile();
     });
   }, [loadFile]);
-
   useEffect(() => {
+    // If the URL has no task selection and it hasn't changed to null from a previous value,
+    // do not reset the local selection.
     if (!focusedTaskId) {
-      setFocusedTask(null);
-      setSelectedTaskId(null);
+      if (lastProcessedTaskIdRef.current !== undefined && lastProcessedTaskIdRef.current !== null) {
+        setFocusedTask(null);
+        setSelectedTaskId(null);
+      }
+      lastProcessedTaskIdRef.current = null;
       return;
     }
+
+    lastProcessedTaskIdRef.current = focusedTaskId;
 
     let isMounted = true;
 
@@ -382,40 +428,25 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
       if (!isMounted) return;
 
       const dbTask = tasks.find((t) => t.id === focusedTaskId);
-      const overrides = readTaskOverrides();
-      const override = overrides[focusedTaskId];
+      if (!dbTask) return;
 
-      let workspaceTask: TaskWorkspaceItem | undefined = undefined;
+      const workspaceTask: TaskWorkspaceItem = {
+        id: dbTask.id,
+        title: dbTask.title,
+        description: dbTask.description,
+        status: dbTask.status,
+        dueDate: dbTask.dueDate || 'No due date',
+        assignee: dbTask.assignedTo,
+        fileId: file?.id ?? fileId,
+        fileTitle: file?.title ?? 'Production File',
+        previewUrl: file?.previewUrl ?? '',
+        priority: 'MEDIUM',
+        region: dbTask.region,
+        submissions: dbTask.submissions || [],
+        isMine: /current|sarah/i.test(dbTask.assignedTo),
+        updatedAt: 'Just now',
+      };
 
-      if (dbTask) {
-        workspaceTask = {
-          id: dbTask.id,
-          title: dbTask.title,
-          description: dbTask.description,
-          status: (override?.status as any) || dbTask.status,
-          dueDate: dbTask.dueDate || 'No due date',
-          assignee: dbTask.assignedTo,
-          fileId: file?.id ?? fileId,
-          fileTitle: file?.title ?? 'Production File',
-          previewUrl: file?.previewUrl ?? '',
-          priority: 'MEDIUM',
-          region: dbTask.region,
-          submissions: override?.submissions || [],
-          isFallback: false,
-          isMine: /current|sarah/i.test(dbTask.assignedTo),
-          updatedAt: 'Just now',
-        };
-      } else {
-        const fallbackTask =
-          override ??
-          readStoredTasks().find((task) => task.id === focusedTaskId) ??
-          fallbackProjectTasks.find((task) => task.id === focusedTaskId);
-        if (fallbackTask) {
-          workspaceTask = fallbackTask;
-        }
-      }
-
-      if (!workspaceTask) return;
       setFocusedTask(workspaceTask);
       setSelectedTaskId(workspaceTask.id);
 
@@ -429,8 +460,12 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
         }
       }
 
-      // Auto select latest submission if any
-      if (workspaceTask.submissions.length > 0 && !selectedSubmissionId) {
+      // Auto select latest submission if it is pending review
+      if (
+        workspaceTask.submissions.length > 0 &&
+        workspaceTask.submissions[0].status === 'PENDING_REVIEW' &&
+        !selectedSubmissionId
+      ) {
         setSelectedSubmissionId(workspaceTask.submissions[0].id);
       }
     });
@@ -439,10 +474,9 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
       isMounted = false;
     };
   }, [focusedTaskId, tasks, file, fileId, selectedSubmissionId, versions]);
-
-  const canReviewTask = FILE_UI_PREVIEW_ALL_ACTIONS;
-  const canSubmitTask = FILE_UI_PREVIEW_ALL_ACTIONS;
-  const canCreateTask = FILE_UI_PREVIEW_ALL_ACTIONS;
+  const canReviewTask = true;
+  const canSubmitTask = true;
+  const canCreateTask = true;
 
   const handleCreateReview = async (input: {
     description?: string;
@@ -462,10 +496,9 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
         materials: {
           files: [
             {
-              fallback: file.isFallback,
               folderId: file.folderId,
               title: file.title.replace(/ \*$/, ''),
-              ...(file.isFallback ? {} : { fileId: file.id }),
+              fileId: file.id,
             },
           ],
         },
@@ -496,6 +529,9 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
 
   const handleCanvasPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (!annotationMode && !frameAnnotationMode) {
+      setIsPanning(true);
+      setPanStart({ x: event.clientX - panOffset.x, y: event.clientY - panOffset.y });
+      event.currentTarget.setPointerCapture(event.pointerId);
       return;
     }
 
@@ -509,6 +545,14 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
   };
 
   const handleCanvasPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (isPanning) {
+      setPanOffset({
+        x: event.clientX - panStart.x,
+        y: event.clientY - panStart.y,
+      });
+      return;
+    }
+
     if ((!annotationMode && !frameAnnotationMode) || !annotationStart) {
       return;
     }
@@ -517,6 +561,12 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
   };
 
   const handleCanvasPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (isPanning) {
+      setIsPanning(false);
+      event.currentTarget.releasePointerCapture(event.pointerId);
+      return;
+    }
+
     if ((!annotationMode && !frameAnnotationMode) || !annotationStart) {
       return;
     }
@@ -630,40 +680,35 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
       setSelectedVersion(null);
     }
 
-    const overrides = readTaskOverrides();
-    const existingWorkspaceTask =
-      overrides[task.id] ??
-      readStoredTasks().find((candidate) => candidate.id === task.id) ??
-      fallbackProjectTasks.find((candidate) => candidate.id === task.id);
+    const workspaceTask: TaskWorkspaceItem = {
+      assignee: task.assignedTo,
+      description: task.description,
+      dueDate: task.dueDate ?? 'No due date',
+      fileId,
+      fileTitle: file?.title ?? `File #${fileId}`,
+      id: task.id,
+      isMine: /current|sarah/i.test(task.assignedTo),
+      previewUrl: file?.previewUrl ?? '',
+      priority: 'MEDIUM',
+      region: task.region,
+      status: task.status,
+      submissions: task.submissions || [],
+      title: task.title,
+      updatedAt: 'Just now',
+      targetVersion: task.targetVersion,
+      parent: task.parent ? {
+        id: task.parent.id,
+        title: task.parent.title,
+        description: task.parent.description,
+        status: task.parent.status,
+      } : null,
+    };
 
-    if (existingWorkspaceTask) {
-      setFocusedTask({
-        ...existingWorkspaceTask,
-        status: task.status,
-        title: task.title || existingWorkspaceTask.title,
-        description: task.description || existingWorkspaceTask.description,
-        assignee: task.assignedTo || existingWorkspaceTask.assignee,
-        targetVersion: task.targetVersion,
-      });
+    setFocusedTask(workspaceTask);
+    if (workspaceTask.submissions.length > 0 && workspaceTask.submissions[0].status === 'PENDING_REVIEW') {
+      setSelectedSubmissionId(workspaceTask.submissions[0].id);
     } else {
-      setFocusedTask({
-        assignee: task.assignedTo,
-        description: task.description,
-        dueDate: task.dueDate ?? 'No due date *',
-        fileId,
-        fileTitle: file?.title ?? `File #${fileId} *`,
-        id: task.id,
-        isFallback: true,
-        isMine: /current|sarah/i.test(task.assignedTo),
-        previewUrl: file?.previewUrl ?? '',
-        priority: 'MEDIUM',
-        region: task.region,
-        status: task.status,
-        submissions: [],
-        title: task.title,
-        updatedAt: 'Just now *',
-        targetVersion: task.targetVersion,
-      });
+      setSelectedSubmissionId(null);
     }
   };
 
@@ -678,7 +723,6 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
     );
 
     setFocusedTask(nextTask);
-    writeTaskOverride(nextTask);
     if (addedSubmission) {
       setSelectedSubmissionId(addedSubmission.id);
     }
@@ -694,7 +738,7 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
           : currentFile,
       );
       setSelectedSubmissionId(null);
-      setSuccessMessage('Submission approved. It is now displayed as the current file in UI preview mode. *');
+      setSuccessMessage('Submission approved. It is now displayed as the current file in UI preview mode.');
     }
     setTasks((currentTasks) =>
       currentTasks.map((task) =>
@@ -711,14 +755,12 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
       ),
     );
 
-    if (!isNaN(Number(nextTask.id))) {
-      try {
-        await updateTask(nextTask.id, {
-          status: nextTask.status,
-        });
-      } catch (err) {
-        console.error('Failed to update task status:', err);
-      }
+    try {
+      await updateTask(nextTask.id, {
+        status: nextTask.status,
+      });
+    } catch (err) {
+      console.error('Failed to update task status:', err);
     }
   };
 
@@ -746,9 +788,13 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
       setSuccessMessage('Work submitted for review successfully. Created a new file material version.');
       await loadFile();
       setSelectedSubmissionId(null);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to submit task work:', err);
-      setError('Failed to upload submission work.');
+      if (err.response?.status === 401) {
+        setError('Your session has expired. Please log in again.');
+      } else {
+        setError('Failed to upload submission work.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -835,22 +881,17 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
 
   return (
     <section className="h-full flex flex-col overflow-hidden bg-[#101820]">
-      {/* 1. Breadcrumbs */}
-      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-[#26303b] bg-[#0d151e] px-5 text-[10px] font-bold text-[#8b94a1]">
-        <Link href="/studio" className="hover:text-white transition-colors">Studio</Link>
-        <span>/</span>
-        <Link href={`/studio/projects/${projectId}`} className="hover:text-white transition-colors">Projects</Link>
-        <span>/</span>
-        <Link href={`/studio/projects/${projectId}/files`} className="hover:text-white transition-colors">Files</Link>
-        <span>/</span>
-        <span className="text-[#aeb7c2]">{folder?.title ?? 'Folder'}</span>
-        <span>/</span>
-        <span className="text-[#FFD369]">{file.title}</span>
-      </div>
 
       {/* 2. File Header */}
       <header className="flex h-16 shrink-0 items-center justify-between border-b border-[#26303b] bg-[#151c25] px-5 py-3 gap-4">
         <div className="flex items-center gap-3">
+          <Link
+            href={`/studio/projects/${projectId}/files`}
+            className="flex items-center gap-1.5 text-xs font-black text-[#8b94a1] hover:text-white transition-colors mr-2 border border-[#39424f] px-2.5 py-1.5 rounded-[4px] bg-[#0d151e]/50 hover:bg-[#303842]"
+          >
+            <ArrowLeft className="size-3.5" />
+            <span>Back</span>
+          </Link>
           <FileText className="size-5 text-[#FFD369]" />
           <h1 className="text-base font-black text-white">{file.title}</h1>
         </div>
@@ -860,25 +901,13 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
             Current v{versions[0]?.version || 1}
           </span>
 
-          {versions[0]?.previewUrl && (
-            <a
-              href={versions[0].previewUrl}
-              download={file.title}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="h-9 rounded-[4px] border border-[#4b535f] bg-[#151c25] px-4 flex items-center justify-center text-xs font-black text-white hover:bg-[#303842] transition-colors"
-            >
-              Download
-            </a>
-          )}
-
           <details className="group relative">
             <summary className="grid size-9 cursor-pointer list-none place-items-center border border-[#39424f] text-[16px] font-black text-[#FFD369] hover:bg-[#303842] select-none rounded-[4px] transition-colors">
               ···
             </summary>
             <div className="absolute right-0 top-11 z-50 w-64 border border-[#39424f] bg-[#101820] p-4 shadow-2xl rounded-[4px]">
               <p className="text-[10px] font-black uppercase tracking-[0.08em] text-white">File Information</p>
-              <dl className="mt-3 grid grid-cols-2 gap-3">
+              <dl className="mt-3 grid grid-cols-2 gap-3 border-b border-[#303842] pb-3 mb-3">
                 {[
                   ['Type', file.category],
                   ['Version', versions[0] ? `v${versions[0].version}` : 'v1'],
@@ -892,6 +921,12 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
                   </div>
                 ))}
               </dl>
+              <div className="mt-2 text-left">
+                <dt className="text-[8px] font-black uppercase text-[#8b94a1]">Description</dt>
+                <dd className="mt-1 text-[10px] font-bold text-white max-h-16 overflow-y-auto leading-relaxed">
+                  {file.description || 'No description provided.'}
+                </dd>
+              </div>
               <div className="mt-4 border-t border-[#303842] pt-3">
                 <CreateFileReviewDialog
                   file={file}
@@ -903,14 +938,9 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
           </details>
 
           <Button
-            className="h-9 bg-[#FFD369] text-[#222831] hover:bg-[#eac04f] text-xs font-black rounded-[4px] px-4"
+            className="h-9 bg-[#FFD369] text-[#222831] hover:bg-[#eac04f] text-xs font-black rounded-[4px] px-4 lg:hidden"
             onClick={() => {
-              // Toggles drawer on mobile/tablet, toggles sidebar on desktop
-              if (window.innerWidth < 1280) {
-                setMobileTasksOpen(true);
-              } else {
-                setDesktopSidebarOpen((prev) => !prev);
-              }
+              setMobileTasksOpen(true);
             }}
           >
             Tasks ({tasks.length})
@@ -935,67 +965,30 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
         </button>
       ) : null}
 
-      <div className="grid flex-1 min-h-0 xl:grid-cols-[minmax(0,1fr)_360px] overflow-hidden">
-        <main className="min-w-0 bg-[#091018] h-full overflow-y-auto">
+      <div className="flex flex-1 min-h-0 overflow-hidden relative">
+        <main className="min-w-0 bg-[#091018] h-full overflow-y-auto relative flex-1">
           <div className="p-5 lg:p-8">
             <div className="mx-auto max-w-6xl">
-              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2 text-base font-black text-white">
-                    <FileText className="size-5 text-[#FFD369]" />
-                    {file.title}
+
+
+
+
+              {/* Status & Review Banners */}
+              {focusedTask && selectedSubmissionId ? (
+                <div className="mb-3 flex items-center justify-between gap-3 rounded-[4px] border border-[#303842] bg-[#151c25] px-4 py-2.5">
+                  <div>
+                    <p className="text-xs font-black text-[#FFD369]">
+                      Review Mode: Previewing Submission for &ldquo;{focusedTask.title}&rdquo;
+                    </p>
+                    <p className="mt-1 text-[10px] font-bold text-[#8b94a1]">
+                      Submitted by {focusedTask.submissions.find(s => s.id === selectedSubmissionId)?.submittedBy || 'Assignee'}
+                    </p>
                   </div>
-                  <p className="mt-1 max-w-3xl text-xs font-medium leading-5 text-[#aeb7c2]">
-                    {file.description ?? 'No description provided.'}
-                  </p>
-                </div>
-                {displayedPreviewUrl ? (
-                  <Badge className="rounded-[3px] border border-[#6c5516] bg-[#30270d] text-[#ffd35b]">
-                    {isViewingHistoricalVersion
-                      ? `Viewing v${selectedVersion.version}`
-                      : 'Active Preview'}
+                  <Badge className="rounded-[3px] border border-[#FFD369]/30 bg-[#2b2413] text-[9px] text-[#FFD369] font-black uppercase tracking-wider">
+                    Reviewing Submission
                   </Badge>
-                ) : null}
-              </div>
-
-              {focusedTask ? (
-                <div className="mb-3 flex min-h-10 items-center gap-1 overflow-x-auto border border-[#303842] bg-[#0d151e] p-1">
-                  <button
-                    className={`h-8 shrink-0 px-3 text-[10px] font-black ${!selectedSubmissionId && !isViewingHistoricalVersion
-                        ? 'bg-[#303842] text-[#FFD369]'
-                        : 'text-[#aeb7c2] hover:bg-[#17202b] hover:text-white'
-                      }`}
-                    onClick={() => {
-                      setSelectedSubmissionId(null);
-                      setSelectedVersion(null);
-                      setFrameAnnotationMode(false);
-                    }}
-                    type="button"
-                  >
-                    Current · {currentVersionName}
-                  </button>
-                  {focusedTask.submissions.map((submission, index) => (
-                    <button
-                      className={`h-8 shrink-0 px-3 text-[10px] font-black ${selectedSubmissionId === submission.id
-                          ? 'bg-[#30270d] text-[#FFD369]'
-                          : 'text-[#aeb7c2] hover:bg-[#17202b] hover:text-white'
-                        }`}
-                      key={submission.id}
-                      onClick={() => {
-                        setSelectedSubmissionId(submission.id);
-                        setSelectedVersion(null);
-                        setFrameAnnotationMode(false);
-                      }}
-                      type="button"
-                    >
-                      Submission #{focusedTask.submissions.length - index}
-                      {submission.status === 'PENDING_REVIEW' ? ' · Review' : ''}
-                    </button>
-                  ))}
                 </div>
-              ) : null}
-
-              {isViewingHistoricalVersion ? (
+              ) : isViewingHistoricalVersion ? (
                 <div className="mb-3 flex items-center justify-between gap-3 rounded-[4px] border border-[#6c5516] bg-[#30270d] px-4 py-3">
                   <div>
                     <p className="text-xs font-black text-[#ffd35b]">
@@ -1005,10 +998,34 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
                   </div>
                   <Button
                     className="h-8 rounded-[4px] border-[#806719] bg-[#101820] px-3 text-[10px] font-black text-white hover:bg-[#303842]"
-                    onClick={() => setSelectedVersion(null)}
+                    onClick={() => {
+                      setSelectedVersion(null);
+                      setSelectedSubmissionId(null);
+                    }}
                     variant="outline"
                   >
                     Back to Current
+                  </Button>
+                </div>
+              ) : tasks.some(t => t.status === 'REVIEW') ? (
+                <div className="mb-3 flex items-center justify-between gap-3 rounded-[4px] border border-[#6c5516] bg-[#30270d]/60 px-4 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-[#FFD369] animate-pulse shrink-0" />
+                    <span className="text-[10px] font-black text-white uppercase tracking-wider">
+                      Task(s) pending review
+                    </span>
+                  </div>
+                  <Button
+                    className="h-7 rounded-[4px] border-[#806719] bg-[#FFD369] px-3 text-[9px] font-black text-[#222831] hover:bg-[#eac04f]"
+                    onClick={() => {
+                      const reviewTask = tasks.find(t => t.status === 'REVIEW');
+                      if (reviewTask) {
+                        focusFileTask(reviewTask);
+                        canvasRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }
+                    }}
+                  >
+                    Review Now →
                   </Button>
                 </div>
               ) : null}
@@ -1021,21 +1038,60 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
 
               <div className="mb-3 flex h-10 items-center justify-between gap-3 border border-[#26303b] bg-[#0d151e] px-3">
                 <div className="flex items-center gap-1">
-                  <ToolbarButton label="Zoom out">
+                  <ToolbarButton
+                    label="Zoom out"
+                    onClick={() => {
+                      setZoom((prev) => {
+                        const next = Math.max(50, prev - 25);
+                        if (next === 100) setPanOffset({ x: 0, y: 0 });
+                        return next;
+                      });
+                    }}
+                  >
                     <Minus className="size-4" />
                   </ToolbarButton>
-                  <span className="grid h-7 min-w-14 place-items-center rounded-[3px] bg-[#151c25] px-2 text-[10px] font-black text-[#dce7f3]">
-                    100%
+                  <span className="grid h-7 min-w-14 place-items-center rounded-[3px] bg-[#151c25] px-2 text-[10px] font-black text-[#dce7f3] select-none">
+                    {zoom}%
                   </span>
-                  <ToolbarButton label="Zoom in">
+                  <ToolbarButton
+                    label="Zoom in"
+                    onClick={() => setZoom((prev) => Math.min(300, prev + 25))}
+                  >
                     <Plus className="size-4" />
                   </ToolbarButton>
-                  <ToolbarButton label="Fit Width">
+                  <ToolbarButton
+                    label="Fit Width"
+                    onClick={() => {
+                      setZoom((current) => (current === 200 ? 100 : 200));
+                      setRotation(0);
+                      setPanOffset({ x: 0, y: 0 });
+                    }}
+                  >
                     <Maximize2 className="size-4" />
                   </ToolbarButton>
-                  <ToolbarButton label="Rotate">
+                  <ToolbarButton
+                    label="Rotate"
+                    onClick={() => setRotation((prev) => (prev + 90) % 360)}
+                  >
                     <RotateCw className="size-4" />
                   </ToolbarButton>
+
+                  {isViewingHistoricalVersion && versions[0]?.previewUrl && (
+                    <div className="flex items-center gap-2 border-l border-[#26303b] pl-3 ml-2">
+                      <span className="text-[9px] font-black text-[#8b94a1] uppercase select-none">Compare Opacity:</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={comparisonOpacity}
+                        onChange={(e) => setComparisonOpacity(Number(e.target.value))}
+                        className="w-16 accent-[#FFD369] h-1 bg-[#26303b] rounded-lg appearance-none cursor-pointer"
+                      />
+                      <span className="text-[9px] font-black text-white w-7 text-right select-none">
+                        {comparisonOpacity}%
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-1">
                   <ToolbarButton
@@ -1047,18 +1103,37 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
                       }, 100);
                     }}
                   >
-                    <MessageSquare className="size-4" />
+                    <MessageCircle className="size-4" />
                   </ToolbarButton>
                   <ToolbarButton
                     active={frameAnnotationMode}
                     label="Frame Comment"
                     onClick={() => {
-                      setAnnotationMode(false);
                       setPendingTaskRegion(null);
                       setPendingFrameRegion(null);
                       setDraftRegion(null);
                       setAnnotationStart(null);
-                      setFrameAnnotationMode((current) => !current);
+
+                      if (!focusedTask) {
+                        const reviewTask = tasks.find((t) => t.status === 'REVIEW');
+                        if (reviewTask) {
+                          focusFileTask(reviewTask);
+                          setAnnotationMode(false);
+                          setFrameAnnotationMode(true);
+                        } else if (tasks.length > 0) {
+                          const activeTask = tasks.find((t) => t.status !== 'DONE') || tasks[0];
+                          focusFileTask(activeTask);
+                          setAnnotationMode(false);
+                          setFrameAnnotationMode(true);
+                        } else {
+                          setAnnotationMode(true);
+                          setFrameAnnotationMode(false);
+                          setSuccessMessage("To place a frame comment, please draw a region to create a task first.");
+                        }
+                      } else {
+                        setAnnotationMode(false);
+                        setFrameAnnotationMode((current) => !current);
+                      }
                     }}
                   >
                     <MessageSquare className="size-4 text-[#FFD369]" />
@@ -1085,114 +1160,143 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
               <div
                 className={`relative grid aspect-[16/10] max-h-[680px] w-full touch-none place-items-center overflow-hidden rounded-[4px] border bg-[#111923] shadow-[0_20px_60px_rgba(0,0,0,0.35)] ${annotationMode || frameAnnotationMode
                     ? 'cursor-crosshair border-[#FFD369]'
-                    : 'border-[#303842]'
+                    : isPanning
+                      ? 'cursor-grabbing border-[#303842]'
+                      : 'cursor-grab border-[#303842]'
                   }`}
                 onPointerDown={handleCanvasPointerDown}
                 onPointerMove={handleCanvasPointerMove}
                 onPointerUp={handleCanvasPointerUp}
                 ref={canvasRef}
-                style={
-                  displayedPreviewUrl
-                    ? {
-                      backgroundImage: `url(${displayedPreviewUrl})`,
-                      backgroundPosition: 'center',
-                      backgroundRepeat: 'no-repeat',
-                      backgroundSize: 'contain',
-                    }
-                    : undefined
-                }
               >
-                {!displayedPreviewUrl ? (
-                  <div className="px-6 text-center">
-                    <FileQuestion className="mx-auto size-10 text-[#5b626d]" />
-                    <p className="mt-3 text-sm font-black text-white">Preview unavailable</p>
-                    <p className="mt-1 text-xs font-bold text-[#8b94a1]">
-                      FileMaterial does not currently provide a reachable media URL.
-                    </p>
-                  </div>
-                ) : null}
+                <div
+                  className="w-full h-full absolute inset-0 origin-center"
+                  style={{
+                    transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom / 100}) rotate(${rotation}deg)`,
+                    transition: isPanning ? 'none' : 'transform 0.15s ease-out',
+                  }}
+                >
+                  {/* Layer 1: Underlay Current Version (displayed only during comparison of a historical version) */}
+                  {isViewingHistoricalVersion && versions[0]?.previewUrl && (
+                    <div
+                      className="w-full h-full absolute inset-0 pointer-events-none"
+                      style={{
+                        backgroundImage: `url(${versions[0].previewUrl})`,
+                        backgroundPosition: 'center',
+                        backgroundRepeat: 'no-repeat',
+                        backgroundSize: 'contain',
+                        opacity: 1,
+                      }}
+                    />
+                  )}
 
-                {tasks.map((task, taskIndex) => {
-                  const canvasVersion = selectedVersion
-                    ? `v${selectedVersion.version}`
-                    : versions[0]
-                      ? `v${versions[0].version}`
-                      : 'v1';
+                  {/* Layer 2: Main Image (Active Preview or Selected Version with custom comparison opacity) */}
+                  {displayedPreviewUrl && (
+                    <div
+                      className="w-full h-full absolute inset-0 transition-opacity duration-150"
+                      style={{
+                        backgroundImage: `url(${displayedPreviewUrl})`,
+                        backgroundPosition: 'center',
+                        backgroundRepeat: 'no-repeat',
+                        backgroundSize: 'contain',
+                        opacity: isViewingHistoricalVersion ? comparisonOpacity / 100 : 1,
+                      }}
+                    />
+                  )}
+                  {!displayedPreviewUrl ? (
+                    <div className="absolute inset-0 grid place-items-center px-6 text-center">
+                      <div>
+                        <FileQuestion className="mx-auto size-10 text-[#5b626d]" />
+                        <p className="mt-3 text-sm font-black text-white">Preview unavailable</p>
+                        <p className="mt-1 text-xs font-bold text-[#8b94a1]">
+                          FileMaterial does not currently provide a reachable media URL.
+                        </p>
+                      </div>
+                    </div>
+                  ) : null}
 
-                  if (task.region) {
-                    if (task.targetVersion && task.targetVersion !== canvasVersion) {
-                      return null;
-                    }
+                  {tasks.map((task, taskIndex) => {
+                    const canvasVersion = selectedVersion
+                      ? `v${selectedVersion.version}`
+                      : versions[0]
+                        ? `v${versions[0].version}`
+                        : 'v1';
 
-                    return (
-                      <button
-                        aria-label={`Open task ${task.title}`}
-                        className={`absolute border-2 bg-[#FFD369]/10 text-left transition-all ${selectedTaskId === task.id
-                            ? 'z-20 border-[#FFD369] bg-[#FFD369]/20'
-                            : selectedTaskId
-                              ? 'z-10 border-[#FFD369]/30 opacity-35 hover:opacity-75'
-                              : 'z-10 border-[#FFD369]/70 hover:bg-[#FFD369]/20'
-                          }`}
-                        key={task.id}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          focusFileTask(task);
-                        }}
-                        onPointerDown={(event) => event.stopPropagation()}
-                        style={{
-                          height: `${(task.region.endY - task.region.startY) * 100}%`,
-                          left: `${task.region.startX * 100}%`,
-                          top: `${task.region.startY * 100}%`,
-                          width: `${(task.region.endX - task.region.startX) * 100}%`,
-                        }}
-                        type="button"
-                      >
-                        <span className="absolute -left-3 -top-3 grid size-6 place-items-center rounded-full border-2 border-[#101820] bg-[#FFD369] text-[10px] font-black text-[#222831]">
-                          {taskIndex + 1}
-                        </span>
-                      </button>
-                    );
-                  }
-                  return null;
-                })}
+                    if (task.region) {
+                      if (task.targetVersion && task.targetVersion !== canvasVersion) {
+                        return null;
+                      }
 
-                {visibleFrameComments.map((comment, index) => (
-                  <button
-                    aria-label={`Open frame comment ${index + 1}`}
-                    className="absolute z-30 border-2 border-[#ff9ab3] bg-[#6b2637]/20 text-left hover:bg-[#6b2637]/35"
-                    key={comment.id}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      requestAnimationFrame(() =>
-                        document.getElementById('sidebar-discussion')?.scrollIntoView({ behavior: 'smooth' }),
+                      return (
+                        <button
+                          aria-label={`Open task ${task.title}`}
+                          className={`absolute border-2 bg-[#FFD369]/10 text-left transition-all ${selectedTaskId === task.id
+                              ? 'z-20 border-[#FFD369] bg-[#FFD369]/20'
+                              : selectedTaskId
+                                ? 'z-10 border-[#FFD369]/30 opacity-35 hover:opacity-75'
+                                : 'z-10 border-[#FFD369]/70 hover:bg-[#FFD369]/20'
+                            }`}
+                          key={task.id}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            focusFileTask(task);
+                          }}
+                          onPointerDown={(event) => event.stopPropagation()}
+                          style={{
+                            height: `${(task.region.endY - task.region.startY) * 100}%`,
+                            left: `${task.region.startX * 100}%`,
+                            top: `${task.region.startY * 100}%`,
+                            width: `${(task.region.endX - task.region.startX) * 100}%`,
+                          }}
+                          type="button"
+                        >
+                          <span className="absolute -left-3 -top-3 grid size-6 place-items-center rounded-full border-2 border-[#101820] bg-[#FFD369] text-[10px] font-black text-[#222831]">
+                            {taskIndex + 1}
+                          </span>
+                        </button>
                       );
-                    }}
-                    onPointerDown={(event) => event.stopPropagation()}
-                    style={{
-                      height: `${(comment.region.endY - comment.region.startY) * 100}%`,
-                      left: `${comment.region.startX * 100}%`,
-                      top: `${comment.region.startY * 100}%`,
-                      width: `${(comment.region.endX - comment.region.startX) * 100}%`,
-                    }}
-                    type="button"
-                  >
-                    <span className="absolute -left-3 -top-3 grid size-6 place-items-center rounded-full border-2 border-[#101820] bg-[#ff9ab3] text-[9px] font-black text-[#371522]">
-                      F{index + 1}
-                    </span>
-                  </button>
-                ))}
+                    }
+                    return null;
+                  })}
 
-                {draftRegion ? (
-                  <div
-                    className="pointer-events-none absolute z-30 border-2 border-dashed border-[#FFD369] bg-[#FFD369]/15"
-                    style={{
-                      height: `${(draftRegion.endY - draftRegion.startY) * 100}%`,
-                      left: `${draftRegion.startX * 100}%`,
-                      top: `${draftRegion.startY * 100}%`,
-                      width: `${(draftRegion.endX - draftRegion.startX) * 100}%`,
-                    }}
-                  />
-                ) : null}
+                  {visibleFrameComments.map((comment, index) => (
+                    <button
+                      aria-label={`Open frame comment ${index + 1}`}
+                      className="absolute z-30 border-2 border-[#ff9ab3] bg-[#6b2637]/20 text-left hover:bg-[#6b2637]/35"
+                      key={comment.id}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        requestAnimationFrame(() =>
+                          document.getElementById('sidebar-discussion')?.scrollIntoView({ behavior: 'smooth' }),
+                        );
+                      }}
+                      onPointerDown={(event) => event.stopPropagation()}
+                      style={{
+                        height: `${(comment.region.endY - comment.region.startY) * 100}%`,
+                        left: `${comment.region.startX * 100}%`,
+                        top: `${comment.region.startY * 100}%`,
+                        width: `${(comment.region.endX - comment.region.startX) * 100}%`,
+                      }}
+                      type="button"
+                    >
+                      <span className="absolute -left-3 -top-3 grid size-6 place-items-center rounded-full border-2 border-[#101820] bg-[#ff9ab3] text-[9px] font-black text-[#371522]">
+                        F{index + 1}
+                      </span>
+                    </button>
+                  ))}
+
+                  {draftRegion ? (
+                    <div
+                      className="pointer-events-none absolute z-30 border-2 border-dashed border-[#FFD369] bg-[#FFD369]/15"
+                      style={{
+                        height: `${(draftRegion.endY - draftRegion.startY) * 100}%`,
+                        left: `${draftRegion.startX * 100}%`,
+                        top: `${draftRegion.startY * 100}%`,
+                        width: `${(draftRegion.endX - draftRegion.startX) * 100}%`,
+                      }}
+                    />
+                  ) : null}
+                </div>
               </div>
             </div>
           </div>
@@ -1533,63 +1637,84 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
               ) : null}
             </div>
           </section>
+          {!desktopSidebarOpen && (
+            <button
+              onClick={() => setDesktopSidebarOpen(true)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 z-40 hidden lg:grid place-items-center size-8 rounded-full border border-[#FFD369] bg-[#FFD369] text-[#222831] hover:bg-[#eac04f] transition-all shadow-[0_4px_12px_rgba(0,0,0,0.6)] group"
+              title="Expand Sidebar"
+            >
+              <ChevronLeft className="size-4 transition-transform group-hover:-translate-x-0.5" />
+            </button>
+          )}
         </main>
 
-        <aside className={`h-full overflow-y-auto flex flex-col border-l border-[#26303b] bg-[#0d151e] w-[360px] shrink-0 ${desktopSidebarOpen ? 'hidden xl:flex' : 'hidden'}`}>
-          <section className="relative shrink-0 border-b border-[#26303b] px-4 py-3 bg-[#151c25]/30">
-            <div className="flex items-center justify-between gap-3">
-              <p className="truncate text-xs font-black uppercase tracking-[0.08em] text-white">Task Summary</p>
-              <Badge className={`rounded-[3px] border text-[9px] ${fileStatusClassName[file.status]}`}>
-                {fileStatusLabels[file.status]}
-              </Badge>
-            </div>
-          </section>
+        <aside className={`relative h-full overflow-visible flex flex-col border-l border-[#26303b] bg-[#0d151e] w-[320px] shrink-0 ${desktopSidebarOpen ? 'hidden lg:flex' : 'hidden'}`}>
+          {/* Collapse Button */}
+          <button
+            onClick={() => setDesktopSidebarOpen(false)}
+            className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 hidden lg:grid place-items-center size-8 rounded-full border border-[#FFD369] bg-[#FFD369] text-[#222831] hover:bg-[#eac04f] transition-all shadow-[0_4px_12px_rgba(0,0,0,0.6)] group"
+            title="Collapse Sidebar"
+          >
+            <ChevronRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+          </button>
 
-          <section className="shrink-0 border-b border-[#26303b] p-4">
-            <FileTasksPanel
-              annotationMode={annotationMode}
-              canCreateTask={canCreateTask}
-              onCreateTask={() => {
-                setPendingTaskRegion(null);
-                setDraftRegion(null);
-                setAnnotationMode(false);
-                setTaskDialogOpen(true);
-              }}
-              onSelectTask={(taskId) => {
-                focusFileTask(tasks.find((task) => task.id === taskId) ?? null);
-                canvasRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              }}
-              selectedTaskId={selectedTaskId}
-              tasks={tasks}
-            />
-          </section>
+          <div className="flex-1 overflow-y-auto flex flex-col min-h-0">
+            <section className="relative shrink-0 border-b border-[#26303b] px-4 py-3 bg-[#151c25]/30">
+              <div className="flex items-center justify-between gap-3">
+                <p className="truncate text-xs font-black uppercase tracking-[0.08em] text-white">Task Summary</p>
+                <Badge className={`rounded-[3px] border text-[9px] ${fileStatusClassName[file.status]}`}>
+                  {fileStatusLabels[file.status]}
+                </Badge>
+              </div>
+            </section>
 
-          {focusedTask ? (
-            <section className="bg-[#101820] p-4">
-              <FocusedTaskWorkspace
-                canReview={canReviewTask}
-                canSubmit={canSubmitTask}
-                onStartFrameComment={() => {
-                  setAnnotationMode(false);
+            <section className="shrink-0 border-b border-[#26303b] p-4">
+              <FileTasksPanel
+                annotationMode={annotationMode}
+                canCreateTask={canCreateTask}
+                onCreateTask={() => {
                   setPendingTaskRegion(null);
                   setDraftRegion(null);
-                  setAnnotationStart(null);
-                  setFrameAnnotationMode(true);
+                  setAnnotationMode(false);
+                  setTaskDialogOpen(true);
                 }}
-                onTaskChange={handleFocusedTaskChange}
-                onSubmitWork={handleSubmitTaskWork}
-                selectedSubmissionId={selectedSubmissionId}
-                task={focusedTask}
-                targetVersion={focusedTask.targetVersion || (versions[0] ? `v${versions[0].version}` : 'v1')}
+                onSelectTask={(taskId) => {
+                  focusFileTask(tasks.find((task) => task.id === taskId) ?? null);
+                  canvasRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }}
+                selectedTaskId={selectedTaskId}
+                tasks={tasks}
               />
             </section>
-          ) : (
-            <section className="grid place-items-center bg-[#101820]/30 p-4 text-center min-h-[200px]">
-              <p className="text-xs font-bold text-[#8b94a1]">Select a task from the list above to view details, submit updates, or review actions.</p>
-            </section>
-          )}
 
-          <div className="mt-auto py-3 border-t border-[#26303b] text-center bg-[#151c25]/10">
+            {focusedTask ? (
+              <section className="bg-[#101820] p-4">
+                <FocusedTaskWorkspace
+                  canReview={canReviewTask}
+                  canSubmit={canSubmitTask}
+                  onStartFrameComment={() => {
+                    setAnnotationMode(false);
+                    setPendingTaskRegion(null);
+                    setDraftRegion(null);
+                    setAnnotationStart(null);
+                    setFrameAnnotationMode(true);
+                  }}
+                  onTaskChange={handleFocusedTaskChange}
+                  onSubmitWork={handleSubmitTaskWork}
+                  selectedSubmissionId={selectedSubmissionId}
+                  task={focusedTask}
+                  targetVersion={focusedTask.targetVersion || (versions[0] ? `v${versions[0].version}` : 'v1')}
+                  onClose={() => focusFileTask(null)}
+                />
+              </section>
+            ) : (
+              <section className="grid place-items-center bg-[#101820]/30 p-4 text-center min-h-[200px]">
+                <p className="text-xs font-bold text-[#8b94a1]">Select a task from the list above to view details, submit updates, or review actions.</p>
+              </section>
+            )}
+          </div>
+
+          <div className="mt-auto py-3 border-t border-[#26303b] text-center bg-[#151c25]/10 shrink-0">
             <p className="text-[10px] text-[#8b94a1] font-bold">
               {selectedVersion ? `v${selectedVersion.version}` : versions[0] ? `v${versions[0].version}` : 'v1'} · {selectedVersion ? selectedVersion.createdAt : versions[0] ? versions[0].createdAt : 'Today'}
             </p>
@@ -1598,7 +1723,7 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
 
         {/* Mobile Tasks Drawer */}
         {mobileTasksOpen && (
-          <div className="fixed inset-0 z-50 flex justify-end bg-black/60 xl:hidden">
+          <div className="fixed inset-0 z-50 flex justify-end bg-black/60 lg:hidden">
             <div className="w-full max-w-md h-full bg-[#0d151e] border-l border-[#26303b] flex flex-col p-4 overflow-y-auto">
               <div className="flex items-center justify-between border-b border-[#26303b] pb-3 mb-4">
                 <span className="text-xs font-black uppercase text-white">Tasks</span>
@@ -1647,6 +1772,7 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
                       selectedSubmissionId={selectedSubmissionId}
                       task={focusedTask}
                       targetVersion={focusedTask.targetVersion || (versions[0] ? `v${versions[0].version}` : 'v1')}
+                      onClose={() => focusFileTask(null)}
                     />
                   </div>
                 ) : (

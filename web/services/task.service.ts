@@ -10,10 +10,27 @@ export type TaskResponse = {
   fileId: number;
   id: number;
   parentId: number | null;
+  parent?: {
+    id: number;
+    title: string;
+    description: string | null;
+    status: TaskStatus;
+  } | null;
   status: TaskStatus;
   title: string;
   updatedAt: string;
   updatedBy: number | null;
+  assignedByUser?: {
+    id: number;
+    email: string;
+    displayName: string | null;
+    avatarUrl: string | null;
+  } | null;
+  deadline?: string | null;
+  file?: {
+    id: number;
+    title: string;
+  } | null;
 };
 
 export type UpdateTaskPayload = {
@@ -68,5 +85,12 @@ export async function getTaskFrames(taskId: number | string) {
   const response = await api.get<{ data: TaskFrameResponse[] }, { data: TaskFrameResponse[] }>(
     `/tasks/${taskId}/frames`,
   );
+  return response.data ?? [];
+}
+
+export async function getMyTasks(query: { me: boolean; limit?: number; page?: number }) {
+  const response = await api.get<{ data: TaskResponse[] }, { data: TaskResponse[] }>('/tasks', {
+    params: query,
+  });
   return response.data ?? [];
 }
