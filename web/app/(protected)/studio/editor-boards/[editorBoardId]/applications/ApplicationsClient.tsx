@@ -1,28 +1,15 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FileCheck2, FileUp, Rocket, Search } from 'lucide-react';
+import { Rocket, Search } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import api from '@/lib/api';
-import { updateApplicationStatus } from '@/services/application.service';
+import { type ApplicationResponse, updateApplicationStatus } from '@/services/application.service';
+import { getEditorBoardApplications } from '@/services/editor-board.service';
 
 import { ApplicationReviewDrawer } from './ApplicationReviewDrawer';
 import { getStatusLabel, getStatusStyle } from './application-ui';
-
-type ApplicationResponse = {
-  createdAt: string;
-  createdByUser?: { avatarUrl?: string; displayName?: string; email?: string };
-  description?: string;
-  id: number;
-  materials?: any;
-  project?: { id: number; name: string };
-  status: string;
-  title: string;
-  type: string;
-  updatedAt: string;
-};
 
 type ApplicationsClientProps = {
   editorBoardId: number;
@@ -43,10 +30,8 @@ export function ApplicationsClient({ editorBoardId }: ApplicationsClientProps) {
     setError(null);
 
     try {
-      const response = await api.get<{ data?: ApplicationResponse[] }, { data?: ApplicationResponse[] }>(
-        `/editor-boards/${editorBoardId}/applications`,
-      );
-      setApplications(response.data ?? []);
+      const response = await getEditorBoardApplications(editorBoardId);
+      setApplications(response.applications);
     } catch {
       setError('Unable to load applications.');
       setApplications([]);
@@ -88,7 +73,7 @@ export function ApplicationsClient({ editorBoardId }: ApplicationsClientProps) {
     setError(null);
 
     try {
-      await updateApplicationStatus(application.id, status as any);
+      await updateApplicationStatus(application.id, status as 'APPROVE' | 'REJECT' | 'CANCELLED');
       setSelectedApplication((current) =>
         current?.id === application.id
           ? { ...current, status, updatedAt: new Date().toISOString() }

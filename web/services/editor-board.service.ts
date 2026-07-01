@@ -1,4 +1,5 @@
 import api from '@/lib/api';
+import type { ApplicationResponse } from './application.service';
 import type { ProjectResponse } from './project.service';
 
 export type CreateEditorBoardPayload = {
@@ -68,6 +69,11 @@ type EditorBoardsResponse = {
 
 type BoardProjectsResponse = {
   data?: Array<ProjectResponse | { project: ProjectResponse }>;
+  pagination?: PaginationResponse;
+};
+
+type BoardApplicationsResponse = {
+  data?: ApplicationResponse[];
   pagination?: PaginationResponse;
 };
 
@@ -247,3 +253,4 @@ export async function getEditorBoardApplications<TApplication extends object = R
     pagination: response.pagination,
   };
 }
+
