@@ -13,6 +13,11 @@ export class CreateProjectFolderReqDto {
   @IsString()
   description?: string;
 
+  @ApiPropertyOptional({ example: 'https://example.com/image.png' })
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+
   @ApiPropertyOptional({ example: 1, minimum: 1, type: Number })
   @IsOptional()
   @Type(() => Number)

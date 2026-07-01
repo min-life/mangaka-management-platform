@@ -329,6 +329,16 @@ export class ApplicationsService {
             }
           }
 
+          // Find thumbnail or first image URL from application materials
+          let imageUrl: string | null = null;
+          const materialsData = application.materials as any[];
+          if (Array.isArray(materialsData)) {
+            const thumbnail = materialsData.find((m) => m.isThumbnail) || materialsData[0];
+            if (thumbnail && thumbnail.url) {
+              imageUrl = thumbnail.url;
+            }
+          }
+
           // Create Folder
           const folder = await this.prisma.folder.create({
             data: {
@@ -336,6 +346,7 @@ export class ApplicationsService {
               title: application.title,
               description: application.description,
               parentId: folderParentId,
+              imageUrl,
               createdBy: application.createdBy,
               updatedBy: application.createdBy,
             },

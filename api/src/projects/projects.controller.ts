@@ -485,6 +485,32 @@ export class ProjectsController {
     };
   }
 
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['project:folder.create', 'project:owner'],
+    resource: 'PROJECT',
+  })
+  @ApiOperation({ summary: 'Create project folder' })
+  @ApiParam({ name: 'id', type: Number, description: 'Project id' })
+  @ApiCreatedResponse({
+    description: 'Project folder created successfully',
+    type: ProjectFolderResponseDto,
+  })
+  @Post(':id/folders')
+  async createProjectFolder(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() currentUser: JwtPayload,
+    @Body() data: CreateProjectFolderReqDto,
+  ) {
+    const folder = await this.projectsService.createProjectFolder(id, {
+      ...data,
+      userId: currentUser.userId,
+    });
+    return {
+      data: folder,
+    };
+  }
+
 
   @Permissions({
     mode: 'ANY',

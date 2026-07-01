@@ -11,6 +11,11 @@ export class UpdateFolderReqDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @ApiPropertyOptional({ example: 'https://example.com/image.png' })
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
 }
 
 export class CreateFileReqDto {
@@ -35,4 +40,9 @@ export class CreateChildFolderReqDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @ApiPropertyOptional({ example: 'https://example.com/image.png' })
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
 }

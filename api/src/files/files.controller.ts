@@ -197,14 +197,18 @@ export class FilesController {
   @ApiParam({ name: 'id', type: Number, description: 'File id' })
   @ApiOkResponse({
     description: 'File materials retrieved successfully',
-    type: MaterialResponseDto,
+    type: MaterialsResponseDto,
   })
   @Get(':id/materials')
-  async getFileMaterials(@Param('id', ParseIntPipe) id: number) {
-    const material = await this.filesService.getFileMaterials(id);
-    return {
-      data: material,
-    };
+  async getFileMaterials(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: QueryFileVersionsReqDto,
+  ) {
+    const result = await this.filesService.getFileMaterials(
+      id,
+      query.page && query.limit ? { page: query.page, limit: query.limit } : undefined,
+    );
+    return result;
   }
 
   @Permissions({

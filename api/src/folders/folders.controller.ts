@@ -145,6 +145,29 @@ export class FoldersController {
 
   @Permissions({
     mode: 'ANY',
+    permissions: ['project:folder.create', 'project:owner'],
+    resource: 'FOLDER',
+  })
+  @ApiOperation({ summary: 'Create child folder' })
+  @ApiParam({ name: 'id', type: Number, description: 'Folder id' })
+  @ApiCreatedResponse({ description: 'Child folder created successfully', type: FolderResponseDto })
+  @Post(':id/children')
+  async createChildFolder(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() currentUser: JwtPayload,
+    @Body() data: CreateChildFolderReqDto,
+  ) {
+    const folder = await this.foldersService.createChildFolder(id, {
+      ...data,
+      userId: currentUser.userId,
+    });
+    return {
+      data: folder,
+    };
+  }
+
+  @Permissions({
+    mode: 'ANY',
     permissions: ['project:read', 'project:owner'],
     resource: 'FOLDER',
   })

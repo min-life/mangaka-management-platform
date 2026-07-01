@@ -177,6 +177,7 @@ const FOLDER_LIST_SELECT = {
   id: true,
   title: true,
   description: true,
+  imageUrl: true,
   createdByUser: {
     select: {
       id: true,
@@ -742,6 +743,7 @@ export class ProjectsService {
       description?: string;
       parentId?: number;
       userId: number;
+      imageUrl?: string;
     },
   ) {
     try {
@@ -759,6 +761,7 @@ export class ProjectsService {
           title: data.title,
           description: data.description,
           parentId: data.parentId,
+          imageUrl: data.imageUrl,
           createdBy: data.userId,
           updatedBy: data.userId,
         },

@@ -39,6 +39,7 @@ const FILE_SELECT = {
       id: true,
       title: true,
       description: true,
+      imageUrl: true,
       project: {
         select: PROJECT_BASIC_SELECT,
       },
@@ -201,35 +202,49 @@ export class FilesService {
     }
   }
 
-  async getFileMaterials(fileId: number) {
+  async getFileMaterials(fileId: number, pagination?: Pagination) {
     try {
       await this.ensureFile(fileId);
 
-      const material = await this.prisma.fileMaterial.findFirst({
-        where: { fileId },
-        orderBy: { createdAt: 'desc' },
-        select: MATERIAL_SELECT,
-      });
+      const where: Prisma.FileMaterialWhereInput = { fileId };
+      const { page, limit, skip } = this.buildPagination(pagination);
 
-      if (material) {
-        const materialsData = material.materials as any[];
-        if (Array.isArray(materialsData)) {
-          await Promise.all(
-            materialsData.map(async (materialData) => {
-              if (materialData?.url) {
-                const [url, downloadUrl] = await Promise.all([
-                  this.awsS3Service.getPresignedUrl(materialData.url),
-                  this.awsS3Service.getPresignedUrl(materialData.url, 3600, materialData.originalName),
-                ]);
-                materialData.url = url;
-                materialData.downloadUrl = downloadUrl;
-              }
-            })
-          );
-        }
-      }
+      const [total, materials] = await this.prisma.$transaction([
+        this.prisma.fileMaterial.count({ where }),
+        this.prisma.fileMaterial.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit,
+          select: MATERIAL_SELECT,
+        }),
+      ]);
 
-      return material;
+      const signedMaterials = await Promise.all(
+        materials.map(async (material) => {
+          const materialsData = material.materials as any[];
+          if (Array.isArray(materialsData)) {
+            await Promise.all(
+              materialsData.map(async (materialData) => {
+                if (materialData?.url) {
+                  const [url, downloadUrl] = await Promise.all([
+                    this.awsS3Service.getPresignedUrl(materialData.url),
+                    this.awsS3Service.getPresignedUrl(materialData.url, 3600, materialData.originalName),
+                  ]);
+                  materialData.url = url;
+                  materialData.downloadUrl = downloadUrl;
+                }
+              })
+            );
+          }
+          return material;
+        }),
+      );
+
+      return {
+        data: signedMaterials,
+        pagination: this.buildPaginationMeta(total, page, limit),
+      };
     } catch (error) {
       this.handleError(error, 'Get file materials fail', ERROR.SVGETFILEMATERIALS);
     }
