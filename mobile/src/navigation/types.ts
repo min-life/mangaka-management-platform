@@ -25,7 +25,7 @@ export type RootStackParamList = {
     projectId: string;
     fileId: string;
     parentFolderId: string;
-    initialTab?: 'Overview' | 'Tasks' | 'Materials';
+    initialTab?: 'Overview' | 'Tasks' | 'Discussion' | 'Materials';
   };
   TaskDetail: { taskId: string } | undefined;
   Profile: undefined;

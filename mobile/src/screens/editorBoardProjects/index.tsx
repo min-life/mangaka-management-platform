@@ -70,7 +70,7 @@ export default function EditorBoardProjectsScreen({
             <BoardProjectRow
               key={project.id}
               project={project}
-              onPress={() => navigation.navigate('ProjectDetail', { projectId: project.id })}
+              onPress={() => navigation.navigate('ProjectReport', { projectId: project.id })}
             />
           ))}
         </ScrollView>

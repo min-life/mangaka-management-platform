@@ -8,6 +8,7 @@ import { Colors } from '@/src/constants/colors';
 import {
   ResourceFileMaterialVersion,
   ResourceFileTask,
+  ResourceTaskComment,
   ResourceTaskFrame,
   ResourceTaskStatus,
 } from '@/src/types/resources';
@@ -15,9 +16,9 @@ import {
 import { C } from '@/src/screens/taskDetail/components';
 import MarkdownLite from './MarkdownLite';
 
-export type ResourceFileTab = 'Overview' | 'Tasks' | 'Materials';
+export type ResourceFileTab = 'Overview' | 'Tasks' | 'Discussion' | 'Materials';
 
-const FILE_TABS: ResourceFileTab[] = ['Overview', 'Tasks', 'Materials'];
+const FILE_TABS: ResourceFileTab[] = ['Overview', 'Tasks', 'Discussion', 'Materials'];
 
 const STATUS_META: Record<ResourceTaskStatus, { label: string; color: string }> = {
   PENDING: { label: 'Pending', color: Colors.statusPending },
@@ -64,13 +65,15 @@ function EmptyState({ title }: { title: string }) {
 export function ResourceFileTabBar({
   activeTab,
   onTabChange,
+  tabs = FILE_TABS,
 }: {
   activeTab: ResourceFileTab;
   onTabChange: (tab: ResourceFileTab) => void;
+  tabs?: ResourceFileTab[];
 }) {
   return (
     <View className="mt-6 flex-row" style={{ borderBottomWidth: 1, borderBottomColor: C.border }}>
-      {FILE_TABS.map((tab) => {
+      {tabs.map((tab) => {
         const isActive = activeTab === tab;
 
         return (
@@ -123,6 +126,120 @@ export function OverviewPanel({
         style={{ backgroundColor: C.surface, borderWidth: 1, borderColor: C.border }}
       >
         <MarkdownLite content={fileContent} />
+      </View>
+    </View>
+  );
+}
+
+export function DiscussionPanel({
+  comments,
+  onCreateComment,
+}: {
+  comments: ResourceTaskComment[];
+  onCreateComment: (text: string) => Promise<void>;
+}) {
+  const [comment, setComment] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    if (isSubmitting || !comment.trim()) return;
+
+    setIsSubmitting(true);
+    setErrorMessage('');
+
+    try {
+      await onCreateComment(comment);
+      setComment('');
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Không thể gửi bình luận.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <View className="mt-6 gap-4">
+      <View
+        className="gap-4 rounded-xl p-4"
+        style={{
+          backgroundColor: 'rgba(255,255,255,0.035)',
+          borderWidth: 1,
+          borderColor: C.border,
+        }}
+      >
+        <View className="flex-row items-center justify-between gap-3">
+          <View className="flex-row items-center gap-2">
+            <MaterialIcon name="comment" color={C.accent} size={18} />
+            <Text className="text-[13px] font-bold uppercase" style={{ color: C.text }}>
+              File Discussion
+            </Text>
+          </View>
+          <Text className="text-[12px]" style={{ color: C.textFaint }}>
+            {comments.length} comment{comments.length === 1 ? '' : 's'}
+          </Text>
+        </View>
+
+        {comments.length > 0 ? (
+          <View className="gap-3">
+            {comments.map((item, index) => (
+              <CommentBubble key={`${item.id}-${index}`} comment={item} />
+            ))}
+          </View>
+        ) : (
+          <EmptyState title="No discussion yet" />
+        )}
+
+        <View
+          className="gap-2 rounded-xl px-4 py-3"
+          style={{ backgroundColor: C.surface, borderWidth: 1, borderColor: C.borderFaint }}
+        >
+          <View className="flex-row items-center gap-3">
+            <View
+              className="h-8 w-8 items-center justify-center rounded-full"
+              style={{ backgroundColor: C.surfaceHighest }}
+            >
+              <Text className="text-[10px] font-bold" style={{ color: C.text }}>
+                ME
+              </Text>
+            </View>
+            <TextInput
+              value={comment}
+              onChangeText={setComment}
+              placeholder="Trao đổi với team về file này..."
+              placeholderTextColor={C.textFaint}
+              className="flex-1 py-2 text-sm"
+              editable={!isSubmitting}
+              style={{ color: C.text }}
+              multiline
+            />
+            <TouchableOpacity
+              activeOpacity={0.75}
+              disabled={isSubmitting || !comment.trim()}
+              onPress={handleSubmit}
+              className="h-9 w-9 items-center justify-center rounded-full"
+              style={{
+                backgroundColor:
+                  isSubmitting || !comment.trim() ? C.surfaceHighest : C.accent,
+              }}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color={C.text} size="small" />
+              ) : (
+                <MaterialIcon
+                  name="send"
+                  color={!comment.trim() ? C.textFaint : C.bg}
+                  size={18}
+                />
+              )}
+            </TouchableOpacity>
+          </View>
+          {errorMessage ? (
+            <Text className="text-[12px]" style={{ color: '#EF4444' }}>
+              {errorMessage}
+            </Text>
+          ) : null}
+        </View>
       </View>
     </View>
   );
@@ -345,6 +462,63 @@ function TaskDiscussion({
   );
 }
 
+function TaskFramePanel({
+  selectedFrame,
+  task,
+  onSelectFrame,
+}: {
+  selectedFrame: ResourceTaskFrame | null;
+  task: ResourceFileTask;
+  onSelectFrame: (frame: ResourceTaskFrame) => void;
+}) {
+  return (
+    <View
+      className="gap-4 rounded-xl p-4"
+      style={{ backgroundColor: 'rgba(255,255,255,0.035)', borderWidth: 1, borderColor: C.border }}
+    >
+      <View className="gap-2">
+        <View className="flex-row items-start justify-between gap-3">
+          <Text className="flex-1 text-[15px] font-bold" style={{ color: C.text }}>
+            {task.title}
+          </Text>
+          <StatusBadge status={task.status} />
+        </View>
+
+        {task.description ? (
+          <Text className="text-[13px] leading-5" style={{ color: C.textMuted }}>
+            {task.description}
+          </Text>
+        ) : null}
+      </View>
+
+      <View className="flex-row items-center justify-between">
+        <Text className="text-[12px] font-bold uppercase" style={{ color: C.textMuted }}>
+          Frames
+        </Text>
+        <Text className="text-[12px]" style={{ color: C.textFaint }}>
+          Tap a frame to focus
+        </Text>
+      </View>
+
+      {task.frames.length > 0 ? (
+        <FrameListPanel
+          comments={task.comments}
+          frames={task.frames}
+          selectedFrameId={selectedFrame?.id ?? null}
+          onSelectFrame={(frame) => {
+            const resourceFrame = task.frames.find((item) => item.id === frame.id);
+            if (resourceFrame) {
+              onSelectFrame(resourceFrame);
+            }
+          }}
+        />
+      ) : (
+        <EmptyState title="No frames for this task" />
+      )}
+    </View>
+  );
+}
+
 function TaskSection({
   onCreateComment,
   onSelectFrame,
@@ -406,9 +580,10 @@ export function TasksPanel({
   onSelectTask,
   selectedFrame,
   selectedTaskId,
+  showTaskDiscussion = true,
   tasks,
 }: {
-  onCreateComment: (params: {
+  onCreateComment?: (params: {
     frameId?: string | null;
     taskId: string;
     text: string;
@@ -417,6 +592,7 @@ export function TasksPanel({
   onSelectTask: (task: ResourceFileTask | null) => void;
   selectedFrame: ResourceTaskFrame | null;
   selectedTaskId: string | null;
+  showTaskDiscussion?: boolean;
   tasks: ResourceFileTask[];
 }) {
   const activeTasks = tasks.filter((task) => task.status !== 'DONE');
@@ -442,12 +618,20 @@ export function TasksPanel({
           </Text>
         </TouchableOpacity>
 
-        <TaskDiscussion
-          onCreateComment={onCreateComment}
-          selectedFrame={selectedFrame}
-          task={selectedTask}
-          onSelectFrame={onSelectFrame}
-        />
+        {showTaskDiscussion && onCreateComment ? (
+          <TaskDiscussion
+            onCreateComment={onCreateComment}
+            selectedFrame={selectedFrame}
+            task={selectedTask}
+            onSelectFrame={onSelectFrame}
+          />
+        ) : (
+          <TaskFramePanel
+            selectedFrame={selectedFrame}
+            task={selectedTask}
+            onSelectFrame={onSelectFrame}
+          />
+        )}
       </View>
     );
   }

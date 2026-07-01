@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import ApiStateView from '@/src/components/shared/ApiStateView';
@@ -12,7 +12,7 @@ import {
   ResourceTaskFrame,
 } from '@/src/types/resources';
 import {
-  createDiscussionComment,
+  createFileDiscussionComment,
   fetchFolderBundle,
   fetchResourceFileBundle,
 } from '@/src/services/resourceApi';
@@ -25,6 +25,7 @@ import {
 import {
   MaterialsPanel,
   OverviewPanel,
+  DiscussionPanel,
   ResourceFileTab,
   ResourceFileTabBar,
   TasksPanel,
@@ -90,6 +91,7 @@ export default function ResourceFileScreen({
 
   const versions = file?.materialVersions ?? [];
   const tasks = file?.tasks ?? [];
+  const comments = file?.comments ?? [];
 
   const description = useMemo(
     () => (file ? buildFileDescription(file.content, file.language) : ''),
@@ -120,21 +122,13 @@ export default function ResourceFileScreen({
     setActiveTab('Materials');
   };
 
-  const handleCreateComment = async (params: {
-    frameId?: string | null;
-    taskId: string;
-    text: string;
-  }) => {
-    await createDiscussionComment(params);
+  const handleCreateFileComment = async (text: string) => {
+    await createFileDiscussionComment({
+      fileId: route.params.fileId,
+      text,
+    });
     const nextFile = await fetchResourceFileBundle(route.params.fileId);
     setFile(nextFile);
-    const selectedTask = nextFile.tasks?.find((task) => task.id === params.taskId);
-    setSelectedTaskId(params.taskId);
-    setSelectedFrame(
-      params.frameId
-        ? selectedTask?.frames.find((frame) => frame.id === params.frameId) ?? null
-        : null,
-    );
   };
 
   if (isLoading) {
@@ -190,12 +184,19 @@ export default function ResourceFileScreen({
 
         {activeTab === 'Tasks' && (
           <TasksPanel
-            onCreateComment={handleCreateComment}
             onSelectFrame={handleSelectFrame}
             onSelectTask={handleSelectTask}
             selectedFrame={selectedFrame}
             selectedTaskId={selectedTaskId}
+            showTaskDiscussion={false}
             tasks={tasks}
+          />
+        )}
+
+        {activeTab === 'Discussion' && (
+          <DiscussionPanel
+            comments={comments}
+            onCreateComment={handleCreateFileComment}
           />
         )}
 

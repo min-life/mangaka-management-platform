@@ -72,7 +72,7 @@ export async function fetchFolderBundle(folderId: string) {
 }
 
 export async function fetchResourceFileBundle(fileId: string) {
-  const [fileResponse, versionsResponse, tasksResponse] = await Promise.all([
+  const [fileResponse, versionsResponse, tasksResponse, commentsResponse] = await Promise.all([
     apiRequest<ApiDataResponse<ApiFile>>(`/files/${fileId}`),
     apiRequest<ApiListResponse<ApiMaterial>>(`/files/${fileId}/versions`, {
       params: { limit: 50, page: 1 },
@@ -80,6 +80,9 @@ export async function fetchResourceFileBundle(fileId: string) {
     apiRequest<ApiListResponse<ApiTask>>(`/files/${fileId}/tasks`, {
       params: { limit: 50, page: 1 },
     }).catch(() => ({ data: [] })),
+    apiRequest<ApiListResponse<ApiComment>>(`/files/${fileId}/comments`, {
+      params: { limit: 100, page: 1 },
+    }),
   ]);
 
   const file = fileResponse.data;
@@ -111,7 +114,28 @@ export async function fetchResourceFileBundle(fileId: string) {
     }),
   );
 
-  return mapFile(file, versionsResponse.data ?? [], uniqueById(tasks));
+  return mapFile(
+    file,
+    versionsResponse.data ?? [],
+    uniqueById(tasks),
+    commentsResponse.data ?? [],
+  );
+}
+
+export async function createFileDiscussionComment(params: {
+  fileId: string;
+  text: string;
+}) {
+  const text = params.text.trim();
+  if (!text) throw new Error('Vui lòng nhập nội dung bình luận.');
+
+  const response = await apiRequest<ApiDataResponse<ApiComment>>(`/files/${params.fileId}/comments`, {
+    body: { content: { text } },
+    method: 'POST',
+  });
+
+  if (!response.data) throw new Error('Không thể tạo bình luận.');
+  return mapComment(response.data);
 }
 
 export async function createDiscussionComment(params: {

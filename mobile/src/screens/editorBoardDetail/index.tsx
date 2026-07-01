@@ -145,6 +145,7 @@ export default function EditorBoardDetailScreen({
   }
 
   const lead = members.find((member) => member.role === 'Lead');
+  const primaryProject = boardProjects[0];
 
   const menuItems = [
     {
@@ -153,7 +154,10 @@ export default function EditorBoardDetailScreen({
       icon: 'folder',
       iconColor: '#FFFFFF',
       iconBg: Colors.accent,
-      onPress: () => navigation.navigate('EditorBoardProjects', { boardId: route.params.boardId }),
+      onPress: () =>
+        boardProjects.length === 1 && primaryProject
+          ? navigation.navigate('ProjectReport', { projectId: primaryProject.id })
+          : navigation.navigate('EditorBoardProjects', { boardId: route.params.boardId }),
     },
     {
       label: 'Members',

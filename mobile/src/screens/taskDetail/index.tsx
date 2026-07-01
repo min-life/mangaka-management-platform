@@ -27,6 +27,8 @@ import {
   TasksPanel,
 } from '@/src/screens/resourceFile/components/ResourceFilePanels';
 
+const TASK_DETAIL_TABS: ResourceFileTab[] = ['Overview', 'Tasks', 'Materials'];
+
 function buildFileDescription(content: string, language: string) {
   const meaningfulLines = content
     .split('\n')
@@ -186,7 +188,11 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
           status={selectedVersion ? 'Material Preview' : 'File Preview'}
         />
 
-        <ResourceFileTabBar activeTab={activeTab} onTabChange={setActiveTab} />
+        <ResourceFileTabBar
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          tabs={TASK_DETAIL_TABS}
+        />
 
         {activeTab === 'Overview' && (
           <OverviewPanel

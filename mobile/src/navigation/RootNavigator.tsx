@@ -43,8 +43,8 @@ export default function RootNavigator() {
         screenOptions={{
           // Ẩn header mặc định — mỗi screen tự quản lý header riêng
           headerShown: false,
-          // Animation giống iOS native
-          animation: 'slide_from_right',
+          // Chuyen man hinh nhe hon, tranh cam giac truot ngang gay mat tap trung
+          animation: 'fade',
           // Màu nền khi transition
           contentStyle: { backgroundColor: '#222831' },
         }}

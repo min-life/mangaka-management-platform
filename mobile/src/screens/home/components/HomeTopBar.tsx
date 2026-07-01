@@ -16,7 +16,7 @@ export default function HomeTopBar({ headerBg }: HomeTopBarProps) {
           backgroundColor: headerBg,
           borderBottomColor: Colors.borderFaint,
           borderBottomWidth: 1,
-          height: 124,
+          height: 56,
         }}
       />
     </SafeAreaView>

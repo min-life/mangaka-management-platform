@@ -167,8 +167,11 @@ export interface ApiComment {
   createdAt: string;
   createByUser?: ApiUserSummary | null;
   createdByUser?: ApiUserSummary | null;
+  applicationId?: number | null;
+  fileId?: number | null;
   frameId?: number | null;
   id: number;
+  taskId?: number | null;
   updatedAt: string;
 }
 

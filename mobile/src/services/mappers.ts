@@ -287,11 +287,17 @@ export function mapMaterialVersion(material: ApiMaterial): ResourceFileMaterialV
   };
 }
 
-export function mapFile(file: ApiFile, versions: ApiMaterial[] = [], tasks: ResourceFileTask[] = []): ResourceFileNode {
+export function mapFile(
+  file: ApiFile,
+  versions: ApiMaterial[] = [],
+  tasks: ResourceFileTask[] = [],
+  comments: ApiComment[] = [],
+): ResourceFileNode {
   const mappedVersions = uniqueById(versions.map(mapMaterialVersion));
   const mappedTasks = uniqueById(tasks);
 
   return {
+    comments: uniqueById(comments.map(mapComment)),
     content: file.description ?? `# ${file.title}`,
     createdAt: file.createdAt,
     createdBy: creatorId(file),
@@ -358,6 +364,7 @@ export function mapComment(comment: ApiComment): ResourceTaskComment {
   const author = displayName(creatorUser(comment));
 
   return {
+    applicationId: comment.applicationId === undefined || comment.applicationId === null ? undefined : String(comment.applicationId),
     author,
     authorRole: 'Reviewer',
     body: text,
@@ -366,9 +373,11 @@ export function mapComment(comment: ApiComment): ResourceTaskComment {
       mentions: typeof comment.content === 'object' ? comment.content?.mentions : [],
       text,
     },
+    fileId: comment.fileId === undefined || comment.fileId === null ? undefined : String(comment.fileId),
     frameId: String(comment.frameId ?? ''),
     id: String(comment.id),
     initials: initials(author),
+    taskId: comment.taskId === undefined || comment.taskId === null ? undefined : String(comment.taskId),
     time: relativeDate(comment.createdAt),
   };
 }
