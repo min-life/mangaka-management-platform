@@ -13,6 +13,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
 import { AwsS3Service } from '../share/services/aws-s3.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import sizeOf from 'image-size';
 
 const USER_SELECT = {
@@ -103,6 +104,7 @@ export class FilesService {
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
     private readonly awsS3Service: AwsS3Service,
+    private readonly realtimeGateway: RealtimeGateway,
   ) {}
 
   async getFileById(id: number) {
@@ -504,7 +506,10 @@ export class FilesService {
         projectId: fileWithFolder?.folder?.projectId ?? null,
         fileId: fileId,
         actorId: data.userId,
+        metadata: { creatorId: fileWithFolder?.createdBy ?? null }
       } satisfies ActivityEventPayload);
+
+      this.realtimeGateway.broadcastComment('FILE', fileId, 'comment:new', comment);
 
       return comment;
     } catch (error) {

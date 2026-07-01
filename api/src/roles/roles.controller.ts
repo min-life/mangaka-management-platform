@@ -15,7 +15,6 @@ export class RolesController {
   constructor(private readonly rolesService: RolesService) {}
 
   @Get()
-  @Permissions({ mode: 'ANY', permissions: ['admin', 'role:read'] })
   @ApiOperation({ summary: 'Get all roles' })
   @ApiOkResponse({ description: 'Roles retrieved successfully' })
   findRoles(@Query() query: FindRolesQueryDto) {

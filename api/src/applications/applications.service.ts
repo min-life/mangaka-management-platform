@@ -14,6 +14,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ACTIVITY_EVENT_NAME, ActivityEventPayload } from '../share/events/activity.event';
 import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 const USER_BASIC_SELECT = {
   id: true,
@@ -82,6 +83,7 @@ export class ApplicationsService {
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
     private readonly usersService: UsersService,
+    private readonly realtimeGateway: RealtimeGateway,
   ) {}
 
   async getApplications(
@@ -555,6 +557,8 @@ export class ApplicationsService {
           projectOwnerId: project?.createdBy,
         },
       } satisfies ActivityEventPayload);
+
+      this.realtimeGateway.broadcastComment('APPLICATION', applicationId, 'comment:new', comment);
 
       return comment;
     } catch (error) {
