@@ -11,9 +11,13 @@ import {
 
 import { Badge } from '@/components/ui/badge';
 import {
+  createFolderFile,
   createProjectFolder,
+  getFolderChildren,
+  getFolderFiles,
   getProjectFolders,
   type ProjectFolderResponse,
+  type ProjectFileResponse,
 } from '@/services/project.service';
 
 import { CreateProductionItemDialog } from './CreateProductionItemDialog';
@@ -36,6 +40,31 @@ type FilesClientProps = {
   projectId: number;
 };
 
+function normalizeFolder(folder: ProjectFolderResponse, projectId: number): ProjectFolderResponse {
+  return {
+    ...folder,
+    parentId: folder.parentId ?? folder.parent?.id ?? null,
+    projectId: folder.projectId ?? projectId,
+  };
+}
+
+function mapApiFileToExplorerItem(file: ProjectFileResponse, folderId: number): FileExplorerItem {
+  return {
+    category: 'Production File',
+    createdAt: file.createdAt,
+    createdByLabel:
+      file.createdByUser?.displayName ?? file.createdByUser?.email ?? 'Project member',
+    description: file.description,
+    folderId: file.folderId ?? file.folder?.id ?? folderId,
+    id: file.id,
+    isFallback: false,
+    status: 'PENDING',
+    taskCount: 0,
+    title: file.title,
+    updatedAt: file.updatedAt,
+  };
+}
+
 export function FilesClient({ projectId }: FilesClientProps) {
   const router = useRouter();
   const [folders, setFolders] = useState<ProjectFolderResponse[]>([]);
@@ -55,8 +84,38 @@ export function FilesClient({ projectId }: FilesClientProps) {
     setError(null);
 
     try {
-      const result = await getProjectFolders(projectId);
-      const productionFolders = buildDemoProductionFolders(projectId, result.folders);
+      const result = await getProjectFolders(projectId, { type: 'ARC' });
+      const rootFolders = result.folders.map((folder) => ({
+        ...normalizeFolder(folder, projectId),
+        parentId: null,
+      }));
+      const childFolderGroups = await Promise.all(
+        rootFolders.map(async (folder) => {
+          try {
+            const childResult = await getFolderChildren(folder.id);
+            return childResult.folders.map((child) => ({
+              ...normalizeFolder(child, projectId),
+              parentId: folder.id,
+            }));
+          } catch {
+            return [];
+          }
+        }),
+      );
+      const apiFolders = [...rootFolders, ...childFolderGroups.flat()];
+      const productionFolders = buildDemoProductionFolders(projectId, apiFolders);
+      const apiFilesByFolder = await Promise.all(
+        apiFolders.map(async (folder) => {
+          try {
+            const folderFiles = await getFolderFiles(folder.id);
+            return folderFiles.files.map((file) => mapApiFileToExplorerItem(file, folder.id));
+          } catch {
+            return [];
+          }
+        }),
+      );
+      const apiFiles = apiFilesByFolder.flat();
+
       setFolders(productionFolders);
       setFolderCovers(readStoredFolderCovers(projectId));
       setFiles((currentFiles) => {
@@ -67,7 +126,7 @@ export function FilesClient({ projectId }: FilesClientProps) {
                 file.folderId && productionFolders.some((folder) => folder.id === file.folderId),
             )
           : currentFiles.filter((file) => file.id <= -1000);
-        return [...buildFallbackFiles(productionFolders), ...localFiles];
+        return [...apiFiles, ...buildFallbackFiles(productionFolders), ...localFiles];
       });
     } catch {
       setFolders([]);
@@ -145,7 +204,12 @@ export function FilesClient({ projectId }: FilesClientProps) {
     setError(null);
 
     try {
-      const createdFolder = await createProjectFolder(projectId, input);
+      const createdFolder = await createProjectFolder(projectId, {
+        ...(input.description ? { description: input.description } : {}),
+        ...(input.coverPreviewUrl ? { imageUrl: input.coverPreviewUrl } : {}),
+        ...(input.parentId ? { parentId: input.parentId } : {}),
+        title: input.title,
+      });
       if (input.coverPreviewUrl) {
         writeStoredFolderCover(projectId, createdFolder.id, input.coverPreviewUrl);
         setFolderCovers((current) => ({
@@ -162,34 +226,38 @@ export function FilesClient({ projectId }: FilesClientProps) {
     }
   };
 
-  const handleCreateFallbackFile = (input: {
+  const handleCreateFile = (input: {
     description?: string;
     folderId: number;
     previewUrl?: string;
     title: string;
   }) => {
-    const now = new Date().toISOString();
-    const nextLocalId = Math.min(-1000, ...files.map((file) => file.id)) - 1;
-    const nextFile: FileExplorerItem = {
-      category: 'Production File *',
-      createdAt: now,
-      createdByLabel: 'Current user *',
-      description: input.description ?? null,
-      folderId: input.folderId,
-      id: nextLocalId,
-      isFallback: true,
-      previewUrl: input.previewUrl,
-      status: 'PENDING',
-      taskCount: 0,
-      title: `${input.title} *`,
-      updatedAt: now,
-    };
+    setIsSubmitting(true);
+    setError(null);
 
-    setFiles((currentFiles) => [...currentFiles, nextFile]);
-    const storedFiles = window.sessionStorage.getItem(FILES_LOCAL_STORAGE_KEY);
-    const localFiles = storedFiles ? (JSON.parse(storedFiles) as FileExplorerItem[]) : [];
-    window.sessionStorage.setItem(FILES_LOCAL_STORAGE_KEY, JSON.stringify([...localFiles, nextFile]));
-    setSuccessMessage('File record created in UI fallback mode. *');
+    createFolderFile(input.folderId, {
+      description: input.description,
+      title: input.title,
+    })
+      .then(async (createdFile) => {
+        setSuccessMessage('File record created successfully.');
+
+        if (input.previewUrl) {
+          setFiles((currentFiles) =>
+            currentFiles.map((file) =>
+              file.id === createdFile.id ? { ...file, previewUrl: input.previewUrl } : file,
+            ),
+          );
+        }
+
+        await loadFolders();
+      })
+      .catch(() => {
+        setError('Unable to create file.');
+      })
+      .finally(() => {
+        setIsSubmitting(false);
+      });
   };
 
   const handleSelectArc = (arcId: number) => {
@@ -227,7 +295,7 @@ export function FilesClient({ projectId }: FilesClientProps) {
           <CreateProductionItemDialog
             folders={folders}
             isSubmitting={isSubmitting}
-            onCreateFile={handleCreateFallbackFile}
+            onCreateFile={handleCreateFile}
             onCreateFolder={handleCreateFolder}
             selectedFolderId={selectedChapterId}
           />

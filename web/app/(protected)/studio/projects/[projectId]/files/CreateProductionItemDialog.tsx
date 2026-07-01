@@ -142,7 +142,7 @@ export function CreateProductionItemDialog({
   const canSubmit =
     mode === 'folder'
       ? Boolean(folderTitle.trim()) && !isSubmitting
-      : Boolean(fileTitle.trim() && fileFolderId);
+      : Boolean(fileTitle.trim() && fileFolderId) && !isSubmitting;
 
   return (
     <Dialog onOpenChange={handleOpenChange} open={open}>
@@ -318,7 +318,7 @@ export function CreateProductionItemDialog({
                         Upload from computer
                       </span>
                       <span className="mt-1 block text-[11px] font-bold text-[#8b94a1]">
-                        Image preview only *
+                        Material upload happens after the file is created
                       </span>
                     </span>
                   )}
@@ -374,7 +374,7 @@ export function CreateProductionItemDialog({
             disabled={!canSubmit}
             onClick={() => void handleCreate()}
           >
-            {isSubmitting ? 'Creating...' : mode === 'folder' ? 'Create Folder' : 'Create File *'}
+            {isSubmitting ? 'Creating...' : mode === 'folder' ? 'Create Folder' : 'Create File'}
           </Button>
         </DialogFooter>
       </DialogContent>
