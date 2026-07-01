@@ -64,6 +64,7 @@ const APPLICATION_LIST_SELECT = {
   title: true,
   type: true,
   status: true,
+  folderImageUrl: true,
   verifiedByUser: USER_SELECT,
   createdByUser: USER_SELECT,
   updatedByUser: USER_SELECT,

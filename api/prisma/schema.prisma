@@ -137,9 +137,9 @@ model User {
   updatedTasks  Task[] @relation("TaskUpdatedByUser")
   assignedTasks Task[] @relation("TaskAssignedByUser")
 
-  // Relations with taskCommentFrame model
-  createdTaskCommentFrames TaskCommentFrame[] @relation("TaskCommentFrameCreatedByUser")
-  updatedTaskCommentFrames TaskCommentFrame[] @relation("TaskCommentFrameUpdatedByUser")
+  // Relations with materialCommentFrame model
+  createdMaterialCommentFrames MaterialCommentFrame[] @relation("MaterialCommentFrameCreatedByUser")
+  updatedMaterialCommentFrames MaterialCommentFrame[] @relation("MaterialCommentFrameUpdatedByUser")
 
   // Relations with Comment model
   createdComments Comment[] @relation("CommentCreatedByUser")
@@ -335,6 +335,7 @@ model Folder {
   id          Int      @id @default(autoincrement())
   title       String
   description String?
+  imageUrl    String?  @map("image_url")
   parentId    Int?     @map("parent_id")
   projectId   Int      @map("project_id")
   createdBy   Int?     @map("created_by")
@@ -399,6 +400,8 @@ model File {
 model FileMaterial {
   id        Int      @id @default(autoincrement())
   fileId    Int      @map("file_id")
+  name      String?
+  taskId    Int?     @map("task_id")
   materials Json
   createdBy Int?     @map("created_by")
   updatedBy Int?     @map("updated_by")
@@ -408,9 +411,15 @@ model FileMaterial {
   // Relations with file model
   file File @relation(fields: [fileId], references: [id], onDelete: Cascade)
 
+  // Relations with task model
+  task Task? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
   // Relations with user model
   createdByUser User? @relation("FileMaterialCreatedByUser", fields: [createdBy], references: [id])
   updatedByUser User? @relation("FileMaterialUpdatedByUser", fields: [updatedBy], references: [id])
+
+  // Relations with materialCommentFrame model
+  commentFrames MaterialCommentFrame[]
 
   @@index([fileId])
   // Configs
@@ -443,11 +452,11 @@ model Task {
   updatedByUser  User? @relation("TaskUpdatedByUser", fields: [updatedBy], references: [id])
   assignedByUser User? @relation("TaskAssignedByUser", fields: [assignedBy], references: [id])
 
-  // Relations with taskCommentFrame model
-  commentFrames TaskCommentFrame[]
-
   // Relations with comment model
   comments Comment[]
+
+  // Relations with fileMaterial model
+  fileMaterials FileMaterial[]
 
   @@index([fileId])
   @@index([parentId])
@@ -456,31 +465,31 @@ model Task {
   @@map("tasks")
 }
 
-model TaskCommentFrame {
-  id        Int      @id @default(autoincrement())
-  startX    Decimal  @map("start_x") @db.Decimal(10, 4)
-  startY    Decimal  @map("start_y") @db.Decimal(10, 4)
-  endX      Decimal  @map("end_x") @db.Decimal(10, 4)
-  endY      Decimal  @map("end_y") @db.Decimal(10, 4)
-  taskId    Int      @map("task_id")
-  createdBy Int?     @map("created_by")
-  updatedBy Int?     @map("updated_by")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+model MaterialCommentFrame {
+  id         Int      @id @default(autoincrement())
+  startX     Decimal  @map("start_x") @db.Decimal(10, 4)
+  startY     Decimal  @map("start_y") @db.Decimal(10, 4)
+  endX       Decimal  @map("end_x") @db.Decimal(10, 4)
+  endY       Decimal  @map("end_y") @db.Decimal(10, 4)
+  materialId Int      @map("material_id")
+  createdBy  Int?     @map("created_by")
+  updatedBy  Int?     @map("updated_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
 
-  // Relations with task model
-  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  // Relations with material model
+  material FileMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
 
   // Relations with user model
-  createdByUser User? @relation("TaskCommentFrameCreatedByUser", fields: [createdBy], references: [id])
-  updatedByUser User? @relation("TaskCommentFrameUpdatedByUser", fields: [updatedBy], references: [id])
+  createdByUser User? @relation("MaterialCommentFrameCreatedByUser", fields: [createdBy], references: [id])
+  updatedByUser User? @relation("MaterialCommentFrameUpdatedByUser", fields: [updatedBy], references: [id])
 
   // Relations with comment model
   comments Comment[]
 
-  @@index([taskId])
+  @@index([materialId])
   // Configs
-  @@map("task_comment_frames")
+  @@map("material_comment_frames")
 }
 
 model Comment {
@@ -495,9 +504,9 @@ model Comment {
   updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
 
   // Relations
-  file          File?             @relation(fields: [fileId], references: [id], onDelete: Cascade)
-  task          Task?             @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  frame         TaskCommentFrame? @relation(fields: [frameId], references: [id], onDelete: Cascade)
+  file          File?                 @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  task          Task?                 @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  frame         MaterialCommentFrame? @relation(fields: [frameId], references: [id], onDelete: Cascade)
   application   Application?      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   createdByUser User?             @relation("CommentCreatedByUser", fields: [createdBy], references: [id])
 
@@ -525,6 +534,8 @@ model Application {
 
   parentFolderId Int?               @map("parent_folder_id")
   parentFolder   Folder?            @relation("ApplicationParentFolder", fields: [parentFolderId], references: [id], onDelete: SetNull)
+
+  folderImageUrl String?            @map("folder_image_url")
 
   // Relations with project model
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)

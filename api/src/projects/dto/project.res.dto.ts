@@ -102,6 +102,9 @@ export class SimpleProjectFolderResDto {
 
   @ApiPropertyOptional({ example: 'Initial rough sketches.', nullable: true })
   description?: string | null;
+
+  @ApiPropertyOptional({ example: 'https://example.com/image.png', nullable: true })
+  imageUrl?: string | null;
 }
 
 export class RoleResDto {
@@ -213,6 +216,9 @@ export class ProjectFolderResDto {
 
   @ApiPropertyOptional({ example: 'Initial rough sketches.', nullable: true })
   description?: string | null;
+
+  @ApiPropertyOptional({ example: 'https://example.com/image.png', nullable: true })
+  imageUrl?: string | null;
 
   @ApiPropertyOptional({ type: () => SimpleProjectFolderResDto, nullable: true })
   parent?: SimpleProjectFolderResDto | null;

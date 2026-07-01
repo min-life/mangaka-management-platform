@@ -45,6 +45,7 @@ export const FOLDER_LIST_SELECT = {
   id: true,
   title: true,
   description: true,
+  imageUrl: true,
   createdByUser: USER_SELECT,
   updatedByUser: USER_SELECT,
   createdAt: true,
@@ -58,6 +59,7 @@ const FOLDER_SELECT = {
       id: true,
       title: true,
       description: true,
+      imageUrl: true,
     },
   },
   project: {
@@ -82,6 +84,7 @@ const FILE_SELECT = {
       id: true,
       title: true,
       description: true,
+      imageUrl: true,
       project: {
         select: PROJECT_BASIC_SELECT,
       },
@@ -115,6 +118,7 @@ export class FoldersService {
     data: {
       title?: string;
       description?: string;
+      imageUrl?: string;
       userId: number;
     },
   ) {
@@ -126,6 +130,7 @@ export class FoldersService {
         data: {
           title: data.title,
           description: data.description,
+          imageUrl: data.imageUrl,
           updatedBy: data.userId,
         },
         select: FOLDER_SELECT,
@@ -255,6 +260,7 @@ export class FoldersService {
     data: {
       title: string;
       description?: string;
+      imageUrl?: string;
       userId: number;
     },
   ) {
@@ -268,6 +274,7 @@ export class FoldersService {
         data: {
           title: data.title,
           description: data.description,
+          imageUrl: data.imageUrl,
           parentId: folderId,
           projectId: parentFolder.projectId,
           createdBy: data.userId,

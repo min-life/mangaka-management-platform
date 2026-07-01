@@ -14,6 +14,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ACTIVITY_EVENT_NAME, ActivityEventPayload } from '../share/events/activity.event';
 import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 const USER_BASIC_SELECT = {
   id: true,
@@ -45,10 +46,12 @@ const PROJECT_DETAIL_SELECT = {
 
 const APPLICATION_LIST_SELECT = {
   id: true,
+  projectId: true,
   title: true,
   type: true,
   status: true,
   parentFolderId: true,
+  folderImageUrl: true,
   project: {
     select: PROJECT_BASIC_SELECT,
   },
@@ -82,6 +85,7 @@ export class ApplicationsService {
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
     private readonly usersService: UsersService,
+    private readonly realtimeGateway: RealtimeGateway,
   ) {}
 
   async getApplications(
@@ -329,6 +333,16 @@ export class ApplicationsService {
             }
           }
 
+          // Find thumbnail or first image URL from application materials
+          let imageUrl: string | null = null;
+          const materialsData = application.materials as any[];
+          if (Array.isArray(materialsData)) {
+            const thumbnail = materialsData.find((m) => m.isThumbnail) || materialsData.find((m) => m.type === 'IMAGE') || materialsData[0];
+            if (thumbnail && thumbnail.url) {
+              imageUrl = thumbnail.url;
+            }
+          }
+
           // Create Folder
           const folder = await this.prisma.folder.create({
             data: {
@@ -336,6 +350,7 @@ export class ApplicationsService {
               title: application.title,
               description: application.description,
               parentId: folderParentId,
+              imageUrl: application.folderImageUrl || imageUrl,
               createdBy: application.createdBy,
               updatedBy: application.createdBy,
             },
@@ -544,6 +559,8 @@ export class ApplicationsService {
           projectOwnerId: project?.createdBy,
         },
       } satisfies ActivityEventPayload);
+
+      this.realtimeGateway.broadcastComment('APPLICATION', applicationId, 'comment:new', comment);
 
       return comment;
     } catch (error) {

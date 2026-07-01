@@ -90,28 +90,56 @@ export class ActivityLogsService {
       }
 
       // 5. Comment Created
-      if (payload.action === ACTIVITY_ACTION.COMMENT_CREATED && payload.metadata && typeof payload.metadata === 'object') {
-        if ('mentionedUserIds' in payload.metadata) {
-          const mentionedIds = payload.metadata.mentionedUserIds as number[];
-          if (Array.isArray(mentionedIds)) {
-            mentionedIds.forEach(id => {
-              if (id !== payload.actorId && id !== null) usersToNotify.add(id);
+      if (payload.action === ACTIVITY_ACTION.COMMENT_CREATED) {
+        // Find previous commenters on the same entity
+        const commentObj = await this.prisma.comment.findUnique({
+          where: { id: payload.entityId },
+          select: { fileId: true, taskId: true, frameId: true, applicationId: true },
+        });
+
+        if (commentObj) {
+          let whereCondition: Prisma.CommentWhereInput | null = null;
+          if (commentObj.fileId) whereCondition = { fileId: commentObj.fileId };
+          else if (commentObj.taskId) whereCondition = { taskId: commentObj.taskId };
+          else if (commentObj.applicationId) whereCondition = { applicationId: commentObj.applicationId };
+          else if (commentObj.frameId) whereCondition = { frameId: commentObj.frameId };
+
+          if (whereCondition) {
+            const relatedComments = await this.prisma.comment.findMany({
+              where: whereCondition,
+              select: { createdBy: true },
             });
+            for (const c of relatedComments) {
+              if (c.createdBy && c.createdBy !== payload.actorId) {
+                usersToNotify.add(c.createdBy);
+              }
+            }
           }
         }
-        // Task Comment
-        if ('assigneeId' in payload.metadata && payload.metadata.assigneeId !== payload.actorId && payload.metadata.assigneeId !== null) {
-          usersToNotify.add(payload.metadata.assigneeId as number);
-        }
-        if ('creatorId' in payload.metadata && payload.metadata.creatorId !== payload.actorId && payload.metadata.creatorId !== null) {
-          usersToNotify.add(payload.metadata.creatorId as number);
-        }
-        // Application Comment
-        if ('applicantId' in payload.metadata && payload.metadata.applicantId !== payload.actorId && payload.metadata.applicantId !== null) {
-          usersToNotify.add(payload.metadata.applicantId as number);
-        }
-        if ('projectOwnerId' in payload.metadata && payload.metadata.projectOwnerId !== payload.actorId && payload.metadata.projectOwnerId !== null) {
-          usersToNotify.add(payload.metadata.projectOwnerId as number);
+
+        if (payload.metadata && typeof payload.metadata === 'object') {
+          if ('mentionedUserIds' in payload.metadata) {
+            const mentionedIds = payload.metadata.mentionedUserIds as number[];
+            if (Array.isArray(mentionedIds)) {
+              mentionedIds.forEach(id => {
+                if (id !== payload.actorId && id !== null) usersToNotify.add(id);
+              });
+            }
+          }
+          // Task Comment
+          if ('assigneeId' in payload.metadata && payload.metadata.assigneeId !== payload.actorId && payload.metadata.assigneeId !== null) {
+            usersToNotify.add(payload.metadata.assigneeId as number);
+          }
+          if ('creatorId' in payload.metadata && payload.metadata.creatorId !== payload.actorId && payload.metadata.creatorId !== null) {
+            usersToNotify.add(payload.metadata.creatorId as number);
+          }
+          // Application Comment
+          if ('applicantId' in payload.metadata && payload.metadata.applicantId !== payload.actorId && payload.metadata.applicantId !== null) {
+            usersToNotify.add(payload.metadata.applicantId as number);
+          }
+          if ('projectOwnerId' in payload.metadata && payload.metadata.projectOwnerId !== payload.actorId && payload.metadata.projectOwnerId !== null) {
+            usersToNotify.add(payload.metadata.projectOwnerId as number);
+          }
         }
       }
 

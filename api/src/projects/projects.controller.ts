@@ -8,7 +8,10 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFiles,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -16,6 +19,7 @@ import {
   ApiOperation,
   ApiParam,
   ApiTags,
+  ApiConsumes,
 } from '@nestjs/swagger';
 import { CurrentUser, Permissions } from '../share/decorators';
 import type { JwtPayload } from '../auth/interfaces';
@@ -43,7 +47,9 @@ import {
   UpdateProjectReqDto,
   CreateProjectStatReqDto,
   ProjectStatResponseDto,
+  SuccessResponseDto,
 } from './dto';
+import { ActivityLogsResponseDto } from '../activity-logs/dto';
 import { TasksResponseDto } from '../tasks/dto';
 import { QueryMyTasksReqDto } from '../tasks/dto';
 import { ActivityLogsService } from '../activity-logs/activity-logs.service';
@@ -173,7 +179,7 @@ export class ProjectsController {
   })
   @ApiOperation({ summary: 'Delete project' })
   @ApiParam({ name: 'id', type: Number, description: 'Project id' })
-  @ApiOkResponse({ description: 'Project deleted successfully' })
+  @ApiOkResponse({ description: 'Project deleted successfully', type: SuccessResponseDto })
   @Delete(':id')
   async deleteProject(@Param('id', ParseIntPipe) id: number) {
     await this.projectsService.deleteProject(id);
@@ -290,7 +296,7 @@ export class ProjectsController {
   @ApiOperation({ summary: 'Remove member from project' })
   @ApiParam({ name: 'id', type: Number, description: 'Project id' })
   @ApiParam({ name: 'userId', type: Number, description: 'User id' })
-  @ApiOkResponse({ description: 'Project member removed successfully' })
+  @ApiOkResponse({ description: 'Project member removed successfully', type: SuccessResponseDto })
   @Delete(':id/members/:userId')
   async removeProjectMember(
     @Param('id', ParseIntPipe) id: number,
@@ -307,7 +313,7 @@ export class ProjectsController {
   })
   @ApiOperation({ summary: 'Leave project' })
   @ApiParam({ name: 'id', type: Number, description: 'Project id' })
-  @ApiOkResponse({ description: 'Successfully left the project' })
+  @ApiOkResponse({ description: 'Successfully left the project', type: SuccessResponseDto })
   @Delete(':id/members/me')
   async leaveProject(
     @Param('id', ParseIntPipe) id: number,
@@ -342,7 +348,7 @@ export class ProjectsController {
   })
   @ApiOperation({ summary: 'Get activity logs for a project' })
   @ApiParam({ name: 'id', type: Number, description: 'Project id' })
-  @ApiOkResponse({ description: 'Project activity logs retrieved successfully' })
+  @ApiOkResponse({ description: 'Project activity logs retrieved successfully', type: ActivityLogsResponseDto })
   @Get(':id/activity-logs')
   async getProjectActivityLogs(
     @Param('id', ParseIntPipe) id: number,
@@ -438,19 +444,34 @@ export class ProjectsController {
   })
   @ApiOperation({ summary: 'Create project application' })
   @ApiParam({ name: 'id', type: Number, description: 'Project id' })
+  @ApiConsumes('multipart/form-data', 'application/json')
   @ApiCreatedResponse({
     description: 'Project application created successfully',
     type: ProjectApplicationResponseDto,
   })
   @Post(':id/applications')
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'image', maxCount: 1 },
+      { name: 'text', maxCount: 1 },
+      { name: 'source', maxCount: 1 },
+    ]),
+  )
   async createProjectApplication(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() currentUser: JwtPayload,
     @Body() data: CreateProjectApplicationReqDto,
+    @UploadedFiles()
+    files?: {
+      image?: Express.Multer.File[];
+      text?: Express.Multer.File[];
+      source?: Express.Multer.File[];
+    },
   ) {
     const application = await this.projectsService.createProjectApplication(id, {
       ...data,
       userId: currentUser.userId,
+      files,
     });
     return {
       data: application,
@@ -482,6 +503,32 @@ export class ProjectsController {
     return {
       data: folders.folders,
       pagination: folders.pagination,
+    };
+  }
+
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['project:folder.create', 'project:owner'],
+    resource: 'PROJECT',
+  })
+  @ApiOperation({ summary: 'Create project folder' })
+  @ApiParam({ name: 'id', type: Number, description: 'Project id' })
+  @ApiCreatedResponse({
+    description: 'Project folder created successfully',
+    type: ProjectFolderResponseDto,
+  })
+  @Post(':id/folders')
+  async createProjectFolder(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() currentUser: JwtPayload,
+    @Body() data: CreateProjectFolderReqDto,
+  ) {
+    const folder = await this.projectsService.createProjectFolder(id, {
+      ...data,
+      userId: currentUser.userId,
+    });
+    return {
+      data: folder,
     };
   }
 

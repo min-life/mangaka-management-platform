@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { PaginationResDto } from './task.res.dto';
+import { PaginationResDto } from '../../files/dto/file.res.dto';
 import { UserResDto } from '../../share/dto';
-import { SimpleTaskResDto } from './task.res.dto';
+import { SimpleMaterialResDto } from './material.res.dto';
 
 export class FrameResDto {
   @ApiProperty({ example: 1 })
@@ -19,8 +19,8 @@ export class FrameResDto {
   @ApiProperty({ example: 150.2, type: Number })
   endY!: number;
 
-  @ApiProperty({ type: () => SimpleTaskResDto })
-  task!: SimpleTaskResDto;
+  @ApiProperty({ type: () => SimpleMaterialResDto })
+  material!: SimpleMaterialResDto;
 
   @ApiPropertyOptional({ type: () => UserResDto, nullable: true })
   createdByUser?: UserResDto | null;

@@ -5,10 +5,13 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, ACTIVITY_ACTION, ENTITY_TYPE } from '@prisma/client';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
+import { ACTIVITY_EVENT_NAME, ActivityEventPayload } from '../share/events/activity.event';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 const USER_SELECT = {
   select: {
@@ -45,7 +48,11 @@ const COMMENT_SELECT = {
 export class FramesService {
   private readonly logger = new Logger(FramesService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+    private readonly realtimeGateway: RealtimeGateway,
+  ) {}
 
   async getFrameById(id: number) {
     try {
@@ -68,7 +75,7 @@ export class FramesService {
     try {
       await this.ensureFrame(id);
 
-      return await this.prisma.taskCommentFrame.update({
+      return await this.prisma.materialCommentFrame.update({
         where: { id },
         data: {
           startX: data.startX,
@@ -87,7 +94,7 @@ export class FramesService {
   async deleteFrame(id: number) {
     try {
       await this.ensureFrame(id);
-      await this.prisma.taskCommentFrame.delete({ where: { id } });
+      await this.prisma.materialCommentFrame.delete({ where: { id } });
     } catch (error) {
       this.handleError(error, 'Delete frame fail', ERROR.SVDELETEFRAME);
     }
@@ -132,19 +139,52 @@ export class FramesService {
     data: {
       content: unknown;
       userId: number;
+      mentionedUserIds?: number[];
     },
   ) {
     try {
       await this.ensureFrame(frameId);
 
-      return await this.prisma.comment.create({
+      const frameObj = await this.prisma.materialCommentFrame.findUnique({
+        where: { id: frameId },
+        include: { material: { include: { file: { include: { folder: true } } } } },
+      });
+
+      const comment = await this.prisma.comment.create({
         data: {
           content: data.content as Prisma.InputJsonValue,
           frameId,
           createdBy: data.userId,
         },
-        select: COMMENT_SELECT,
+        select: {
+          id: true,
+          content: true,
+          frameId: true,
+          createdByUser: {
+            select: { id: true, email: true, displayName: true, avatarUrl: true },
+          },
+          createdAt: true,
+          updatedAt: true,
+        },
       });
+
+      this.eventEmitter.emit(ACTIVITY_EVENT_NAME, {
+        action: ACTIVITY_ACTION.COMMENT_CREATED,
+        entityType: ENTITY_TYPE.COMMENT,
+        entityId: comment.id,
+        projectId: frameObj?.material?.file?.folder?.projectId ?? null,
+        fileId: frameObj?.material?.file?.id ?? null,
+        actorId: data.userId,
+        metadata: {
+          frameId,
+          creatorId: frameObj?.createdBy,
+          mentionedUserIds: data.mentionedUserIds || [],
+        },
+      } satisfies ActivityEventPayload);
+
+      this.realtimeGateway.broadcastComment('FRAME', frameId, 'comment:new', comment);
+
+      return comment;
     } catch (error) {
       this.handleError(error, 'Create comment fail', ERROR.SVCREATECOMMENT);
     }
@@ -170,7 +210,7 @@ export class FramesService {
   }
 
   private async ensureFrame(id: number) {
-    const frame = await this.prisma.taskCommentFrame.findUnique({
+    const frame = await this.prisma.materialCommentFrame.findUnique({
       where: { id },
       select: FRAME_SELECT,
     });

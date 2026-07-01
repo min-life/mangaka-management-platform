@@ -7,6 +7,9 @@ import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { FindRolesQueryDto } from './dto/find-roles-query.dto';
 import { ReplaceRolePermissionsDto } from './dto/replace-role-permissions.dto';
+import { RoleResponseDto, RolesResponseDto } from './dto/role.res.dto';
+import { PermissionsResponseDto } from '../permissions/dto/permission.dto';
+import { SuccessResponseDto } from '../projects/dto/project.res.dto';
 
 @ApiTags('Roles')
 @ApiBearerAuth()
@@ -15,9 +18,8 @@ export class RolesController {
   constructor(private readonly rolesService: RolesService) {}
 
   @Get()
-  @Permissions({ mode: 'ANY', permissions: ['admin', 'role:read'] })
   @ApiOperation({ summary: 'Get all roles' })
-  @ApiOkResponse({ description: 'Roles retrieved successfully' })
+  @ApiOkResponse({ description: 'Roles retrieved successfully', type: RolesResponseDto })
   findRoles(@Query() query: FindRolesQueryDto) {
     return this.rolesService.findRoles(query.scope);
   }
@@ -25,7 +27,7 @@ export class RolesController {
   @Post()
   @Permissions({ mode: 'ANY', permissions: ['admin', 'role:create'] })
   @ApiOperation({ summary: 'Create a new role' })
-  @ApiOkResponse({ description: 'Role created successfully' })
+  @ApiOkResponse({ description: 'Role created successfully', type: RoleResponseDto })
   createRole(@CurrentUser() currentUser: JwtPayload, @Body() dto: CreateRoleDto) {
     return this.rolesService.createRole(currentUser.userId, dto);
   }
@@ -34,7 +36,7 @@ export class RolesController {
   @Permissions({ mode: 'ANY', permissions: ['admin', 'role:read'] })
   @ApiOperation({ summary: 'Get role by ID' })
   @ApiParam({ name: 'id', type: Number, description: 'Role ID' })
-  @ApiOkResponse({ description: 'Role retrieved successfully' })
+  @ApiOkResponse({ description: 'Role retrieved successfully', type: RoleResponseDto })
   findOne(@Param('id') id: string) {
     return this.rolesService.findOne(Number(id));
   }
@@ -43,7 +45,7 @@ export class RolesController {
   @Permissions({ mode: 'ANY', permissions: ['admin', 'role:update'] })
   @ApiOperation({ summary: 'Update role' })
   @ApiParam({ name: 'id', type: Number, description: 'Role ID' })
-  @ApiOkResponse({ description: 'Role updated successfully' })
+  @ApiOkResponse({ description: 'Role updated successfully', type: RoleResponseDto })
   updateRole(@Param('id') id: string, @Body() dto: UpdateRoleDto) {
     return this.rolesService.updateRole(Number(id), dto);
   }
@@ -52,7 +54,7 @@ export class RolesController {
   @Permissions({ mode: 'ANY', permissions: ['admin', 'role:delete'] })
   @ApiOperation({ summary: 'Delete role' })
   @ApiParam({ name: 'id', type: Number, description: 'Role ID' })
-  @ApiOkResponse({ description: 'Role deleted successfully' })
+  @ApiOkResponse({ description: 'Role deleted successfully', type: SuccessResponseDto })
   deleteRole(@Param('id') id: string) {
     return this.rolesService.deleteRole(Number(id));
   }
@@ -61,7 +63,7 @@ export class RolesController {
   @Permissions({ mode: 'ANY', permissions: ['admin', 'role:read'] })
   @ApiOperation({ summary: 'Get role permissions' })
   @ApiParam({ name: 'id', type: Number, description: 'Role ID' })
-  @ApiOkResponse({ description: 'Role permissions retrieved successfully' })
+  @ApiOkResponse({ description: 'Role permissions retrieved successfully', type: PermissionsResponseDto })
   findPermissions(@Param('id') id: string) {
     return this.rolesService.findPermissions(Number(id));
   }
@@ -70,7 +72,7 @@ export class RolesController {
   @Permissions({ mode: 'ANY', permissions: ['admin', 'role:update'] })
   @ApiOperation({ summary: 'Replace role permissions' })
   @ApiParam({ name: 'id', type: Number, description: 'Role ID' })
-  @ApiOkResponse({ description: 'Role permissions replaced successfully' })
+  @ApiOkResponse({ description: 'Role permissions replaced successfully', type: SuccessResponseDto })
   replacePermissions(@Param('id') id: string, @Body() dto: ReplaceRolePermissionsDto) {
     return this.rolesService.replacePermissions(Number(id), dto.permissionIds);
   }
