@@ -4,36 +4,17 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
-  BarChart3,
-  Bell,
-  BookOpen,
   ChevronDown,
   CircleGauge,
-  FolderOpen,
-  LayoutDashboard,
-  LogOut,
   MoreVertical,
   Plus,
   Search,
-  Settings,
-  User,
-  Users,
   X,
 } from 'lucide-react';
 
-import { useAuth } from '@/hooks/useAuth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import {
@@ -60,10 +41,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  StudioSidebar,
-  type StudioSidebarItem,
-} from '@/app/(protected)/studio/components/StudioSidebar';
 
 import {
   getEditorBoardProjects,
@@ -73,20 +50,6 @@ import {
   type PublishingStatus,
   type EditorBoardProjectsSummary,
 } from '../services/editor-board-projects-service';
-
-function getSidebarItems(editorBoardId: string): StudioSidebarItem[] {
-  const baseHref = `/studio/editor-boards/${editorBoardId}`;
-
-  return [
-    { href: '/studio', icon: LayoutDashboard, label: 'Dashboard', exact: true },
-    { href: `${baseHref}/projects`, icon: FolderOpen, label: 'Projects' },
-    { href: `${baseHref}/members`, icon: Users, label: 'Members' },
-    { href: `${baseHref}/applications`, icon: CircleGauge, label: 'Applications' },
-    { href: `${baseHref}/publishing`, icon: BookOpen, label: 'Publishing' },
-    { href: `${baseHref}/reports`, icon: BarChart3, label: 'Reports' },
-    { href: `${baseHref}/settings`, icon: Settings, label: 'Settings' },
-  ];
-}
 
 const statusLabels: Record<ProjectStatus, string> = {
   HIATUS: 'Hiatus',
@@ -145,9 +108,12 @@ function ProjectCover({ project }: { project: EditorBoardProject }) {
 }
 
 function MemberStack({ members }: { members: EditorBoardProject['members'] }) {
+  const visibleMembers = members.slice(0, 5);
+  const hiddenCount = Math.max(0, members.length - visibleMembers.length);
+
   return (
-    <div className="flex -space-x-2">
-      {members.map((member) => (
+    <div className="flex items-center -space-x-2">
+      {visibleMembers.map((member) => (
         <Avatar
           className="size-8 border-2 border-[#1a2029]"
           key={member.id}
@@ -157,6 +123,11 @@ function MemberStack({ members }: { members: EditorBoardProject['members'] }) {
           <AvatarFallback>{member.displayName.slice(0, 2).toUpperCase()}</AvatarFallback>
         </Avatar>
       ))}
+      {hiddenCount > 0 ? (
+        <span className="grid size-8 place-items-center rounded-full border-2 border-[#1a2029] bg-[#2f353e] text-[10px] font-bold text-[#dde3ef]">
+          +{hiddenCount}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -211,13 +182,13 @@ function ProjectDrawer({
           <div className="mt-8 grid grid-cols-2 gap-4">
             <div className="rounded-[4px] border border-[#50555D] bg-[#0e141c] p-4">
               <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                Current Target*
+                Current Target
               </p>
               <p className="text-[13px] font-medium text-white">{getTargetChapter(project)}</p>
             </div>
             <div className="rounded-[4px] border border-[#50555D] bg-[#0e141c] p-4">
               <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                Contact*
+                Contact
               </p>
               <p className="text-[13px] font-medium text-white">{project.contactName}</p>
             </div>
@@ -291,12 +262,12 @@ function ProjectDrawer({
 
 export function EditorBoardProjectsPage() {
   const params = useParams<{ editorBoardId?: string }>();
-  const { logout, user } = useAuth();
   const editorBoardId = params.editorBoardId ?? '1';
   const [projects, setProjects] = useState<EditorBoardProject[]>([]);
   const [summary, setSummary] = useState<EditorBoardProjectsSummary | null>(null);
   const [selectedProject, setSelectedProject] = useState<EditorBoardProject | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | ProjectStatus>('ALL');
   const [sortBy, setSortBy] = useState<'ALPHA' | 'DEADLINE' | 'UPDATED'>('UPDATED');
@@ -306,15 +277,28 @@ export function EditorBoardProjectsPage() {
 
     async function loadProjects() {
       setIsLoading(true);
-      const [nextProjects, nextSummary] = await Promise.all([
-        getEditorBoardProjects(editorBoardId),
-        getEditorBoardProjectsSummary(editorBoardId),
-      ]);
+      setError(null);
 
-      if (isMounted) {
-        setProjects(nextProjects);
-        setSummary(nextSummary);
-        setIsLoading(false);
+      try {
+        const [nextProjects, nextSummary] = await Promise.all([
+          getEditorBoardProjects(editorBoardId),
+          getEditorBoardProjectsSummary(editorBoardId),
+        ]);
+
+        if (isMounted) {
+          setProjects(nextProjects);
+          setSummary(nextSummary);
+        }
+      } catch {
+        if (isMounted) {
+          setProjects([]);
+          setSummary(null);
+          setError('Unable to load editor board projects.');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     }
 
@@ -350,144 +334,28 @@ export function EditorBoardProjectsPage() {
         return new Date(second.updatedAt).getTime() - new Date(first.updatedAt).getTime();
       });
   }, [projects, searchTerm, sortBy, statusFilter]);
-  const sidebarItems = useMemo(() => getSidebarItems(editorBoardId), [editorBoardId]);
-  const displayName = user?.displayName || user?.email || 'Current user';
-  const email = user?.email ?? 'No email';
-  const roleLabel = user?.role ?? 'Workspace Member';
-  const initials =
-    displayName
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part.charAt(0).toUpperCase())
-      .join('') || 'U';
-
   return (
-    <div className="flex min-h-screen bg-[#0e141c] text-[#dde3ef]">
-      <StudioSidebar items={sidebarItems} subtitle="Manga Production" />
-
-      <div className="min-w-0 flex-1">
-        <header className="flex h-16 items-center justify-between border-b border-[#393E46] bg-[#222831] px-6">
-          <div className="flex min-w-[360px] items-center gap-4">
-            <img alt="Inkly" className="h-[50px] w-auto object-contain" src="/brand/1.png" />
-            <div className="h-7 w-px bg-[#434A55]" />
-            <div className="leading-tight">
-              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8B93A5]">
-                Editor Board
-              </p>
-              <h1 className="text-[15px] font-semibold text-white">Project Dashboard</h1>
-            </div>
-          </div>
-
-          <div className="relative mx-8 hidden w-full max-w-xl lg:block">
-            <Search className="absolute left-3 top-1/2 size-[18px] -translate-y-1/2 text-[#C8C8C8]" />
-            <Input
-              className="h-9 rounded-lg border-[#4b535f] bg-[#393E46] pl-10 text-sm font-medium text-white placeholder:text-[#8B93A5] focus-visible:border-[#FFD369] focus-visible:ring-[#FFD369]/20"
-              placeholder="Search projects..."
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              className="relative rounded-lg p-2 text-[#B8BEC8] transition hover:bg-[#2F3742] hover:text-white"
-              type="button"
-            >
-              <Bell className="size-5" />
-              <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full border border-[#222831] bg-[#FFD369]" />
-            </button>
-            <button
-              className="rounded-lg p-2 text-[#B8BEC8] transition hover:bg-[#2F3742] hover:text-white"
-              type="button"
-            >
-              <Settings className="size-5" />
-            </button>
-            <div className="mx-2 h-8 w-px bg-[#434A55]" />
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  className="flex items-center gap-4 rounded-xl px-2 py-1.5 transition hover:bg-[#2F3742]"
-                  type="button"
-                >
-                  {user?.avatarUrl ? (
-                    <img
-                      alt={displayName}
-                      className="h-9 w-9 rounded-full border border-[#FFD369] object-cover"
-                      src={user.avatarUrl}
-                    />
-                  ) : (
-                    <span className="grid h-9 w-9 place-items-center rounded-full border border-[#FFD369] bg-[#101820] text-xs font-black text-white">
-                      {initials}
-                    </span>
-                  )}
-                  <div className="hidden text-left md:block">
-                    <p className="text-sm font-semibold leading-none text-white">{displayName}</p>
-                    <p className="mt-1 text-[11px] font-medium text-[#8B93A5]">{roleLabel}</p>
-                  </div>
-                  <ChevronDown className="size-4 text-[#8B93A5]" />
-                </button>
-              </DropdownMenuTrigger>
-
-              <DropdownMenuContent
-                align="end"
-                className="w-72 border-[#393E46] bg-[#222831] text-white"
-              >
-                <DropdownMenuLabel className="py-3">
-                  <div className="flex items-center gap-4">
-                    {user?.avatarUrl ? (
-                      <img
-                        alt={displayName}
-                        className="h-10 w-10 rounded-full object-cover"
-                        src={user.avatarUrl}
-                      />
-                    ) : (
-                      <span className="grid h-10 w-10 place-items-center rounded-full border border-[#FFD369] bg-[#101820] text-xs font-black text-white">
-                        {initials}
-                      </span>
-                    )}
-                    <div>
-                      <p className="font-semibold">{displayName}</p>
-                      <p className="text-xs text-[#8B93A5]">{email}</p>
-                      <p className="text-[11px] font-bold text-[#FFD369]">{roleLabel}</p>
-                    </div>
-                  </div>
-                </DropdownMenuLabel>
-
-                <DropdownMenuSeparator className="bg-[#393E46]" />
-                <DropdownMenuGroup>
-                  <DropdownMenuItem asChild className="cursor-pointer focus:bg-[#2F3742]">
-                    <Link href="/user-profile">
-                      <User className="mr-2 size-4" />
-                      My Profile
-                    </Link>
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator className="bg-[#393E46]" />
-                <DropdownMenuItem
-                  className="cursor-pointer text-red-400 focus:bg-[#2F3742] focus:text-red-400"
-                  onClick={logout}
-                >
-                  <LogOut className="mr-2 size-4" />
-                  Logout
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </header>
-
-        <main className="h-[calc(100vh-64px)] overflow-y-auto p-6">
+    <>
+      <main className="p-6">
           <section className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
             <div>
               <h1 className="text-[32px] font-bold leading-10 text-white">Project Dashboard</h1>
               <p className="mt-1 text-sm leading-5 text-[#C8C8C8]">
                 Overseeing {summary?.projectCount ?? 0} active manga productions across{' '}
-                {summary?.editorialTeamCount ?? 0} editorial teams*.
+                {summary?.editorialTeamCount ?? 0} editorial teams.
               </p>
             </div>
 
-            <div className="flex items-end gap-2">
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="relative w-[320px] max-w-full">
+                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#8b94a1]" />
+                <Input
+                  className="h-9 rounded-[4px] border-[#50555D] bg-[#161c25] pl-10 text-xs text-[#dde3ef] placeholder:text-[#8b94a1] focus-visible:border-[#FFD369] focus-visible:ring-[#FFD369]/20"
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Search projects..."
+                  value={searchTerm}
+                />
+              </div>
               <div className="flex flex-col gap-1">
                 <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
                   Filter
@@ -534,6 +402,12 @@ export function EditorBoardProjectsPage() {
             </div>
           </section>
 
+          {error ? (
+            <p className="mb-6 rounded-[6px] border border-red-400/30 bg-red-950/20 px-4 py-3 text-xs font-bold text-red-300">
+              {error}
+            </p>
+          ) : null}
+
           <section className="overflow-hidden rounded-[8px] border border-[#50555D] bg-[#1a2029]">
             <Table>
               <TableHeader className="bg-[#242a33]">
@@ -542,19 +416,19 @@ export function EditorBoardProjectsPage() {
                     Project Name
                   </TableHead>
                   <TableHead className="h-12 px-4 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                    Status*
+                    Status
                   </TableHead>
                   <TableHead className="h-12 px-4 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                    Members*
+                    Members
                   </TableHead>
                   <TableHead className="h-12 px-4 text-center text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                    Apps*
+                    Apps
                   </TableHead>
                   <TableHead className="h-12 w-64 px-4 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                    Chapter Progress*
+                    Chapter Progress
                   </TableHead>
                   <TableHead className="h-12 px-4 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                    Publishing*
+                    Publishing
                   </TableHead>
                   <TableHead className="h-12 px-4 text-right text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
                     Actions
@@ -596,7 +470,7 @@ export function EditorBoardProjectsPage() {
                           <Badge
                             className={`rounded-[4px] px-2 py-1 text-[11px] font-semibold ${statusClassNames[status]}`}
                           >
-                            {statusLabels[status]}*
+                            {statusLabels[status]}
                           </Badge>
                         </TableCell>
                         <TableCell className="px-4 py-4">
@@ -638,7 +512,7 @@ export function EditorBoardProjectsPage() {
                               }`}
                             />
                             <span className="text-xs text-white">
-                              {publishingLabels[project.publishingStatus]}*
+                              {publishingLabels[project.publishingStatus]}
                             </span>
                           </div>
                         </TableCell>
@@ -675,7 +549,7 @@ export function EditorBoardProjectsPage() {
           <section className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
             <article className="rounded-[8px] border border-[#50555D] bg-[#1a2029] p-6">
               <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                Average Cycle Time*
+                Average Cycle Time
               </p>
               <div className="mt-2 flex items-end justify-between">
                 <span className="text-[32px] font-bold leading-10 text-white">
@@ -689,7 +563,7 @@ export function EditorBoardProjectsPage() {
             </article>
             <article className="rounded-[8px] border border-[#50555D] bg-[#1a2029] p-6">
               <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                Active Staffers*
+                Active Staffers
               </p>
               <div className="mt-2 flex items-end justify-between">
                 <span className="text-[32px] font-bold leading-10 text-white">
@@ -712,9 +586,7 @@ export function EditorBoardProjectsPage() {
               </div>
             </article>
           </section>
-        </main>
-      </div>
-
+      </main>
       <ProjectDrawer
         open={Boolean(selectedProject)}
         project={selectedProject}
@@ -724,6 +596,6 @@ export function EditorBoardProjectsPage() {
           }
         }}
       />
-    </div>
+    </>
   );
 }

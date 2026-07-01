@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ChevronRight, FileCheck2, Users } from 'lucide-react';
+import { ChevronRight, CircleGauge, FileCheck2, Users } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,10 @@ import {
   type BoardMemberResponse,
   type EditorBoardResponse,
 } from '@/services/editor-board.service';
+import {
+  getEditorBoardActivityLogs,
+  type ActivityLogResponse,
+} from '@/services/activity-log.service';
 import type { ProjectResponse } from '@/services/project.service';
 
 import { getStatusLabel, getStatusStyle } from './applications/application-ui';
@@ -39,9 +43,22 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
   const [members, setMembers] = useState<BoardMemberResponse[]>([]);
   const [projects, setProjects] = useState<ProjectResponse[]>([]);
   const [applications, setApplications] = useState<ApplicationResponse[]>([]);
+  const [activities, setActivities] = useState<ActivityLogResponse[]>([]);
+  const [activityError, setActivityError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    const loadActivityLogs = async () => {
+      const activityResult = await getEditorBoardActivityLogs(editorBoardId, {
+        limit: 3,
+        page: 1,
+      });
+
+      setActivities(activityResult.activities);
+      setActivityError(null);
+      return activityResult.activities;
+    };
+
     const fetchData = async () => {
       try {
         const boardData = await getEditorBoardById(Number(editorBoardId));
@@ -53,10 +70,22 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
         const projectsData = await getEditorBoardProjects(editorBoardId);
         setProjects(projectsData.projects.slice(0, 5));
 
-        const appsRes = await api.get<{ data?: ApplicationResponse[] }, { data?: ApplicationResponse[] }>(
-          `/editor-boards/${editorBoardId}/applications`,
-        );
+        const [appsRes, activityResult] = await Promise.all([
+          api.get<{ data?: ApplicationResponse[] }, { data?: ApplicationResponse[] }>(
+            `/editor-boards/${editorBoardId}/applications`,
+          ),
+          loadActivityLogs().catch(() => null),
+        ]);
+
         setApplications(appsRes.data ?? []);
+        if (!activityResult) {
+          setActivities([]);
+          setActivityError('Unable to load recent activity.');
+        } else if (activityResult.length === 0) {
+          window.setTimeout(() => {
+            void loadActivityLogs().catch(() => undefined);
+          }, 800);
+        }
       } catch (error) {
         // Ignore error
       } finally {
@@ -90,6 +119,107 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
     { label: 'Pending Approvals', meta: 'Needs Review', value: pendingApprovals },
     { label: 'Approved This Month', meta: 'Publish Requests', value: approvedThisMonth },
   ];
+
+  const formatActivityTitle = (action: ActivityLogResponse['action']) =>
+    action
+      .toLowerCase()
+      .split('_')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+
+  const isActivityRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value);
+
+  const getActivityUserName = (value: unknown) => {
+    if (!isActivityRecord(value)) {
+      return null;
+    }
+
+    const displayName = value.displayName;
+    const email = value.email;
+    const id = value.id;
+
+    if (typeof displayName === 'string' && displayName.trim()) {
+      return displayName;
+    }
+
+    if (typeof email === 'string' && email.trim()) {
+      return email;
+    }
+
+    return typeof id === 'number' ? `User #${id}` : null;
+  };
+
+  const getActivityBoardName = (metadata: Record<string, unknown>) => {
+    const editorBoardName = metadata.editorBoardName;
+
+    if (typeof editorBoardName === 'string' && editorBoardName.trim()) {
+      return editorBoardName;
+    }
+
+    return board.name;
+  };
+
+  const formatInvitedUsers = (metadata: Record<string, unknown>) => {
+    const invitedUsers = metadata.invitedUsers;
+
+    if (!Array.isArray(invitedUsers)) {
+      return null;
+    }
+
+    const names = invitedUsers
+      .map(getActivityUserName)
+      .filter((name): name is string => Boolean(name));
+
+    if (names.length === 0) {
+      return null;
+    }
+
+    if (names.length === 1) {
+      return names[0];
+    }
+
+    return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  };
+
+  const formatActivityDescription = (activity: ActivityLogResponse) => {
+    const metadata = isActivityRecord(activity.metadata) ? activity.metadata : {};
+    const boardName = getActivityBoardName(metadata);
+
+    if (activity.action === 'MEMBER_INVITED') {
+      const invitedUserNames = formatInvitedUsers(metadata);
+
+      if (invitedUserNames) {
+        return `${invitedUserNames} joined editor board "${boardName}"`;
+      }
+    }
+
+    if (activity.action === 'MEMBER_REMOVED') {
+      const removedUserName = getActivityUserName(metadata.removedUser);
+
+      if (removedUserName) {
+        return `${removedUserName} left editor board "${boardName}"`;
+      }
+    }
+
+    const entityLabel = activity.entityType.toLowerCase().split('_').join(' ');
+    return `${formatActivityTitle(activity.action)} on ${entityLabel} #${activity.entityId}.`;
+  };
+
+  const formatActivityDate = (value: string) => {
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+
+    return new Intl.DateTimeFormat('en', {
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      month: 'short',
+    }).format(date);
+  };
 
   return (
     <section className="px-5 py-6">
@@ -275,6 +405,48 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
               ))}
               {members.length === 0 ? (
                 <p className="text-center text-xs text-[#aeb7c2]">No members found.</p>
+              ) : null}
+            </div>
+          </aside>
+
+          <aside className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-black text-white">Recent Activity</h2>
+            </div>
+            <div className="grid gap-3">
+              {activities.map((activity) => (
+                <article
+                  className="rounded-[5px] border border-[#303842] bg-[#202832] p-3"
+                  key={activity.id}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-[4px] bg-[#101820] text-[#FFD369]">
+                      <CircleGauge className="size-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-black text-white">
+                        {formatActivityTitle(activity.action)}
+                      </p>
+                      <p className="mt-1 text-[11px] leading-5 text-[#aeb7c2]">
+                        {formatActivityDescription(activity)}
+                      </p>
+                      <p className="mt-2 text-[10px] font-black uppercase tracking-[0.08em] text-[#8b94a1]">
+                        By {activity.actor?.displayName ??
+                          activity.actor?.email ??
+                          `User #${activity.actorId}`}{' '}
+                        / {formatActivityDate(activity.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+                </article>
+              ))}
+              {activityError ? (
+                <p className="text-center text-xs text-red-300">{activityError}</p>
+              ) : null}
+              {!activityError && activities.length === 0 ? (
+                <p className="text-center text-xs text-[#aeb7c2]">
+                  No recent activity found.
+                </p>
               ) : null}
             </div>
           </aside>

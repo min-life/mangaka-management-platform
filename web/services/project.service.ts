@@ -75,7 +75,50 @@ export type ProjectMemberResponse = {
   displayName: string | null;
   email: string;
   id: number;
+  numberOfTasks?: number;
   role: ProjectMemberRoleResponse;
+  taskOverview?: {
+    done: number;
+    inprogress: number;
+    pending: number;
+    review: number;
+    total: number;
+  } | null;
+  updatedAt: string;
+};
+
+type ProjectMemberApiResponse =
+  | ProjectMemberResponse
+  | {
+      createdAt: string;
+      numberOfTasks?: number;
+      role: ProjectMemberRoleResponse;
+      taskOverview?: ProjectMemberResponse['taskOverview'];
+      updatedAt: string;
+      user: UserSummaryResponse;
+    };
+
+export type ProjectApplicationResponse = {
+  createdAt: string;
+  description?: string | null;
+  id: number;
+  materials?: unknown;
+  project?: {
+    id: number;
+    imageUrl?: string | null;
+    name: string;
+  };
+  status: 'APPROVE' | 'CANCELLED' | 'PENDING' | 'REJECT';
+  title: string;
+  type: 'MANUSCRIPT_REVIEW' | 'PUBLISH_REQUEST';
+  updatedAt: string;
+};
+
+export type ProjectStatResponse = {
+  id: number;
+  metrics: unknown;
+  project?: ProjectResponse;
+  projectId?: number;
   updatedAt: string;
 };
 
@@ -119,8 +162,17 @@ type ProjectsResponse = {
 };
 
 type ProjectMembersResponse = {
-  data?: ProjectMemberResponse[];
+  data?: ProjectMemberApiResponse[];
   pagination?: PaginationResponse;
+};
+
+type ProjectApplicationsResponse = {
+  data?: ProjectApplicationResponse[];
+  pagination?: PaginationResponse;
+};
+
+type ProjectStatApiResponse = {
+  data?: ProjectStatResponse | null;
 };
 
 type ProjectFoldersResponse = {
@@ -132,6 +184,24 @@ type FolderFilesResponse = {
   data?: ProjectFileResponse[];
   pagination?: PaginationResponse;
 };
+
+function normalizeProjectMember(member: ProjectMemberApiResponse): ProjectMemberResponse {
+  if ('user' in member) {
+    return {
+      avatarUrl: member.user.avatarUrl ?? null,
+      createdAt: member.createdAt,
+      displayName: member.user.displayName ?? null,
+      email: member.user.email ?? '',
+      id: member.user.id,
+      numberOfTasks: member.numberOfTasks,
+      role: member.role,
+      taskOverview: member.taskOverview ?? null,
+      updatedAt: member.updatedAt,
+    };
+  }
+
+  return member;
+}
 
 export async function createProject(payload: CreateProjectPayload) {
   const response = await api.post<ApiResponse<ProjectResponse>, ApiResponse<ProjectResponse>>(
@@ -176,15 +246,68 @@ export async function addProjectMembers(projectId: number, payload: AddProjectMe
   await api.post(`/projects/${projectId}/members`, payload);
 }
 
-export async function getProjectMembers(projectId: number) {
+export async function getProjectMembers(
+  projectId: number,
+  params?: {
+    field?: 'createdAt' | 'displayName' | 'email';
+    limit?: number;
+    order?: 'asc' | 'desc';
+    page?: number;
+    search?: string;
+  },
+) {
   const response = await api.get<ProjectMembersResponse, ProjectMembersResponse>(
     `/projects/${projectId}/members`,
+    { params },
   );
 
   return {
-    members: response.data ?? [],
+    members: response.data?.map(normalizeProjectMember) ?? [],
     pagination: response.pagination,
   };
+}
+
+export async function getProjectMember(projectId: number, userId: number) {
+  const response = await api.get<ApiResponse<ProjectMemberApiResponse>, ApiResponse<ProjectMemberApiResponse>>(
+    `/projects/${projectId}/members/${userId}`,
+  );
+
+  return normalizeProjectMember(response.data ?? (response as ProjectMemberApiResponse));
+}
+
+export async function leaveProject(projectId: number) {
+  await api.delete(`/projects/${projectId}/members/me`);
+}
+
+export async function getProjectApplications(
+  projectId: number,
+  params?: {
+    field?: 'createdAt' | 'updatedAt' | 'title';
+    limit?: number;
+    order?: 'asc' | 'desc';
+    page?: number;
+    search?: string;
+    status?: ProjectApplicationResponse['status'];
+    type?: ProjectApplicationResponse['type'];
+  },
+) {
+  const response = await api.get<ProjectApplicationsResponse, ProjectApplicationsResponse>(
+    `/projects/${projectId}/applications`,
+    { params },
+  );
+
+  return {
+    applications: response.data ?? [],
+    pagination: response.pagination,
+  };
+}
+
+export async function getProjectStats(projectId: number) {
+  const response = await api.get<ProjectStatApiResponse, ProjectStatApiResponse>(
+    `/projects/${projectId}/stats`,
+  );
+
+  return response.data ?? null;
 }
 
 export async function updateProjectMember(
@@ -193,11 +316,11 @@ export async function updateProjectMember(
   payload: UpdateProjectMemberPayload,
 ) {
   const response = await api.patch<
-    ApiResponse<ProjectMemberResponse>,
-    ApiResponse<ProjectMemberResponse>
+    ApiResponse<ProjectMemberApiResponse>,
+    ApiResponse<ProjectMemberApiResponse>
   >(`/projects/${projectId}/members/${userId}`, payload);
 
-  return response.data ?? (response as ProjectMemberResponse);
+  return normalizeProjectMember(response.data ?? (response as ProjectMemberApiResponse));
 }
 
 export async function removeProjectMember(projectId: number, userId: number) {

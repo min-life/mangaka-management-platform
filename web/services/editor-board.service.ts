@@ -15,14 +15,23 @@ export type UpdateEditorBoardPayload = {
 
 export type UserSummaryResponse = {
   avatarUrl?: string | null;
+  createdAt?: string;
   displayName?: string | null;
   email?: string;
   id: number;
+  updatedAt?: string;
 };
 
 export type BoardMemberResponse = UserSummaryResponse & {
   isLead: boolean;
 };
+
+type BoardMemberApiResponse =
+  | BoardMemberResponse
+  | {
+      isLead: boolean;
+      user: UserSummaryResponse;
+    };
 
 export type EditorBoardResponse = {
   createdAt: string;
@@ -58,18 +67,38 @@ type EditorBoardsResponse = {
 };
 
 type BoardProjectsResponse = {
-  data?: ProjectResponse[];
+  data?: Array<ProjectResponse | { project: ProjectResponse }>;
   pagination?: PaginationResponse;
 };
 
 type BoardMembersResponse = {
-  data?: BoardMemberResponse[];
+  data?: BoardMemberApiResponse[];
+  pagination?: PaginationResponse;
+};
+
+type BoardApplicationsResponse<TApplication> = {
+  data?: Array<TApplication | { application: TApplication }>;
   pagination?: PaginationResponse;
 };
 
 export type AddBoardMembersPayload = {
   userIds: number[];
 };
+
+export type AddBoardProjectsPayload = {
+  projectIds: number[];
+};
+
+function normalizeBoardMember(member: BoardMemberApiResponse): BoardMemberResponse {
+  if ('user' in member) {
+    return {
+      ...member.user,
+      isLead: member.isLead,
+    };
+  }
+
+  return member;
+}
 
 export async function createEditorBoard(payload: CreateEditorBoardPayload) {
   const response = await api.post<
@@ -111,14 +140,25 @@ export async function deleteEditorBoard(boardId: number) {
   await api.delete(`/editor-boards/${boardId}`);
 }
 
-export async function getEditorBoardProjects(boardId: number | string) {
+export async function getEditorBoardProjects(
+  boardId: number | string,
+  params?: {
+    field?: 'name' | 'createdAt';
+    limit?: number;
+    order?: 'asc' | 'desc';
+    page?: number;
+    search?: string;
+  },
+) {
   const response = await api.get<BoardProjectsResponse, BoardProjectsResponse>(
     `/editor-boards/${boardId}/projects`,
+    { params },
   );
 
   return {
     pagination: response.pagination,
-    projects: response.data ?? [],
+    projects:
+      response.data?.map((item) => ('project' in item ? item.project : item)) ?? [],
   };
 }
 
@@ -138,7 +178,7 @@ export async function getEditorBoardMembers(
   );
 
   return {
-    members: response.data ?? [],
+    members: response.data?.map(normalizeBoardMember) ?? [],
     pagination: response.pagination,
   };
 }
@@ -155,9 +195,55 @@ export async function removeEditorBoardMember(boardId: number | string, userId: 
 }
 
 export async function setEditorBoardMemberLead(boardId: number | string, userId: number) {
-  const response = await api.patch<ApiResponse<BoardMemberResponse>, ApiResponse<BoardMemberResponse>>(
+  const response = await api.patch<ApiResponse<BoardMemberApiResponse>, ApiResponse<BoardMemberApiResponse>>(
     `/editor-boards/${boardId}/members/${userId}/lead`,
   );
 
-  return response.data ?? (response as BoardMemberResponse);
+  return normalizeBoardMember(response.data ?? (response as BoardMemberApiResponse));
+}
+
+export async function getEditorBoardMember(boardId: number | string, userId: number) {
+  const response = await api.get<ApiResponse<BoardMemberApiResponse>, ApiResponse<BoardMemberApiResponse>>(
+    `/editor-boards/${boardId}/members/${userId}`,
+  );
+
+  return normalizeBoardMember(response.data ?? (response as BoardMemberApiResponse));
+}
+
+export async function leaveEditorBoard(boardId: number | string) {
+  await api.delete(`/editor-boards/${boardId}/members/me`);
+}
+
+export async function addEditorBoardProjects(
+  boardId: number | string,
+  payload: AddBoardProjectsPayload,
+) {
+  const response = await api.post<ApiResponse<{ count: number }>, ApiResponse<{ count: number }>>(
+    `/editor-boards/${boardId}/projects`,
+    payload,
+  );
+
+  return response.data ?? (response as { count: number });
+}
+
+export async function getEditorBoardApplications<TApplication extends object = Record<string, unknown>>(
+  boardId: number | string,
+  params?: {
+    field?: 'createdAt' | 'updatedAt' | 'title';
+    limit?: number;
+    order?: 'asc' | 'desc';
+    page?: number;
+    search?: string;
+  },
+) {
+  const response = await api.get<
+    BoardApplicationsResponse<TApplication>,
+    BoardApplicationsResponse<TApplication>
+  >(`/editor-boards/${boardId}/applications`, { params });
+
+  return {
+    applications:
+      response.data?.map((item) => ('application' in item ? item.application : item)) ?? [],
+    pagination: response.pagination,
+  };
 }

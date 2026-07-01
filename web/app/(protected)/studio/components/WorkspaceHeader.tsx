@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { Bell, ChevronDown, LogOut, Settings, User } from 'lucide-react';
+import { ChevronDown, LogOut, Settings, User } from 'lucide-react';
 
 import { useAuth } from '@/hooks/useAuth';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 import {
   DropdownMenu,
@@ -52,14 +53,7 @@ export function WorkspaceHeader() {
 
       {/* RIGHT */}
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          className="relative rounded-lg p-2 text-[#B8BEC8] transition hover:bg-[#2F3742] hover:text-white"
-        >
-          <Bell className="size-5" />
-
-          <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full border border-[#222831] bg-[#FFD369]" />
-        </button>
+        <NotificationBell />
 
         <button
           type="button"

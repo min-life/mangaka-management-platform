@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { Prisma, ACTIVITY_ACTION } from '@prisma/client';
+import { Prisma, ACTIVITY_ACTION, ENTITY_TYPE } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ACTIVITY_EVENT_NAME, ActivityEventPayload } from '../share/events/activity.event';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -15,6 +15,26 @@ const ACTIVITY_INCLUDE = {
     }
   }
 };
+
+type ActivityLogWithActor = Prisma.ActivityLogGetPayload<{
+  include: typeof ACTIVITY_INCLUDE;
+}>;
+
+type JsonRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is JsonRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function getNumber(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function getNumberArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is number => typeof item === 'number' && Number.isFinite(item))
+    : [];
+}
 
 @Injectable()
 export class ActivityLogsService {
@@ -45,7 +65,8 @@ export class ActivityLogsService {
       });
 
       if (logWithRelations) {
-        this.realtimeGateway.broadcastActivity(payload.projectId ?? null, payload.editorBoardId ?? null, logWithRelations);
+        const [enrichedLog] = await this.enrichActivityLogs([logWithRelations]);
+        this.realtimeGateway.broadcastActivity(payload.projectId ?? null, payload.editorBoardId ?? null, enrichedLog ?? logWithRelations);
       }
 
       // Determine who to notify
@@ -185,9 +206,10 @@ export class ActivityLogsService {
           take: limit,
         }),
       ]);
+      const enrichedData = await this.enrichActivityLogs(data);
 
       return {
-        data,
+        data: enrichedData,
         meta: {
           total,
           page,
@@ -199,5 +221,84 @@ export class ActivityLogsService {
       this.logger.error('Failed to get activity logs', error);
       throw new Error('Failed to get activity logs');
     }
+  }
+
+  private async enrichActivityLogs(logs: ActivityLogWithActor[]) {
+    const boardIds = new Set<number>();
+    const userIds = new Set<number>();
+
+    logs.forEach((log) => {
+      const metadata = isRecord(log.metadata) ? log.metadata : {};
+      const boardId = log.editorBoardId ?? (log.entityType === ENTITY_TYPE.EDITOR_BOARD ? log.entityId : null);
+
+      if (boardId && typeof metadata.editorBoardName !== 'string') {
+        boardIds.add(boardId);
+      }
+
+      if (log.action === ACTIVITY_ACTION.MEMBER_INVITED && !Array.isArray(metadata.invitedUsers)) {
+        getNumberArray(metadata.invitedUserIds).forEach((id) => userIds.add(id));
+      }
+
+      if (log.action === ACTIVITY_ACTION.MEMBER_REMOVED && !isRecord(metadata.removedUser)) {
+        const removedUserId = getNumber(metadata.removedUserId);
+        if (removedUserId) {
+          userIds.add(removedUserId);
+        }
+      }
+    });
+
+    const [boards, users] = await Promise.all([
+      boardIds.size
+        ? this.prisma.editorBoard.findMany({
+            where: { id: { in: [...boardIds] } },
+            select: { id: true, name: true },
+          })
+        : Promise.resolve([]),
+      userIds.size
+        ? this.prisma.user.findMany({
+            where: { id: { in: [...userIds] } },
+            select: { id: true, displayName: true, email: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const boardMap = new Map(boards.map((board) => [board.id, board.name] as const));
+    const userMap = new Map(users.map((user) => [user.id, user] as const));
+
+    return logs.map((log) => {
+      const metadata = isRecord(log.metadata) ? { ...log.metadata } : {};
+      const boardId = log.editorBoardId ?? (log.entityType === ENTITY_TYPE.EDITOR_BOARD ? log.entityId : null);
+
+      if (boardId && typeof metadata.editorBoardName !== 'string') {
+        const boardName = boardMap.get(boardId);
+        if (boardName) {
+          metadata.editorBoardName = boardName;
+        }
+      }
+
+      if (log.action === ACTIVITY_ACTION.MEMBER_INVITED && !Array.isArray(metadata.invitedUsers)) {
+        const invitedUsers = getNumberArray(metadata.invitedUserIds)
+          .map((id) => userMap.get(id))
+          .filter((user): user is NonNullable<typeof user> => Boolean(user));
+
+        if (invitedUsers.length > 0) {
+          metadata.invitedUsers = invitedUsers;
+        }
+      }
+
+      if (log.action === ACTIVITY_ACTION.MEMBER_REMOVED && !isRecord(metadata.removedUser)) {
+        const removedUserId = getNumber(metadata.removedUserId);
+        const removedUser = removedUserId ? userMap.get(removedUserId) : null;
+
+        if (removedUser) {
+          metadata.removedUser = removedUser;
+        }
+      }
+
+      return {
+        ...log,
+        metadata: Object.keys(metadata).length > 0 ? (metadata as Prisma.JsonObject) : log.metadata,
+      };
+    });
   }
 }
