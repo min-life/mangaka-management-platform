@@ -8,12 +8,21 @@ const activityToneClassName = {
   warning: 'text-[#FFD369]',
 };
 
-export function FileActivityPanel() {
+type FileActivityPanelProps = {
+  fileId: number | string;
+};
+
+export function FileActivityPanel({ fileId }: FileActivityPanelProps) {
   return (
     <section>
-      <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.08em] text-white">
-        <Activity className="size-4 text-[#FFD369]" />
-        Activity *
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.08em] text-white">
+          <Activity className="size-4 text-[#FFD369]" />
+          Activity
+        </div>
+        <span className="text-[9px] font-black uppercase tracking-[0.08em] text-[#8b94a1]">
+          File #{fileId}
+        </span>
       </div>
       <div className="mt-3 space-y-1">
         {fallbackFileActivity.map((item) => (

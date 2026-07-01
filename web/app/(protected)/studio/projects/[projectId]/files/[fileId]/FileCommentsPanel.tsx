@@ -26,15 +26,19 @@ const initialComments: CommentItem[] = [
 type FileCommentsPanelProps = {
   contextKey: string;
   contextLabel: string;
+  fileId?: number | string;
   frameComments?: SubmissionFrameComment[];
   onSelectFrame?: (comment: SubmissionFrameComment) => void;
+  taskId?: number | string | null;
 };
 
 export function FileCommentsPanel({
   contextKey,
   contextLabel,
+  fileId,
   frameComments = [],
   onSelectFrame,
+  taskId,
 }: FileCommentsPanelProps) {
   const [commentsByContext, setCommentsByContext] = useState<Record<string, CommentItem[]>>({
     file: initialComments,
@@ -72,6 +76,13 @@ export function FileCommentsPanel({
       <div className="mt-3 border border-[#39424f] bg-[#202832] px-3 py-2">
         <p className="text-[9px] font-black uppercase tracking-[0.08em] text-[#8b94a1]">Context</p>
         <p className="mt-1 truncate text-xs font-black text-[#FFD369]">{contextLabel}</p>
+        {fileId || taskId ? (
+          <p className="mt-1 text-[9px] font-bold text-[#8b94a1]">
+            {fileId ? `File #${fileId}` : null}
+            {fileId && taskId ? ' · ' : null}
+            {taskId ? `Task #${taskId}` : null}
+          </p>
+        ) : null}
       </div>
       <div className="mt-3 space-y-2 pr-1">
         {frameComments.map((item, index) => (

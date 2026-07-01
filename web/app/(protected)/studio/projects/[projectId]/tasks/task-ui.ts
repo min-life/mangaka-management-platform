@@ -33,6 +33,7 @@ export type TaskWorkspaceItem = {
   region?: TaskRegion;
   status: TaskStatus;
   submissions: TaskSubmission[];
+  targetVersion?: string;
   title: string;
   updatedAt: string;
 };

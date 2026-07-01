@@ -143,8 +143,16 @@ export function TaskDetailClient({ projectId, taskId }: TaskDetailClientProps) {
     writeTaskOverride(nextTask);
   };
 
-  const handleSubmit = (submission: TaskSubmission) => {
+  const handleSubmit = (input: { file: File; note: string }) => {
     if (!task) return;
+    const submission: TaskSubmission = {
+      assetName: input.file.name,
+      id: `submission-${Date.now()}`,
+      note: input.note || 'Submitted work file.',
+      status: 'PENDING_REVIEW',
+      submittedAt: 'Just now',
+      submittedBy: 'Current user',
+    };
     persistTask({ ...task, status: 'REVIEW', submissions: [submission, ...task.submissions], updatedAt: 'Just now *' });
     setActiveTab('SUBMISSIONS');
   };

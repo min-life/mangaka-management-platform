@@ -15,52 +15,46 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 
-import type { TaskPriority, TaskStatus, TaskWorkspaceItem } from './task-ui';
+import type { TaskStatus } from './task-ui';
 
 type CreateTaskDialogProps = {
   fileOptions: Array<{ id: number; title: string }>;
-  onCreate: (task: TaskWorkspaceItem) => void;
+  members?: Array<{ id: number; name: string }>;
+  onCreate: (input: {
+    assignedToId?: number;
+    description: string;
+    dueDate: string;
+    fileId: number;
+    status: TaskStatus;
+    title: string;
+  }) => void | Promise<void>;
 };
 
-const assignees = ['Kaito Yamamoto *', 'Hana Tanaka *', 'Akira Tanaka *'];
-
-export function CreateTaskDialog({ fileOptions, onCreate }: CreateTaskDialogProps) {
+export function CreateTaskDialog({ fileOptions, members = [], onCreate }: CreateTaskDialogProps) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [fileId, setFileId] = useState(fileOptions[0]?.id ? String(fileOptions[0].id) : '');
-  const [assignee, setAssignee] = useState(assignees[0]);
-  const [priority, setPriority] = useState<TaskPriority>('MEDIUM');
+  const [assigneeId, setAssigneeId] = useState('');
   const [status, setStatus] = useState<TaskStatus>('PENDING');
-  const [dueDate, setDueDate] = useState('2026-06-25');
+  const [dueDate, setDueDate] = useState('');
 
   const resetForm = () => {
     setTitle('');
     setDescription('');
-    setAssignee(assignees[0]);
-    setPriority('MEDIUM');
+    setAssigneeId('');
     setStatus('PENDING');
-    setDueDate('2026-06-25');
+    setDueDate('');
   };
 
   const handleCreate = () => {
-    const selectedFile = fileOptions.find((file) => file.id === Number(fileId));
     onCreate({
-      assignee,
-      description: description.trim() || 'No description. *',
-      dueDate: `${dueDate} *`,
+      ...(assigneeId ? { assignedToId: Number(assigneeId) } : {}),
+      description: description.trim(),
+      dueDate,
       fileId: Number(fileId),
-      fileTitle: selectedFile?.title ?? 'Unknown file *',
-      id: `task-local-${Date.now()}`,
-      isFallback: true,
-      isMine: assignee === 'Kaito Yamamoto *',
-      previewUrl:
-        'https://images.unsplash.com/photo-1518709268805-4e9042af2176?q=80&w=1400&auto=format&fit=crop',
-      priority,
       status,
-      submissions: [],
-      title: `${title.trim()} *`,
-      updatedAt: 'Just now *',
+      title: title.trim(),
     });
     resetForm();
     setOpen(false);
@@ -105,21 +99,16 @@ export function CreateTaskDialog({ fileOptions, onCreate }: CreateTaskDialogProp
           </label>
           <div className="grid gap-4 sm:grid-cols-2">
             <label>
-              <span className="text-[10px] font-black uppercase text-[#dce7f3]">Related File *</span>
+              <span className="text-[10px] font-black uppercase text-[#dce7f3]">Related File</span>
               <select className="mt-2 h-10 w-full rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 text-xs font-bold text-white" onChange={(event) => setFileId(event.target.value)} value={fileId}>
                 {fileOptions.map((file) => <option key={file.id} value={file.id}>{file.title}</option>)}
               </select>
             </label>
             <label>
-              <span className="text-[10px] font-black uppercase text-[#dce7f3]">Assignee *</span>
-              <select className="mt-2 h-10 w-full rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 text-xs font-bold text-white" onChange={(event) => setAssignee(event.target.value)} value={assignee}>
-                {assignees.map((name) => <option key={name}>{name}</option>)}
-              </select>
-            </label>
-            <label>
-              <span className="text-[10px] font-black uppercase text-[#dce7f3]">Priority *</span>
-              <select className="mt-2 h-10 w-full rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 text-xs font-bold text-white" onChange={(event) => setPriority(event.target.value as TaskPriority)} value={priority}>
-                {(['LOW', 'MEDIUM', 'HIGH'] as const).map((value) => <option key={value}>{value}</option>)}
+              <span className="text-[10px] font-black uppercase text-[#dce7f3]">Assignee</span>
+              <select className="mt-2 h-10 w-full rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 text-xs font-bold text-white" onChange={(event) => setAssigneeId(event.target.value)} value={assigneeId}>
+                <option value="">Unassigned</option>
+                {members.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
               </select>
             </label>
             <label>
@@ -128,11 +117,11 @@ export function CreateTaskDialog({ fileOptions, onCreate }: CreateTaskDialogProp
                 {(['PENDING', 'INPROGRESS', 'REVIEW', 'DONE'] as const).map((value) => <option key={value}>{value}</option>)}
               </select>
             </label>
+            <label>
+              <span className="text-[10px] font-black uppercase text-[#dce7f3]">Due Date</span>
+              <input className="mt-2 h-10 w-full rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 text-sm font-bold text-white" onChange={(event) => setDueDate(event.target.value)} type="date" value={dueDate} />
+            </label>
           </div>
-          <label className="block">
-            <span className="text-[10px] font-black uppercase text-[#dce7f3]">Due Date *</span>
-            <input className="mt-2 h-10 w-full rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 text-sm font-bold text-white" onChange={(event) => setDueDate(event.target.value)} type="date" value={dueDate} />
-          </label>
         </div>
         <DialogFooter className="mx-0 mb-0 shrink-0 rounded-none border-[#39424f] bg-[#151c25] px-6 py-4">
           <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>

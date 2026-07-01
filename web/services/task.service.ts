@@ -43,3 +43,30 @@ export async function updateTask(taskId: number | string, payload: UpdateTaskPay
 export async function deleteTask(taskId: number | string) {
   await api.delete(`/tasks/${taskId}`);
 }
+
+export type TaskFramePayload = {
+  endX: number;
+  endY: number;
+  startX: number;
+  startY: number;
+};
+
+export type TaskFrameResponse = TaskFramePayload & {
+  id: number;
+  taskId: number;
+};
+
+export async function createTaskFrame(taskId: number | string, payload: TaskFramePayload) {
+  const response = await api.post<{ data: TaskFrameResponse }, { data: TaskFrameResponse }>(
+    `/tasks/${taskId}/frames`,
+    payload,
+  );
+  return response.data;
+}
+
+export async function getTaskFrames(taskId: number | string) {
+  const response = await api.get<{ data: TaskFrameResponse[] }, { data: TaskFrameResponse[] }>(
+    `/tasks/${taskId}/frames`,
+  );
+  return response.data ?? [];
+}

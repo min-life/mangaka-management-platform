@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import {
   taskStatusClassName,
   taskStatusLabels,
-  type TaskSubmission,
   type TaskWorkspaceItem,
 } from '../../tasks/task-ui';
 import { SubmitWorkDialog } from '../../tasks/[taskId]/SubmitWorkDialog';
@@ -18,32 +17,27 @@ type FocusedTaskWorkspaceProps = {
   canReview: boolean;
   canSubmit: boolean;
   onStartFrameComment: () => void;
+  onSubmitWork?: (input: { file: File; note: string }) => void;
   onTaskChange: (task: TaskWorkspaceItem) => void;
   selectedSubmissionId: string | null;
   task: TaskWorkspaceItem;
+  targetVersion?: string;
 };
 
 export function FocusedTaskWorkspace({
   canReview,
   canSubmit,
   onStartFrameComment,
+  onSubmitWork,
   onTaskChange,
   selectedSubmissionId,
   task,
+  targetVersion,
 }: FocusedTaskWorkspaceProps) {
   const [reviewNote, setReviewNote] = useState('');
   const selectedSubmission = task.submissions.find(
     (submission) => submission.id === selectedSubmissionId,
   );
-
-  const handleSubmit = (submission: TaskSubmission) => {
-    onTaskChange({
-      ...task,
-      status: 'REVIEW',
-      submissions: [submission, ...task.submissions],
-      updatedAt: 'Just now *',
-    });
-  };
 
   const handleReview = (approved: boolean) => {
     if (!selectedSubmission || !reviewNote.trim()) return;
@@ -127,12 +121,17 @@ export function FocusedTaskWorkspace({
       <div className="mt-3 border border-[#303842] bg-[#151c25] p-3">
         <p className="text-xs font-black text-white">{task.title}</p>
         <p className="mt-2 text-[10px] leading-4 text-[#dce7f3]">{task.description}</p>
+        {targetVersion ? (
+          <p className="mt-2 text-[9px] font-black uppercase tracking-[0.08em] text-[#FFD369]">
+            Target {targetVersion}
+          </p>
+        ) : null}
         <p className="mt-2 flex items-center gap-1 text-[9px] font-bold text-[#8b94a1]">
           <UserRound className="size-3" /> {task.assignee} · Due {task.dueDate}
         </p>
       </div>
       {canSubmit && task.status !== 'DONE' && task.status !== 'REVIEW' ? (
-        <div className="mt-3"><SubmitWorkDialog onSubmit={handleSubmit} /></div>
+        <div className="mt-3"><SubmitWorkDialog onSubmit={onSubmitWork ?? (() => undefined)} /></div>
       ) : null}
     </section>
   );

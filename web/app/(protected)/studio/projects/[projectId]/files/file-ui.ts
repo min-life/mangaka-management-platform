@@ -36,6 +36,7 @@ export type FileTaskItem = {
   id: string;
   region?: FileTaskRegion;
   status: FileStatus;
+  targetVersion?: string;
   title: string;
 };
 
@@ -52,7 +53,9 @@ export type SubmissionFrameComment = {
   id: string;
   region: FileTaskRegion;
   submissionId: string;
+  taskId?: string;
   time: string;
+  version?: string;
 };
 
 export type FileActivityItem = {
@@ -68,6 +71,7 @@ export type FileVersionItem = {
   createdAt: string;
   id: string;
   isCurrent: boolean;
+  materials?: unknown[];
   note: string;
   previewUrl?: string;
   version: number;
