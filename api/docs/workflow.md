@@ -115,9 +115,39 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 ### 11.1 Thống kê Dự án
 1. **Xem tiến độ**: Gọi `GET /api/projects/:id/stats` để vẽ các biểu đồ tiến độ, số task hoàn thành, số đơn từ.
 
+## 12. Luồng Lịch sử Hoạt động (Activity Logs Flow)
+
+### 12.1 Theo dõi hoạt động
+1. **Xem hoạt động**: Hiển thị dòng thời gian (timeline) các hành động của user (tạo/xóa file, comment, tạo task, v.v.). Gọi `GET /api/activity-logs` (hoặc API tương ứng của từng module như `GET /api/projects/:id/activity-logs`).
+2. **Phản hồi**: Trả về danh sách được phân trang. Frontend render giao diện Feed.
+
+## 13. Luồng Thông báo (Notifications Flow)
+
+### 13.1 Nhận và đọc thông báo
+1. **Lấy thông báo**: Lấy danh sách các thông báo của user hiện tại qua `GET /api/notifications`.
+2. **Đánh dấu đã đọc**: User bấm vào 1 thông báo -> Gọi `PATCH /api/notifications/:id/read`. Bấm "Đọc tất cả" -> Gọi `PATCH /api/notifications/read-all`.
+3. **Hiển thị**: Nếu API trả về thành công, cập nhật trạng thái UI (mất dấu chấm đỏ chưa đọc).
+
 ---
 
 # API Endpoints Workflow
+
+
+## Activity Logs
+
+### Get my activity logs with pagination 
+**GET** `/api/activity-logs`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `page` | `query` | `No` | `number` |  |
+| `limit` | `query` | `No` | `number` |  |
+
+#### Responses
+- **200**: Return paginated activity logs
+
+---
 
 ## App
 
@@ -554,6 +584,38 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 
 #### Responses
 - **200**: Role permissions replaced successfully
+
+---
+
+
+## Notifications
+
+### Get current user notifications 
+**GET** `/api/notifications`
+
+#### Responses
+- **200**: Return list of notifications
+
+---
+
+### Mark a notification as read 
+**PATCH** `/api/notifications/{id}/read`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Notification ID |
+
+#### Responses
+- **200**: Return updated notification
+
+---
+
+### Mark all notifications as read 
+**PATCH** `/api/notifications/read-all`
+
+#### Responses
+- **200**: Return success status
 
 ---
 
@@ -1050,6 +1112,34 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 
 ---
 
+---
+
+### Create project folder 
+**POST** `/api/projects/{id}/folders`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Project id |
+
+#### Responses
+- **201**: Folder created successfully
+
+---
+
+### Get project activity logs 
+**GET** `/api/projects/{id}/activity-logs`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Project id |
+
+#### Responses
+- **200**: Activity logs retrieved successfully
+
+---
+
 ### Get project stats 
 **GET** `/api/projects/{id}/stats`
 
@@ -1358,6 +1448,21 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 
 ---
 
+---
+
+### Get editor board activity logs 
+**GET** `/api/editor-boards/{id}/activity-logs`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Editor board id |
+
+#### Responses
+- **200**: Activity logs retrieved successfully
+
+---
+
 ### Get editor board applications 
 **GET** `/api/editor-boards/{id}/applications`
 
@@ -1586,6 +1691,49 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 
 ---
 
+---
+
+### Add a material item to application 
+**POST** `/api/applications/{id}/materials/add`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Application id |
+
+#### Responses
+- **200**: Application updated successfully
+
+---
+
+### Update a material item in application 
+**PATCH** `/api/applications/{id}/materials/{index}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Application id |
+| `index` | `path` | `Yes` | `number` | Index |
+
+#### Responses
+- **200**: Application updated successfully
+
+---
+
+### Delete a material item from application 
+**DELETE** `/api/applications/{id}/materials/{index}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Application id |
+| `index` | `path` | `Yes` | `number` | Index |
+
+#### Responses
+- **200**: Application updated successfully
+
+---
+
 ## Folders
 
 ### Get folder details 
@@ -1692,6 +1840,21 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
   |-------|------|-------------|
   | `data` | `string` |  |
 
+
+---
+
+---
+
+### Create child folder 
+**POST** `/api/folders/{id}/children`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Folder id |
+
+#### Responses
+- **201**: Child folder created successfully
 
 ---
 
@@ -1952,6 +2115,21 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 
 ---
 
+---
+
+### Get file activity logs 
+**GET** `/api/files/{id}/activity-logs`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | File id |
+
+#### Responses
+- **200**: Activity logs retrieved successfully
+
+---
+
 ## Materials
 
 ### Get material details 
@@ -2026,6 +2204,75 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
   |-------|------|-------------|
   | `data` | `string` |  |
 
+
+---
+
+---
+
+### Add files to an existing material version 
+**POST** `/api/materials/{id}/add`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Material id |
+
+#### Responses
+- **201**: Material updated successfully
+
+---
+
+### Delete a file item from a material 
+**DELETE** `/api/materials/{id}/delete/{index}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Material id |
+| `index` | `path` | `Yes` | `number` | Index |
+
+#### Responses
+- **200**: Material updated successfully
+
+---
+
+### Set a file item as thumbnail 
+**PATCH** `/api/materials/{id}/thumbnail/{index}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Material id |
+| `index` | `path` | `Yes` | `number` | Index |
+
+#### Responses
+- **200**: Material updated successfully
+
+---
+
+### Get material frames 
+**GET** `/api/materials/{id}/frames`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Material id |
+
+#### Responses
+- **200**: Material frames retrieved successfully
+
+---
+
+### Create frame for material 
+**POST** `/api/materials/{id}/frames`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Material id |
+
+#### Responses
+- **201**: Frame created successfully
 
 ---
 
@@ -2247,6 +2494,21 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
   |-------|------|-------------|
   | `data` | `string` |  |
 
+
+---
+
+---
+
+### Get task materials for select 
+**GET** `/api/tasks/{id}/materials`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Task id |
+
+#### Responses
+- **200**: Task materials for select retrieved successfully
 
 ---
 

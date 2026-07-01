@@ -255,16 +255,27 @@ export class FilesService {
   async createMaterial(
     fileId: number,
     data: {
-      files: Array<Express.Multer.File>;
+      taskId?: number;
+      name?: string;
+      files: {
+        image?: Express.Multer.File[];
+        text?: Express.Multer.File[];
+        source?: Express.Multer.File[];
+      };
       userId: number;
     },
   ) {
     try {
       await this.ensureFile(fileId);
 
-      let hasThumbnail = false;
+      const allFiles = [
+        ...(data.files.image?.map(f => ({ file: f, type: 'IMAGE' })) || []),
+        ...(data.files.text?.map(f => ({ file: f, type: 'TEXT' })) || []),
+        ...(data.files.source?.map(f => ({ file: f, type: 'SOURCE' })) || [])
+      ];
+
       const materialsData = await Promise.all(
-        data.files.map(async (file) => {
+        allFiles.map(async ({ file, type }) => {
           // Upload file to S3
           const ext = file.originalname.split('.').pop();
           const key = `materials/${fileId}/${randomUUID()}.${ext}`;
@@ -275,25 +286,22 @@ export class FilesService {
             originalName: file.originalname,
             size: file.size,
             mimeType: file.mimetype,
+            type
           };
 
-          // Try to extract dimensions
-          try {
-            const dimensions = sizeOf(file.buffer);
-            if (dimensions && dimensions.width && dimensions.height) {
-              materialObj.width = dimensions.width;
-              materialObj.height = dimensions.height;
-              materialObj.ratio = Number((dimensions.width / dimensions.height).toFixed(3));
-              
-              if (!hasThumbnail) {
+          // Try to extract dimensions for IMAGE
+          if (type === 'IMAGE') {
+            try {
+              const dimensions = sizeOf(file.buffer);
+              if (dimensions && dimensions.width && dimensions.height) {
+                materialObj.width = dimensions.width;
+                materialObj.height = dimensions.height;
+                materialObj.ratio = Number((dimensions.width / dimensions.height).toFixed(3));
                 materialObj.isThumbnail = true;
-                hasThumbnail = true;
-              } else {
-                materialObj.isThumbnail = false;
               }
+            } catch (e) {
+              // Not an image or unsupported format, ignore dimensions
             }
-          } catch (e) {
-            // Not an image or unsupported format, ignore dimensions
           }
 
           return materialObj;
@@ -304,6 +312,8 @@ export class FilesService {
         data: {
           materials: materialsData as Prisma.InputJsonArray,
           fileId,
+          taskId: data.taskId ? Number(data.taskId) : null,
+          name: data.name || null,
           createdBy: data.userId,
           updatedBy: data.userId,
         },
@@ -471,6 +481,7 @@ export class FilesService {
     data: {
       content: unknown;
       userId: number;
+      mentionedUserIds?: number[];
     },
   ) {
     try {
@@ -506,7 +517,7 @@ export class FilesService {
         projectId: fileWithFolder?.folder?.projectId ?? null,
         fileId: fileId,
         actorId: data.userId,
-        metadata: { creatorId: fileWithFolder?.createdBy ?? null }
+        metadata: { creatorId: fileWithFolder?.createdBy ?? null, mentionedUserIds: data.mentionedUserIds }
       } satisfies ActivityEventPayload);
 
       this.realtimeGateway.broadcastComment('FILE', fileId, 'comment:new', comment);

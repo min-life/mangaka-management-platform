@@ -11,6 +11,7 @@ import { ERROR } from '../share/constants/message-error';
 import { randomUUID } from 'crypto';
 import { AwsS3Service } from '../share/services/aws-s3.service';
 import sizeOf from 'image-size';
+import type { Pagination } from '../share/interfaces';
 
 const USER_SELECT = {
   select: {
@@ -24,7 +25,27 @@ const USER_SELECT = {
 const MATERIAL_SELECT = {
   id: true,
   fileId: true,
+  taskId: true,
+  name: true,
   materials: true,
+  createdByUser: USER_SELECT,
+  updatedByUser: USER_SELECT,
+  createdAt: true,
+  updatedAt: true,
+};
+
+const FRAME_SELECT = {
+  id: true,
+  startX: true,
+  startY: true,
+  endX: true,
+  endY: true,
+  material: {
+    select: {
+      id: true,
+      fileId: true,
+    },
+  },
   createdByUser: USER_SELECT,
   updatedByUser: USER_SELECT,
   createdAt: true,
@@ -79,9 +100,12 @@ export class MaterialsService {
       // Creating a new version based on the old one
       return await this.prisma.fileMaterial.create({
         data: {
-          materials: oldMaterial.materials as Prisma.InputJsonValue,
+          materials: oldMaterial.materials as Prisma.InputJsonArray,
           fileId: oldMaterial.fileId,
+          taskId: oldMaterial.taskId,
+          name: oldMaterial.name,
           createdBy: userId,
+          updatedBy: userId,
         },
         select: MATERIAL_SELECT,
       });
@@ -145,6 +169,8 @@ export class MaterialsService {
         data: {
           materials: combinedMaterials as Prisma.InputJsonArray,
           fileId: oldMaterial.fileId,
+          taskId: oldMaterial.taskId,
+          name: oldMaterial.name,
           createdBy: userId,
           updatedBy: userId,
         },
@@ -175,6 +201,8 @@ export class MaterialsService {
         data: {
           materials: materialsArray as Prisma.InputJsonArray,
           fileId: oldMaterial.fileId,
+          taskId: oldMaterial.taskId,
+          name: oldMaterial.name,
           createdBy: userId,
           updatedBy: userId,
         },
@@ -200,6 +228,8 @@ export class MaterialsService {
         data: {
           materials: materialsArray as Prisma.InputJsonArray,
           fileId: oldMaterial.fileId,
+          taskId: oldMaterial.taskId,
+          name: oldMaterial.name,
           createdBy: userId,
           updatedBy: userId,
         },
@@ -208,6 +238,88 @@ export class MaterialsService {
     } catch (error) {
       this.handleError(error, 'Set material thumbnail fail', ERROR.SVUPDATEMATERIAL);
     }
+  }
+
+  async getMaterialFrames(
+    materialId: number,
+    sort?: { field: 'createdAt'; order: 'asc' | 'desc' },
+    pagination?: Pagination,
+  ) {
+    try {
+      await this.ensureMaterial(materialId);
+
+      const where: Prisma.MaterialCommentFrameWhereInput = { materialId };
+      const orderBy: Prisma.MaterialCommentFrameOrderByWithRelationInput = sort
+        ? { [sort.field]: sort.order }
+        : { createdAt: 'desc' };
+      const { page, limit, skip } = this.buildPagination(pagination);
+
+      const [total, frames] = await this.prisma.$transaction([
+        this.prisma.materialCommentFrame.count({ where }),
+        this.prisma.materialCommentFrame.findMany({
+          where,
+          orderBy,
+          skip,
+          take: limit,
+          select: FRAME_SELECT,
+        }),
+      ]);
+
+      return {
+        frames,
+        pagination: this.buildPaginationMeta(total, page, limit),
+      };
+    } catch (error) {
+      this.handleError(error, 'Get material frames fail', 'SVGETMATERIALFRAMES');
+    }
+  }
+
+  async createFrame(
+    materialId: number,
+    data: {
+      startX: number;
+      startY: number;
+      endX: number;
+      endY: number;
+      userId: number;
+    },
+  ) {
+    try {
+      await this.ensureMaterial(materialId);
+
+      return await this.prisma.materialCommentFrame.create({
+        data: {
+          startX: data.startX,
+          startY: data.startY,
+          endX: data.endX,
+          endY: data.endY,
+          materialId,
+          createdBy: data.userId,
+        },
+        select: FRAME_SELECT,
+      });
+    } catch (error) {
+      this.handleError(error, 'Create frame fail', 'SVCREATEFRAME');
+    }
+  }
+
+  private buildPagination(pagination?: Pagination) {
+    const page = pagination?.page || 1;
+    const limit = pagination?.limit || 10;
+    return {
+      page,
+      limit,
+      skip: (page - 1) * limit,
+    };
+  }
+
+  private buildPaginationMeta(total: number, page: number, limit: number) {
+    return {
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    };
   }
 
   private async ensureMaterial(id: number) {

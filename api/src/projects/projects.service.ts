@@ -20,7 +20,9 @@ import { ACTIVITY_EVENT_NAME, ActivityEventPayload } from '../share/events/activ
 import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
-
+import { AwsS3Service } from '../share/services/aws-s3.service';
+import { randomUUID } from 'crypto';
+import sizeOf from 'image-size';
 const PROJECT_MEMBER_SELECT = {
   user: {
     select: {
@@ -138,6 +140,7 @@ const APPLICATION_LIST_SELECT = {
   type: true,
   status: true,
   parentFolderId: true,
+  folderImageUrl: true,
   project: {
     select: {
       id: true,
@@ -214,6 +217,7 @@ export class ProjectsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly awsS3Service: AwsS3Service,
   ) { }
 
   async createProject(data: {
@@ -644,10 +648,16 @@ export class ProjectsService {
     data: {
       title: string;
       description?: string;
-      materials: unknown;
+      materials?: unknown;
+      folderImageUrl?: string;
       type: APPLICATION_TYPE;
       userId: number;
       parentFolderId?: number;
+      files?: {
+        image?: Express.Multer.File[];
+        text?: Express.Multer.File[];
+        source?: Express.Multer.File[];
+      };
     },
   ) {
     try {
@@ -663,14 +673,66 @@ export class ProjectsService {
         }
       }
 
+      let applicationMaterials: any[] = Array.isArray(data.materials) ? data.materials : [];
+
+      if (data.type === APPLICATION_TYPE.CREATE_ARC || data.type === APPLICATION_TYPE.CREATE_CHAPTER) {
+        const hasImage = data.files?.image && data.files.image.length > 0;
+        const hasText = data.files?.text && data.files.text.length > 0;
+        
+        if (!hasImage || !hasText) {
+          throw new BadRequestException('At least 1 image and 1 text file are required for CREATE_ARC and CREATE_CHAPTER applications');
+        }
+
+        const allFiles = [
+          ...(data.files?.image?.map(f => ({ file: f, type: 'IMAGE' })) || []),
+          ...(data.files?.text?.map(f => ({ file: f, type: 'TEXT' })) || []),
+          ...(data.files?.source?.map(f => ({ file: f, type: 'SOURCE' })) || [])
+        ];
+
+        const uploadedMaterials = await Promise.all(
+          allFiles.map(async ({ file, type }) => {
+            const ext = file.originalname.split('.').pop();
+            const key = `applications/${projectId}/${randomUUID()}.${ext}`;
+            const url = await this.awsS3Service.uploadFile(file, key);
+
+            const materialObj: any = {
+              url,
+              originalName: file.originalname,
+              size: file.size,
+              mimeType: file.mimetype,
+              type
+            };
+
+            if (type === 'IMAGE') {
+              try {
+                const dimensions = sizeOf(file.buffer);
+                if (dimensions && dimensions.width && dimensions.height) {
+                  materialObj.width = dimensions.width;
+                  materialObj.height = dimensions.height;
+                  materialObj.ratio = Number((dimensions.width / dimensions.height).toFixed(3));
+                  materialObj.isThumbnail = true;
+                }
+              } catch (e) {
+                // Ignore dimensions
+              }
+            }
+
+            return materialObj;
+          })
+        );
+        
+        applicationMaterials = [...applicationMaterials, ...uploadedMaterials];
+      }
+
       const application = await this.prisma.application.create({
         data: {
           projectId,
           title: data.title,
           description: data.description,
-          materials: data.materials as Prisma.InputJsonValue,
+          materials: applicationMaterials as Prisma.InputJsonValue,
           type: data.type,
-          parentFolderId: data.parentFolderId || null,
+          parentFolderId: data.parentFolderId ? Number(data.parentFolderId) : null,
+          folderImageUrl: data.folderImageUrl,
           createdBy: data.userId,
           updatedBy: data.userId,
         },

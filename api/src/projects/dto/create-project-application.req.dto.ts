@@ -13,7 +13,12 @@ export class CreateProjectApplicationReqDto {
   @IsString()
   description?: string;
 
-  @ApiProperty({ 
+  @ApiPropertyOptional({ example: 'https://thumbnail.url', description: 'Folder thumbnail URL' })
+  @IsOptional()
+  @IsString()
+  folderImageUrl?: string;
+
+  @ApiPropertyOptional({ 
     example: [
       {
         url: 'https://...',
@@ -27,8 +32,8 @@ export class CreateProjectApplicationReqDto {
       }
     ] 
   })
-  @IsNotEmpty()
-  materials!: unknown;
+  @IsOptional()
+  materials?: unknown;
 
   @ApiProperty({ enum: APPLICATION_TYPE, example: APPLICATION_TYPE.PUBLISH_REQUEST })
   @IsEnum(APPLICATION_TYPE)
@@ -38,4 +43,25 @@ export class CreateProjectApplicationReqDto {
   @IsOptional()
   @IsNumber()
   parentFolderId?: number;
+
+  @ApiPropertyOptional({
+    type: 'string',
+    format: 'binary',
+    description: 'Required for CREATE_ARC and CREATE_CHAPTER types',
+  })
+  image?: Express.Multer.File;
+
+  @ApiPropertyOptional({
+    type: 'string',
+    format: 'binary',
+    description: 'Required for CREATE_ARC and CREATE_CHAPTER types',
+  })
+  text?: Express.Multer.File;
+
+  @ApiPropertyOptional({
+    type: 'string',
+    format: 'binary',
+    description: 'Optional source file for CREATE_ARC and CREATE_CHAPTER types',
+  })
+  source?: Express.Multer.File;
 }

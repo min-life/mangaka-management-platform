@@ -24,11 +24,11 @@ import {
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
-import { FilesInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { CurrentUser, Permissions } from '../share/decorators';
 import type { JwtPayload } from '../auth/interfaces';
 import { ActivityLogsService } from '../activity-logs/activity-logs.service';
-import { QueryActivityLogsReqDto } from '../activity-logs/dto';
+import { QueryActivityLogsReqDto, ActivityLogsResponseDto } from '../activity-logs/dto';
 import { FilesService } from './files.service';
 import {
   CreateMaterialReqDto,
@@ -222,21 +222,26 @@ export class FilesController {
   @ApiBody({ type: CreateMaterialReqDto })
   @ApiCreatedResponse({ description: 'Material created successfully', type: MaterialResponseDto })
   @Post(':id/materials')
-  @UseInterceptors(FilesInterceptor('files', 20))
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'image', maxCount: 1 },
+      { name: 'text', maxCount: 1 },
+      { name: 'source', maxCount: 1 },
+    ]),
+  )
   async createMaterial(
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() currentUser: JwtPayload,
-    @UploadedFiles(
-      new ParseFilePipe({
-        validators: [
-          new MaxFileSizeValidator({ maxSize: 524288000 }), // 500MB
-          new FileTypeValidator({ fileType: /(jpg|jpeg|png|gif|webp|pdf|photoshop)$/i }),
-        ],
-      }),
-    )
-    files: Array<Express.Multer.File>,
+    @Body() data: CreateMaterialReqDto,
+    @UploadedFiles()
+    files: {
+      image?: Express.Multer.File[];
+      text?: Express.Multer.File[];
+      source?: Express.Multer.File[];
+    },
   ) {
     const material = await this.filesService.createMaterial(id, {
+      ...data,
       files,
       userId: currentUser.userId,
     });
@@ -300,7 +305,7 @@ export class FilesController {
   })
   @ApiOperation({ summary: 'Get file activity logs' })
   @ApiParam({ name: 'id', type: Number, description: 'File id' })
-  @ApiOkResponse({ description: 'File activity logs retrieved successfully' })
+  @ApiOkResponse({ description: 'File activity logs retrieved successfully', type: ActivityLogsResponseDto })
   @Get(':id/activity-logs')
   async getFileActivityLogs(
     @Param('id', ParseIntPipe) id: number,
