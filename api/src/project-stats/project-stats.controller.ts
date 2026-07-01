@@ -12,7 +12,7 @@ export class ProjectStatsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:read', 'board:leader'],
+    permissions: ['project:read', 'project:owner'],
     resource: 'PROJECT_STAT',
   })
   @ApiOperation({ summary: 'Get project stat details' })
@@ -31,7 +31,7 @@ export class ProjectStatsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:update', 'board:leader'],
+    permissions: ['project:update', 'project:owner'],
     resource: 'PROJECT_STAT',
   })
   @ApiOperation({ summary: 'Update project stat' })
@@ -50,7 +50,7 @@ export class ProjectStatsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:delete', 'board:leader'],
+    permissions: ['project:delete', 'project:owner'],
     resource: 'PROJECT_STAT',
   })
   @ApiOperation({ summary: 'Delete project stat' })

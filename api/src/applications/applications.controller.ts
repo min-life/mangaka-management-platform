@@ -40,7 +40,7 @@ export class ApplicationsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:read', 'board:leader'],
+    permissions: ['project:read', 'board:leader', 'board:member', 'board:owner', 'project:owner'],
     resource: 'APPLICATION',
   })
   @ApiOperation({ summary: 'Get application comments' })
@@ -67,7 +67,7 @@ export class ApplicationsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:comment.create', 'board:leader'],
+    permissions: ['project:comment.create', 'board:leader', 'project:owner', 'board:member', 'board:owner'],
     resource: 'APPLICATION',
   })
   @ApiOperation({ summary: 'Create comment for application' })
@@ -113,7 +113,7 @@ export class ApplicationsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:application.read', 'board:leader'],
+    permissions: ['project:application.read', 'board:leader', 'project:owner', 'board:member', 'board:owner'],
     resource: 'APPLICATION',
   })
   @ApiOperation({ summary: 'Get application details' })
@@ -132,7 +132,7 @@ export class ApplicationsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:application.update', 'board:leader'],
+    permissions: ['project:application.update', 'project:owner'],
     resource: 'APPLICATION',
   })
   @ApiOperation({ summary: 'Update application' })
@@ -155,7 +155,7 @@ export class ApplicationsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:application.delete', 'board:leader'],
+    permissions: ['project:application.delete', 'project:owner'],
     resource: 'APPLICATION',
   })
   @ApiOperation({ summary: 'Delete application' })
@@ -168,7 +168,7 @@ export class ApplicationsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:application.approve', 'board:leader'],
+    permissions: ['project:application.approve', 'board:leader', 'project:owner'],
     resource: 'APPLICATION',
   })
   @ApiOperation({ summary: 'Update application status' })
@@ -194,7 +194,7 @@ export class ApplicationsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:application.read', 'board:leader', 'board:member', 'board:owner'],
+    permissions: ['project:application.read', 'project:owner', 'board:leader', 'board:member', 'board:owner'],
     resource: 'APPLICATION',
   })
   @ApiOperation({ summary: 'Get application votes' })
@@ -237,7 +237,7 @@ export class ApplicationsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:application.update', 'board:leader'],
+    permissions: ['project:application.update', 'project:owner'],
     resource: 'APPLICATION',
   })
   @ApiOperation({ summary: 'Add a material item to application' })
@@ -255,7 +255,7 @@ export class ApplicationsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:application.update', 'board:leader'],
+    permissions: ['project:application.update', 'project:owner'],
     resource: 'APPLICATION',
   })
   @ApiOperation({ summary: 'Update a material item in application' })
@@ -275,7 +275,7 @@ export class ApplicationsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:application.update', 'board:leader'],
+    permissions: ['project:application.update', 'project:owner'],
     resource: 'APPLICATION',
   })
   @ApiOperation({ summary: 'Delete a material item from application' })

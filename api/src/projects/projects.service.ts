@@ -20,7 +20,9 @@ import { ACTIVITY_EVENT_NAME, ActivityEventPayload } from '../share/events/activ
 import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
-
+import { AwsS3Service } from '../share/services/aws-s3.service';
+import { randomUUID } from 'crypto';
+import sizeOf from 'image-size';
 const PROJECT_MEMBER_SELECT = {
   user: {
     select: {
@@ -137,6 +139,8 @@ const APPLICATION_LIST_SELECT = {
   title: true,
   type: true,
   status: true,
+  parentFolderId: true,
+  folderImageUrl: true,
   project: {
     select: {
       id: true,
@@ -176,6 +180,7 @@ const FOLDER_LIST_SELECT = {
   id: true,
   title: true,
   description: true,
+  imageUrl: true,
   createdByUser: {
     select: {
       id: true,
@@ -212,6 +217,7 @@ export class ProjectsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly awsS3Service: AwsS3Service,
   ) { }
 
   async createProject(data: {
@@ -642,20 +648,91 @@ export class ProjectsService {
     data: {
       title: string;
       description?: string;
-      materials: unknown;
+      materials?: unknown;
+      folderImageUrl?: string;
       type: APPLICATION_TYPE;
       userId: number;
+      parentFolderId?: number;
+      files?: {
+        image?: Express.Multer.File[];
+        text?: Express.Multer.File[];
+        source?: Express.Multer.File[];
+      };
     },
   ) {
     try {
       const project = await this.ensureProject(projectId);
+
+      if (data.type === APPLICATION_TYPE.CREATE_CHAPTER) {
+        if (!data.parentFolderId) {
+          throw new BadRequestException('parentFolderId is required for CREATE_CHAPTER application');
+        }
+        const parentFolder = await this.ensureProjectFolder(projectId, data.parentFolderId);
+        if (parentFolder.parentId !== null) {
+          throw new BadRequestException('Cannot create a subfolder under a Chapter (maximum depth is 2)');
+        }
+      }
+
+      let applicationMaterials: any[] = Array.isArray(data.materials) ? data.materials : [];
+
+      if (data.type === APPLICATION_TYPE.CREATE_ARC || data.type === APPLICATION_TYPE.CREATE_CHAPTER) {
+        const hasImage = data.files?.image && data.files.image.length > 0;
+        const hasText = data.files?.text && data.files.text.length > 0;
+        
+        if (!hasImage || !hasText) {
+          throw new BadRequestException('At least 1 image and 1 text file are required for CREATE_ARC and CREATE_CHAPTER applications');
+        }
+
+        const allFiles = [
+          ...(data.files?.image?.map(f => ({ file: f, type: 'IMAGE' })) || []),
+          ...(data.files?.text?.map(f => ({ file: f, type: 'TEXT' })) || []),
+          ...(data.files?.source?.map(f => ({ file: f, type: 'SOURCE' })) || [])
+        ];
+
+        const uploadedMaterials = await Promise.all(
+          allFiles.map(async ({ file, type }) => {
+            const ext = file.originalname.split('.').pop();
+            const key = `applications/${projectId}/${randomUUID()}.${ext}`;
+            const url = await this.awsS3Service.uploadFile(file, key);
+
+            const materialObj: any = {
+              url,
+              originalName: file.originalname,
+              size: file.size,
+              mimeType: file.mimetype,
+              type
+            };
+
+            if (type === 'IMAGE') {
+              try {
+                const dimensions = sizeOf(file.buffer);
+                if (dimensions && dimensions.width && dimensions.height) {
+                  materialObj.width = dimensions.width;
+                  materialObj.height = dimensions.height;
+                  materialObj.ratio = Number((dimensions.width / dimensions.height).toFixed(3));
+                  materialObj.isThumbnail = true;
+                }
+              } catch (e) {
+                // Ignore dimensions
+              }
+            }
+
+            return materialObj;
+          })
+        );
+        
+        applicationMaterials = [...applicationMaterials, ...uploadedMaterials];
+      }
+
       const application = await this.prisma.application.create({
         data: {
           projectId,
           title: data.title,
           description: data.description,
-          materials: data.materials as Prisma.InputJsonValue,
+          materials: applicationMaterials as Prisma.InputJsonValue,
           type: data.type,
+          parentFolderId: data.parentFolderId ? Number(data.parentFolderId) : null,
+          folderImageUrl: data.folderImageUrl,
           createdBy: data.userId,
           updatedBy: data.userId,
         },
@@ -682,7 +759,7 @@ export class ProjectsService {
 
   async getProjectFolders(
     projectId: number,
-    filter?: { search?: string; parentId?: number },
+    filter?: { search?: string; parentId?: number; type?: 'ARC' | 'CHAPTER' },
     order?: { field: 'title' | 'createdAt'; order: 'asc' | 'desc' },
     pagination?: Pagination,
   ) {
@@ -693,6 +770,8 @@ export class ProjectsService {
         projectId,
         ...(filter?.search && { title: { contains: filter.search, mode: 'insensitive' } }),
         ...(filter?.parentId && { parentId: filter.parentId }),
+        ...(filter?.type === 'ARC' && { parentId: null }),
+        ...(filter?.type === 'CHAPTER' && { parentId: { not: null } }),
       };
       const orderBy: Prisma.FolderOrderByWithRelationInput = order
         ? { [order.field]: order.order }
@@ -726,12 +805,16 @@ export class ProjectsService {
       description?: string;
       parentId?: number;
       userId: number;
+      imageUrl?: string;
     },
   ) {
     try {
       await this.ensureProject(projectId);
       if (data.parentId) {
-        await this.ensureProjectFolder(projectId, data.parentId);
+        const parentFolder = await this.ensureProjectFolder(projectId, data.parentId);
+        if (parentFolder.parentId !== null) {
+          throw new BadRequestException('Cannot create a subfolder under a Chapter (maximum depth is 2)');
+        }
       }
 
       return await this.prisma.folder.create({
@@ -740,6 +823,7 @@ export class ProjectsService {
           title: data.title,
           description: data.description,
           parentId: data.parentId,
+          imageUrl: data.imageUrl,
           createdBy: data.userId,
           updatedBy: data.userId,
         },

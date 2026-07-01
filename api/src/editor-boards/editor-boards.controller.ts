@@ -38,6 +38,7 @@ import {
   UpdateBoardReqDto,
 } from './dto';
 import { ActivityLogsService } from '../activity-logs/activity-logs.service';
+import { ActivityLogsResponseDto } from '../activity-logs/dto';
 import { QueryActivityLogsReqDto } from '../activity-logs/dto';
 @ApiTags('Editor Boards')
 @ApiBearerAuth()
@@ -358,7 +359,7 @@ export class EditorBoardsController {
   })
   @ApiOperation({ summary: 'Get activity logs for an editor board' })
   @ApiParam({ name: 'id', type: Number, description: 'Editor board id' })
-  @ApiOkResponse({ description: 'Editor board activity logs retrieved successfully' })
+  @ApiOkResponse({ description: 'Editor board activity logs retrieved successfully', type: ActivityLogsResponseDto })
   @Get(':id/activity-logs')
   async getBoardActivityLogs(
     @Param('id', ParseIntPipe) id: number,

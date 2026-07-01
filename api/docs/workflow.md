@@ -19,7 +19,7 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 
 ### 1.4 Luồng Đăng nhập Google
 1. **Điều hướng**: Từ `/login`, bấm nút Google -> Redirect Location sang `GET /api/auth/google`.
-2. **Callback**: Google trả về backend -> Backend redirect ngược về Frontend (`/oauth-success`) kèm Access Token.
+2. **Callback**: Google trả về backend -> Backend redirect ngược về Frontend (`/auth/oauth-success`) kèm Access Token trong URL parameter (`?access_token=...`).
 
 ## 2. Luồng Quản lý Người dùng (Users Flow)
 
@@ -67,8 +67,12 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 1. **Mở Đơn (`/applications/:id`)**: Thành viên Ban biên tập xem đơn và tài liệu.
 2. **Bỏ phiếu**: Bấm Chấp thuận / Từ chối / Trắng án -> Gọi `POST /api/applications/:id/votes`. (Cho phép bấm lại để đổi phiếu - Upsert).
 
-### 6.2 Quyết định cuối cùng (Finalize)
-1. **Chốt sổ**: Trưởng ban (Lead) xem thống kê vote, ra quyết định cuối. Bấm Duyệt/Trượt -> Gọi `PATCH /api/applications/:id/status`. Đơn chuyển trạng thái và bị khóa.
+### 6.2 Quyết định cuối cùng (Finalize) & Luồng Phê duyệt 2 Bước
+1. **Đối với Đơn thường (Publish Request, v.v.)**: Trưởng ban (Lead) hoặc Board Owner ra quyết định cuối bằng cách gọi `PATCH /api/applications/:id/status`.
+2. **Đối với Đơn tạo thư mục (`CREATE_ARC`, `CREATE_CHAPTER`)**: Áp dụng luồng phê duyệt 2 bước nghiêm ngặt:
+   - **Bước 1 (Duyệt cấp Dự án)**: Người có quyền duyệt trong dự án (`project:owner` hoặc `project:application.approve`) duyệt đơn từ `PENDING` -> `INTERNAL_APPROVED` (hoặc `REJECT`). Đơn ở trạng thái này mới được đẩy lên Ban biên tập (Editor Board).
+   - **Bước 2 (Duyệt cấp Ban biên tập)**: Trưởng ban (`board:leader` hoặc `board:owner`) duyệt từ `INTERNAL_APPROVED` -> `APPROVE` (hoặc `REJECT`).
+   - **Tự động hóa sau phê duyệt**: Khi đơn đạt trạng thái `APPROVE`, hệ thống sẽ tự động tạo thư mục gốc (`ARC`) hoặc thư mục con (`Chapter`) tương ứng, đồng thời tự động tạo 1 File và 1 FileMaterial đầu tiên chứa bản thảo đính kèm từ đơn.
 
 ## 7. Luồng Công việc (Tasks Flow)
 
@@ -80,8 +84,14 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 ## 8. Luồng Thư mục & Tập tin (Folders & Files Flow)
 
 ### 8.1 Cây thư mục (Folder Tree)
-1. **Xem cây thư mục**: Vào chi tiết dự án, gọi `GET /api/projects/:id/folders`. Hiển thị dưới dạng cây (nested hoặc theo `parentId`).
-2. **Tạo thư mục**: Chọn thư mục cha (hoặc thư mục gốc), gọi `POST /api/projects/:id/folders` kèm `parentId`.
+1. **Quy tắc phân loại**:
+   - **ARC (Thư mục gốc)**: Là thư mục không có thư mục cha (`parentId: null`). Có thể chứa Chapter hoặc File.
+   - **Chapter (Thư mục con)**: Là thư mục có thư mục cha (`parentId != null`). Chỉ được phép chứa File, không được chứa thư mục con (chiều sâu tối đa 2 cấp).
+2. **Xem cây thư mục**: Vào chi tiết dự án, gọi `GET /api/projects/:id/folders`.
+   - Có thể truyền query `type=ARC` để lấy danh sách các thư mục gốc, hoặc `type=CHAPTER` để lấy danh sách thư mục con.
+   - Hoặc truyền `parentId` để lấy trực tiếp các Chapter của một ARC.
+3. **Tạo thư mục**: Không cho phép tạo trực tiếp thông qua API. Để tạo thư mục (ARC hoặc Chapter), người dùng bắt buộc phải tạo Đơn duyệt (Application) loại `CREATE_ARC` hoặc `CREATE_CHAPTER` đính kèm bản thảo (materials) tương ứng thông qua API tạo đơn của dự án. Hệ thống sẽ tự động tạo thư mục sau khi đơn được duyệt qua 2 cấp (Dự án và Ban biên tập).
+   - **Ràng buộc khi tạo Đơn**: Khi tạo đơn `CREATE_CHAPTER`, bắt buộc phải truyền `parentFolderId` hợp lệ (thuộc về một ARC - thư mục cha có `parentId` bằng null) để đảm bảo chiều sâu tối đa không vượt quá 2 cấp.
 
 ### 8.2 Quản lý File & Material (Phiên bản)
 1. **Tải lên File/Material (Upload)**: Khi người dùng muốn cập nhật/thêm bản vẽ mới cho File, Frontend cần khởi tạo một đối tượng `FormData`, dùng `formData.append('file', fileObject)` để đính kèm file vật lý, sau đó gọi `POST /api/files/:id/materials` (sử dụng Content-Type `multipart/form-data`).
@@ -105,9 +115,39 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 ### 11.1 Thống kê Dự án
 1. **Xem tiến độ**: Gọi `GET /api/projects/:id/stats` để vẽ các biểu đồ tiến độ, số task hoàn thành, số đơn từ.
 
+## 12. Luồng Lịch sử Hoạt động (Activity Logs Flow)
+
+### 12.1 Theo dõi hoạt động
+1. **Xem hoạt động**: Hiển thị dòng thời gian (timeline) các hành động của user (tạo/xóa file, comment, tạo task, v.v.). Gọi `GET /api/activity-logs` (hoặc API tương ứng của từng module như `GET /api/projects/:id/activity-logs`).
+2. **Phản hồi**: Trả về danh sách được phân trang. Frontend render giao diện Feed.
+
+## 13. Luồng Thông báo (Notifications Flow)
+
+### 13.1 Nhận và đọc thông báo
+1. **Lấy thông báo**: Lấy danh sách các thông báo của user hiện tại qua `GET /api/notifications`.
+2. **Đánh dấu đã đọc**: User bấm vào 1 thông báo -> Gọi `PATCH /api/notifications/:id/read`. Bấm "Đọc tất cả" -> Gọi `PATCH /api/notifications/read-all`.
+3. **Hiển thị**: Nếu API trả về thành công, cập nhật trạng thái UI (mất dấu chấm đỏ chưa đọc).
+
 ---
 
 # API Endpoints Workflow
+
+
+## Activity Logs
+
+### Get my activity logs with pagination 
+**GET** `/api/activity-logs`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `page` | `query` | `No` | `number` |  |
+| `limit` | `query` | `No` | `number` |  |
+
+#### Responses
+- **200**: Return paginated activity logs
+
+---
 
 ## App
 
@@ -544,6 +584,38 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 
 #### Responses
 - **200**: Role permissions replaced successfully
+
+---
+
+
+## Notifications
+
+### Get current user notifications 
+**GET** `/api/notifications`
+
+#### Responses
+- **200**: Return list of notifications
+
+---
+
+### Mark a notification as read 
+**PATCH** `/api/notifications/{id}/read`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Notification ID |
+
+#### Responses
+- **200**: Return updated notification
+
+---
+
+### Mark all notifications as read 
+**PATCH** `/api/notifications/read-all`
+
+#### Responses
+- **200**: Return success status
 
 ---
 
@@ -998,7 +1070,8 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 | `title` | `string` | `Yes` |  |
 | `description` | `string` | `No` |  |
 | `materials` | `object` | `Yes` |  |
-| `type` | `string` | `Yes` |  |
+| `type` | `string` | `Yes` | `PUBLISH_REQUEST`, `MANUSCRIPT_REVIEW`, `CREATE_ARC`, `CREATE_CHAPTER` |
+| `parentFolderId` | `number` | `No` | Required for `CREATE_CHAPTER` type. Must be ID of an ARC (parentless folder) |
 
 #### Responses
 - **201**: Project application created successfully
@@ -1037,6 +1110,10 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 
 ---
 
+---
+
+---
+
 ### Create project folder 
 **POST** `/api/projects/{id}/folders`
 
@@ -1045,21 +1122,21 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 |------|----|----------|------|-------------|
 | `id` | `path` | `Yes` | `number` | Project id |
 
-#### Request Body
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `title` | `string` | `Yes` |  |
-| `description` | `string` | `No` |  |
-| `parentId` | `number` | `No` |  |
+#### Responses
+- **201**: Folder created successfully
+
+---
+
+### Get project activity logs 
+**GET** `/api/projects/{id}/activity-logs`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Project id |
 
 #### Responses
-- **201**: Project folder created successfully
-  
-  **Response Schema:**
-  | Field | Type | Description |
-  |-------|------|-------------|
-  | `data` | `string` |  |
-
+- **200**: Activity logs retrieved successfully
 
 ---
 
@@ -1371,6 +1448,21 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 
 ---
 
+---
+
+### Get editor board activity logs 
+**GET** `/api/editor-boards/{id}/activity-logs`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Editor board id |
+
+#### Responses
+- **200**: Activity logs retrieved successfully
+
+---
+
 ### Get editor board applications 
 **GET** `/api/editor-boards/{id}/applications`
 
@@ -1599,6 +1691,49 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 
 ---
 
+---
+
+### Add a material item to application 
+**POST** `/api/applications/{id}/materials/add`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Application id |
+
+#### Responses
+- **200**: Application updated successfully
+
+---
+
+### Update a material item in application 
+**PATCH** `/api/applications/{id}/materials/{index}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Application id |
+| `index` | `path` | `Yes` | `number` | Index |
+
+#### Responses
+- **200**: Application updated successfully
+
+---
+
+### Delete a material item from application 
+**DELETE** `/api/applications/{id}/materials/{index}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Application id |
+| `index` | `path` | `Yes` | `number` | Index |
+
+#### Responses
+- **200**: Application updated successfully
+
+---
+
 ## Folders
 
 ### Get folder details 
@@ -1708,6 +1843,21 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 
 ---
 
+---
+
+### Create child folder 
+**POST** `/api/folders/{id}/children`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Folder id |
+
+#### Responses
+- **201**: Child folder created successfully
+
+---
+
 ### Get folder children 
 **GET** `/api/folders/{id}/children`
 
@@ -1732,29 +1882,6 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 
 
 ---
-
-### Create child folder 
-**POST** `/api/folders/{id}/children`
-
-#### Parameters
-| Name | In | Required | Type | Description |
-|------|----|----------|------|-------------|
-| `id` | `path` | `Yes` | `number` | Folder id |
-
-#### Request Body
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `title` | `string` | `Yes` |  |
-| `description` | `string` | `No` |  |
-
-#### Responses
-- **201**: Child folder created successfully
-  
-  **Response Schema:**
-  | Field | Type | Description |
-  |-------|------|-------------|
-  | `data` | `string` |  |
-
 
 ---
 
@@ -1988,6 +2115,21 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 
 ---
 
+---
+
+### Get file activity logs 
+**GET** `/api/files/{id}/activity-logs`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | File id |
+
+#### Responses
+- **200**: Activity logs retrieved successfully
+
+---
+
 ## Materials
 
 ### Get material details 
@@ -2062,6 +2204,75 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
   |-------|------|-------------|
   | `data` | `string` |  |
 
+
+---
+
+---
+
+### Add files to an existing material version 
+**POST** `/api/materials/{id}/add`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Material id |
+
+#### Responses
+- **201**: Material updated successfully
+
+---
+
+### Delete a file item from a material 
+**DELETE** `/api/materials/{id}/delete/{index}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Material id |
+| `index` | `path` | `Yes` | `number` | Index |
+
+#### Responses
+- **200**: Material updated successfully
+
+---
+
+### Set a file item as thumbnail 
+**PATCH** `/api/materials/{id}/thumbnail/{index}`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Material id |
+| `index` | `path` | `Yes` | `number` | Index |
+
+#### Responses
+- **200**: Material updated successfully
+
+---
+
+### Get material frames 
+**GET** `/api/materials/{id}/frames`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Material id |
+
+#### Responses
+- **200**: Material frames retrieved successfully
+
+---
+
+### Create frame for material 
+**POST** `/api/materials/{id}/frames`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Material id |
+
+#### Responses
+- **201**: Frame created successfully
 
 ---
 
@@ -2157,6 +2368,8 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
   |-------|------|-------------|
   | `data` | `string` |  |
 
+#### Ràng buộc
+- Yêu cầu xác thực JWT. Người dùng phải có quyền `project:owner`.
 
 ---
 
@@ -2186,6 +2399,8 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
   |-------|------|-------------|
   | `data` | `string` |  |
 
+#### Ràng buộc
+- Yêu cầu xác thực JWT. Người dùng phải có quyền `project:owner`.
 
 ---
 
@@ -2199,6 +2414,9 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 
 #### Responses
 - **200**: Task deleted successfully
+
+#### Ràng buộc
+- Yêu cầu xác thực JWT. Người dùng phải có quyền `project:owner`.
 
 ---
 
@@ -2276,6 +2494,21 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
   |-------|------|-------------|
   | `data` | `string` |  |
 
+
+---
+
+---
+
+### Get task materials for select 
+**GET** `/api/tasks/{id}/materials`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Task id |
+
+#### Responses
+- **200**: Task materials for select retrieved successfully
 
 ---
 
@@ -2491,30 +2724,37 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 
 ### 1. Chi tiết các Endpoints
 
-#### Get activity logs with pagination and filters
+#### 1. Lấy hoạt động cá nhân (Personal Activity Logs)
 - **URL**: `GET /api/activity-logs`
-- **Chức năng**: Lấy danh sách lịch sử hoạt động (Activity Logs). Hỗ trợ phân trang và lọc theo dự án, bảng biên tập hoặc tài khoản thực hiện.
+- **Chức năng**: Lấy danh sách lịch sử hoạt động của người dùng đang đăng nhập.
 - **Input**:
   - `page` (Query, optional): Trang hiện tại (Mặc định: 1).
   - `limit` (Query, optional): Số lượng item trên một trang (Mặc định: 20).
-  - `projectId` (Query, optional): Lọc theo ID dự án.
-  - `editorBoardId` (Query, optional): Lọc theo ID bảng biên tập.
-  - `actorId` (Query, optional): Lọc theo ID người thực hiện.
 - **Output**: JSON `200 OK`.
-  ```json
-  {
-    "data": [...],
-    "meta": { "total": 100, "page": 1, "limit": 20, "totalPages": 5 }
-  }
-  ```
-- **Ràng buộc**: Yêu cầu xác thực JWT. Người dùng phải có một trong các quyền `['project:read', 'board:leader', 'board:member', 'board:owner']`.
+- **Ràng buộc**: Yêu cầu xác thực JWT. Bất kỳ user nào đăng nhập đều gọi được.
+
+#### 2. Lấy hoạt động của Dự án (Project Activity Logs)
+- **URL**: `GET /api/projects/:id/activity-logs`
+- **Chức năng**: Lấy lịch sử hoạt động của một dự án cụ thể.
+- **Input**: `id` (Param) - ID dự án. `page`, `limit` (Query).
+- **Output**: JSON `200 OK`.
+- **Ràng buộc**: Yêu cầu xác thực JWT. Người dùng phải có quyền `project:read` hoặc `project:owner`.
+
+#### 3. Lấy hoạt động của Ban biên tập (Editor Board Activity Logs)
+- **URL**: `GET /api/editor-boards/:id/activity-logs`
+- **Chức năng**: Lấy lịch sử hoạt động của một bảng biên tập cụ thể.
+- **Input**: `id` (Param) - ID bảng biên tập. `page`, `limit` (Query).
+- **Output**: JSON `200 OK`.
+- **Ràng buộc**: Yêu cầu xác thực JWT. Người dùng phải có quyền `board:leader`, `board:member`, hoặc `board:owner`.
 
 ### 2. Frontend Flow (Luồng phối hợp các Màn hình)
 
 - **Trang hiện tại**: Màn hình Chi tiết Dự án (Project Details) hoặc Chi tiết Bảng (Board Details) - Tab "Lịch sử hoạt động" (Activity).
 - **Hành động của người dùng**:
-  1. Khi mở tab Activity, Frontend gọi `GET /api/activity-logs?projectId=X` (hoặc `editorBoardId=Y`) để tải danh sách các hoạt động gần nhất.
-  2. Khi scroll xuống cuối danh sách, Frontend gọi tiếp API với `page` tăng lên để load more.
+  1. Khi mở tab Activity trong Dự án, Frontend gọi `GET /api/projects/:id/activity-logs`.
+  2. Khi mở tab Activity trong Ban biên tập, Frontend gọi `GET /api/editor-boards/:id/activity-logs`.
+  3. Khi xem hoạt động cá nhân ở trang Profile, Frontend gọi `GET /api/activity-logs`.
+  4. Khi scroll xuống cuối danh sách, Frontend gọi tiếp API với `page` tăng lên để load more.
 - **Phản hồi của Frontend**:
   - `Thành công (✅)`: Render danh sách dạng Timeline hiển thị nội dung `Ai (actor)` đã làm `hành động gì (action)` vào `lúc nào (createdAt)`.
   - Để cập nhật thời gian thực, Frontend cần `socket.emit('project:subscribe', { projectId: X })` khi vào trang, và lắng nghe `socket.on('activity:new')`. Khi nhận sự kiện này, prepend (thêm vào đầu) activity mới vào danh sách hiện tại. Khi rời trang, gọi `socket.emit('project:unsubscribe')`.

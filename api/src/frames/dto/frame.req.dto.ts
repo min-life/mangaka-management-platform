@@ -32,4 +32,9 @@ export class CreateCommentReqDto {
   @ApiProperty({ example: { text: 'Review this area' } })
   @IsNotEmpty()
   content!: unknown;
+
+  @ApiPropertyOptional({ example: [1, 2], type: [Number] })
+  @IsOptional()
+  @IsNumber({}, { each: true })
+  mentionedUserIds?: number[];
 }

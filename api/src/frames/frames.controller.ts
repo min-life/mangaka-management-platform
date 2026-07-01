@@ -37,7 +37,7 @@ export class FramesController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:read', 'board:leader'],
+    permissions: ['project:read', 'project:owner'],
     resource: 'FRAME',
   })
   @ApiOperation({ summary: 'Get frame details' })
@@ -56,7 +56,7 @@ export class FramesController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:frame.update', 'board:leader'],
+    permissions: ['project:frame.update', 'project:owner'],
     resource: 'FRAME',
   })
   @ApiOperation({ summary: 'Update frame' })
@@ -79,7 +79,7 @@ export class FramesController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:frame.delete', 'board:leader'],
+    permissions: ['project:frame.delete', 'project:owner'],
     resource: 'FRAME',
   })
   @ApiOperation({ summary: 'Delete frame' })
@@ -92,7 +92,7 @@ export class FramesController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:read', 'board:leader'],
+    permissions: ['project:read', 'project:owner'],
     resource: 'FRAME',
   })
   @ApiOperation({ summary: 'Get frame comments' })
@@ -119,7 +119,7 @@ export class FramesController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:comment.create', 'board:leader'],
+    permissions: ['project:comment.create', 'project:owner'],
     resource: 'FRAME',
   })
   @ApiOperation({ summary: 'Create comment for frame' })

@@ -102,6 +102,9 @@ export class SimpleProjectFolderResDto {
 
   @ApiPropertyOptional({ example: 'Initial rough sketches.', nullable: true })
   description?: string | null;
+
+  @ApiPropertyOptional({ example: 'https://example.com/image.png', nullable: true })
+  imageUrl?: string | null;
 }
 
 export class RoleResDto {
@@ -185,6 +188,9 @@ export class ProjectApplicationResDto {
   @ApiProperty({ enum: APPLICATION_STATUS, example: APPLICATION_STATUS.PENDING })
   status!: APPLICATION_STATUS;
 
+  @ApiPropertyOptional({ example: 1, description: 'Parent folder ID for CREATE_CHAPTER type', nullable: true })
+  parentFolderId?: number | null;
+
   @ApiPropertyOptional({ type: UserResDto, nullable: true })
   verifiedByUser?: UserResDto | null;
 
@@ -210,6 +216,9 @@ export class ProjectFolderResDto {
 
   @ApiPropertyOptional({ example: 'Initial rough sketches.', nullable: true })
   description?: string | null;
+
+  @ApiPropertyOptional({ example: 'https://example.com/image.png', nullable: true })
+  imageUrl?: string | null;
 
   @ApiPropertyOptional({ type: () => SimpleProjectFolderResDto, nullable: true })
   parent?: SimpleProjectFolderResDto | null;

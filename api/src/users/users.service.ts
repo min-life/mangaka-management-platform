@@ -714,10 +714,10 @@ export class UsersService {
   private async getFramePermission(userId: number, frameId: number): Promise<Permission[]> {
     let permissions = [] as Permission[];
     // Get projectId from frameId
-    const frame = await this.prisma.taskCommentFrame.findUnique({
+    const frame = await this.prisma.materialCommentFrame.findUnique({
       where: { id: frameId },
       select: {
-        task: { select: { file: { select: { folder: { select: { projectId: true } } } } } },
+        material: { select: { file: { select: { folder: { select: { projectId: true } } } } } },
       },
     });
     if (!frame) {
@@ -726,18 +726,18 @@ export class UsersService {
 
     // Check if user is a project member
     // If not, throw 403 error
-    const isMember = await this.isProjectMember(userId, frame.task.file.folder.projectId);
+    const isMember = await this.isProjectMember(userId, frame.material.file.folder.projectId);
     if (!isMember) {
       throw new ForbiddenException();
     }
 
     // If yes, get permission
     permissions = permissions.concat(
-      await this.getProjectOwnerPermission(userId, frame.task.file.folder.projectId),
+      await this.getProjectOwnerPermission(userId, frame.material.file.folder.projectId),
     );
     if (permissions.length === 0) {
       permissions = permissions.concat(
-        await this.getProjectMemberPermission(userId, frame.task.file.folder.projectId),
+        await this.getProjectMemberPermission(userId, frame.material.file.folder.projectId),
       );
     }
 
@@ -754,7 +754,7 @@ export class UsersService {
         task: { select: { file: { select: { folder: { select: { projectId: true } } } } } },
         frame: {
           select: {
-            task: { select: { file: { select: { folder: { select: { projectId: true } } } } } },
+            material: { select: { file: { select: { folder: { select: { projectId: true } } } } } },
           },
         },
         application: { select: { projectId: true } },
@@ -767,7 +767,7 @@ export class UsersService {
     const projectId =
       comment.file?.folder.projectId ||
       comment.task?.file.folder.projectId ||
-      comment.frame?.task.file.folder.projectId ||
+      comment.frame?.material.file.folder.projectId ||
       comment.application?.projectId;
 
     if (!projectId) {

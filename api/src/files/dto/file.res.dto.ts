@@ -65,6 +65,7 @@ export class MaterialResDto {
         originalName: 'image.png',
         size: 1024,
         mimeType: 'image/png',
+        type: 'IMAGE',
         width: 1920,
         height: 1080,
         ratio: 1.77,

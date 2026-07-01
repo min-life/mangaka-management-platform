@@ -40,4 +40,10 @@ export class QueryProjectFoldersReqDto {
   @IsInt()
   @Min(1)
   limit?: number;
+
+  @ApiPropertyOptional({ enum: ['ARC', 'CHAPTER'] })
+  @IsOptional()
+  @IsString()
+  @IsIn(['ARC', 'CHAPTER'])
+  type?: 'ARC' | 'CHAPTER';
 }

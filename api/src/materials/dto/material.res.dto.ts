@@ -1,6 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UserResDto } from '../../share/dto';
 
+export class SimpleMaterialResDto {
+  @ApiProperty({ example: 1 })
+  id!: number;
+
+  @ApiProperty({ example: 5 })
+  fileId!: number;
+}
+
 export class MaterialResDto {
   @ApiProperty({ example: 1 })
   id!: number;
@@ -9,7 +17,28 @@ export class MaterialResDto {
   fileId!: number;
 
   @ApiProperty({
-    example: { layers: ['background', 'characters'], colors: ['#FF0000', '#00FF00'] },
+    example: [
+      {
+        url: 'https://...',
+        downloadUrl: 'https://...',
+        originalName: 'image.png',
+        size: 1024,
+        mimeType: 'image/png',
+        type: 'IMAGE',
+        width: 1920,
+        height: 1080,
+        ratio: 1.77,
+        isThumbnail: true,
+      },
+      {
+        url: 'https://...',
+        downloadUrl: 'https://...',
+        originalName: 'document.pdf',
+        size: 2048,
+        mimeType: 'application/pdf',
+        type: 'TEXT',
+      }
+    ]
   })
   materials!: unknown;
 

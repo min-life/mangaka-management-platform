@@ -13,6 +13,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
 import { AwsS3Service } from '../share/services/aws-s3.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import sizeOf from 'image-size';
 
 const USER_SELECT = {
@@ -39,6 +40,7 @@ const FILE_SELECT = {
       id: true,
       title: true,
       description: true,
+      imageUrl: true,
       project: {
         select: PROJECT_BASIC_SELECT,
       },
@@ -102,6 +104,7 @@ export class FilesService {
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
     private readonly awsS3Service: AwsS3Service,
+    private readonly realtimeGateway: RealtimeGateway,
   ) {}
 
   async getFileById(id: number) {
@@ -201,35 +204,49 @@ export class FilesService {
     }
   }
 
-  async getFileMaterials(fileId: number) {
+  async getFileMaterials(fileId: number, pagination?: Pagination) {
     try {
       await this.ensureFile(fileId);
 
-      const material = await this.prisma.fileMaterial.findFirst({
-        where: { fileId },
-        orderBy: { createdAt: 'desc' },
-        select: MATERIAL_SELECT,
-      });
+      const where: Prisma.FileMaterialWhereInput = { fileId };
+      const { page, limit, skip } = this.buildPagination(pagination);
 
-      if (material) {
-        const materialsData = material.materials as any[];
-        if (Array.isArray(materialsData)) {
-          await Promise.all(
-            materialsData.map(async (materialData) => {
-              if (materialData?.url) {
-                const [url, downloadUrl] = await Promise.all([
-                  this.awsS3Service.getPresignedUrl(materialData.url),
-                  this.awsS3Service.getPresignedUrl(materialData.url, 3600, materialData.originalName),
-                ]);
-                materialData.url = url;
-                materialData.downloadUrl = downloadUrl;
-              }
-            })
-          );
-        }
-      }
+      const [total, materials] = await this.prisma.$transaction([
+        this.prisma.fileMaterial.count({ where }),
+        this.prisma.fileMaterial.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit,
+          select: MATERIAL_SELECT,
+        }),
+      ]);
 
-      return material;
+      const signedMaterials = await Promise.all(
+        materials.map(async (material) => {
+          const materialsData = material.materials as any[];
+          if (Array.isArray(materialsData)) {
+            await Promise.all(
+              materialsData.map(async (materialData) => {
+                if (materialData?.url) {
+                  const [url, downloadUrl] = await Promise.all([
+                    this.awsS3Service.getPresignedUrl(materialData.url),
+                    this.awsS3Service.getPresignedUrl(materialData.url, 3600, materialData.originalName),
+                  ]);
+                  materialData.url = url;
+                  materialData.downloadUrl = downloadUrl;
+                }
+              })
+            );
+          }
+          return material;
+        }),
+      );
+
+      return {
+        data: signedMaterials,
+        pagination: this.buildPaginationMeta(total, page, limit),
+      };
     } catch (error) {
       this.handleError(error, 'Get file materials fail', ERROR.SVGETFILEMATERIALS);
     }
@@ -238,16 +255,27 @@ export class FilesService {
   async createMaterial(
     fileId: number,
     data: {
-      files: Array<Express.Multer.File>;
+      taskId?: number;
+      name?: string;
+      files: {
+        image?: Express.Multer.File[];
+        text?: Express.Multer.File[];
+        source?: Express.Multer.File[];
+      };
       userId: number;
     },
   ) {
     try {
       await this.ensureFile(fileId);
 
-      let hasThumbnail = false;
+      const allFiles = [
+        ...(data.files.image?.map(f => ({ file: f, type: 'IMAGE' })) || []),
+        ...(data.files.text?.map(f => ({ file: f, type: 'TEXT' })) || []),
+        ...(data.files.source?.map(f => ({ file: f, type: 'SOURCE' })) || [])
+      ];
+
       const materialsData = await Promise.all(
-        data.files.map(async (file) => {
+        allFiles.map(async ({ file, type }) => {
           // Upload file to S3
           const ext = file.originalname.split('.').pop();
           const key = `materials/${fileId}/${randomUUID()}.${ext}`;
@@ -258,40 +286,55 @@ export class FilesService {
             originalName: file.originalname,
             size: file.size,
             mimeType: file.mimetype,
+            type
           };
 
-          // Try to extract dimensions
-          try {
-            const dimensions = sizeOf(file.buffer);
-            if (dimensions && dimensions.width && dimensions.height) {
-              materialObj.width = dimensions.width;
-              materialObj.height = dimensions.height;
-              materialObj.ratio = Number((dimensions.width / dimensions.height).toFixed(3));
-              
-              if (!hasThumbnail) {
+          // Try to extract dimensions for IMAGE
+          if (type === 'IMAGE') {
+            try {
+              const dimensions = sizeOf(file.buffer);
+              if (dimensions && dimensions.width && dimensions.height) {
+                materialObj.width = dimensions.width;
+                materialObj.height = dimensions.height;
+                materialObj.ratio = Number((dimensions.width / dimensions.height).toFixed(3));
                 materialObj.isThumbnail = true;
-                hasThumbnail = true;
-              } else {
-                materialObj.isThumbnail = false;
               }
+            } catch (e) {
+              // Not an image or unsupported format, ignore dimensions
             }
-          } catch (e) {
-            // Not an image or unsupported format, ignore dimensions
           }
 
           return materialObj;
         })
       );
 
-      return await this.prisma.fileMaterial.create({
+      const material = await this.prisma.fileMaterial.create({
         data: {
           materials: materialsData as Prisma.InputJsonArray,
           fileId,
+          taskId: data.taskId ? Number(data.taskId) : null,
+          name: data.name || null,
           createdBy: data.userId,
           updatedBy: data.userId,
         },
         select: MATERIAL_SELECT,
       });
+
+      const fileWithFolder = await this.prisma.file.findUnique({
+        where: { id: fileId },
+        include: { folder: true },
+      });
+
+      this.eventEmitter.emit(ACTIVITY_EVENT_NAME, {
+        action: ACTIVITY_ACTION.MATERIAL_UPLOADED,
+        entityType: ENTITY_TYPE.MATERIAL,
+        entityId: material.id,
+        projectId: fileWithFolder?.folder?.projectId ?? null,
+        fileId: fileId,
+        actorId: data.userId,
+      } satisfies ActivityEventPayload);
+
+      return material;
     } catch (error) {
       this.handleError(error, 'Create material fail', ERROR.SVCREATEMATERIAL);
     }
@@ -379,6 +422,7 @@ export class FilesService {
         entityType: ENTITY_TYPE.TASK,
         entityId: task.id,
         projectId: fileWithFolder?.folder?.projectId ?? null,
+        fileId: fileId,
         actorId: data.userId,
         metadata: { title: task.title, assignedBy: task.assignedByUser?.id ?? null },
       } satisfies ActivityEventPayload);
@@ -437,12 +481,13 @@ export class FilesService {
     data: {
       content: unknown;
       userId: number;
+      mentionedUserIds?: number[];
     },
   ) {
     try {
       await this.ensureFile(fileId);
 
-      return await this.prisma.comment.create({
+      const comment = await this.prisma.comment.create({
         data: {
           content: data.content as Prisma.InputJsonValue,
           fileId,
@@ -459,6 +504,25 @@ export class FilesService {
           updatedAt: true,
         },
       });
+
+      const fileWithFolder = await this.prisma.file.findUnique({
+        where: { id: fileId },
+        include: { folder: true },
+      });
+
+      this.eventEmitter.emit(ACTIVITY_EVENT_NAME, {
+        action: ACTIVITY_ACTION.COMMENT_CREATED,
+        entityType: ENTITY_TYPE.COMMENT,
+        entityId: comment.id,
+        projectId: fileWithFolder?.folder?.projectId ?? null,
+        fileId: fileId,
+        actorId: data.userId,
+        metadata: { creatorId: fileWithFolder?.createdBy ?? null, mentionedUserIds: data.mentionedUserIds }
+      } satisfies ActivityEventPayload);
+
+      this.realtimeGateway.broadcastComment('FILE', fileId, 'comment:new', comment);
+
+      return comment;
     } catch (error) {
       this.handleError(error, 'Create comment fail', ERROR.SVCREATECOMMENT);
     }
