@@ -1,7 +1,7 @@
 import { Geist } from 'next/font/google';
 import './globals.css';
 import { cn } from '@/lib/utils';
-import './globals.css';
+import { LanguageProvider } from '@/contexts/language-context';
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 
@@ -12,7 +12,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={cn('font-sans', geist.variable)}>
-      <body>{children}</body>
+      <body>
+        <LanguageProvider>{children}</LanguageProvider>
+      </body>
     </html>
   );
 }

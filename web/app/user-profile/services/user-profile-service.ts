@@ -1,5 +1,6 @@
 import api from '@/lib/api';
 import { compressImageFile } from '@/lib/image-upload';
+import { getActivityLogs, type ActivityLogResponse } from '@/services/activity-log.service';
 
 export type Scope = 'SYS' | 'PRJ' | string;
 export type ProgressStatus = 'PENDING' | 'INPROGRESS' | 'REVIEW' | 'DONE';
@@ -41,7 +42,6 @@ export type UserProject = {
     projectId: number;
     metrics: {
       progress: number;
-      statusLabel: 'On Track' | 'Revision' | 'Blocked';
     };
     updatedAt: string;
   }>;
@@ -114,13 +114,9 @@ function normalizeProfile(user: ApiUserProfile): UserProfile {
 
 function normalizeProject(project: ApiUserProject): UserProject {
   const apiMetrics = project.projectStats?.[0]?.metrics as
-    | { progress?: unknown; statusLabel?: unknown }
+    | { progress?: unknown }
     | undefined;
   const progress = typeof apiMetrics?.progress === 'number' ? apiMetrics.progress : 0;
-  const statusLabel =
-    apiMetrics?.statusLabel === 'Revision' || apiMetrics?.statusLabel === 'Blocked'
-      ? apiMetrics.statusLabel
-      : 'On Track';
 
   return {
     ...project,
@@ -129,7 +125,6 @@ function normalizeProject(project: ApiUserProject): UserProject {
         id: project.projectStats?.[0]?.id ?? project.id,
         metrics: {
           progress,
-          statusLabel,
         },
         projectId: project.id,
         updatedAt: project.projectStats?.[0]?.updatedAt ?? project.updatedAt,
@@ -164,8 +159,94 @@ export async function getCurrentUserEditorBoards(userId?: number) {
   return unwrapData<UserEditorBoard[]>(response);
 }
 
-export async function getCurrentUserActivities(): Promise<UserActivity[]> {
-  return [];
+function formatActionTitle(action: string) {
+  return action
+    .toLowerCase()
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function formatTimeLabel(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat('en', {
+    hour: '2-digit',
+    minute: '2-digit',
+    month: 'short',
+    day: '2-digit',
+  }).format(date);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function getMetadataLabel(metadata: unknown, keys: string[]) {
+  if (!isRecord(metadata)) {
+    return null;
+  }
+
+  for (const key of keys) {
+    const value = metadata[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+export function mapActivityLogToUserActivity(
+  activity: ActivityLogResponse,
+  options?: {
+    editorBoards?: UserEditorBoard[];
+  },
+): UserActivity {
+  const title = formatActionTitle(activity.action);
+  const boardId =
+    activity.editorBoardId ??
+    (activity.entityType === 'EDITOR_BOARD' ? activity.entityId : null);
+  const editorBoardName =
+    getMetadataLabel(activity.metadata, ['editorBoardName']) ??
+    options?.editorBoards?.find((board) => board.id === boardId)?.name ??
+    null;
+  const projectName =
+    getMetadataLabel(activity.metadata, ['projectName', 'fileName', 'folderName']) ??
+    editorBoardName ??
+    (activity.projectId
+      ? `Project #${activity.projectId}`
+      : boardId
+        ? `Editor Board #${boardId}`
+        : activity.entityType);
+  const actorName =
+    activity.actor?.displayName ?? activity.actor?.email ?? `User #${activity.actorId}`;
+  const entityName =
+    activity.entityType === 'EDITOR_BOARD' && editorBoardName
+      ? `editor board "${editorBoardName}"`
+      : `${activity.entityType.toLowerCase().replaceAll('_', ' ')} #${activity.entityId}`;
+
+  return {
+    id: activity.id,
+    title,
+    description: `${actorName} performed ${title.toLowerCase()} on ${entityName}.`,
+    status: 'DONE',
+    projectName,
+    createdAt: activity.createdAt,
+    updatedAt: activity.createdAt,
+    timeLabel: formatTimeLabel(activity.createdAt),
+  };
+}
+
+export async function getCurrentUserActivities(editorBoards?: UserEditorBoard[]): Promise<UserActivity[]> {
+  const result = await getActivityLogs({ limit: 3, page: 1 });
+  return result.activities.map((activity) =>
+    mapActivityLogToUserActivity(activity, { editorBoards }),
+  );
 }
 
 export async function updateCurrentUserProfile(payload: UpdateProfilePayload) {

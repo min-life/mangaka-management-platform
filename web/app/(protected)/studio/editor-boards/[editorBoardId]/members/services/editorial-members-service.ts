@@ -10,8 +10,6 @@ import { getActivityLogs, type ActivityLogResponse } from '@/services/activity-l
 import { getProjectMembers } from '@/services/project.service';
 import { getUsers, type UserResponse } from '@/services/user.service';
 
-import { memberActivities, members } from '../const/members';
-
 export type MemberStatus = 'AVAILABLE' | 'BUSY' | 'OFFLINE';
 
 export type EditorialMember = {
@@ -51,32 +49,14 @@ export type EditorialMembersSummary = {
   totalMembers: number;
 };
 
-const MOCK_DELAY = 160;
-
-function clone<T>(value: T): T {
-  return structuredClone(value);
-}
-
-async function wait() {
-  await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
-}
-
-function getStatus(memberId: number): MemberStatus {
-  if (memberId % 5 === 0) {
-    return 'OFFLINE';
-  }
-
-  return memberId % 2 === 0 ? 'BUSY' : 'AVAILABLE';
-}
-
 type MemberWorkload = {
   activeProjects: number;
   reviewLoad: number;
 };
 
-function getStatusFromWorkload(workload: MemberWorkload | undefined, fallbackMemberId: number): MemberStatus {
+function getStatusFromWorkload(workload: MemberWorkload | undefined): MemberStatus {
   if (!workload) {
-    return getStatus(fallbackMemberId);
+    return 'OFFLINE';
   }
 
   if (workload.reviewLoad === 0) {
@@ -95,7 +75,7 @@ function mapBoardMember(
   const numericBoardId = Number(editorBoardId);
 
   return {
-    activeProjects: workload?.activeProjects ?? (member.isLead ? 8 : 3 + (member.id % 4)),
+    activeProjects: workload?.activeProjects ?? 0,
     avatarUrl: member.avatarUrl ?? null,
     displayName: member.displayName ?? memberName,
     email: member.email ?? `${member.id}@inkly.local`,
@@ -104,9 +84,9 @@ function mapBoardMember(
     joinedAt: member.createdAt,
     lastActiveAt: member.updatedAt,
     region: member.isLead ? 'Editorial Lead Desk' : 'Editorial Desk',
-    reviewLoad: workload?.reviewLoad ?? (member.isLead ? 12 : 2 + (member.id % 8)),
+    reviewLoad: workload?.reviewLoad ?? 0,
     roleTitle: member.isLead ? 'Lead Editor' : 'Editorial Member',
-    status: getStatusFromWorkload(workload, member.id),
+    status: getStatusFromWorkload(workload),
     userEditorBoard: {
       editorBoardId: Number.isFinite(numericBoardId) ? numericBoardId : 0,
       isLead: member.isLead,
@@ -128,7 +108,12 @@ async function getMemberWorkloads(editorBoardId: number | string) {
 
     await Promise.all(
       result.projects.map(async (project) => {
-        const projectMembers = await getProjectMembers(project.id);
+        const projectMembers = await getProjectMembers(project.id, {
+          field: 'displayName',
+          limit: 100,
+          order: 'asc',
+          page: 1,
+        });
 
         projectMembers.members.forEach((member) => {
           const current = workloads.get(member.id) ?? {
@@ -163,15 +148,7 @@ export async function getEditorialMembers(editorBoardId: number | string) {
 
     return result.members.map((member) => mapBoardMember(member, editorBoardId, workloads.get(member.id)));
   } catch {
-    await wait();
-
-    return clone(members).map((member) => ({
-      ...member,
-      userEditorBoard: {
-        ...member.userEditorBoard,
-        editorBoardId: Number(editorBoardId) || member.userEditorBoard.editorBoardId,
-      },
-    }));
+    return [];
   }
 }
 
@@ -238,30 +215,18 @@ export async function getEditorialMemberActivities(editorBoardId?: number | stri
           }) satisfies MemberActivity,
       );
     } catch {
-      await wait();
+      return [];
     }
-  } else {
-    await wait();
   }
 
-  return clone(memberActivities);
+  return [];
 }
 
 export async function getAvailableEditorialUsers() {
   try {
     return await getUsers();
   } catch {
-    await wait();
-
-    return clone(members).map(
-      (member) =>
-        ({
-          avatarUrl: member.avatarUrl,
-          displayName: member.displayName,
-          email: member.email,
-          id: member.id,
-        }) satisfies UserResponse,
-    );
+    return [] satisfies UserResponse[];
   }
 }
 
@@ -278,7 +243,6 @@ export async function setEditorialMemberAsLead(editorBoardId: number | string, u
     const member = await setEditorBoardMemberLead(editorBoardId, userId);
     return mapBoardMember(member, editorBoardId);
   } catch {
-    await wait();
     return null;
   }
 }

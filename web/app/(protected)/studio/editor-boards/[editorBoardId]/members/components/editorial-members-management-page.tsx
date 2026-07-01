@@ -10,7 +10,6 @@ import {
   ShieldCheck,
   Trash2,
   User,
-  UserCheck,
   UserPlus,
   Users,
   X,
@@ -36,13 +35,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Sheet,
   SheetContent,
@@ -70,20 +62,7 @@ import {
   setEditorialMemberAsLead,
   type EditorialMember,
   type EditorialMembersSummary,
-  type MemberStatus,
 } from '../services/editorial-members-service';
-
-const statusLabels: Record<MemberStatus, string> = {
-  AVAILABLE: 'Available',
-  BUSY: 'Busy',
-  OFFLINE: 'Offline',
-};
-
-const statusClassNames: Record<MemberStatus, string> = {
-  AVAILABLE: 'border-emerald-400/20 bg-emerald-500/10 text-emerald-300',
-  BUSY: 'border-amber-400/20 bg-amber-500/10 text-[#FFD369]',
-  OFFLINE: 'border-[#50555D] bg-[#2f353e] text-[#C8C8C8]',
-};
 
 function getInitials(name?: string | null, email?: string) {
   const label = name || email || 'Member';
@@ -476,7 +455,6 @@ export function EditorialMembersManagementPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | MemberStatus>('ALL');
 
   const loadMembers = useCallback(async () => {
     setIsLoading(true);
@@ -509,11 +487,10 @@ export function EditorialMembersManagementPage() {
         [member.displayName ?? '', member.email, member.roleTitle, member.region].some((value) =>
           value.toLowerCase().includes(normalizedSearch),
         );
-      const matchesStatus = statusFilter === 'ALL' || member.status === statusFilter;
 
-      return matchesSearch && matchesStatus;
+      return matchesSearch;
     });
-  }, [members, searchTerm, statusFilter]);
+  }, [members, searchTerm]);
 
   const handleAddMembers = async (users: UserResponse[]) => {
     setIsSubmitting(true);
@@ -595,25 +572,6 @@ export function EditorialMembersManagementPage() {
                   value={searchTerm}
                 />
               </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                  Status
-                </span>
-                <Select
-                  value={statusFilter}
-                  onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}
-                >
-                  <SelectTrigger className="h-10 w-[160px] rounded-[4px] border-[#50555D] bg-[#161c25] text-xs text-[#dde3ef]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="border-[#50555D] bg-[#1a2029] text-white">
-                    <SelectItem value="ALL">All Members</SelectItem>
-                    <SelectItem value="AVAILABLE">Available</SelectItem>
-                    <SelectItem value="BUSY">Busy</SelectItem>
-                    <SelectItem value="OFFLINE">Offline</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
               <AddBoardMemberDialog
                 existingMemberIds={members.map((member) => member.id)}
                 onAddMembers={handleAddMembers}
@@ -627,10 +585,9 @@ export function EditorialMembersManagementPage() {
             </p>
           ) : null}
 
-          <section className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4">
+          <section className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
             {[
               { icon: Users, label: 'Total Members', value: summary?.totalMembers ?? 0 },
-              { icon: UserCheck, label: 'Active Members*', value: summary?.activeMembers ?? 0 },
               { icon: ShieldCheck, label: 'Board Leads', value: summary?.leadMembers ?? 0 },
               { icon: CircleGauge, label: 'Review Load', value: summary?.reviewLoad ?? 0 },
             ].map((item) => (
@@ -660,9 +617,6 @@ export function EditorialMembersManagementPage() {
                     <TableHead className="h-12 px-4 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
                       Board Role
                     </TableHead>
-                    <TableHead className="h-12 px-4 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                      Status*
-                    </TableHead>
                     <TableHead className="h-12 px-4 text-right text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
                       Projects
                     </TableHead>
@@ -678,7 +632,7 @@ export function EditorialMembersManagementPage() {
                   {isLoading ? (
                     Array.from({ length: 4 }).map((_, index) => (
                       <TableRow className="border-[#50555D]" key={index}>
-                        {Array.from({ length: 6 }).map((__, cellIndex) => (
+                        {Array.from({ length: 5 }).map((__, cellIndex) => (
                           <TableCell className="px-4 py-4" key={cellIndex}>
                             <Skeleton className="h-8 rounded-[4px] bg-[#2f353e]" />
                           </TableCell>
@@ -712,13 +666,6 @@ export function EditorialMembersManagementPage() {
                               <ShieldCheck className="size-4 text-[#FFD369]" />
                             ) : null}
                           </div>
-                        </TableCell>
-                        <TableCell className="px-4 py-4">
-                          <Badge
-                            className={`rounded-[4px] px-2 py-1 text-[11px] font-semibold ${statusClassNames[member.status]}`}
-                          >
-                            {statusLabels[member.status]}*
-                          </Badge>
                         </TableCell>
                         <TableCell className="px-4 py-4 text-right font-mono text-sm text-[#dde3ef]">
                           {member.activeProjects}
@@ -774,7 +721,7 @@ export function EditorialMembersManagementPage() {
                     <TableRow className="border-[#50555D]">
                       <TableCell
                         className="px-4 py-10 text-center text-sm text-[#C8C8C8]"
-                        colSpan={6}
+                        colSpan={5}
                       >
                         No editorial members found.
                       </TableCell>

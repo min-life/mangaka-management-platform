@@ -4,8 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
-  ChevronDown,
-  CircleGauge,
   MoreVertical,
   Plus,
   Search,
@@ -13,10 +11,8 @@ import {
 } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
@@ -44,38 +40,8 @@ import {
 
 import {
   getEditorBoardProjects,
-  getEditorBoardProjectsSummary,
   type EditorBoardProject,
-  type ProjectStatus,
-  type PublishingStatus,
-  type EditorBoardProjectsSummary,
 } from '../services/editor-board-projects-service';
-
-const statusLabels: Record<ProjectStatus, string> = {
-  HIATUS: 'Hiatus',
-  IN_PRODUCTION: 'In Production',
-  STORYBOARDING: 'Storyboarding',
-};
-
-const publishingLabels: Record<PublishingStatus, string> = {
-  LIVE: 'Live',
-  PENDING_APPROVAL: 'Pending Approval',
-  SCHEDULED: 'Scheduled',
-};
-
-const statusClassNames: Record<ProjectStatus, string> = {
-  HIATUS: 'border-red-400/20 bg-red-500/10 text-red-300',
-  IN_PRODUCTION: 'border-emerald-400/20 bg-emerald-500/10 text-emerald-300',
-  STORYBOARDING: 'border-amber-400/20 bg-amber-500/10 text-[#FFD369]',
-};
-
-function getProgress(project: EditorBoardProject) {
-  return project.projectStats[0]?.metrics.progress ?? 0;
-}
-
-function getProjectStatus(project: EditorBoardProject) {
-  return project.projectStats[0]?.metrics.status ?? 'IN_PRODUCTION';
-}
 
 function getTargetChapter(project: EditorBoardProject) {
   return project.projectStats[0]?.metrics.targetChapter ?? 'Chapter --';
@@ -108,7 +74,7 @@ function ProjectCover({ project }: { project: EditorBoardProject }) {
 }
 
 function MemberStack({ members }: { members: EditorBoardProject['members'] }) {
-  const visibleMembers = members.slice(0, 5);
+  const visibleMembers = members.slice(0, 3);
   const hiddenCount = Math.max(0, members.length - visibleMembers.length);
 
   return (
@@ -144,8 +110,6 @@ function ProjectDrawer({
   if (!project) {
     return null;
   }
-
-  const status = getProjectStatus(project);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -193,51 +157,6 @@ function ProjectDrawer({
               <p className="text-[13px] font-medium text-white">{project.contactName}</p>
             </div>
           </div>
-
-          <div className="mt-8 rounded-[8px] border border-red-400/20 bg-red-500/5 p-6">
-            <div className="mb-4 flex items-center gap-2 text-red-300">
-              <CircleGauge className="size-5" />
-              <p className="text-[13px] font-medium uppercase tracking-wide">Next Deadline*</p>
-            </div>
-            <p className="text-[24px] font-semibold leading-8 text-[#dde3ef]">
-              {formatDate(project.nextDeadline)}
-            </p>
-            <p className="mt-2 text-xs text-red-300">
-              Critical: Editorial review required within 24h.
-            </p>
-          </div>
-
-          <div className="mt-8">
-            <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-              Pipeline Health*
-            </p>
-            <div className="space-y-4">
-              <div>
-                <div className="mb-1 flex justify-between text-xs">
-                  <span className="text-[#C8C8C8]">Scripting</span>
-                  <span className="text-emerald-300">Approved</span>
-                </div>
-                <div className="h-1 rounded-full bg-emerald-400" />
-              </div>
-              <div>
-                <div className="mb-1 flex justify-between text-xs">
-                  <span className="text-[#C8C8C8]">Pencils & Inks</span>
-                  <span className="text-[#FFD369]">{statusLabels[status]}</span>
-                </div>
-                <Progress
-                  className="h-1 rounded-full bg-[#2f353e] [&_[data-slot=progress-indicator]]:bg-[#FFD369]"
-                  value={getProgress(project)}
-                />
-              </div>
-              <div>
-                <div className="mb-1 flex justify-between text-xs">
-                  <span className="text-[#C8C8C8]">Lettering</span>
-                  <span className="text-[#C8C8C8]">Waitlist</span>
-                </div>
-                <div className="h-1 rounded-full bg-[#2f353e]" />
-              </div>
-            </div>
-          </div>
         </div>
 
         <SheetFooter className="grid grid-cols-2 gap-2 border-t border-[#50555D] bg-[#242a33] p-6">
@@ -264,13 +183,11 @@ export function EditorBoardProjectsPage() {
   const params = useParams<{ editorBoardId?: string }>();
   const editorBoardId = params.editorBoardId ?? '1';
   const [projects, setProjects] = useState<EditorBoardProject[]>([]);
-  const [summary, setSummary] = useState<EditorBoardProjectsSummary | null>(null);
   const [selectedProject, setSelectedProject] = useState<EditorBoardProject | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | ProjectStatus>('ALL');
-  const [sortBy, setSortBy] = useState<'ALPHA' | 'DEADLINE' | 'UPDATED'>('UPDATED');
+  const [sortBy, setSortBy] = useState<'ALPHA' | 'UPDATED'>('UPDATED');
 
   useEffect(() => {
     let isMounted = true;
@@ -280,19 +197,14 @@ export function EditorBoardProjectsPage() {
       setError(null);
 
       try {
-        const [nextProjects, nextSummary] = await Promise.all([
-          getEditorBoardProjects(editorBoardId),
-          getEditorBoardProjectsSummary(editorBoardId),
-        ]);
+        const nextProjects = await getEditorBoardProjects(editorBoardId);
 
         if (isMounted) {
           setProjects(nextProjects);
-          setSummary(nextSummary);
         }
       } catch {
         if (isMounted) {
           setProjects([]);
-          setSummary(null);
           setError('Unable to load editor board projects.');
         }
       } finally {
@@ -318,22 +230,17 @@ export function EditorBoardProjectsPage() {
           !normalizedSearch ||
           project.name.toLowerCase().includes(normalizedSearch) ||
           project.imprintName.toLowerCase().includes(normalizedSearch);
-        const matchesStatus = statusFilter === 'ALL' || getProjectStatus(project) === statusFilter;
 
-        return matchesSearch && matchesStatus;
+        return matchesSearch;
       })
       .sort((first, second) => {
         if (sortBy === 'ALPHA') {
           return first.name.localeCompare(second.name);
         }
 
-        if (sortBy === 'DEADLINE') {
-          return new Date(first.nextDeadline).getTime() - new Date(second.nextDeadline).getTime();
-        }
-
         return new Date(second.updatedAt).getTime() - new Date(first.updatedAt).getTime();
       });
-  }, [projects, searchTerm, sortBy, statusFilter]);
+  }, [projects, searchTerm, sortBy]);
   return (
     <>
       <main className="p-6">
@@ -341,8 +248,7 @@ export function EditorBoardProjectsPage() {
             <div>
               <h1 className="text-[32px] font-bold leading-10 text-white">Project Dashboard</h1>
               <p className="mt-1 text-sm leading-5 text-[#C8C8C8]">
-                Overseeing {summary?.projectCount ?? 0} active manga productions across{' '}
-                {summary?.editorialTeamCount ?? 0} editorial teams.
+                Overseeing {projects.length} active manga productions in this editor board.
               </p>
             </div>
 
@@ -358,25 +264,6 @@ export function EditorBoardProjectsPage() {
               </div>
               <div className="flex flex-col gap-1">
                 <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                  Filter
-                </span>
-                <Select
-                  value={statusFilter}
-                  onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}
-                >
-                  <SelectTrigger className="h-9 w-[160px] rounded-[4px] border-[#50555D] bg-[#161c25] text-xs text-[#dde3ef]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="border-[#50555D] bg-[#1a2029] text-white">
-                    <SelectItem value="ALL">All Statuses</SelectItem>
-                    <SelectItem value="IN_PRODUCTION">In Production</SelectItem>
-                    <SelectItem value="STORYBOARDING">Storyboarding</SelectItem>
-                    <SelectItem value="HIATUS">Hiatus</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
                   Sort
                 </span>
                 <Select value={sortBy} onValueChange={(value) => setSortBy(value as typeof sortBy)}>
@@ -385,7 +272,6 @@ export function EditorBoardProjectsPage() {
                   </SelectTrigger>
                   <SelectContent className="border-[#50555D] bg-[#1a2029] text-white">
                     <SelectItem value="UPDATED">Last Updated</SelectItem>
-                    <SelectItem value="DEADLINE">Deadline</SelectItem>
                     <SelectItem value="ALPHA">Alphabetical</SelectItem>
                   </SelectContent>
                 </Select>
@@ -416,19 +302,10 @@ export function EditorBoardProjectsPage() {
                     Project Name
                   </TableHead>
                   <TableHead className="h-12 px-4 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                    Status
-                  </TableHead>
-                  <TableHead className="h-12 px-4 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
                     Members
                   </TableHead>
-                  <TableHead className="h-12 px-4 text-center text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                    Apps
-                  </TableHead>
-                  <TableHead className="h-12 w-64 px-4 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                    Chapter Progress
-                  </TableHead>
                   <TableHead className="h-12 px-4 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                    Publishing
+                    Created At
                   </TableHead>
                   <TableHead className="h-12 px-4 text-right text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
                     Actions
@@ -439,7 +316,7 @@ export function EditorBoardProjectsPage() {
                 {isLoading ? (
                   Array.from({ length: 3 }).map((_, index) => (
                     <TableRow className="border-[#50555D]" key={index}>
-                      {Array.from({ length: 7 }).map((__, cellIndex) => (
+                      {Array.from({ length: 4 }).map((__, cellIndex) => (
                         <TableCell className="px-4 py-4" key={cellIndex}>
                           <Skeleton className="h-8 rounded-[4px] bg-[#2f353e]" />
                         </TableCell>
@@ -448,9 +325,6 @@ export function EditorBoardProjectsPage() {
                   ))
                 ) : visibleProjects.length ? (
                   visibleProjects.map((project) => {
-                    const status = getProjectStatus(project);
-                    const progress = getProgress(project);
-
                     return (
                       <TableRow
                         className="cursor-pointer border-[#50555D] transition-colors hover:bg-[#50555D]/20"
@@ -467,54 +341,17 @@ export function EditorBoardProjectsPage() {
                           </div>
                         </TableCell>
                         <TableCell className="px-4 py-4">
-                          <Badge
-                            className={`rounded-[4px] px-2 py-1 text-[11px] font-semibold ${statusClassNames[status]}`}
+                          <Link
+                            aria-label={`View members for ${project.name}`}
+                            className="inline-flex rounded-[4px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD369]"
+                            href={`/studio/editor-boards/${editorBoardId}/members`}
+                            onClick={(event) => event.stopPropagation()}
                           >
-                            {statusLabels[status]}
-                          </Badge>
+                            <MemberStack members={project.members} />
+                          </Link>
                         </TableCell>
-                        <TableCell className="px-4 py-4">
-                          <MemberStack members={project.members} />
-                        </TableCell>
-                        <TableCell className="px-4 py-4 text-center font-mono text-sm text-[#C8C8C8]">
-                          <span
-                            className={
-                              project.applicationsCount > 5 ? 'font-bold text-red-300' : undefined
-                            }
-                          >
-                            {project.applicationsCount}
-                          </span>
-                        </TableCell>
-                        <TableCell className="w-64 px-4 py-4">
-                          <div className="flex items-center gap-2">
-                            <Progress
-                              className={`h-1.5 flex-1 rounded-full bg-[#080f17] ${
-                                status === 'HIATUS'
-                                  ? '[&_[data-slot=progress-indicator]]:bg-red-400/50'
-                                  : '[&_[data-slot=progress-indicator]]:bg-[#FFD369]'
-                              }`}
-                              value={progress}
-                            />
-                            <span className="w-10 font-mono text-xs text-[#dde3ef]">
-                              {progress}%
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="px-4 py-4">
-                          <div className="flex items-center gap-1.5">
-                            <span
-                              className={`size-2 rounded-full ${
-                                project.publishingStatus === 'LIVE'
-                                  ? 'bg-emerald-400'
-                                  : project.publishingStatus === 'SCHEDULED'
-                                    ? 'bg-[#FFD369]'
-                                    : 'bg-[#50555D]'
-                              }`}
-                            />
-                            <span className="text-xs text-white">
-                              {publishingLabels[project.publishingStatus]}
-                            </span>
-                          </div>
+                        <TableCell className="px-4 py-4 text-sm font-medium text-[#dde3ef]">
+                          {formatDate(project.createdAt)}
                         </TableCell>
                         <TableCell className="px-4 py-4 text-right">
                           <button
@@ -536,7 +373,7 @@ export function EditorBoardProjectsPage() {
                   <TableRow className="border-[#50555D]">
                     <TableCell
                       className="px-4 py-10 text-center text-sm text-[#C8C8C8]"
-                      colSpan={7}
+                      colSpan={4}
                     >
                       No editor board projects found.
                     </TableCell>
@@ -544,47 +381,6 @@ export function EditorBoardProjectsPage() {
                 )}
               </TableBody>
             </Table>
-          </section>
-
-          <section className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
-            <article className="rounded-[8px] border border-[#50555D] bg-[#1a2029] p-6">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                Average Cycle Time
-              </p>
-              <div className="mt-2 flex items-end justify-between">
-                <span className="text-[32px] font-bold leading-10 text-white">
-                  {summary?.averageCycleTimeDays ?? 0} Days
-                </span>
-                <span className="text-[13px] font-medium text-emerald-300">
-                  <ChevronDown className="inline size-4" />
-                  {summary?.averageCycleTimeTrendPercent ?? 0}%
-                </span>
-              </div>
-            </article>
-            <article className="rounded-[8px] border border-[#50555D] bg-[#1a2029] p-6">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                Active Staffers
-              </p>
-              <div className="mt-2 flex items-end justify-between">
-                <span className="text-[32px] font-bold leading-10 text-white">
-                  {summary?.activeStaffers ?? 0}
-                </span>
-                <span className="text-[13px] font-medium text-[#C8C8C8]">
-                  Total across all regions
-                </span>
-              </div>
-            </article>
-            <article className="rounded-[8px] border border-l-4 border-[#50555D] border-l-[#FFD369] bg-[#1a2029] p-6">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#FFD369]">
-                Critical Deadlines*
-              </p>
-              <div className="mt-2 flex items-end justify-between">
-                <span className="text-[32px] font-bold leading-10 text-white">
-                  {String(summary?.criticalDeadlines ?? 0).padStart(2, '0')}
-                </span>
-                <span className="text-[13px] font-medium text-red-300">Next 48h</span>
-              </div>
-            </article>
           </section>
       </main>
       <ProjectDrawer

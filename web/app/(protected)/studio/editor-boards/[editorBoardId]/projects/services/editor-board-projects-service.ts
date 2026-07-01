@@ -76,14 +76,7 @@ function mapProjectResponse(project: ProjectResponse, editorBoardId: number | st
         displayName: member.user.displayName ?? member.user.email ?? 'Member',
         id: member.user.id,
         roleName: member.role.name,
-      })) ?? [
-        {
-          avatarUrl: project.createdByUser?.avatarUrl ?? '',
-          displayName: createdByName,
-          id: project.createdByUser?.id ?? project.id,
-          roleName: 'Project Owner',
-        },
-      ],
+      })) ?? [],
     name: project.name,
     nextDeadline: project.updatedAt,
     projectStats: [
@@ -136,29 +129,13 @@ function getProjectStatus(metrics: unknown): ProjectStatus {
   return 'IN_PRODUCTION';
 }
 
-function mapMembers(members: ProjectMemberResponse[], fallbackProject: ProjectResponse): ProjectMember[] {
-  if (members.length > 0) {
-    return members.map((member) => ({
-      avatarUrl: member.avatarUrl ?? '',
-      displayName: member.displayName ?? member.email ?? 'Member',
-      id: member.id,
-      roleName: member.role.name,
-    }));
-  }
-
-  const createdByName =
-    fallbackProject.createdByUser?.displayName ??
-    fallbackProject.createdByUser?.email ??
-    'Unassigned';
-
-  return [
-    {
-      avatarUrl: fallbackProject.createdByUser?.avatarUrl ?? '',
-      displayName: createdByName,
-      id: fallbackProject.createdByUser?.id ?? fallbackProject.id,
-      roleName: 'Project Owner',
-    },
-  ];
+function mapMembers(members: ProjectMemberResponse[]): ProjectMember[] {
+  return members.map((member) => ({
+    avatarUrl: member.avatarUrl ?? '',
+    displayName: member.displayName ?? member.email ?? 'Member',
+    id: member.id,
+    roleName: member.role.name,
+  }));
 }
 
 function mapStats(project: ProjectResponse, stat: ProjectStatResponse | null) {
@@ -217,7 +194,7 @@ async function getProjectDetails(project: ProjectResponse, editorBoardId: number
   return {
     ...baseProject,
     applicationsCount: applications.length,
-    members: mapMembers(members, project),
+    members: mapMembers(members),
     nextDeadline: applications[0]?.updatedAt ?? stat?.updatedAt ?? project.updatedAt,
     projectStats: mapStats(project, stat),
     publishingStatus: getPublishingStatus(applications),
@@ -253,8 +230,8 @@ export async function getEditorBoardProjectsSummary(editorBoardId: number | stri
       cycleTimes.length > 0
         ? Number((cycleTimes.reduce((total, value) => total + value, 0) / cycleTimes.length).toFixed(1))
         : 0,
-    averageCycleTimeTrendPercent: 12,
-    criticalDeadlines: boardProjects.filter((project) => project.applicationsCount >= 3).length,
+    averageCycleTimeTrendPercent: 0,
+    criticalDeadlines: 0,
     editorialTeamCount: roleNames.size,
     projectCount: boardProjects.length,
   } satisfies EditorBoardProjectsSummary;

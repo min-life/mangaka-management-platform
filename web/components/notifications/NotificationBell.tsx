@@ -55,7 +55,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function getEditorBoardName(notification: NotificationResponse) {
   const metadata = notification.activityLog?.metadata;
 
-  if (isRecord(metadata) && typeof metadata.editorBoardName === 'string' && metadata.editorBoardName.trim()) {
+  if (
+    isRecord(metadata) &&
+    typeof metadata.editorBoardName === 'string' &&
+    metadata.editorBoardName.trim()
+  ) {
     return metadata.editorBoardName;
   }
 
@@ -106,15 +110,8 @@ export function NotificationBell({
   dotClassName,
   triggerClassName,
 }: NotificationBellProps) {
-  const {
-    error,
-    isConnected,
-    isLoading,
-    markAllAsRead,
-    markAsRead,
-    notifications,
-    unreadCount,
-  } = useRealtimeNotifications();
+  const { error, isConnected, isLoading, markAllAsRead, markAsRead, notifications, unreadCount } =
+    useRealtimeNotifications();
 
   return (
     <DropdownMenu>
@@ -147,7 +144,7 @@ export function NotificationBell({
           <span>
             <span className="block text-sm font-black">Notifications</span>
             <span className="mt-1 block text-[11px] font-bold text-[#8B93A5]">
-              {isConnected ? 'Realtime connected' : 'Realtime pending'}
+              {isConnected ? '' : 'Realtime pending'}
             </span>
           </span>
           {unreadCount > 0 ? (
