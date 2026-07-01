@@ -21,11 +21,6 @@ import { CurrentUser, Permissions } from '../share/decorators';
 import type { JwtPayload } from '../auth/interfaces';
 import { TasksService } from './tasks.service';
 import {
-  CommentsResponseDto,
-  CreateFrameReqDto,
-  FrameResponseDto,
-  FramesResponseDto,
-  QueryFramesReqDto,
   QueryMyTasksReqDto,
   QueryTasksReqDto,
   TaskResponseDto,
@@ -33,7 +28,7 @@ import {
   UpdateTaskReqDto,
 } from './dto';
 
-import { CommentResponseDto, CreateCommentReqDto, QueryCommentsReqDto } from '../frames/dto';
+import { CommentResponseDto, CommentsResponseDto, CreateCommentReqDto, QueryCommentsReqDto } from '../frames/dto';
 
 @ApiTags('Tasks')
 @ApiBearerAuth()
@@ -206,45 +201,15 @@ export class TasksController {
     permissions: ['project:read', 'project:owner'],
     resource: 'TASK',
   })
-  @ApiOperation({ summary: 'Get task frames' })
+  @ApiOperation({ summary: 'Get task materials for select' })
   @ApiParam({ name: 'id', type: Number, description: 'Task id' })
-  @ApiOkResponse({
-    description: 'Task frames retrieved successfully',
-    type: FramesResponseDto,
-  })
-  @Get(':id/frames')
-  async getTaskFrames(@Param('id', ParseIntPipe) id: number, @Query() query: QueryFramesReqDto) {
-    const result = await this.tasksService.getTaskFrames(
-      id,
-      query.field && query.order ? { field: query.field, order: query.order } : undefined,
-      query.page && query.limit ? { page: query.page, limit: query.limit } : undefined,
-    );
+  @ApiOkResponse({ description: 'Task materials for select retrieved successfully' })
+  @Get(':id/materials')
+  async getTaskMaterialsForSelect(@Param('id', ParseIntPipe) id: number) {
+    const data = await this.tasksService.getTaskMaterialsForSelect(id);
     return {
-      data: result.frames,
-      pagination: result.pagination,
+      data,
     };
   }
 
-  @Permissions({
-    mode: 'ANY',
-    permissions: ['project:frame.create', 'project:owner'],
-    resource: 'TASK',
-  })
-  @ApiOperation({ summary: 'Create frame for task' })
-  @ApiParam({ name: 'id', type: Number, description: 'Task id' })
-  @ApiCreatedResponse({ description: 'Frame created successfully', type: FrameResponseDto })
-  @Post(':id/frames')
-  async createFrame(
-    @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() currentUser: JwtPayload,
-    @Body() data: CreateFrameReqDto,
-  ) {
-    const frame = await this.tasksService.createFrame(id, {
-      ...data,
-      userId: currentUser.userId,
-    });
-    return {
-      data: frame,
-    };
-  }
 }

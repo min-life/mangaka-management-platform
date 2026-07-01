@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsNotEmpty, IsOptional, IsInt, Min } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsInt, Min, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PROGRESS_STATUS } from '@prisma/client';
 
@@ -14,8 +14,26 @@ export class UpdateFileReqDto {
 }
 
 export class CreateMaterialReqDto {
-  @ApiProperty({ type: 'array', items: { type: 'string', format: 'binary' }, description: 'The files to upload' })
-  files!: any[];
+  @ApiPropertyOptional({ example: 1, description: 'Task ID if uploaded from a task' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  taskId?: number;
+
+  @ApiPropertyOptional({ example: 'Bản thảo chính thức' })
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiPropertyOptional({ type: 'string', format: 'binary', description: 'Thumbnail image file (PDF/Image)' })
+  image?: any;
+
+  @ApiPropertyOptional({ type: 'string', format: 'binary', description: 'Document file (PDF/TXT/Docs)' })
+  text?: any;
+
+  @ApiPropertyOptional({ type: 'string', format: 'binary', description: 'Source file (PSD/ZIP)' })
+  source?: any;
 }
 
 export class CreateTaskReqDto {

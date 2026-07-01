@@ -7,3 +7,7 @@ export class PermissionResponseDto {
   description?: string;
   status?: string;
 }
+
+export class PermissionsResponseDto {
+  data!: PermissionResponseDto[];
+}

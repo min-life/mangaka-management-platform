@@ -46,10 +46,12 @@ const PROJECT_DETAIL_SELECT = {
 
 const APPLICATION_LIST_SELECT = {
   id: true,
+  projectId: true,
   title: true,
   type: true,
   status: true,
   parentFolderId: true,
+  folderImageUrl: true,
   project: {
     select: PROJECT_BASIC_SELECT,
   },
@@ -335,7 +337,7 @@ export class ApplicationsService {
           let imageUrl: string | null = null;
           const materialsData = application.materials as any[];
           if (Array.isArray(materialsData)) {
-            const thumbnail = materialsData.find((m) => m.isThumbnail) || materialsData[0];
+            const thumbnail = materialsData.find((m) => m.isThumbnail) || materialsData.find((m) => m.type === 'IMAGE') || materialsData[0];
             if (thumbnail && thumbnail.url) {
               imageUrl = thumbnail.url;
             }
@@ -348,7 +350,7 @@ export class ApplicationsService {
               title: application.title,
               description: application.description,
               parentId: folderParentId,
-              imageUrl,
+              imageUrl: application.folderImageUrl || imageUrl,
               createdBy: application.createdBy,
               updatedBy: application.createdBy,
             },

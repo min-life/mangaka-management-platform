@@ -19,6 +19,7 @@ export type Resource =
   | 'PROJECT_STAT';
 export type Permission =
   | 'admin'
+  | 'staff'
   | 'user:read'
   | 'user:update'
   | 'user:delete'
