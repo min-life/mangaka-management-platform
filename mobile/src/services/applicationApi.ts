@@ -1,6 +1,6 @@
 import { ApiApplication, ApiDataResponse, ApiListResponse } from './apiTypes';
 import { apiRequest } from './apiClient';
-import { mapApplication } from './mappers';
+import { mapApplication, uniqueById } from './mappers';
 
 export async function fetchApplications(params: {
   projectId?: string;
@@ -22,7 +22,8 @@ export async function fetchApplications(params: {
   });
 
   return {
-    applications: (response.data ?? []).map(mapApplication),
+    applications: uniqueById((response.data ?? []).map(mapApplication)),
+    pagination: response.pagination,
     rawApplications: response.data ?? [],
   };
 }

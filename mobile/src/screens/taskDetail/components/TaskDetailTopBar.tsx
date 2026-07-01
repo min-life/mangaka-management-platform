@@ -3,7 +3,6 @@ import { Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
-import { TASK_INFO } from '@/src/constants/taskDetailData';
 
 import { C } from './theme';
 
@@ -15,8 +14,8 @@ interface TaskDetailTopBarProps {
 
 export default function TaskDetailTopBar({
   onBack,
-  subtitle = TASK_INFO.chapter,
-  title = TASK_INFO.pageCode,
+  subtitle = 'Detail',
+  title = 'Resource',
 }: TaskDetailTopBarProps) {
   return (
     <SafeAreaView edges={['top']} style={{ backgroundColor: C.bg }}>

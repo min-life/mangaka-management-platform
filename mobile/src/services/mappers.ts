@@ -3,6 +3,7 @@ import { ApplicationItem, ApplicationStatus } from '@/src/types/applications';
 import { EditorBoardItem, EditorBoardMember } from '@/src/types/editorBoards';
 import {
   ProjectItem,
+  ProjectMemberItem,
   ProjectTaskSummary,
   ProjectType,
 } from '@/src/types/projects';
@@ -27,6 +28,7 @@ import {
   ApiMaterial,
   ApiNotification,
   ApiProject,
+  ApiProjectMember,
   ApiTask,
   ApiTaskStatus,
   ApiUserSummary,
@@ -35,6 +37,30 @@ import { absoluteDate, displayName, initials, relativeDate } from './formatters'
 
 const FALLBACK_AVATAR =
   'https://i.pravatar.cc/160?img=1';
+
+export function uniqueById<T extends { id: string }>(items: T[]): T[] {
+  const seen = new Set<string>();
+
+  return items.filter((item) => {
+    if (seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  });
+}
+
+type ApiCreatorEntity = {
+  createByUser?: ApiUserSummary | null;
+  createdBy?: number | null;
+  createdByUser?: ApiUserSummary | null;
+};
+
+function creatorUser(entity?: ApiCreatorEntity | null) {
+  return entity?.createdByUser ?? entity?.createByUser ?? null;
+}
+
+function creatorId(entity?: ApiCreatorEntity | null) {
+  return String(entity?.createdBy ?? creatorUser(entity)?.id ?? '');
+}
 
 function projectTypeFromName(name: string): ProjectType {
   const normalized = name.toLowerCase();
@@ -66,7 +92,11 @@ export function mapProject(
     tasks?: ApiTask[];
   } = {},
 ): ProjectItem {
-  const creator = displayName(project.createdByUser);
+  if (!project) {
+    throw new Error('Project response is missing.');
+  }
+
+  const creator = displayName(creatorUser(project));
   const completionRate =
     Number(extras.stats?.progress ?? extras.stats?.completionRate ?? extras.stats?.completedTasks) || 0;
   const tasks = taskSummary(extras.tasks);
@@ -88,14 +118,14 @@ export function mapProject(
     contributors: project.userProjects?.length ?? project._count?.userProjects ?? 0,
     coverUri: project.imageUrl ?? undefined,
     createdAt: project.createdAt,
-    createdBy: String(project.createdBy ?? project.createdByUser?.id ?? ''),
+    createdBy: creatorId(project),
     createdByName: creator,
     currentUserRole: project.userProjects?.[0]?.role?.name ?? 'Member',
     description: project.description ?? undefined,
     editorBoard: extras.board?.name ?? project.editorBoard?.name ?? 'No editor board',
-    editorBoardLeaderInitials: initials(extras.board?.createdByUser?.displayName),
-    editorBoardLeaderName: displayName(extras.board?.createdByUser),
-    editorBoardLeaderAvatarUri: extras.board?.createdByUser?.avatarUrl ?? undefined,
+    editorBoardLeaderInitials: initials(creatorUser(extras.board)?.displayName),
+    editorBoardLeaderName: displayName(creatorUser(extras.board)),
+    editorBoardLeaderAvatarUri: creatorUser(extras.board)?.avatarUrl ?? undefined,
     files: project._count?.files ?? 0,
     forks: 0,
     id: String(project.id),
@@ -119,13 +149,34 @@ export function mapProject(
   };
 }
 
-export function mapEditorBoard(board: ApiEditorBoard): EditorBoardItem {
+export function mapProjectMember(member: ApiProjectMember): ProjectMemberItem {
+  const name = member.displayName || member.email || `User ${member.id}`;
+
   return {
-    createdBy: String(board.createdBy ?? board.createdByUser?.id ?? ''),
+    avatarUri: member.avatarUrl,
+    email: member.email ?? '',
+    id: String(member.id),
+    initials: initials(name),
+    joinedAtLabel: `Joined ${relativeDate(member.createdAt)}`,
+    name,
+    numberOfTasks: member.numberOfTasks ?? member.taskOverview?.total ?? 0,
+    roleCode: member.role?.code ?? '',
+    roleName: member.role?.name ?? 'Member',
+    taskOverview: member.taskOverview ?? null,
+  };
+}
+
+export function mapEditorBoard(board: ApiEditorBoard): EditorBoardItem {
+  if (!board) {
+    throw new Error('Editor board response is missing.');
+  }
+
+  return {
+    createdBy: creatorId(board),
     currentUserRole: 'Member',
     description: board.description ?? 'Editor board workspace.',
     id: String(board.id),
-    leadMemberId: String(board.createdBy ?? board.createdByUser?.id ?? ''),
+    leadMemberId: creatorId(board),
     memberIds: Array.from({ length: board._count?.members ?? 0 }, (_, index) => `member-${index}`),
     name: board.name,
     projectIds: Array.from({ length: board._count?.projects ?? 0 }, (_, index) => `project-${index}`),
@@ -155,11 +206,15 @@ function normalizeApplicationStatus(status: ApiApplication['status']): Applicati
 }
 
 export function mapApplication(application: ApiApplication): ApplicationItem {
+  if (!application) {
+    throw new Error('Application response is missing.');
+  }
+
   const rawMaterials = Array.isArray(application.materials) ? application.materials : [];
 
   return {
     createdAtLabel: absoluteDate(application.createdAt),
-    createdBy: displayName(application.createdByUser),
+    createdBy: displayName(creatorUser(application)),
     description: application.description ?? '',
     id: String(application.id),
     materials: {
@@ -190,8 +245,8 @@ export function mapFolder(folder: ApiFolder, children: Array<ResourceFolderNode 
   return {
     children,
     createdAt: folder.createdAt,
-    createdBy: String(folder.createdBy ?? folder.createdByUser?.id ?? ''),
-    createdByName: displayName(folder.createdByUser),
+    createdBy: creatorId(folder),
+    createdByName: displayName(creatorUser(folder)),
     description: folder.description ?? undefined,
     id: String(folder.id),
     name: folder.title,
@@ -205,7 +260,8 @@ export function mapFolder(folder: ApiFolder, children: Array<ResourceFolderNode 
 export function materialImage(material?: Record<string, unknown>) {
   const pages = Array.isArray(material?.pages) ? material.pages : [];
   const firstPage = pages[0] as { url?: unknown } | undefined;
-  return String(material?.imageUri ?? material?.thumbnailUrl ?? firstPage?.url ?? 'https://picsum.photos/seed/mangaka-material/900/1200');
+  const imageUri = material?.imageUri ?? material?.thumbnailUrl ?? firstPage?.url;
+  return typeof imageUri === 'string' && imageUri.trim() ? imageUri : undefined;
 }
 
 export function mapMaterialVersion(material: ApiMaterial): ResourceFileMaterialVersion {
@@ -213,8 +269,8 @@ export function mapMaterialVersion(material: ApiMaterial): ResourceFileMaterialV
 
   return {
     createdAt: material.createdAt,
-    createdBy: String(material.createdBy ?? material.createdByUser?.id ?? ''),
-    createdByName: displayName(material.createdByUser),
+    createdBy: creatorId(material),
+    createdByName: displayName(creatorUser(material)),
     fileId: String(material.fileId ?? material.file?.id ?? ''),
     id: String(material.id),
     materials: {
@@ -232,13 +288,14 @@ export function mapMaterialVersion(material: ApiMaterial): ResourceFileMaterialV
 }
 
 export function mapFile(file: ApiFile, versions: ApiMaterial[] = [], tasks: ResourceFileTask[] = []): ResourceFileNode {
-  const mappedVersions = versions.map(mapMaterialVersion);
+  const mappedVersions = uniqueById(versions.map(mapMaterialVersion));
+  const mappedTasks = uniqueById(tasks);
 
   return {
     content: file.description ?? `# ${file.title}`,
     createdAt: file.createdAt,
-    createdBy: String(file.createdBy ?? file.createdByUser?.id ?? ''),
-    createdByName: displayName(file.createdByUser),
+    createdBy: creatorId(file),
+    createdByName: displayName(creatorUser(file)),
     description: file.description ?? undefined,
     folderId: file.folderId === undefined ? (file.folder ? String(file.folder.id) : undefined) : String(file.folderId),
     id: String(file.id),
@@ -246,7 +303,7 @@ export function mapFile(file: ApiFile, versions: ApiMaterial[] = [], tasks: Reso
     materialVersions: mappedVersions,
     name: file.title,
     previewImageUri: mappedVersions[0]?.materials.imageUri,
-    tasks,
+    tasks: mappedTasks,
     type: 'file',
     updatedAt: file.updatedAt,
   };
@@ -261,7 +318,7 @@ function mapTaskStatus(status: ApiTaskStatus): TaskStatus {
 
 export function mapTaskCard(task: ApiTask): Task {
   return {
-    assignees: [task.assignedByUser?.avatarUrl ?? task.createdByUser?.avatarUrl ?? FALLBACK_AVATAR],
+    assignees: [task.assignedByUser?.avatarUrl ?? creatorUser(task)?.avatarUrl ?? FALLBACK_AVATAR],
     dueLabel: task.deadline ? relativeDate(task.deadline) : 'No due date',
     id: String(task.id),
     priority: task.status === 'REVIEW' ? 'HIGH' : task.status === 'INPROGRESS' ? 'MEDIUM' : 'LOW',
@@ -298,7 +355,7 @@ export function mapComment(comment: ApiComment): ResourceTaskComment {
     typeof comment.content === 'string'
       ? comment.content
       : comment.content?.text ?? '';
-  const author = displayName(comment.createdByUser);
+  const author = displayName(creatorUser(comment));
 
   return {
     author,
@@ -320,14 +377,14 @@ export function mapResourceTask(task: ApiTask, frames: ApiFrame[] = [], comments
   return {
     assignedBy: String(task.assignedBy ?? task.assignedByUser?.id ?? ''),
     assignedByName: displayName(task.assignedByUser),
-    comments: comments.map(mapComment),
+    comments: uniqueById(comments.map(mapComment)),
     createdAt: task.createdAt,
-    createdBy: String(task.createdBy ?? task.createdByUser?.id ?? ''),
-    createdByName: displayName(task.createdByUser),
+    createdBy: creatorId(task),
+    createdByName: displayName(creatorUser(task)),
     deadline: task.deadline ?? undefined,
     description: task.description ?? undefined,
     fileId: String(task.fileId ?? task.file?.id ?? ''),
-    frames: frames.map(mapFrame),
+    frames: uniqueById(frames.map(mapFrame)),
     id: String(task.id),
     status: task.status,
     title: task.title,
@@ -345,8 +402,52 @@ function notificationFilter(type?: string): NotificationItem['filter'] {
   return 'Tasks';
 }
 
+function notificationFilterFromEntity(entityType?: string): NotificationItem['filter'] {
+  const normalized = (entityType ?? '').toLowerCase();
+  if (normalized.includes('application')) return 'Applications';
+  if (normalized.includes('project')) return 'Projects';
+  if (normalized.includes('editor_board')) return 'Projects';
+  if (normalized.includes('comment')) return 'Reviews';
+  return 'Tasks';
+}
+
+function humanizeAction(action?: string) {
+  return (action ?? 'Notification')
+    .toLowerCase()
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
 export function mapNotification(notification: ApiNotification): NotificationItem {
-  const filter = notificationFilter(notification.type);
+  const activityLog = notification.activityLog;
+  const filter = notification.type
+    ? notificationFilter(notification.type)
+    : notificationFilterFromEntity(activityLog?.entityType);
+  const entityType = activityLog?.entityType?.toUpperCase();
+  const entityId = activityLog?.entityId === undefined ? undefined : String(activityLog.entityId);
+  const projectId = activityLog?.projectId === undefined || activityLog.projectId === null
+    ? undefined
+    : String(activityLog.projectId);
+  const boardId =
+    activityLog?.editorBoardId === undefined || activityLog.editorBoardId === null
+      ? undefined
+      : String(activityLog.editorBoardId);
+  const target: NotificationItem['target'] | undefined =
+    entityType === 'PROJECT' && entityId
+      ? { projectId: entityId, type: 'project' }
+      : entityType === 'TASK' && entityId
+        ? { taskId: entityId, type: 'task' }
+        : entityType === 'APPLICATION' && entityId
+          ? { applicationId: entityId, projectId: projectId ?? '', type: 'application' }
+          : entityType === 'EDITOR_BOARD' && entityId
+            ? { boardId: entityId, type: 'board' }
+            : projectId
+              ? { projectId, type: 'project' }
+              : boardId
+                ? { boardId, type: 'board' }
+                : undefined;
 
   return {
     filter,
@@ -361,9 +462,14 @@ export function mapNotification(notification: ApiNotification): NotificationItem
     id: String(notification.id),
     isUnread: !notification.isRead,
     project: notification.project?.name ?? filter,
-    subtitle: notification.message ?? '',
+    subtitle:
+      notification.message ??
+      (activityLog?.actor
+        ? `${displayName(activityLog.actor)} triggered ${humanizeAction(activityLog.action).toLowerCase()}.`
+        : ''),
+    target,
     time: relativeDate(notification.createdAt),
-    title: notification.title ?? notification.message ?? 'Notification',
+    title: notification.title ?? humanizeAction(activityLog?.action),
   };
 }
 

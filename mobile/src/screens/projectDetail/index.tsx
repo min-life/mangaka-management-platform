@@ -116,6 +116,7 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
       icon: 'group_add',
       iconColor: '#FFFFFF',
       iconBg: '#DB2777',
+      onPress: () => navigation.navigate('ProjectContributors', { projectId: project.id }),
     },
     {
       label: 'Report',

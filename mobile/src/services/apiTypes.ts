@@ -21,9 +21,36 @@ export interface ApiUserSummary {
   id: number;
 }
 
+export interface ApiRoleSummary {
+  code?: string;
+  id?: number;
+  isDefault?: boolean;
+  name?: string;
+  scope?: string;
+}
+
+export interface ApiProjectMember {
+  avatarUrl?: string | null;
+  createdAt: string;
+  displayName?: string | null;
+  email?: string;
+  id: number;
+  numberOfTasks?: number;
+  role?: ApiRoleSummary | null;
+  taskOverview?: {
+    done?: number;
+    inprogress?: number;
+    pending?: number;
+    review?: number;
+    total?: number;
+  } | null;
+  updatedAt: string;
+}
+
 export interface ApiProject {
   createdAt: string;
   createdBy?: number | null;
+  createByUser?: ApiUserSummary | null;
   createdByUser?: ApiUserSummary | null;
   description?: string | null;
   editorBoard?: ApiEditorBoard | null;
@@ -51,6 +78,7 @@ export interface ApiProject {
 export interface ApiEditorBoard {
   createdAt: string;
   createdBy?: number | null;
+  createByUser?: ApiUserSummary | null;
   createdByUser?: ApiUserSummary | null;
   description?: string | null;
   id: number;
@@ -68,6 +96,7 @@ export interface ApiEditorBoard {
 export interface ApiFolder {
   createdAt: string;
   createdBy?: number | null;
+  createByUser?: ApiUserSummary | null;
   createdByUser?: ApiUserSummary | null;
   description?: string | null;
   id: number;
@@ -84,6 +113,7 @@ export interface ApiFolder {
 export interface ApiFile {
   createdAt: string;
   createdBy?: number | null;
+  createByUser?: ApiUserSummary | null;
   createdByUser?: ApiUserSummary | null;
   description?: string | null;
   folder?: { id: number; title: string } | null;
@@ -102,6 +132,7 @@ export interface ApiTask {
   assignedByUser?: ApiUserSummary | null;
   createdAt: string;
   createdBy?: number | null;
+  createByUser?: ApiUserSummary | null;
   createdByUser?: ApiUserSummary | null;
   deadline?: string | null;
   description?: string | null;
@@ -119,6 +150,7 @@ export interface ApiTask {
 export interface ApiFrame {
   createdAt: string;
   createdBy?: number | null;
+  createByUser?: ApiUserSummary | null;
   createdByUser?: ApiUserSummary | null;
   endX: number | string;
   endY: number | string;
@@ -133,6 +165,7 @@ export interface ApiFrame {
 export interface ApiComment {
   content?: { text?: string; mentions?: string[]; attachments?: unknown[] } | string;
   createdAt: string;
+  createByUser?: ApiUserSummary | null;
   createdByUser?: ApiUserSummary | null;
   frameId?: number | null;
   id: number;
@@ -142,6 +175,7 @@ export interface ApiComment {
 export interface ApiMaterial {
   createdAt: string;
   createdBy?: number | null;
+  createByUser?: ApiUserSummary | null;
   createdByUser?: ApiUserSummary | null;
   file?: ApiFile | null;
   fileId?: number;
@@ -163,6 +197,7 @@ export type ApiApplicationStatus =
 
 export interface ApiApplication {
   createdAt: string;
+  createByUser?: ApiUserSummary | null;
   createdByUser?: ApiUserSummary | null;
   description?: string | null;
   id: number;
@@ -178,6 +213,15 @@ export interface ApiApplication {
 }
 
 export interface ApiNotification {
+  activityLog?: {
+    action?: string;
+    actor?: ApiUserSummary | null;
+    editorBoardId?: number | null;
+    entityId?: number;
+    entityType?: string;
+    metadata?: Record<string, unknown> | null;
+    projectId?: number | null;
+  } | null;
   createdAt?: string;
   id: number;
   isRead?: boolean;

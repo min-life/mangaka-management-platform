@@ -1,6 +1,15 @@
-import { ApiApplication, ApiDataResponse, ApiEditorBoard, ApiFolder, ApiListResponse, ApiProject, ApiTask } from './apiTypes';
+import {
+  ApiApplication,
+  ApiDataResponse,
+  ApiEditorBoard,
+  ApiFolder,
+  ApiListResponse,
+  ApiProject,
+  ApiProjectMember,
+  ApiTask,
+} from './apiTypes';
 import { apiRequest } from './apiClient';
-import { mapProject } from './mappers';
+import { mapProject, mapProjectMember, uniqueById } from './mappers';
 
 export async function fetchProjects(params: { name?: string } = {}) {
   const response = await apiRequest<ApiListResponse<ApiProject>>('/projects', {
@@ -16,7 +25,7 @@ export async function fetchProjects(params: { name?: string } = {}) {
 
   return {
     pagination: response.pagination,
-    projects: (response.data ?? []).map((project) => mapProject(project)),
+    projects: uniqueById((response.data ?? []).map((project) => mapProject(project))),
     rawProjects: response.data ?? [],
   };
 }
@@ -54,5 +63,24 @@ export async function fetchProjectBundle(projectId: string) {
     }),
     stats: statsResponse.data?.metrics ?? null,
     tasks: tasksResponse.data ?? [],
+  };
+}
+
+export async function fetchProjectMembers(projectId: string, params: { search?: string } = {}) {
+  const response = await apiRequest<ApiListResponse<ApiProjectMember>>(
+    `/projects/${projectId}/members`,
+    {
+      params: {
+        limit: 100,
+        page: 1,
+        search: params.search,
+      },
+    },
+  );
+
+  return {
+    members: uniqueById((response.data ?? []).map(mapProjectMember)),
+    pagination: response.pagination,
+    rawMembers: response.data ?? [],
   };
 }

@@ -57,7 +57,7 @@ export interface ResourceFileMaterialVersion {
   materials: {
     title: string;
     note?: string;
-    imageUri: string;
+    imageUri?: string;
     layers?: string[];
     pages?: Array<{ index: number; url: string }>;
     editorState?: Record<string, unknown>;

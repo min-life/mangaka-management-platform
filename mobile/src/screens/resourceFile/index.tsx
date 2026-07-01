@@ -11,7 +11,11 @@ import {
   ResourceFileTask,
   ResourceTaskFrame,
 } from '@/src/types/resources';
-import { fetchFolderBundle, fetchResourceFileBundle } from '@/src/services/resourceApi';
+import {
+  createDiscussionComment,
+  fetchFolderBundle,
+  fetchResourceFileBundle,
+} from '@/src/services/resourceApi';
 
 import {
   C,
@@ -51,7 +55,6 @@ export default function ResourceFileScreen({
   const [activeTab, setActiveTab] = useState<ResourceFileTab>(
     route.params.initialTab ?? 'Overview',
   );
-  const [comment, setComment] = useState('');
   const [file, setFile] = useState<ResourceFileNode | null>(null);
   const [parentName, setParentName] = useState('Resource');
   const [isLoading, setIsLoading] = useState(true);
@@ -117,6 +120,23 @@ export default function ResourceFileScreen({
     setActiveTab('Materials');
   };
 
+  const handleCreateComment = async (params: {
+    frameId?: string | null;
+    taskId: string;
+    text: string;
+  }) => {
+    await createDiscussionComment(params);
+    const nextFile = await fetchResourceFileBundle(route.params.fileId);
+    setFile(nextFile);
+    const selectedTask = nextFile.tasks?.find((task) => task.id === params.taskId);
+    setSelectedTaskId(params.taskId);
+    setSelectedFrame(
+      params.frameId
+        ? selectedTask?.frames.find((frame) => frame.id === params.frameId) ?? null
+        : null,
+    );
+  };
+
   if (isLoading) {
     return (
       <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
@@ -170,8 +190,7 @@ export default function ResourceFileScreen({
 
         {activeTab === 'Tasks' && (
           <TasksPanel
-            comment={comment}
-            onCommentChange={setComment}
+            onCreateComment={handleCreateComment}
             onSelectFrame={handleSelectFrame}
             onSelectTask={handleSelectTask}
             selectedFrame={selectedFrame}

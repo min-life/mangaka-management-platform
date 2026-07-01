@@ -2,18 +2,21 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { RootStackParamList } from './types';
+import { flushPendingNavigationReset, navigationRef } from './navigationRef';
 
 import HomeScreen from '@/src/screens/home';
 import TasksScreen from '@/src/screens/tasks';
 import ProjectsScreen from '@/src/screens/projects';
 import ProjectDetailScreen from '@/src/screens/projectDetail';
+import ProjectContributorsScreen from '@/src/screens/projectContributors';
 import ProjectReportScreen from '@/src/screens/projectReport';
 import ApplicationsScreen from '@/src/screens/applications';
 import ApplicationDetailScreen from '@/src/screens/applicationDetail';
-import ApplicationCreateScreen from '@/src/screens/applicationCreate';
 import EditorBoardsScreen from '@/src/screens/editorBoards';
 import EditorBoardDetailScreen from '@/src/screens/editorBoardDetail';
-import EditorBoardAttachProjectScreen from '@/src/screens/editorBoardAttachProject';
+import EditorBoardProjectsScreen from '@/src/screens/editorBoardProjects';
+import EditorBoardMembersScreen from '@/src/screens/editorBoardMembers';
+import EditorBoardApplicationsScreen from '@/src/screens/editorBoardApplications';
 import ResourcesScreen from '@/src/screens/resources';
 import ResourceFolderDetailScreen from '@/src/screens/resourceFolderDetail';
 import ResourceFileScreen from '@/src/screens/resourceFile';
@@ -34,7 +37,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
  */
 export default function RootNavigator() {
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef} onReady={flushPendingNavigationReset}>
       <Stack.Navigator
         initialRouteName="Login"
         screenOptions={{
@@ -51,13 +54,15 @@ export default function RootNavigator() {
         <Stack.Screen name="Tasks" component={TasksScreen} />
         <Stack.Screen name="Projects" component={ProjectsScreen} />
         <Stack.Screen name="ProjectDetail" component={ProjectDetailScreen} />
+        <Stack.Screen name="ProjectContributors" component={ProjectContributorsScreen} />
         <Stack.Screen name="ProjectReport" component={ProjectReportScreen} />
         <Stack.Screen name="Applications" component={ApplicationsScreen} />
         <Stack.Screen name="ApplicationDetail" component={ApplicationDetailScreen} />
-        <Stack.Screen name="ApplicationCreate" component={ApplicationCreateScreen} />
         <Stack.Screen name="EditorBoards" component={EditorBoardsScreen} />
         <Stack.Screen name="EditorBoardDetail" component={EditorBoardDetailScreen} />
-        <Stack.Screen name="EditorBoardAttachProject" component={EditorBoardAttachProjectScreen} />
+        <Stack.Screen name="EditorBoardProjects" component={EditorBoardProjectsScreen} />
+        <Stack.Screen name="EditorBoardMembers" component={EditorBoardMembersScreen} />
+        <Stack.Screen name="EditorBoardApplications" component={EditorBoardApplicationsScreen} />
         <Stack.Screen name="Resources" component={ResourcesScreen} />
         <Stack.Screen name="ResourceFolderDetail" component={ResourceFolderDetailScreen} />
         <Stack.Screen name="ResourceFile" component={ResourceFileScreen} />

@@ -1,13 +1,22 @@
 import {
+  ApiComment,
   ApiDataResponse,
   ApiFile,
+  ApiFrame,
   ApiFolder,
   ApiListResponse,
   ApiMaterial,
   ApiTask,
 } from './apiTypes';
 import { apiRequest } from './apiClient';
-import { mapFile, mapFolder, mapMaterialVersion, mapResourceTask } from './mappers';
+import {
+  mapComment,
+  mapFile,
+  mapFolder,
+  mapMaterialVersion,
+  mapResourceTask,
+  uniqueById,
+} from './mappers';
 import {
   ResourceFileMaterialVersion,
   ResourceFileNode,
@@ -32,9 +41,11 @@ export async function fetchProjectRootFolders(projectId: string) {
     },
   });
 
-  return (response.data ?? [])
-    .filter((folder) => !folder.parent && !folder.parentId)
-    .map((folder) => mapFolder(folder));
+  return uniqueById(
+    (response.data ?? [])
+      .filter((folder) => !folder.parent && !folder.parentId)
+      .map((folder) => mapFolder(folder)),
+  );
 }
 
 export async function fetchFolderBundle(folderId: string) {
@@ -51,8 +62,8 @@ export async function fetchFolderBundle(folderId: string) {
   const folder = folderResponse.data;
   if (!folder) throw new Error('Resource folder not found');
 
-  const childFolders = (childrenResponse.data ?? []).map((item) => mapFolder(item));
-  const files = (filesResponse.data ?? []).map((item) => mapFile(item));
+  const childFolders = uniqueById((childrenResponse.data ?? []).map((item) => mapFolder(item)));
+  const files = uniqueById((filesResponse.data ?? []).map((item) => mapFile(item)));
 
   return {
     folder: mapFolder(folder, [...childFolders, ...files]),
@@ -61,16 +72,13 @@ export async function fetchFolderBundle(folderId: string) {
 }
 
 export async function fetchResourceFileBundle(fileId: string) {
-  const [fileResponse, versionsResponse, tasksResponse, commentsResponse] = await Promise.all([
+  const [fileResponse, versionsResponse, tasksResponse] = await Promise.all([
     apiRequest<ApiDataResponse<ApiFile>>(`/files/${fileId}`),
     apiRequest<ApiListResponse<ApiMaterial>>(`/files/${fileId}/versions`, {
       params: { limit: 50, page: 1 },
     }).catch(() => ({ data: [] })),
     apiRequest<ApiListResponse<ApiTask>>(`/files/${fileId}/tasks`, {
       params: { limit: 50, page: 1 },
-    }).catch(() => ({ data: [] })),
-    apiRequest<ApiListResponse<never>>(`/files/${fileId}/comments`, {
-      params: { limit: 100, page: 1 },
     }).catch(() => ({ data: [] })),
   ]);
 
@@ -80,18 +88,50 @@ export async function fetchResourceFileBundle(fileId: string) {
   const tasks = await Promise.all(
     (tasksResponse.data ?? []).map(async (task) => {
       const [framesResponse, taskCommentsResponse] = await Promise.all([
-        apiRequest<ApiListResponse<never>>(`/tasks/${task.id}/frames`, {
+        apiRequest<ApiListResponse<ApiFrame>>(`/tasks/${task.id}/frames`, {
           params: { limit: 100, page: 1 },
         }).catch(() => ({ data: [] })),
-        apiRequest<ApiListResponse<never>>(`/tasks/${task.id}/comments`, {
+        apiRequest<ApiListResponse<ApiComment>>(`/tasks/${task.id}/comments`, {
           params: { limit: 100, page: 1 },
         }).catch(() => ({ data: [] })),
       ]);
-      return mapResourceTask(task, framesResponse.data ?? [], taskCommentsResponse.data ?? []);
+      const frameComments = await Promise.all(
+        (framesResponse.data ?? []).map((frame) =>
+          apiRequest<ApiListResponse<ApiComment>>(`/frames/${frame.id}/comments`, {
+            params: { limit: 100, page: 1 },
+          })
+            .then((response) => response.data ?? [])
+            .catch(() => []),
+        ),
+      );
+      return mapResourceTask(task, framesResponse.data ?? [], [
+        ...(taskCommentsResponse.data ?? []),
+        ...frameComments.flat(),
+      ]);
     }),
   );
 
-  return mapFile(file, versionsResponse.data ?? [], tasks);
+  return mapFile(file, versionsResponse.data ?? [], uniqueById(tasks));
+}
+
+export async function createDiscussionComment(params: {
+  frameId?: string | null;
+  taskId: string;
+  text: string;
+}) {
+  const text = params.text.trim();
+  if (!text) throw new Error('Vui lòng nhập nội dung bình luận.');
+
+  const path = params.frameId
+    ? `/frames/${params.frameId}/comments`
+    : `/tasks/${params.taskId}/comments`;
+  const response = await apiRequest<ApiDataResponse<ApiComment>>(path, {
+    body: { content: { text } },
+    method: 'POST',
+  });
+
+  if (!response.data) throw new Error('Không thể tạo bình luận.');
+  return mapComment(response.data);
 }
 
 export async function fetchProjectMaterials(projectId: string): Promise<ProjectMaterialFile[]> {
@@ -111,7 +151,7 @@ export async function fetchProjectMaterials(projectId: string): Promise<ProjectM
           `/files/${item.id}/versions`,
           { params: { limit: 20, page: 1 } },
         ).catch(() => ({ data: [] }));
-        const versions = (versionsResponse.data ?? []).map(mapMaterialVersion);
+        const versions = uniqueById((versionsResponse.data ?? []).map(mapMaterialVersion));
         const latestVersion = versions[0];
         if (latestVersion) {
           const file = { ...item, materialVersions: versions, previewImageUri: latestVersion.materials.imageUri } as ResourceFileNode;

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import CommentBubble from '@/src/components/sub-component/CommentBubble';
 import FrameListPanel from '@/src/components/sub-component/FrameListPanel';
@@ -201,21 +201,46 @@ function TaskRow({
 }
 
 function TaskDiscussion({
-  comment,
-  onCommentChange,
+  onCreateComment,
   selectedFrame,
   task,
   onSelectFrame,
 }: {
-  comment: string;
-  onCommentChange: (value: string) => void;
+  onCreateComment: (params: {
+    frameId?: string | null;
+    taskId: string;
+    text: string;
+  }) => Promise<void>;
   selectedFrame: ResourceTaskFrame | null;
   task: ResourceFileTask;
   onSelectFrame: (frame: ResourceTaskFrame) => void;
 }) {
+  const [comment, setComment] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const visibleComments = selectedFrame
     ? task.comments.filter((item) => item.frameId === selectedFrame.id)
     : task.comments;
+
+  const handleSubmit = async () => {
+    if (isSubmitting || !comment.trim()) return;
+
+    setIsSubmitting(true);
+    setErrorMessage('');
+
+    try {
+      await onCreateComment({
+        frameId: selectedFrame?.id ?? null,
+        taskId: task.id,
+        text: comment,
+      });
+      setComment('');
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Không thể gửi bình luận.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <View
@@ -253,8 +278,8 @@ function TaskDiscussion({
 
         {visibleComments.length > 0 ? (
           <View className="gap-3">
-            {visibleComments.map((item) => (
-              <CommentBubble key={item.id} comment={item} />
+            {visibleComments.map((item, index) => (
+              <CommentBubble key={`${item.id}-${index}`} comment={item} />
             ))}
           </View>
         ) : (
@@ -262,30 +287,58 @@ function TaskDiscussion({
         )}
 
         <View
-          className="flex-row items-center gap-3 rounded-xl px-4 py-2"
+          className="gap-2 rounded-xl px-4 py-3"
           style={{ backgroundColor: C.surface, borderWidth: 1, borderColor: C.borderFaint }}
         >
-          <View
-            className="h-8 w-8 items-center justify-center rounded-full"
-            style={{ backgroundColor: C.surfaceHighest }}
-          >
-            <Text className="text-[10px] font-bold" style={{ color: C.text }}>
-              ME
-            </Text>
+          <View className="flex-row items-center gap-3">
+            <View
+              className="h-8 w-8 items-center justify-center rounded-full"
+              style={{ backgroundColor: C.surfaceHighest }}
+            >
+              <Text className="text-[10px] font-bold" style={{ color: C.text }}>
+                ME
+              </Text>
+            </View>
+            <TextInput
+              value={comment}
+              onChangeText={setComment}
+              placeholder={
+                selectedFrame
+                  ? `Nhận xét về "${selectedFrame.name}"...`
+                  : 'Trao đổi với team về task này...'
+              }
+              placeholderTextColor={C.textFaint}
+              className="flex-1 py-2 text-sm"
+              editable={!isSubmitting}
+              style={{ color: C.text }}
+              multiline
+            />
+            <TouchableOpacity
+              activeOpacity={0.75}
+              disabled={isSubmitting || !comment.trim()}
+              onPress={handleSubmit}
+              className="h-9 w-9 items-center justify-center rounded-full"
+              style={{
+                backgroundColor:
+                  isSubmitting || !comment.trim() ? C.surfaceHighest : C.accent,
+              }}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color={C.text} size="small" />
+              ) : (
+                <MaterialIcon
+                  name="send"
+                  color={!comment.trim() ? C.textFaint : C.bg}
+                  size={18}
+                />
+              )}
+            </TouchableOpacity>
           </View>
-          <TextInput
-            value={comment}
-            onChangeText={onCommentChange}
-            placeholder={
-              selectedFrame
-                ? `Nhận xét về "${selectedFrame.name}"...`
-                : 'Trao đổi với team về task này...'
-            }
-            placeholderTextColor={C.textFaint}
-            className="flex-1 py-2 text-sm"
-            style={{ color: C.text }}
-            multiline
-          />
+          {errorMessage ? (
+            <Text className="text-[12px]" style={{ color: '#EF4444' }}>
+              {errorMessage}
+            </Text>
+          ) : null}
         </View>
       </View>
     </View>
@@ -293,8 +346,7 @@ function TaskDiscussion({
 }
 
 function TaskSection({
-  comment,
-  onCommentChange,
+  onCreateComment,
   onSelectFrame,
   onSelectTask,
   selectedFrame,
@@ -302,8 +354,11 @@ function TaskSection({
   tasks,
   title,
 }: {
-  comment: string;
-  onCommentChange: (value: string) => void;
+  onCreateComment: (params: {
+    frameId?: string | null;
+    taskId: string;
+    text: string;
+  }) => Promise<void>;
   onSelectFrame: (frame: ResourceTaskFrame) => void;
   onSelectTask: (task: ResourceFileTask) => void;
   selectedFrame: ResourceTaskFrame | null;
@@ -331,8 +386,7 @@ function TaskSection({
               <TaskRow task={task} isSelected={isSelected} onPress={() => onSelectTask(task)} />
               {isSelected ? (
                 <TaskDiscussion
-                  comment={comment}
-                  onCommentChange={onCommentChange}
+                  onCreateComment={onCreateComment}
                   selectedFrame={selectedFrame}
                   task={task}
                   onSelectFrame={onSelectFrame}
@@ -347,16 +401,18 @@ function TaskSection({
 }
 
 export function TasksPanel({
-  comment,
-  onCommentChange,
+  onCreateComment,
   onSelectFrame,
   onSelectTask,
   selectedFrame,
   selectedTaskId,
   tasks,
 }: {
-  comment: string;
-  onCommentChange: (value: string) => void;
+  onCreateComment: (params: {
+    frameId?: string | null;
+    taskId: string;
+    text: string;
+  }) => Promise<void>;
   onSelectFrame: (frame: ResourceTaskFrame) => void;
   onSelectTask: (task: ResourceFileTask | null) => void;
   selectedFrame: ResourceTaskFrame | null;
@@ -387,8 +443,7 @@ export function TasksPanel({
         </TouchableOpacity>
 
         <TaskDiscussion
-          comment={comment}
-          onCommentChange={onCommentChange}
+          onCreateComment={onCreateComment}
           selectedFrame={selectedFrame}
           task={selectedTask}
           onSelectFrame={onSelectFrame}
