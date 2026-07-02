@@ -72,11 +72,6 @@ type BoardProjectsResponse = {
   pagination?: PaginationResponse;
 };
 
-type BoardApplicationsResponse = {
-  data?: ApplicationResponse[];
-  pagination?: PaginationResponse;
-};
-
 type BoardMembersResponse = {
   data?: BoardMemberApiResponse[];
   pagination?: PaginationResponse;
@@ -232,7 +227,7 @@ export async function addEditorBoardProjects(
   return response.data ?? (response as { count: number });
 }
 
-export async function getEditorBoardApplications<TApplication extends object = Record<string, unknown>>(
+export async function getEditorBoardApplications<TApplication extends object = ApplicationResponse>(
   boardId: number | string,
   params?: {
     field?: 'createdAt' | 'updatedAt' | 'title';

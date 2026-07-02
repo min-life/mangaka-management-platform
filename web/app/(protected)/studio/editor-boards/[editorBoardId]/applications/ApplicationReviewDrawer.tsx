@@ -15,7 +15,14 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 
 import { useAuth } from '@/hooks/useAuth';
-import { getApplicationVotes, voteApplication, ApplicationVoteResponse, VoteDecision } from '@/services/application.service';
+import {
+  getApplicationVotes,
+  voteApplication,
+  type ApplicationResponse,
+  type ApplicationStatus,
+  type ApplicationVoteResponse,
+  type VoteDecision,
+} from '@/services/application.service';
 
 import { getStatusLabel, getStatusStyle } from './application-ui';
 
@@ -64,30 +71,13 @@ const MOCK_COMMENTS: CommentItem[] = [
   },
 ];
 
-type ApplicationResponse = {
-  createdAt: string;
-  createdByUser?: { avatarUrl?: string; displayName?: string; email?: string };
-  description?: string;
-  id: number;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  materials?: any;
-  project?: { id: number; name: string };
-  status: string;
-  title: string;
-  type: string;
-  updatedAt: string;
-  verifiedByUser?: { displayName?: string; email?: string };
-  verifyBy?: number;
-  createdBy?: number;
-};
-
 type ApplicationReviewDrawerProps = {
   application: ApplicationResponse | null;
   isSubmitting: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdateStatus: (
     application: ApplicationResponse,
-    status: string,
+    status: ApplicationStatus,
   ) => void;
 };
 
