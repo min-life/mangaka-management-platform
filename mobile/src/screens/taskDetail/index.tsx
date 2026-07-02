@@ -11,7 +11,7 @@ import {
   ResourceFileTask,
   ResourceTaskFrame,
 } from '@/src/types/resources';
-import { fetchResourceFileBundle } from '@/src/services/resourceApi';
+import { createDiscussionComment, fetchResourceFileBundle } from '@/src/services/resourceApi';
 import { fetchTask } from '@/src/services/taskApi';
 
 import {
@@ -26,6 +26,8 @@ import {
   ResourceFileTabBar,
   TasksPanel,
 } from '@/src/screens/resourceFile/components/ResourceFilePanels';
+
+const TASK_DETAIL_TABS: ResourceFileTab[] = ['Overview', 'Tasks', 'Materials'];
 
 function buildFileDescription(content: string, language: string) {
   const meaningfulLines = content
@@ -47,7 +49,6 @@ type TaskDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'TaskDet
 
 export default function TaskDetailScreen({ navigation, route }: TaskDetailScreenProps) {
   const [activeTab, setActiveTab] = useState<ResourceFileTab>('Overview');
-  const [comment, setComment] = useState('');
   const [file, setFile] = useState<ResourceFileNode | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
@@ -121,6 +122,26 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
     setActiveTab('Materials');
   };
 
+  const handleCreateComment = async (params: {
+    frameId?: string | null;
+    taskId: string;
+    text: string;
+  }) => {
+    await createDiscussionComment(params);
+    const task = await fetchTask(params.taskId);
+    const fileId = String(task.fileId ?? task.file?.id ?? '');
+    if (!fileId) throw new Error('Task does not have a file.');
+    const nextFile = await fetchResourceFileBundle(fileId);
+    setFile(nextFile);
+    const selectedTask = nextFile.tasks?.find((item) => item.id === params.taskId);
+    setSelectedTaskId(params.taskId);
+    setSelectedFrame(
+      params.frameId
+        ? selectedTask?.frames.find((frame) => frame.id === params.frameId) ?? null
+        : null,
+    );
+  };
+
   if (isLoading) {
     return (
       <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
@@ -167,7 +188,11 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
           status={selectedVersion ? 'Material Preview' : 'File Preview'}
         />
 
-        <ResourceFileTabBar activeTab={activeTab} onTabChange={setActiveTab} />
+        <ResourceFileTabBar
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          tabs={TASK_DETAIL_TABS}
+        />
 
         {activeTab === 'Overview' && (
           <OverviewPanel
@@ -178,8 +203,7 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
 
         {activeTab === 'Tasks' && (
           <TasksPanel
-            comment={comment}
-            onCommentChange={setComment}
+            onCreateComment={handleCreateComment}
             onSelectFrame={handleSelectFrame}
             onSelectTask={handleSelectTask}
             selectedFrame={selectedFrame}

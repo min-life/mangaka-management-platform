@@ -29,15 +29,6 @@ export default function ResourceFolderDetailTopBar({
           <TouchableOpacity
             activeOpacity={0.72}
             accessibilityRole="button"
-            accessibilityLabel="Add resource item"
-            className="h-10 w-10 items-center justify-center rounded-full"
-          >
-            <MaterialIcon name="add" color={Colors.statusProgress} size={27} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            activeOpacity={0.72}
-            accessibilityRole="button"
             accessibilityLabel="More resource actions"
             className="h-10 w-10 items-center justify-center rounded-full"
           >

@@ -1,6 +1,6 @@
 import { ApiDataResponse, ApiListResponse, ApiTask } from './apiTypes';
 import { apiRequest } from './apiClient';
-import { mapTaskCard } from './mappers';
+import { mapTaskCard, uniqueById } from './mappers';
 
 export async function fetchTasks(params: { projectId?: string; search?: string; status?: string } = {}) {
   const path = params.projectId ? `/projects/${params.projectId}/tasks` : '/tasks';
@@ -15,8 +15,9 @@ export async function fetchTasks(params: { projectId?: string; search?: string; 
   });
 
   return {
+    pagination: response.pagination,
     rawTasks: response.data ?? [],
-    tasks: (response.data ?? []).map(mapTaskCard),
+    tasks: uniqueById((response.data ?? []).map(mapTaskCard)),
   };
 }
 

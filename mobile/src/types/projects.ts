@@ -54,3 +54,22 @@ export interface ProjectItem {
   avatarBg: string;
   coverUri?: string;
 }
+
+export interface ProjectMemberItem {
+  id: string;
+  avatarUri?: string | null;
+  email: string;
+  initials: string;
+  joinedAtLabel: string;
+  name: string;
+  numberOfTasks: number;
+  roleCode: string;
+  roleName: string;
+  taskOverview?: {
+    done?: number;
+    inprogress?: number;
+    pending?: number;
+    review?: number;
+    total?: number;
+  } | null;
+}
