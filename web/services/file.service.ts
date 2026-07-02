@@ -92,10 +92,10 @@ export async function createMaterial(fileId: number | string, formData: FormData
     `/files/${fileId}/materials`,
     formData,
     {
+      timeout: 300000,
       headers: {
         'Content-Type': 'multipart/form-data',
       },
-      timeout: 300000,
     },
   );
   return response.data;
@@ -174,4 +174,3 @@ export async function getFileActivityLogs(fileId: number | string, page = 1, lim
   );
   return response;
 }
-

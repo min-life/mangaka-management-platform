@@ -1,9 +1,10 @@
 'use client';
 
-import { ArrowRight, Calendar, ClipboardList, Mail, Trash2, UserCog } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Calendar, Clock, Mail, ShieldCheck, Trash2, UserCog } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
 import { Can } from '@/components/auth/Can';
+import { Badge } from '@/components/ui/badge';
 import {
   Sheet,
   SheetContent,
@@ -11,14 +12,12 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import type { ProjectMemberResponse } from '@/services/project.service';
-
 import {
-  formatOptionalDate,
-  getInitials,
-  getMemberTaskSummary,
-  getRoleClassName,
-} from './member-ui';
+  getProjectMember,
+  type ProjectMemberResponse,
+} from '@/services/project.service';
+
+import { formatOptionalDate, getInitials, getRoleClassName } from './member-ui';
 
 type MemberDetailDrawerProps = {
   member: ProjectMemberResponse | null;
@@ -28,53 +27,37 @@ type MemberDetailDrawerProps = {
   projectId: number;
 };
 
-const STAT_CARDS: {
-  color: string;
-  dotColor: string;
-  key: 'assigned' | 'inProgress' | 'review' | 'done';
+type InfoRowProps = {
   label: string;
-}[] = [
-  { color: 'text-[#7ec8f8]', dotColor: 'bg-[#7ec8f8]', key: 'assigned', label: 'Assigned' },
-  { color: 'text-[#FFD369]', dotColor: 'bg-[#FFD369]', key: 'inProgress', label: 'In Progress' },
-  { color: 'text-[#c084fc]', dotColor: 'bg-[#c084fc]', key: 'review', label: 'Review' },
-  { color: 'text-[#4ade80]', dotColor: 'bg-[#4ade80]', key: 'done', label: 'Done' },
-];
+  value: string;
+};
 
-// Placeholder assignments until backend provides real data
-function getCurrentAssignments(member: ProjectMemberResponse) {
-  return [
-    {
-      chapter: 'Chapter 07',
-      context: 'Storyboard',
-      status: 'In Progress' as const,
-      title: `${member.role.name} production pass`,
-    },
-    {
-      chapter: 'Chapter 12',
-      context: 'Inking',
-      status: 'Review' as const,
-      title: 'Chapter panel correction',
-    },
-    {
-      chapter: 'Chapter 07',
-      context: 'Dialogue',
-      status: 'Pending' as const,
-      title: 'Dialogue cleanup task',
-    },
-  ];
+function InfoRow({ label, value }: InfoRowProps) {
+  return (
+    <div className="border-b border-[#303842] px-4 py-3 last:border-b-0">
+      <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8b94a1]">
+        {label}
+      </p>
+      <p className="mt-1 break-words text-sm font-black text-white">{value}</p>
+    </div>
+  );
 }
 
-function getStatusDotColor(status: string) {
-  switch (status) {
-    case 'In Progress':
-      return 'bg-[#FFD369]';
-    case 'Review':
-      return 'bg-[#c084fc]';
-    case 'Done':
-      return 'bg-[#4ade80]';
-    default:
-      return 'bg-[#7ec8f8]';
-  }
+type TaskMetricProps = {
+  label: string;
+  tone: string;
+  value: number;
+};
+
+function TaskMetric({ label, tone, value }: TaskMetricProps) {
+  return (
+    <div className="rounded-[5px] border border-[#303842] bg-[#101820] px-3 py-2.5">
+      <p className="text-[10px] font-black uppercase tracking-[0.06em] text-[#8b94a1]">
+        {label}
+      </p>
+      <p className={`mt-1 text-xl font-black leading-6 ${tone}`}>{value}</p>
+    </div>
+  );
 }
 
 export function MemberDetailDrawer({
@@ -84,11 +67,48 @@ export function MemberDetailDrawer({
   onRemoveMember,
   projectId,
 }: MemberDetailDrawerProps) {
-  const taskSummary = member ? getMemberTaskSummary(member) : null;
-  const currentAssignments = member ? getCurrentAssignments(member) : [];
+  const [detailMember, setDetailMember] = useState<ProjectMemberResponse | null>(null);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
 
-  // Build "Working On" line from the first in-progress assignment
-  const workingOn = currentAssignments.find((a) => a.status === 'In Progress');
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!member) {
+      setDetailMember(null);
+      setDetailError(null);
+      setIsDetailLoading(false);
+      return;
+    }
+
+    setDetailMember(member);
+    setIsDetailLoading(true);
+    setDetailError(null);
+
+    void getProjectMember(projectId, member.id)
+      .then((result) => {
+        if (isMounted) {
+          setDetailMember(result);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setDetailError('Unable to load member task summary.');
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsDetailLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [member, projectId]);
+
+  const activeMember = detailMember ?? member;
+  const taskOverview = activeMember?.taskOverview;
 
   return (
     <Sheet
@@ -104,139 +124,136 @@ export function MemberDetailDrawer({
         showCloseButton={false}
         side="right"
       >
-        {member && taskSummary ? (
+        {activeMember ? (
           <>
-            {/* ─── Header ─── */}
             <SheetHeader className="border-b border-[#303842] px-5 pb-5 pt-6 text-left">
               <div className="flex items-start gap-4">
-                {member.avatarUrl ? (
+                {activeMember.avatarUrl ? (
                   <img
                     alt=""
-                    className="size-14 rounded-lg border border-[#39424f] object-cover"
-                    src={member.avatarUrl}
+                    className="size-16 rounded-lg border border-[#39424f] object-cover"
+                    src={activeMember.avatarUrl}
                   />
                 ) : (
-                  <span className="grid size-14 place-items-center rounded-lg border border-[#39424f] bg-[#202832] text-base font-black text-[#FFD369]">
-                    {getInitials(member)}
+                  <span className="grid size-16 place-items-center rounded-lg border border-[#39424f] bg-[#202832] text-lg font-black text-[#FFD369]">
+                    {getInitials(activeMember)}
                   </span>
                 )}
+
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <SheetTitle className="truncate text-lg font-black leading-6 text-white">
-                      {member.displayName ?? member.email}
+                      {activeMember.displayName ?? activeMember.email}
                     </SheetTitle>
                     <Badge
-                      className={`h-5 shrink-0 rounded-[3px] border px-2 text-[9px] font-black ${getRoleClassName(member.role.name)}`}
+                      className={`h-5 shrink-0 rounded-[3px] border px-2 text-[9px] font-black ${getRoleClassName(activeMember.role.name)}`}
                       variant="outline"
                     >
-                      {member.role.name}
+                      {activeMember.role.name}
                     </Badge>
                   </div>
 
-                  <SheetDescription className="mt-1.5 space-y-1 text-xs text-[#aeb7c2]">
-                    <span className="flex items-center gap-1.5 font-bold">
-                      <Calendar className="size-3 shrink-0 text-[#8b94a1]" />
-                      Joined {formatOptionalDate(member.createdAt)}
+                  <SheetDescription className="mt-1.5 text-xs font-bold text-[#aeb7c2]">
+                    <span className="flex items-center gap-1.5">
+                      <Mail className="size-3.5 text-[#8b94a1]" />
+                      <span className="truncate">{activeMember.email}</span>
                     </span>
-                    <span className="flex items-center gap-1.5 font-medium">
-                      <Mail className="size-3 shrink-0 text-[#8b94a1]" />
-                      <span className="truncate">{member.email}</span>
+                    <span className="mt-1 flex items-center gap-1.5">
+                      <Calendar className="size-3.5 text-[#8b94a1]" />
+                      Joined {formatOptionalDate(activeMember.createdAt)}
                     </span>
                   </SheetDescription>
                 </div>
               </div>
             </SheetHeader>
 
-            {/* ─── Scrollable Body ─── */}
-            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5">
-              {/* ── Stats Cards ── */}
+            <div className="min-h-0 flex-1 space-y-7 overflow-y-auto px-5 py-5">
               <section>
                 <h3 className="text-xs font-black uppercase tracking-[0.08em] text-white">
-                  Task Overview
+                  Member
                 </h3>
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  {STAT_CARDS.map((card) => (
-                    <div
-                      className="rounded-lg border border-[#303842] bg-[#151c25] px-3.5 py-3"
-                      key={card.key}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <span className={`size-1.5 rounded-full ${card.dotColor}`} />
-                        <span className="text-[10px] font-bold uppercase tracking-[0.06em] text-[#8b94a1]">
-                          {card.label}
-                        </span>
-                      </div>
-                      <p className={`mt-1.5 text-2xl font-black leading-7 ${card.color}`}>
-                        {taskSummary[card.key]}
-                      </p>
-                    </div>
-                  ))}
+                <div className="mt-3 overflow-hidden rounded-lg border border-[#303842] bg-[#151c25]">
+                  <InfoRow label="Project Role" value={activeMember.role.name} />
+                  <InfoRow label="Role Code" value={activeMember.role.code} />
+                  <InfoRow label="Last Updated" value={formatOptionalDate(activeMember.updatedAt)} />
                 </div>
-                <p className="mt-2 text-[10px] font-bold text-[#8b94a1]">
-                  * Task counts use UI fallback data
-                </p>
               </section>
 
-              {/* ── Working On (single line) ── */}
-              {workingOn ? (
-                <section>
+              <section>
+                <div className="flex items-center justify-between gap-3">
                   <h3 className="text-xs font-black uppercase tracking-[0.08em] text-white">
-                    Working On
+                    Task Summary
                   </h3>
-                  <div className="mt-2 flex items-center gap-2 rounded-lg border border-[#303842] bg-[#151c25] px-3.5 py-2.5">
-                    <span className="size-1.5 shrink-0 rounded-full bg-[#FFD369]" />
-                    <p className="truncate text-xs font-bold text-[#dce7f3]">
-                      {workingOn.title}
-                      <span className="ml-1 text-[#8b94a1]">
-                        • {workingOn.chapter} • {workingOn.context}
-                      </span>
+                  {isDetailLoading ? (
+                    <span className="text-[10px] font-black uppercase tracking-[0.06em] text-[#8b94a1]">
+                      Loading
+                    </span>
+                  ) : null}
+                </div>
+
+                {detailError ? (
+                  <p className="mt-3 rounded-lg border border-red-400/30 bg-red-950/20 px-4 py-3 text-xs font-bold text-red-300">
+                    {detailError}
+                  </p>
+                ) : (
+                  <div className="mt-3 rounded-lg border border-[#303842] bg-[#151c25] p-4">
+                    <div className="rounded-[6px] border border-[#3f4855] bg-[#101820] px-4 py-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8b94a1]">
+                        Assigned
+                      </p>
+                      <p className="mt-2 text-4xl font-black leading-none text-white">
+                        {activeMember.numberOfTasks ?? taskOverview?.total ?? 0}
+                      </p>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <TaskMetric
+                        label="Pending"
+                        tone="text-[#7ec8f8]"
+                        value={taskOverview?.pending ?? 0}
+                      />
+                      <TaskMetric
+                        label="Review"
+                        tone="text-[#c084fc]"
+                        value={taskOverview?.review ?? 0}
+                      />
+                      <TaskMetric
+                        label="In Progress"
+                        tone="text-[#FFD369]"
+                        value={taskOverview?.inprogress ?? 0}
+                      />
+                      <TaskMetric
+                        label="Done"
+                        tone="text-[#4ade80]"
+                        value={taskOverview?.done ?? 0}
+                      />
+                    </div>
+                  </div>
+                )}
+              </section>
+
+              <section>
+                <h3 className="text-xs font-black uppercase tracking-[0.08em] text-white">
+                  Permissions
+                </h3>
+                <div className="mt-3 flex items-center gap-3 rounded-lg border border-[#303842] bg-[#151c25] px-4 py-3">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-[5px] border border-[#3f4855] bg-[#101820] text-[#FFD369]">
+                    <ShieldCheck className="size-4" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-black text-white">Inherited from project role</p>
+                    <p className="mt-1 text-xs font-bold text-[#8b94a1]">
+                      {activeMember.role.name}
                     </p>
                   </div>
-                </section>
-              ) : null}
-
-              {/* ── Current Assignments ── */}
-              <section>
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black uppercase tracking-[0.08em] text-white">
-                    Recent Assignments
-                  </h3>
-                  <span className="text-[10px] font-bold text-[#8b94a1]">Top 3</span>
-                </div>
-                <div className="mt-3 divide-y divide-[#303842] rounded-lg border border-[#303842] bg-[#151c25]">
-                  {currentAssignments.map((assignment) => (
-                    <div className="px-4 py-3" key={assignment.title}>
-                      <div className="flex items-center gap-2">
-                        <span className={`size-1.5 shrink-0 rounded-full ${getStatusDotColor(assignment.status)}`} />
-                        <p className="truncate text-xs font-black text-white">
-                          {assignment.title}
-                        </p>
-                      </div>
-                      <p className="mt-1 pl-3.5 text-[10px] font-bold text-[#8b94a1]">
-                        {assignment.chapter} • {assignment.context}
-                      </p>
-                    </div>
-                  ))}
-                  <button
-                    className="flex h-10 w-full items-center justify-between px-4 text-xs font-black text-[#dce7f3] transition-colors hover:bg-[#202832] hover:text-white"
-                    type="button"
-                  >
-                    <span className="flex items-center gap-2">
-                      <ClipboardList className="size-3.5 text-[#8b94a1]" />
-                      View member tasks
-                    </span>
-                    <ArrowRight className="size-4" />
-                  </button>
                 </div>
               </section>
 
-              {/* ── Actions ── */}
               <section>
-                <div className="border-t border-[#303842] pt-4">
-                  <h3 className="text-xs font-black uppercase tracking-[0.08em] text-white">
-                    Actions
-                  </h3>
-                  <div className="mt-3 divide-y divide-[#303842] rounded-lg border border-[#303842] bg-[#151c25]">
+                <h3 className="text-xs font-black uppercase tracking-[0.08em] text-white">
+                  Actions
+                </h3>
+                <div className="mt-3 overflow-hidden rounded-lg border border-[#303842] bg-[#151c25]">
+                  <div className="divide-y divide-[#303842]">
                     <Can
                       any={['project:member.update', 'project:owner']}
                       resource="PROJECT"
@@ -244,13 +261,15 @@ export function MemberDetailDrawer({
                     >
                       <button
                         className="flex h-10 w-full items-center gap-3 px-4 text-left text-xs font-black text-[#dce7f3] transition-colors hover:bg-[#202832] hover:text-white"
-                        onClick={() => onChangeRole(member)}
+                        onClick={() => onChangeRole(activeMember)}
                         type="button"
                       >
                         <UserCog className="size-4 text-[#FFD369]" />
                         Change Role
                       </button>
                     </Can>
+                  </div>
+                  <div className="border-t border-[#303842]">
                     <Can
                       any={['project:member.remove', 'project:owner']}
                       resource="PROJECT"
@@ -258,7 +277,7 @@ export function MemberDetailDrawer({
                     >
                       <button
                         className="flex h-10 w-full items-center gap-3 px-4 text-left text-xs font-black text-red-300 transition-colors hover:bg-red-950/30 hover:text-red-200"
-                        onClick={() => onRemoveMember(member)}
+                        onClick={() => onRemoveMember(activeMember)}
                         type="button"
                       >
                         <Trash2 className="size-4" />

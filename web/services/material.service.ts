@@ -41,3 +41,16 @@ export async function updateMaterial(
 export async function deleteMaterial(materialId: number | string) {
   await api.delete(`/materials/${materialId}`);
 }
+
+export async function addMaterialItems(materialId: number | string, formData: FormData) {
+  const response = await api.post<MaterialItemResponse, MaterialItemResponse>(
+    `/materials/${materialId}/add`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    },
+  );
+  return response.data;
+}

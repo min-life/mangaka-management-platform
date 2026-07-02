@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { AxiosError } from 'axios';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 
+import { useAuth } from '@/hooks/useAuth';
 import { setAccessToken } from '@/lib/auth-storage';
 import { validateLogin, type LoginErrors } from '@/lib/validators/auth';
 import { login } from '@/services/auth.service';
@@ -58,6 +59,7 @@ export function AuthForm({
 }: AuthFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { logout, refreshUser, status, user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -97,6 +99,7 @@ export function AuthForm({
       });
 
       setAccessToken(response.accessToken);
+      await refreshUser();
       router.push(submitHref);
     } catch (error) {
       const axiosError = error as AxiosError<{ message?: string }>;
@@ -113,6 +116,14 @@ export function AuthForm({
     }
   };
 
+  const displayName = user?.displayName?.trim() || user?.email || 'Inkly user';
+  const userInitials = displayName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('');
+
   return (
     <section className={authPanelClassName}>
       <div className="mb-8">
@@ -124,6 +135,60 @@ export function AuthForm({
         <p className="text-sm leading-5 text-[#EEEEEE]">{description}</p>
       </div>
 
+      {status === 'loading' ? (
+        <div className="space-y-5">
+          <div className="h-12 animate-shimmer rounded-[4px] bg-[linear-gradient(110deg,#393E46_8%,#4A5260_18%,#393E46_33%)] bg-[length:200%_100%]" />
+          <div className="h-12 animate-shimmer rounded-[4px] bg-[linear-gradient(110deg,#393E46_8%,#4A5260_18%,#393E46_33%)] bg-[length:200%_100%]" />
+          <div className="h-14 animate-shimmer rounded-[4px] bg-[linear-gradient(110deg,#FFD36966_8%,#FFD369_18%,#FFD36966_33%)] bg-[length:200%_100%]" />
+        </div>
+      ) : null}
+
+      {status === 'authenticated' && user ? (
+        <div className="space-y-5">
+          <div className="rounded-[6px] border border-[#4A5260] bg-[#101820] p-4">
+            <p className="text-xs font-black uppercase tracking-[0.12em] text-[#FFD369]">
+              You&apos;re already signed in
+            </p>
+            <div className="mt-4 flex items-center gap-4">
+              {user.avatarUrl ? (
+                <img
+                  alt={displayName}
+                  className="size-12 rounded-full border border-[#FFD369] object-cover"
+                  src={user.avatarUrl}
+                />
+              ) : (
+                <span className="grid size-12 place-items-center rounded-full border border-[#FFD369] bg-[#0c1219] text-sm font-black text-[#FFD369]">
+                  {userInitials || 'I'}
+                </span>
+              )}
+              <div className="min-w-0">
+                <p className="truncate text-base font-black text-white">{displayName}</p>
+                <p className="mt-1 truncate text-sm font-semibold text-[#aeb7c2]">
+                  {user.email}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <Button
+            className={authPrimaryButtonClassName}
+            onClick={() => router.push('/studio')}
+            type="button"
+          >
+            Continue to Workspace
+          </Button>
+
+          <button
+            className="h-12 w-full rounded-[4px] border border-[#4A5260] text-xs font-black uppercase tracking-[0.12em] text-white hover:bg-[#393E46]"
+            onClick={() => void logout()}
+            type="button"
+          >
+            Sign out and use another account
+          </button>
+        </div>
+      ) : null}
+
+      {status !== 'loading' && status !== 'authenticated' ? (
       <form className="space-y-5" onSubmit={handleSubmit}>
         {fields.map((field) => (
           <div className="space-y-2" key={field.id}>
@@ -193,7 +258,9 @@ export function AuthForm({
 
         {showSocialLogin ? <SocialLogin /> : null}
       </form>
+      ) : null}
 
+      {status !== 'authenticated' && status !== 'loading' ? (
       <footer className="mt-10 text-center">
         <p className="text-xs font-medium text-[#EEEEEE]">
           {footerText}{' '}
@@ -202,6 +269,7 @@ export function AuthForm({
           </Link>
         </p>
       </footer>
+      ) : null}
     </section>
   );
 }

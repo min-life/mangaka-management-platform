@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { toast } from '@/lib/toast';
 import Link from 'next/link';
 import {
   AlertTriangle,
@@ -21,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { getTaskById, getTaskFrames, updateTask } from '@/services/task.service';
 import { createMaterial, getFileMaterialVersions } from '@/services/file.service';
+import { LoadingState } from '@/components/ui/loading-state';
 
 import {
   taskPriorityClassName,
@@ -68,6 +70,7 @@ export function TaskDetailClient({ projectId, taskId }: TaskDetailClientProps) {
   const [reviewNote, setReviewNote] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSubmittingAction, setIsSubmittingAction] = useState(false);
 
   const loadTask = async (cancelled = false) => {
     if (!/^\d+$/.test(taskId)) {
@@ -189,13 +192,19 @@ export function TaskDetailClient({ projectId, taskId }: TaskDetailClientProps) {
     [task],
   );
 
-  const handleSubmit = async (input: { file: File; note: string }) => {
+  const handleSubmit = async (input: {
+    image?: File;
+    text?: File;
+    source?: File;
+    note: string;
+  }) => {
     if (!task) return;
-    setIsLoading(true);
-    setError(null);
     try {
       const formData = new FormData();
-      formData.append('files', input.file);
+      if (input.image) formData.append('image', input.image);
+      if (input.text) formData.append('text', input.text);
+      if (input.source) formData.append('source', input.source);
+      formData.append('taskId', String(task.id));
       await createMaterial(task.fileId, formData);
 
       const versionsRes = await getFileMaterialVersions(task.fileId);
@@ -210,18 +219,16 @@ export function TaskDetailClient({ projectId, taskId }: TaskDetailClientProps) {
 
       await loadTask();
       setActiveTab('SUBMISSIONS');
+      toast.success('Work submitted.');
     } catch (err) {
       console.error('Failed to submit task work:', err);
-      setError('Failed to upload submission work.');
-    } finally {
-      setIsLoading(false);
+      throw err;
     }
   };
 
   const handleReview = async (submissionId: string, approved: boolean) => {
     if (!task || !reviewNote.trim()) return;
-    setIsLoading(true);
-    setError(null);
+    setIsSubmittingAction(true);
     try {
       const nextStatus = approved ? ('DONE' as const) : ('INPROGRESS' as const);
 
@@ -248,11 +255,12 @@ export function TaskDetailClient({ projectId, taskId }: TaskDetailClientProps) {
 
       setReviewNote('');
       await loadTask();
+      toast.success(approved ? 'Version approved.' : 'Review rejected.');
     } catch (err) {
       console.error('Failed to review task:', err);
-      setError('Failed to update task review.');
+      toast.error('Failed to update task review. Please try again.');
     } finally {
-      setIsLoading(false);
+      setIsSubmittingAction(false);
     }
   };
 
@@ -266,7 +274,7 @@ export function TaskDetailClient({ projectId, taskId }: TaskDetailClientProps) {
   };
 
   if (isLoading) {
-    return <div className="grid min-h-[70vh] place-items-center text-sm font-bold text-[#aeb7c2]">Loading task workspace...</div>;
+    return <LoadingState message="Loading task workspace..." minHeight="70vh" variant="detail" />;
   }
 
   if (!task) {
@@ -388,8 +396,14 @@ export function TaskDetailClient({ projectId, taskId }: TaskDetailClientProps) {
                         <div className="mt-4 border-t border-[#303842] pt-4">
                           <textarea className="h-20 w-full resize-none bg-[#101820] p-3 text-xs text-white outline-none placeholder:text-[#8b94a1]" onChange={(event) => setReviewNote(event.target.value)} placeholder="Required review note..." value={reviewNote} />
                           <div className="mt-3 flex justify-end gap-2">
-                            <Button className="border-[#6b2637] bg-[#371522] text-[#ff9ab3] hover:bg-[#4a1d2c]" disabled={!reviewNote.trim()} onClick={() => handleReview(submission.id, false)} variant="outline"><X className="size-4" /> Request Changes *</Button>
-                            <Button className="bg-[#FFD369] text-[#222831] hover:bg-[#eac04f]" disabled={!reviewNote.trim()} onClick={() => handleReview(submission.id, true)}><Check className="size-4" /> Approve *</Button>
+                            <Button className="border-[#6b2637] bg-[#371522] text-[#ff9ab3] hover:bg-[#4a1d2c]" disabled={!reviewNote.trim() || isSubmittingAction} onClick={() => handleReview(submission.id, false)} variant="outline">
+                              <X className="size-4" />
+                              {isSubmittingAction ? 'Rejecting...' : 'Request Changes *'}
+                            </Button>
+                            <Button className="bg-[#FFD369] text-[#222831] hover:bg-[#eac04f]" disabled={!reviewNote.trim() || isSubmittingAction} onClick={() => handleReview(submission.id, true)}>
+                              <Check className="size-4" />
+                              {isSubmittingAction ? 'Approving...' : 'Approve *'}
+                            </Button>
                           </div>
                         </div>
                       ) : null}

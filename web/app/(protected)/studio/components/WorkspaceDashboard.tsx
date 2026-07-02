@@ -44,6 +44,7 @@ import {
   type EditorBoardResponse,
 } from '@/services/editor-board.service';
 import { getMyTasks } from '@/services/task.service';
+import { toast } from '@/lib/toast';
 
 import { CreateBoardDialog } from './CreateBoardDialog';
 import { CreateProjectDialog } from './CreateProjectDialog';
@@ -128,7 +129,6 @@ export function WorkspaceDashboard() {
   const [projectError, setProjectError] = useState<string | null>(null);
   const [boardError, setBoardError] = useState<string | null>(null);
   const [taskError, setTaskError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
   const [activeActionId, setActiveActionId] = useState<string | null>(null);
   const isProjectsTab = activeTab === 'projects';
   const projectRows = useMemo(
@@ -270,13 +270,13 @@ export function WorkspaceDashboard() {
     }
 
     setActiveActionId(`board-${board.boardId}`);
-    setActionError(null);
 
     try {
       await updateEditorBoard(board.boardId, { name: nextName });
       await loadEditorBoards();
+      toast.success(`Board renamed to "${nextName}".`);
     } catch {
-      setActionError('Unable to update editor board.');
+      toast.error('Failed to rename editor board. Please try again.');
     } finally {
       setActiveActionId(null);
     }
@@ -288,13 +288,13 @@ export function WorkspaceDashboard() {
     }
 
     setActiveActionId(`board-${board.boardId}`);
-    setActionError(null);
 
     try {
       await deleteEditorBoard(board.boardId);
       await loadEditorBoards();
+      toast.success(`Board "${board.name}" deleted.`);
     } catch {
-      setActionError('Unable to delete editor board.');
+      toast.error('Failed to delete editor board. Please try again.');
     } finally {
       setActiveActionId(null);
     }
@@ -401,15 +401,13 @@ export function WorkspaceDashboard() {
                   <List className="size-4" />
                 </button>
               </div>
-              <Can any={['admin', 'project:create']}>
-                <CreateProjectDialog
-                  editorBoards={apiBoards}
-                  onCreated={() => {
-                    void loadProjects();
-                    void loadEditorBoards();
-                  }}
-                />
-              </Can>
+              <CreateProjectDialog
+                editorBoards={apiBoards}
+                onCreated={() => {
+                  void loadProjects();
+                  void loadEditorBoards();
+                }}
+              />
             </>
           ) : activeTab === 'myTasks' ? (
             <Button className="ml-auto h-9 rounded-[4px] bg-[#FFD369] px-4 text-xs font-black text-[#222831] hover:bg-[#eac04f]">
@@ -417,11 +415,9 @@ export function WorkspaceDashboard() {
               New Task
             </Button>
           ) : (
-            <Can any={['admin', 'board:create']}>
-              <div className="ml-auto">
-                <CreateBoardDialog onCreated={() => void loadEditorBoards()} />
-              </div>
-            </Can>
+            <div className="ml-auto">
+              <CreateBoardDialog onCreated={() => void loadEditorBoards()} />
+            </div>
           )}
         </div>
 
@@ -431,11 +427,7 @@ export function WorkspaceDashboard() {
           </p>
         ) : null}
 
-        {actionError ? (
-          <p className="mt-4 rounded-[4px] border border-red-400/30 bg-red-950/20 px-4 py-3 text-xs font-bold text-red-300">
-            {actionError}
-          </p>
-        ) : null}
+
 
         {isProjectsTab ? (
           <p className="mt-3 text-[11px] font-bold text-[#8b94a1]">

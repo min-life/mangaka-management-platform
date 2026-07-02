@@ -1,19 +1,30 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AxiosError } from 'axios';
+import { toast } from '@/lib/toast';
 import { FileCheck2, FileUp, Rocket, Search } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
+  addApplicationMaterial,
+  createApplicationComment,
   createProjectApplication,
+  deleteApplication,
+  deleteApplicationMaterial,
+  getApplicationById,
+  getApplicationComments,
   getProjectApplications,
+  updateApplication,
   updateApplicationStatus,
+  type ApplicationCommentResponse,
   type ApplicationResponse,
   type ApplicationStatus,
   type ApplicationType,
 } from '@/services/application.service';
 import { getMyProjectPermissions } from '@/services/permission.service';
+import { getProjectFolders, type ProjectFolderResponse } from '@/services/project.service';
 
 import { ApplicationReviewDrawer } from './ApplicationReviewDrawer';
 import { CreateApplicationDialog, type UploadedApplicationFile } from './CreateApplicationDialog';
@@ -29,20 +40,61 @@ type ApplicationsClientProps = {
   projectId: number;
 };
 
+type ApplicationStatusFilter = 'ALL' | 'APPROVED' | 'IN_REVIEW' | 'PENDING' | 'REJECTED';
+
+const applicationStatusTabs: Array<{ label: string; value: ApplicationStatusFilter }> = [
+  { label: 'All', value: 'ALL' },
+  { label: 'Pending', value: 'PENDING' },
+  { label: 'In Review', value: 'IN_REVIEW' },
+  { label: 'Approved', value: 'APPROVED' },
+  { label: 'Rejected', value: 'REJECTED' },
+];
+
+function ApplicationListSkeleton() {
+  return (
+    <>
+      {Array.from({ length: 4 }).map((_, index) => (
+        <article
+          className="rounded-[5px] border border-[#39424f] bg-[#101820] px-5 py-4"
+          key={index}
+        >
+          <div className="flex items-start justify-between gap-5">
+            <div className="flex min-w-0 flex-1 gap-4">
+              <div className="size-11 shrink-0 animate-pulse rounded-[4px] bg-[#1f2937]" />
+              <div className="min-w-0 flex-1 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-5 w-52 animate-pulse rounded-[4px] bg-[#1f2937]" />
+                  <div className="h-6 w-24 animate-pulse rounded-full bg-[#1f2937]" />
+                </div>
+                <div className="h-3 w-72 max-w-full animate-pulse rounded-[4px] bg-[#1f2937]" />
+                <div className="h-4 w-full max-w-[560px] animate-pulse rounded-[4px] bg-[#1f2937]" />
+              </div>
+            </div>
+            <div className="h-9 w-28 shrink-0 animate-pulse rounded-[4px] bg-[#1f2937]" />
+          </div>
+        </article>
+      ))}
+    </>
+  );
+}
+
 export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
   const [applications, setApplications] = useState<ApplicationResponse[]>([]);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<ApplicationStatus | 'ALL'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<ApplicationStatusFilter>('ALL');
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
   const [selectedApplication, setSelectedApplication] = useState<ApplicationResponse | null>(null);
+  const [selectedComments, setSelectedComments] = useState<ApplicationCommentResponse[]>([]);
   const [mockRejectionReasons, setMockRejectionReasons] = useState<Record<number, string>>({});
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [type, setType] = useState<ApplicationType>('MANUSCRIPT_REVIEW');
+  const [type, setType] = useState<ApplicationType>('CREATE_ARC');
+  const [parentFolderId, setParentFolderId] = useState('');
+  const [parentFolders, setParentFolders] = useState<ProjectFolderResponse[]>([]);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedApplicationFile[]>([]);
 
   const canCreate =
@@ -60,13 +112,15 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
     setError(null);
 
     try {
-      const [applicationResult, permissionResult] = await Promise.all([
+      const [applicationResult, permissionResult, folderResult] = await Promise.all([
         getProjectApplications(projectId),
         getMyProjectPermissions(projectId),
+        getProjectFolders(projectId, { type: 'ARC' }),
       ]);
 
       setApplications(applicationResult.applications);
       setPermissions(permissionResult);
+      setParentFolders(folderResult.folders);
     } catch {
       setError('Unable to load approvals.');
       setApplications([]);
@@ -85,7 +139,13 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
     const normalizedQuery = searchQuery.trim().toLowerCase();
 
     return applications.filter((application) => {
-      const matchesStatus = statusFilter === 'ALL' || application.status === statusFilter;
+      const matchesStatus =
+        statusFilter === 'ALL' ||
+        (statusFilter === 'PENDING' && application.status === 'PENDING') ||
+        (statusFilter === 'IN_REVIEW' &&
+          (application.status === 'INTERNAL_APPROVED' || application.status === 'SUBMITTED')) ||
+        (statusFilter === 'APPROVED' && application.status === 'APPROVE') ||
+        (statusFilter === 'REJECTED' && application.status === 'REJECT');
       const matchesSearch =
         !normalizedQuery ||
         [application.title, application.description ?? '', application.type, application.status].some(
@@ -103,34 +163,80 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
   const resetCreateForm = () => {
     setTitle('');
     setDescription('');
-    setType('MANUSCRIPT_REVIEW');
+    setType('CREATE_ARC');
+    setParentFolderId('');
     setUploadedFiles([]);
   };
 
   const handleCreateApplication = async () => {
+    const trimmedTitle = title.trim();
+    const isFolderRequest = type === 'CREATE_ARC' || type === 'CREATE_CHAPTER';
+    const imageFile =
+      uploadedFiles.find((file) => file.role === 'image')?.file ??
+      uploadedFiles.find((file) => !file.role && file.mimeType.startsWith('image/'))?.file;
+    const textFile =
+      uploadedFiles.find((file) => file.role === 'text')?.file ??
+      uploadedFiles.find((file) => !file.role && !file.mimeType.startsWith('image/'))?.file;
+    const sourceFile = uploadedFiles.find((file) => file.role === 'source')?.file;
+    const materialFiles = uploadedFiles.filter((file) => file.role === 'material' || !file.role);
+
+    if (!trimmedTitle) {
+      toast.error('Title is required.');
+      return;
+    }
+
+    if (type === 'CREATE_CHAPTER' && !parentFolderId) {
+      toast.error('Please select the parent story arc for this chapter request.');
+      return;
+    }
+
+    if (isFolderRequest && (!imageFile || !textFile)) {
+      toast.error('Create arc/chapter requests require at least one image and one text/manuscript file.');
+      return;
+    }
+
     setIsSubmitting(true);
-    setError(null);
 
     try {
       await createProjectApplication(projectId, {
         description: description.trim() || undefined,
-        materials: {
-          uploadedFiles: uploadedFiles.map((file) => ({
-            lastModified: file.lastModified,
-            mimeType: file.mimeType,
-            name: file.name,
-            sizeBytes: file.sizeBytes,
-          })),
-          uploadSource: 'LOCAL_MACHINE_METADATA_ONLY',
-        },
-        title: title.trim(),
+        image: isFolderRequest ? imageFile : undefined,
+        materials: isFolderRequest
+          ? []
+          : materialFiles.map((file) => ({
+              kind: 'SUPPORTING_FILE',
+              lastModified: file.lastModified,
+              mimeType: file.mimeType,
+              originalName: file.name,
+              size: file.sizeBytes,
+              uploadSource: 'LOCAL_MACHINE_METADATA_ONLY',
+            })),
+        parentFolderId: type === 'CREATE_CHAPTER' ? Number(parentFolderId) : undefined,
+        source: isFolderRequest ? sourceFile : undefined,
+        text: isFolderRequest ? textFile : undefined,
+        title: trimmedTitle,
         type,
       });
       setOpenCreateDialog(false);
       resetCreateForm();
       await loadApplications();
-    } catch {
-      setError('Unable to create approval request.');
+      toast.success('Request submitted.');
+    } catch (createError) {
+      console.error('Unable to create approval request:', createError);
+      if (createError instanceof AxiosError && createError.response?.data) {
+        console.error('Create application response:', createError.response.data);
+      }
+      const apiMessage =
+        createError instanceof AxiosError
+          ? createError.response?.data?.message
+          : undefined;
+      const errorMsg =
+        Array.isArray(apiMessage)
+          ? apiMessage.join(' ')
+          : typeof apiMessage === 'string'
+            ? apiMessage
+            : 'Unable to create approval request. Please check required fields and files.';
+      toast.error(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -142,11 +248,21 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
     options?: { rejectionReason?: string },
   ) => {
     setIsSubmitting(true);
-    setError(null);
 
     try {
-      await updateApplicationStatus(application.id, status);
+      const nextStatus =
+        status === 'APPROVE' &&
+        application.status === 'PENDING' &&
+        (application.type === 'CREATE_ARC' || application.type === 'CREATE_CHAPTER')
+          ? 'INTERNAL_APPROVED'
+          : status;
+
+      await updateApplicationStatus(application.id, nextStatus);
       if (status === 'REJECT' && options?.rejectionReason) {
+        await createApplicationComment(application.id, {
+          kind: 'REJECTION_REASON',
+          text: options.rejectionReason,
+        });
         setMockRejectionReasons((currentReasons) => ({
           ...currentReasons,
           [application.id]: options.rejectionReason ?? '',
@@ -154,12 +270,131 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
       }
       setSelectedApplication((currentApplication) =>
         currentApplication?.id === application.id
-          ? { ...currentApplication, status, updatedAt: new Date().toISOString() }
+          ? { ...currentApplication, status: nextStatus, updatedAt: new Date().toISOString() }
           : currentApplication,
       );
       await loadApplications();
+      if (status === 'APPROVE') {
+        toast.success('Application approved.');
+      } else if (status === 'REJECT') {
+        toast.success('Application rejected.');
+      } else {
+        toast.success('Status updated.');
+      }
     } catch {
-      setError('Unable to update approval status.');
+      toast.error('Failed to update status. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleOpenApplication = async (application: ApplicationResponse) => {
+    setSelectedApplication(application);
+    setSelectedComments([]);
+
+    try {
+      const [detail, commentResult] = await Promise.all([
+        getApplicationById(application.id),
+        getApplicationComments(application.id),
+      ]);
+      if (detail) {
+        setSelectedApplication(detail);
+      }
+      setSelectedComments(commentResult.comments);
+    } catch (detailError) {
+      console.error('Unable to load application detail:', detailError);
+    }
+  };
+
+  const refreshSelectedApplication = async (applicationId: number) => {
+    const [detail, commentResult] = await Promise.all([
+      getApplicationById(applicationId),
+      getApplicationComments(applicationId),
+      loadApplications(),
+    ]);
+
+    if (detail) {
+      setSelectedApplication(detail);
+    }
+    setSelectedComments(commentResult.comments);
+  };
+
+  const handleUpdateApplication = async (
+    application: ApplicationResponse,
+    payload: { description?: string; title?: string },
+  ) => {
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      await updateApplication(application.id, payload);
+      await refreshSelectedApplication(application.id);
+    } catch (updateError) {
+      console.error('Unable to update application:', updateError);
+      toast.error('Failed to update application. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteApplication = async (application: ApplicationResponse) => {
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      await deleteApplication(application.id);
+      setSelectedApplication(null);
+      setSelectedComments([]);
+      await loadApplications();
+      toast.success('Application deleted.');
+    } catch (deleteError) {
+      console.error('Unable to delete application:', deleteError);
+      toast.error('Failed to delete application. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCreateComment = async (application: ApplicationResponse, text: string) => {
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      await createApplicationComment(application.id, { text });
+      await refreshSelectedApplication(application.id);
+    } catch (commentError) {
+      console.error('Unable to create application comment:', commentError);
+      toast.error('Failed to add comment. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAddMaterial = async (application: ApplicationResponse, materialItem: unknown) => {
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      await addApplicationMaterial(application.id, materialItem);
+      await refreshSelectedApplication(application.id);
+    } catch (materialError) {
+      console.error('Unable to add application material:', materialError);
+      toast.error('Failed to add material. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteMaterial = async (application: ApplicationResponse, index: number) => {
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      await deleteApplicationMaterial(application.id, index);
+      await refreshSelectedApplication(application.id);
+    } catch (materialError) {
+      console.error('Unable to delete application material:', materialError);
+      toast.error('Failed to delete material. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -183,9 +418,12 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
             onDescriptionChange={setDescription}
             onFilesChange={setUploadedFiles}
             onOpenChange={setOpenCreateDialog}
+            onParentFolderIdChange={setParentFolderId}
             onTitleChange={setTitle}
             onTypeChange={setType}
             open={openCreateDialog}
+            parentFolderId={parentFolderId}
+            parentFolders={parentFolders}
             title={title}
             type={type}
             uploadedFiles={uploadedFiles}
@@ -193,11 +431,7 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
         ) : null}
       </div>
 
-      {error ? (
-        <p className="mt-4 rounded-[4px] border border-red-400/30 bg-red-950/20 px-4 py-3 text-xs font-bold text-red-300">
-          {error}
-        </p>
-      ) : null}
+
 
       <div className="mt-5 grid grid-cols-3 gap-4">
         <article className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-4">
@@ -236,17 +470,17 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
       </div>
 
       <div className="mt-4 flex h-10 items-center gap-2 border-b border-[#26303b]">
-        {(['ALL', 'PENDING', 'APPROVE', 'REJECT'] as const).map((status) => (
+        {applicationStatusTabs.map((tab) => (
           <button
             className={`relative h-full px-2 text-xs font-black ${
-              statusFilter === status ? 'text-[#FFD369]' : 'text-[#aeb7c2] hover:text-white'
+              statusFilter === tab.value ? 'text-[#FFD369]' : 'text-[#aeb7c2] hover:text-white'
             }`}
-            key={status}
-            onClick={() => setStatusFilter(status)}
+            key={tab.value}
+            onClick={() => setStatusFilter(tab.value)}
             type="button"
           >
-            {status === 'ALL' ? 'All' : formatStatus(status)}
-            {statusFilter === status ? (
+            {tab.label}
+            {statusFilter === tab.value ? (
               <span className="absolute inset-x-0 bottom-[-1px] h-[2px] bg-[#FFD369]" />
             ) : null}
           </button>
@@ -255,9 +489,7 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
 
       <section className="mt-4 space-y-3">
         {isLoading ? (
-          <article className="rounded-[5px] border border-[#39424f] bg-[#101820] px-5 py-5 text-xs font-bold text-[#aeb7c2]">
-            Loading applications...
-          </article>
+          <ApplicationListSkeleton />
         ) : filteredApplications.length ? (
           filteredApplications.map((application) => (
             <article
@@ -298,7 +530,7 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
                 </div>
                 <Button
                   className="h-9 shrink-0 rounded-[4px] border-[#4b535f] bg-[#101820] px-4 text-xs font-black text-white hover:bg-[#303842]"
-                  onClick={() => setSelectedApplication(application)}
+                  onClick={() => void handleOpenApplication(application)}
                   variant="outline"
                 >
                   {application.status === 'PENDING' ? 'Open Review' : 'View Result'}
@@ -320,6 +552,7 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
         onOpenChange={(open) => {
           if (!open) {
             setSelectedApplication(null);
+            setSelectedComments([]);
           }
         }}
         rejectionReason={

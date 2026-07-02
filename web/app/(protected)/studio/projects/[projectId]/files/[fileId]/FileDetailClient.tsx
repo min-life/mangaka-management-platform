@@ -33,6 +33,7 @@ import { createProjectApplication, type ApplicationType } from '@/services/appli
 import { getFileById, getFileMaterialVersions, createMaterial, getFileTasks, getFileComments, createFileTask, createFileComment } from '@/services/file.service';
 import { getProjectFolders, getProjectMembers, type ProjectFolderResponse } from '@/services/project.service';
 import { updateTask, createTaskFrame, getTaskFrames } from '@/services/task.service';
+import { toast } from '@/lib/toast';
 
 import { CreateFileReviewDialog } from '../CreateFileReviewDialog';
 import {
@@ -55,6 +56,7 @@ import { VersionHistoryDrawer } from './VersionHistoryDrawer';
 import {
   type TaskWorkspaceItem,
 } from '../../tasks/task-ui';
+import { LoadingState } from '@/components/ui/loading-state';
 
 type ResourceTab = 'overview' | 'discussion' | 'versions' | 'activity';
 type NormalizedPoint = { x: number; y: number };
@@ -132,7 +134,6 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [versionTabMode, setVersionTabMode] = useState<'browse' | 'materials'>('browse');
   const [selectedVersionForMaterials, setSelectedVersionForMaterials] = useState<FileVersionItem | null>(null);
   const [mobileTasksOpen, setMobileTasksOpen] = useState(false);
@@ -503,7 +504,7 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
           ],
         },
       });
-      setSuccessMessage('Review request submitted to Applications.');
+      toast.success('Review request submitted to Applications.');
     } catch {
       setError('Unable to create review request.');
     } finally {
@@ -738,7 +739,9 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
           : currentFile,
       );
       setSelectedSubmissionId(null);
-      setSuccessMessage('Submission approved. It is now displayed as the current file in UI preview mode.');
+      toast.success('Submission approved.', {
+        description: 'It is now displayed as the current file in UI preview mode.',
+      });
     }
     setTasks((currentTasks) =>
       currentTasks.map((task) =>
@@ -764,13 +767,20 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
     }
   };
 
-  const handleSubmitTaskWork = async (input: { file: File; note: string }) => {
+  const handleSubmitTaskWork = async (input: {
+    image?: File;
+    text?: File;
+    source?: File;
+    note: string;
+  }) => {
     if (!focusedTask) return;
     setIsLoading(true);
     setError(null);
     try {
       const formData = new FormData();
-      formData.append('files', input.file);
+      if (input.image) formData.append('image', input.image);
+      if (input.text) formData.append('text', input.text);
+      if (input.source) formData.append('source', input.source);
       await createMaterial(fileId, formData);
 
       const versionsRes = await getFileMaterialVersions(fileId);
@@ -785,7 +795,9 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
         description: `${focusedTask.description}\n[Note: ${input.note.trim()}] [version:${targetVersionTag}]`,
       });
 
-      setSuccessMessage('Work submitted for review successfully. Created a new file material version.');
+      toast.success('Work submitted for review.', {
+        description: `New version ${targetVersionTag} created.`,
+      });
       await loadFile();
       setSelectedSubmissionId(null);
     } catch (err: any) {
@@ -823,9 +835,7 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
 
   if (isLoading) {
     return (
-      <div className="grid min-h-[70vh] place-items-center text-sm font-bold text-[#aeb7c2]">
-        Loading file workspace...
-      </div>
+      <LoadingState message="Loading file workspace..." minHeight="70vh" variant="detail" />
     );
   }
 
@@ -955,15 +965,7 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
           {error}
         </p>
       ) : null}
-      {successMessage ? (
-        <button
-          className="mx-5 mt-4 block rounded-[4px] border border-[#315846] bg-[#14291f] px-4 py-3 text-left text-xs font-bold text-[#9df2c7]"
-          onClick={() => setSuccessMessage(null)}
-          type="button"
-        >
-          {successMessage}
-        </button>
-      ) : null}
+
 
       <div className="flex flex-1 min-h-0 overflow-hidden relative">
         <main className="min-w-0 bg-[#091018] h-full overflow-y-auto relative flex-1">
@@ -1012,7 +1014,9 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
                   <div className="flex items-center gap-2">
                     <span className="size-2 rounded-full bg-[#FFD369] animate-pulse shrink-0" />
                     <span className="text-[10px] font-black text-white uppercase tracking-wider">
-                      Task(s) pending review
+                      {tasks.filter(t => t.status === 'REVIEW').length === 1
+                        ? '1 task is waiting for review'
+                        : `${tasks.filter(t => t.status === 'REVIEW').length} tasks are waiting for review`}
                     </span>
                   </div>
                   <Button
@@ -1128,7 +1132,7 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
                         } else {
                           setAnnotationMode(true);
                           setFrameAnnotationMode(false);
-                          setSuccessMessage("To place a frame comment, please draw a region to create a task first.");
+                          toast.warning("To place a frame comment, please draw a region to create a task first.");
                         }
                       } else {
                         setAnnotationMode(false);
@@ -1552,7 +1556,7 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
                                   formData.append('files', files[i]);
                                 }
                                 await createMaterial(file.id, formData);
-                                setSuccessMessage('Material uploaded successfully.');
+                                toast.success('Material uploaded successfully.');
                                 await loadFile();
                                 setVersionTabMode('browse');
                                 setSelectedVersionForMaterials(null);

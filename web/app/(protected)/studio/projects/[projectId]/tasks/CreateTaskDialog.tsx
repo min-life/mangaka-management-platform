@@ -38,6 +38,7 @@ export function CreateTaskDialog({ fileOptions, members = [], onCreate }: Create
   const [assigneeId, setAssigneeId] = useState('');
   const [status, setStatus] = useState<TaskStatus>('PENDING');
   const [dueDate, setDueDate] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const resetForm = () => {
     setTitle('');
@@ -47,17 +48,24 @@ export function CreateTaskDialog({ fileOptions, members = [], onCreate }: Create
     setDueDate('');
   };
 
-  const handleCreate = () => {
-    onCreate({
-      ...(assigneeId ? { assignedToId: Number(assigneeId) } : {}),
-      description: description.trim(),
-      dueDate,
-      fileId: Number(fileId),
-      status,
-      title: title.trim(),
-    });
-    resetForm();
-    setOpen(false);
+  const handleCreate = async () => {
+    setIsSubmitting(true);
+    try {
+      await onCreate({
+        ...(assigneeId ? { assignedToId: Number(assigneeId) } : {}),
+        description: description.trim(),
+        dueDate,
+        fileId: Number(fileId),
+        status,
+        title: title.trim(),
+      });
+      resetForm();
+      setOpen(false);
+    } catch (err) {
+      console.error('Failed to create task:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -82,7 +90,8 @@ export function CreateTaskDialog({ fileOptions, members = [], onCreate }: Create
           <label className="block">
             <span className="text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">Title</span>
             <input
-              className="mt-2 h-10 w-full rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 text-sm font-bold text-white outline-none placeholder:text-[#8b94a1]"
+              className="mt-2 h-10 w-full rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 text-sm font-bold text-white outline-none placeholder:text-[#8b94a1] disabled:opacity-50"
+              disabled={isSubmitting}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="Finalize inking for Chapter 01"
               value={title}
@@ -91,7 +100,8 @@ export function CreateTaskDialog({ fileOptions, members = [], onCreate }: Create
           <label className="block">
             <span className="text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">Description</span>
             <textarea
-              className="mt-2 h-24 w-full resize-none rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 py-3 text-sm font-bold text-white outline-none placeholder:text-[#8b94a1]"
+              className="mt-2 h-24 w-full resize-none rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 py-3 text-sm font-bold text-white outline-none placeholder:text-[#8b94a1] disabled:opacity-50"
+              disabled={isSubmitting}
               onChange={(event) => setDescription(event.target.value)}
               placeholder="Describe the expected production result"
               value={description}
@@ -100,32 +110,61 @@ export function CreateTaskDialog({ fileOptions, members = [], onCreate }: Create
           <div className="grid gap-4 sm:grid-cols-2">
             <label>
               <span className="text-[10px] font-black uppercase text-[#dce7f3]">Related File</span>
-              <select className="mt-2 h-10 w-full rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 text-xs font-bold text-white" onChange={(event) => setFileId(event.target.value)} value={fileId}>
+              <select
+                className="mt-2 h-10 w-full rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 text-xs font-bold text-white disabled:opacity-50"
+                disabled={isSubmitting}
+                onChange={(event) => setFileId(event.target.value)}
+                value={fileId}
+              >
                 {fileOptions.map((file) => <option key={file.id} value={file.id}>{file.title}</option>)}
               </select>
             </label>
             <label>
               <span className="text-[10px] font-black uppercase text-[#dce7f3]">Assignee</span>
-              <select className="mt-2 h-10 w-full rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 text-xs font-bold text-white" onChange={(event) => setAssigneeId(event.target.value)} value={assigneeId}>
+              <select
+                className="mt-2 h-10 w-full rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 text-xs font-bold text-white disabled:opacity-50"
+                disabled={isSubmitting}
+                onChange={(event) => setAssigneeId(event.target.value)}
+                value={assigneeId}
+              >
                 <option value="">Unassigned</option>
                 {members.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
               </select>
             </label>
             <label>
               <span className="text-[10px] font-black uppercase text-[#dce7f3]">Status</span>
-              <select className="mt-2 h-10 w-full rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 text-xs font-bold text-white" onChange={(event) => setStatus(event.target.value as TaskStatus)} value={status}>
+              <select
+                className="mt-2 h-10 w-full rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 text-xs font-bold text-white disabled:opacity-50"
+                disabled={isSubmitting}
+                onChange={(event) => setStatus(event.target.value as TaskStatus)}
+                value={status}
+              >
                 {(['PENDING', 'INPROGRESS', 'REVIEW', 'DONE'] as const).map((value) => <option key={value}>{value}</option>)}
               </select>
             </label>
             <label>
               <span className="text-[10px] font-black uppercase text-[#dce7f3]">Due Date</span>
-              <input className="mt-2 h-10 w-full rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 text-sm font-bold text-white" onChange={(event) => setDueDate(event.target.value)} type="date" value={dueDate} />
+              <input
+                className="mt-2 h-10 w-full rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 text-sm font-bold text-white disabled:opacity-50"
+                disabled={isSubmitting}
+                onChange={(event) => setDueDate(event.target.value)}
+                type="date"
+                value={dueDate}
+              />
             </label>
           </div>
         </div>
         <DialogFooter className="mx-0 mb-0 shrink-0 rounded-none border-[#39424f] bg-[#151c25] px-6 py-4">
-          <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-          <Button className="bg-[#FFD369] text-[#222831] hover:bg-[#eac04f]" disabled={!title.trim() || !fileId} onClick={handleCreate}>Create Task *</Button>
+          <DialogClose asChild>
+            <Button variant="outline" disabled={isSubmitting}>Cancel</Button>
+          </DialogClose>
+          <Button
+            className="bg-[#FFD369] text-[#222831] hover:bg-[#eac04f]"
+            disabled={!title.trim() || !fileId || isSubmitting}
+            onClick={handleCreate}
+          >
+            {isSubmitting ? 'Creating...' : 'Create Task *'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

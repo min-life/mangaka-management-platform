@@ -21,21 +21,28 @@ import {
 } from '../file-ui';
 
 type CreateAnnotatedTaskDialogProps = {
+  isSubmitting?: boolean;
   members: Array<{ id: number; name: string }>;
   onCancel: () => void;
-  onCreate: (task: FileTaskItem, options?: { assignedBy?: number; parentId?: number }) => void;
+  onCreate: (
+    task: FileTaskItem,
+    options?: { assignedBy?: number; parentId?: number },
+  ) => Promise<void> | void;
   onRequestFrame: () => void;
   open: boolean;
   region: FileTaskRegion | null;
+  tasks?: FileTaskItem[];
 };
 
 export function CreateAnnotatedTaskDialog({
+  isSubmitting = false,
   members,
   onCancel,
   onCreate,
   onRequestFrame,
   open,
   region,
+  tasks = [],
 }: CreateAnnotatedTaskDialogProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -65,7 +72,7 @@ export function CreateAnnotatedTaskDialog({
     onCancel();
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (shouldAttachFrame && !region) {
       return;
     }
@@ -73,22 +80,26 @@ export function CreateAnnotatedTaskDialog({
     const selectedMember = members.find((member) => member.id === Number(effectiveAssigneeId));
     const assigneeName = selectedMember?.name || 'Unassigned';
 
-    onCreate(
-      {
-        assignedTo: assigneeName,
-        description: description.trim() || 'No description.',
-        dueDate: dueDate || undefined,
-        id: `task-local-${Date.now()}`,
-        ...(shouldAttachFrame && region ? { region } : {}),
-        status,
-        title: title.trim(),
-      },
-      {
-        assignedBy: effectiveAssigneeId ? Number(effectiveAssigneeId) : undefined,
-        parentId: parentId ? Number(parentId) : undefined,
-      },
-    );
-    resetForm();
+    try {
+      await onCreate(
+        {
+          assignedTo: assigneeName,
+          description: description.trim() || 'No description.',
+          dueDate: dueDate || undefined,
+          id: `task-local-${Date.now()}`,
+          ...(shouldAttachFrame && region ? { region } : {}),
+          status,
+          title: title.trim(),
+        },
+        {
+          assignedBy: effectiveAssigneeId ? Number(effectiveAssigneeId) : undefined,
+          parentId: parentId ? Number(parentId) : undefined,
+        },
+      );
+      resetForm();
+    } catch {
+      // Keep the form values so the user can retry after an API error.
+    }
   };
 
   return (
@@ -192,27 +203,32 @@ export function CreateAnnotatedTaskDialog({
             </label>
             <label className="block">
               <span className="text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
-                Parent Task ID
+                Parent Task
               </span>
-              <input
+              <select
                 className="mt-2 h-10 w-full rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 text-sm font-bold text-white outline-none placeholder:text-[#8b94a1]"
-                min={1}
                 onChange={(event) => setParentId(event.target.value)}
-                placeholder="Optional"
-                type="number"
                 value={parentId}
-              />
+              >
+                <option value="">No parent task</option>
+                {tasks.map((task) => (
+                  <option key={task.id} value={task.id}>
+                    {task.title}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
 
           <div className="rounded-[5px] border border-[#39424f] bg-[#151c25] p-4">
             <label className="flex items-start gap-3">
-              <input
-                checked={shouldAttachFrame}
-                className="mt-1 accent-[#FFD369]"
-                onChange={(event) => {
-                  setFramePreferenceTouched(true);
-                  setIncludeFrame(event.target.checked);
+            <input
+              checked={shouldAttachFrame}
+              className="mt-1 accent-[#FFD369]"
+              disabled={isSubmitting}
+              onChange={(event) => {
+                setFramePreferenceTouched(true);
+                setIncludeFrame(event.target.checked);
                 }}
                 type="checkbox"
               />
@@ -244,6 +260,7 @@ export function CreateAnnotatedTaskDialog({
               ) : (
                 <button
                   className="mt-3 inline-flex h-9 items-center gap-2 rounded-[4px] border border-[#FFD369] px-3 text-xs font-black text-[#FFD369] hover:bg-[#30270d]"
+                  disabled={isSubmitting}
                   onClick={onRequestFrame}
                   type="button"
                 >
@@ -256,15 +273,15 @@ export function CreateAnnotatedTaskDialog({
         </div>
 
         <DialogFooter className="mx-0 mb-0 rounded-none border-[#39424f] bg-[#151c25] px-6 py-4">
-          <Button onClick={handleCancel} variant="outline">
+          <Button disabled={isSubmitting} onClick={handleCancel} variant="outline">
             Cancel
           </Button>
           <Button
             className="bg-[#FFD369] text-[#222831] hover:bg-[#eac04f]"
-            disabled={!title.trim() || (shouldAttachFrame && !region)}
-            onClick={handleCreate}
+            disabled={isSubmitting || !title.trim() || (shouldAttachFrame && !region)}
+            onClick={() => void handleCreate()}
           >
-            Create Task
+            {isSubmitting ? 'Creating...' : 'Create Task'}
           </Button>
         </DialogFooter>
       </DialogContent>

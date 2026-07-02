@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, FileUp, X } from 'lucide-react';
+import { Check, FileUp, X, AlertTriangle } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -53,6 +53,7 @@ export function ApplicationReviewDrawer({
   rejectionReason,
 }: ApplicationReviewDrawerProps) {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [draftRejectReason, setDraftRejectReason] = useState('');
   const uploadedFiles = application ? readUploadedFiles(application.materials) : [];
   const submittedBy =
@@ -269,7 +270,7 @@ export function ApplicationReviewDrawer({
                     <Button
                       className="h-10 rounded-[4px] bg-[#FFD369] px-4 text-xs font-black text-[#222831] hover:bg-[#eac04f]"
                       disabled={isSubmitting}
-                      onClick={() => onUpdateStatus(application, 'APPROVE')}
+                      onClick={() => setApproveDialogOpen(true)}
                       type="button"
                     >
                       <Check className="size-4" />
@@ -329,6 +330,48 @@ export function ApplicationReviewDrawer({
               type="button"
             >
               Confirm Reject
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog onOpenChange={setApproveDialogOpen} open={approveDialogOpen}>
+        <DialogContent
+          className="max-w-md gap-0 overflow-hidden rounded-[7px] border border-[#39424f] bg-[#101820] p-0 text-white"
+          showCloseButton={false}
+        >
+          <DialogHeader className="border-b border-[#39424f] px-6 py-5">
+            <div className="mb-3 grid size-10 place-items-center rounded-[4px] border border-[#ffd35b]/30 bg-[#30270d] text-[#ffd35b]">
+              <AlertTriangle className="size-5" />
+            </div>
+            <DialogTitle className="text-xl font-black text-white">Approve Request</DialogTitle>
+            <DialogDescription className="text-sm font-medium text-[#aeb7c2]">
+              Are you sure you want to approve this request? This action will transition the application status.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="mx-0 mb-0 rounded-none border-[#39424f] bg-[#151c25] px-6 py-4">
+            <Button
+              className="h-9 rounded-[4px] border-[#4b535f] bg-[#101820] px-4 text-xs font-black text-white hover:bg-[#303842]"
+              onClick={() => setApproveDialogOpen(false)}
+              type="button"
+              variant="outline"
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="h-9 rounded-[4px] bg-[#FFD369] px-4 text-xs font-black text-[#222831] hover:bg-[#eac04f]"
+              disabled={isSubmitting}
+              onClick={() => {
+                if (application) {
+                  onUpdateStatus(application, 'APPROVE');
+                  setApproveDialogOpen(false);
+                }
+              }}
+              type="button"
+            >
+              {isSubmitting ? 'Approving...' : 'Confirm Approve'}
             </Button>
           </DialogFooter>
         </DialogContent>

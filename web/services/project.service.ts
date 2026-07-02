@@ -76,7 +76,15 @@ export type ProjectMemberResponse = {
   displayName: string | null;
   email: string;
   id: number;
+  numberOfTasks?: number;
   role: ProjectMemberRoleResponse;
+  taskOverview?: {
+    done: number;
+    inprogress: number;
+    pending: number;
+    review: number;
+    total: number;
+  } | null;
   updatedAt: string;
 };
 
@@ -201,6 +209,40 @@ export async function getProjectMembers(projectId: number) {
     members: response.data ?? [],
     pagination: response.pagination,
   };
+}
+
+export async function getProjectMember(projectId: number, userId: number) {
+  const response = await api.get<ApiResponse<ProjectMemberResponse>, ApiResponse<ProjectMemberResponse>>(
+    `/projects/${projectId}/members/${userId}`,
+  );
+  const member = response.data ?? (response as ProjectMemberResponse);
+
+  if ('user' in (member as unknown as Record<string, unknown>)) {
+    const nestedMember = member as unknown as {
+      createdAt: string;
+      numberOfTasks?: number;
+      role: ProjectMemberRoleResponse;
+      taskOverview?: ProjectMemberResponse['taskOverview'];
+      updatedAt: string;
+      user: {
+        avatarUrl: string | null;
+        displayName: string | null;
+        email: string;
+        id: number;
+      };
+    };
+
+    return {
+      ...nestedMember.user,
+      createdAt: nestedMember.createdAt,
+      numberOfTasks: nestedMember.numberOfTasks,
+      role: nestedMember.role,
+      taskOverview: nestedMember.taskOverview,
+      updatedAt: nestedMember.updatedAt,
+    };
+  }
+
+  return member;
 }
 
 export async function updateProjectMember(

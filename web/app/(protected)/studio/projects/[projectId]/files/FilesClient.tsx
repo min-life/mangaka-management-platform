@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from '@/lib/toast';
 import {
   ChevronLeft,
   ChevronRight,
@@ -12,22 +13,22 @@ import {
 import { Badge } from '@/components/ui/badge';
 import {
   createFolderFile,
-  createProjectFolder,
   getFolderChildren,
   getFolderFiles,
   getProjectFolders,
   type ProjectFolderResponse,
   type ProjectFileResponse,
 } from '@/services/project.service';
+import { createMaterial } from '@/services/file.service';
 
 import { CreateProductionItemDialog } from './CreateProductionItemDialog';
 import { FileCollection, type FileViewMode } from './FileCollection';
+import { LoadingState } from '@/components/ui/loading-state';
 import { ArcGrid, ChapterGrid, ChapterWorkspaceHeader } from './FileFolderViews';
 import {
   getFolderBranchIds,
   isProductionAssetRoot,
   readStoredFolderCovers,
-  writeStoredFolderCover,
 } from './file-folder-utils';
 import {
   type FileExplorerItem,
@@ -73,7 +74,6 @@ export function FilesClient({ projectId }: FilesClientProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const loadFolders = useCallback(async () => {
     setIsLoading(true);
@@ -181,70 +181,55 @@ export function FilesClient({ projectId }: FilesClientProps) {
     [files, folders],
   );
 
-  const handleCreateFolder = async (input: {
-    coverPreviewUrl?: string;
-    description?: string;
-    parentId?: number;
-    title: string;
-  }) => {
-    setIsSubmitting(true);
-    setError(null);
-
-    try {
-      const createdFolder = await createProjectFolder(projectId, {
-        ...(input.description ? { description: input.description } : {}),
-        ...(input.coverPreviewUrl ? { imageUrl: input.coverPreviewUrl } : {}),
-        ...(input.parentId ? { parentId: input.parentId } : {}),
-        title: input.title,
-      });
-      if (input.coverPreviewUrl) {
-        writeStoredFolderCover(projectId, createdFolder.id, input.coverPreviewUrl);
-        setFolderCovers((current) => ({
-          ...current,
-          [createdFolder.id]: input.coverPreviewUrl ?? '',
-        }));
-      }
-      setSuccessMessage('Folder created successfully.');
-      await loadFolders();
-    } catch {
-      setError('Unable to create folder.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleCreateFile = (input: {
+  const handleCreateFile = async (input: {
+    assetFile?: File;
     description?: string;
     folderId: number;
     previewUrl?: string;
     title: string;
   }) => {
     setIsSubmitting(true);
-    setError(null);
 
-    createFolderFile(input.folderId, {
-      description: input.description,
-      title: input.title,
-    })
-      .then(async (createdFile) => {
-        setSuccessMessage('File record created successfully.');
+    try {
+      const createdFile = await createFolderFile(input.folderId, {
+        description: input.description,
+        title: input.title,
+      });
 
-        if (input.previewUrl) {
-          setFiles((currentFiles) =>
-            currentFiles.map((file) =>
-              file.id === createdFile.id ? { ...file, previewUrl: input.previewUrl } : file,
-            ),
-          );
+      if (input.assetFile) {
+        const formData = new FormData();
+        formData.append('name', input.assetFile.name.replace(/\.[^/.]+$/, ''));
+
+        if (input.assetFile.type.startsWith('image/')) {
+          formData.append('image', input.assetFile);
+        } else if (
+          input.assetFile.type.startsWith('text/') ||
+          input.assetFile.type === 'application/pdf' ||
+          /\.(txt|doc|docx)$/i.test(input.assetFile.name)
+        ) {
+          formData.append('text', input.assetFile);
+        } else {
+          formData.append('source', input.assetFile);
         }
 
-        await loadFolders();
-      })
-      .catch(() => {
-        setError('Unable to create file.');
-      })
-      .finally(() => {
-        setIsSubmitting(false);
-      });
+        await createMaterial(createdFile.id, formData);
+      }
+
+      if (input.previewUrl) {
+        setFiles((currentFiles) =>
+          currentFiles.map((file) =>
+            file.id === createdFile.id ? { ...file, previewUrl: input.previewUrl } : file,
+          ),
+        );
+      }
+
+      toast.success(input.assetFile ? 'File created with initial material.' : 'File created.');
+      await loadFolders();
+    } catch {
+      toast.error('Failed to create file. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleSelectArc = (arcId: number) => {
@@ -283,7 +268,6 @@ export function FilesClient({ projectId }: FilesClientProps) {
             folders={folders}
             isSubmitting={isSubmitting}
             onCreateFile={handleCreateFile}
-            onCreateFolder={handleCreateFolder}
             selectedFolderId={selectedChapterId}
           />
         </div>
@@ -314,15 +298,7 @@ export function FilesClient({ projectId }: FilesClientProps) {
           {error}
         </p>
       ) : null}
-      {successMessage ? (
-        <button
-          className="mt-4 rounded-[4px] border border-[#315846] bg-[#14291f] px-4 py-3 text-left text-xs font-bold text-[#9df2c7]"
-          onClick={() => setSuccessMessage(null)}
-          type="button"
-        >
-          {successMessage}
-        </button>
-      ) : null}
+
 
       <div className="mt-4 flex items-center justify-between border-y border-[#26303b] bg-[#151c25] px-4 py-2">
         <div className="flex items-center gap-2 text-xs font-bold text-[#aeb7c2]">
@@ -336,9 +312,7 @@ export function FilesClient({ projectId }: FilesClientProps) {
 
       <div className="mt-4 min-h-[560px] flex-1 overflow-hidden rounded-[5px] border border-[#26303b] bg-[#101820]">
         {isLoading ? (
-          <div className="grid h-full min-h-[560px] place-items-center text-sm font-bold text-[#aeb7c2]">
-            Loading file workspace...
-          </div>
+          <LoadingState message="Loading file workspace..." />
         ) : folders.length ? (
           selectedChapter ? (
             <div className="min-h-[560px] overflow-hidden">

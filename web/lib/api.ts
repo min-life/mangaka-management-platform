@@ -27,6 +27,14 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+      // Force-set at request level first to override instance default ('application/json'),
+      // then delete entirely so the browser auto-sets 'multipart/form-data; boundary=...'
+      config.headers.set('Content-Type', 'multipart/form-data');
+      config.headers.delete('Content-Type');
+    }
+
     return config;
   },
   (error) => Promise.reject(error),

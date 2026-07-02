@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Activity, Circle, Loader2 } from 'lucide-react';
+import { Activity, Circle } from 'lucide-react';
 
 import { getFileActivityLogs } from '@/services/file.service';
 import { type FileActivityItem } from '../file-ui';
@@ -11,6 +11,20 @@ const activityToneClassName = {
   success: 'text-[#9df2c7]',
   warning: 'text-[#FFD369]',
 };
+
+function ActivitySkeleton() {
+  return (
+    <div className="mt-4 space-y-4">
+      {Array.from({ length: 5 }).map((_, index) => (
+        <div className="relative ml-2 border-l border-[#39424f] pb-2 pl-4" key={index}>
+          <div className="absolute -left-1.5 top-1 size-3 rounded-full border border-[#39424f] bg-[#0d151e]" />
+          <div className="h-3 w-4/5 animate-pulse rounded-[4px] bg-[#1f2937]" />
+          <div className="mt-2 h-3 w-20 animate-pulse rounded-[4px] bg-[#1f2937]" />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 type FileActivityPanelProps = {
   fileId: number | string;
@@ -182,10 +196,7 @@ export function FileActivityPanel({ fileId }: FileActivityPanelProps) {
       </div>
 
       {isLoading ? (
-        <div className="flex h-32 flex-col items-center justify-center gap-2 text-xs font-bold text-[#8b94a1]">
-          <Loader2 className="size-5 animate-spin text-[#FFD369]" />
-          Loading activity history...
-        </div>
+        <ActivitySkeleton />
       ) : error ? (
         <div className="flex h-32 items-center justify-center text-xs font-bold text-[#f29f9f]">
           {error}

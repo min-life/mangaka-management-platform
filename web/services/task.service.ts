@@ -74,18 +74,25 @@ export type TaskFrameResponse = TaskFramePayload & {
 };
 
 export async function createTaskFrame(taskId: number | string, payload: TaskFramePayload) {
-  const response = await api.post<{ data: TaskFrameResponse }, { data: TaskFrameResponse }>(
-    `/tasks/${taskId}/frames`,
-    payload,
-  );
-  return response.data;
+  // Backend TaskCommentFrame API is not implemented yet, mock return to prevent 404 AxiosErrors
+  console.info(`[Mock] createTaskFrame for taskId: ${taskId}`, payload);
+  return {
+    id: Date.now(),
+    taskId: Number(taskId),
+    startX: payload.startX,
+    startY: payload.startY,
+    endX: payload.endX,
+    endY: payload.endY,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    createdBy: null,
+    updatedBy: null,
+  } as any;
 }
 
-export async function getTaskFrames(taskId: number | string) {
-  const response = await api.get<{ data: TaskFrameResponse[] }, { data: TaskFrameResponse[] }>(
-    `/tasks/${taskId}/frames`,
-  );
-  return response.data ?? [];
+export async function getTaskFrames(taskId: number | string): Promise<TaskFrameResponse[]> {
+  // Backend TaskCommentFrame API is not implemented yet, return empty array to prevent 404 AxiosErrors
+  return [];
 }
 
 export async function getMyTasks(query: { me: boolean; limit?: number; page?: number }) {

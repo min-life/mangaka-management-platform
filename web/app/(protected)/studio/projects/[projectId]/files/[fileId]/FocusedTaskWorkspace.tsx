@@ -18,7 +18,12 @@ type FocusedTaskWorkspaceProps = {
   canSubmit: boolean;
   onStartFrameComment: () => void;
   onClose?: () => void;
-  onSubmitWork?: (input: { file: File; note: string }) => void;
+  onSubmitWork?: (input: {
+    image?: File;
+    text?: File;
+    source?: File;
+    note: string;
+  }) => void;
   onTaskChange: (task: TaskWorkspaceItem) => void;
   selectedSubmissionId: string | null;
   task: TaskWorkspaceItem;

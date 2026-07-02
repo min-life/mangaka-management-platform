@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from '@/lib/toast';
 import {
   AlertTriangle,
   Columns3,
@@ -22,6 +23,7 @@ import {
   createFileTask,
   getFileMaterialVersions,
 } from '@/services/file.service';
+import { LoadingState } from '@/components/ui/loading-state';
 
 import { CreateTaskDialog } from './CreateTaskDialog';
 import { TaskKanban } from './TaskKanban';
@@ -234,9 +236,10 @@ export function TasksClient({ projectId }: TasksClientProps) {
       });
 
       await loadData();
+      toast.success('Task created.');
     } catch (err) {
       console.error('Failed to create task:', err);
-      setError('Failed to create task on the server.');
+      toast.error('Failed to create task. Please try again.');
     }
   };
 
@@ -270,9 +273,7 @@ export function TasksClient({ projectId }: TasksClientProps) {
 
   if (isLoading) {
     return (
-      <div className="grid min-h-[70vh] place-items-center text-sm font-bold text-[#aeb7c2]">
-        Loading production tasks...
-      </div>
+      <LoadingState message="Loading production tasks..." minHeight="70vh" />
     );
   }
 
