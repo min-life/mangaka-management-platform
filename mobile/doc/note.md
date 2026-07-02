@@ -3,7 +3,7 @@
 
 
 Version
-/api/tasks/{id}/materials -> danh sách materials dưới dạng select
+/api/tasks/{id}/frames -> danh sách materials dưới dạng select
 /api/materials/{id}/frames -> danh sách các frame
 /api/frames/{id} -> show khung
 /api/frames/{id}/comments -> comment để hiện 

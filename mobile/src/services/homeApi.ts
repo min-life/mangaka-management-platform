@@ -18,6 +18,7 @@ export async function fetchHomeSummary() {
   ]);
 
   const projectCount = projects.pagination?.total ?? projects.projects.length;
+  console.log(projectCount);
   const taskCount = tasks.pagination?.total ?? tasks.tasks.length;
   const applicationCount = applications.pagination?.total ?? applications.applications.length;
   const boardCount = boards.pagination?.total ?? boards.boards.length;
@@ -66,4 +67,3 @@ export async function fetchHomeSummary() {
 
   return { activities, workItems };
 }
-

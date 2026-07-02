@@ -9,12 +9,20 @@ import {
   ResourceFileMaterialVersion,
   ResourceFileNode,
   ResourceFileTask,
+  ResourceTaskComment,
   ResourceTaskFrame,
 } from '@/src/types/resources';
 import {
+  createDiscussionComment,
   createFileDiscussionComment,
+  fetchFileDiscussionComments,
+  fetchFileDiscussionTasks,
   fetchFolderBundle,
+  fetchFrameDetail,
+  fetchFrameDiscussionComments,
   fetchResourceFileBundle,
+  fetchTaskDiscussionComments,
+  fetchTaskDiscussionFrames,
 } from '@/src/services/resourceApi';
 
 import {
@@ -25,7 +33,9 @@ import {
 import {
   MaterialsPanel,
   OverviewPanel,
+  DiscussionComposer,
   DiscussionPanel,
+  DiscussionScope,
   ResourceFileTab,
   ResourceFileTabBar,
   TasksPanel,
@@ -63,6 +73,18 @@ export default function ResourceFileScreen({
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedFrame, setSelectedFrame] = useState<ResourceTaskFrame | null>(null);
+  const [discussionScope, setDiscussionScope] = useState<DiscussionScope>('file');
+  const [discussionComments, setDiscussionComments] = useState<ResourceTaskComment[]>([]);
+  const [fileDiscussionCommentCount, setFileDiscussionCommentCount] = useState(0);
+  const [discussionErrorMessage, setDiscussionErrorMessage] = useState('');
+  const [isDiscussionCommentsLoading, setIsDiscussionCommentsLoading] = useState(false);
+  const [discussionTasks, setDiscussionTasks] = useState<ResourceFileTask[]>([]);
+  const [isDiscussionTasksLoading, setIsDiscussionTasksLoading] = useState(false);
+  const [selectedDiscussionTaskId, setSelectedDiscussionTaskId] = useState<string | null>(null);
+  const [discussionFrames, setDiscussionFrames] = useState<ResourceTaskFrame[]>([]);
+  const [isDiscussionFramesLoading, setIsDiscussionFramesLoading] = useState(false);
+  const [discussionFrameStatusMessage, setDiscussionFrameStatusMessage] = useState('');
+  const [selectedDiscussionFrameId, setSelectedDiscussionFrameId] = useState<string | null>(null);
 
   const loadFile = useCallback(async () => {
     setIsLoading(true);
@@ -74,6 +96,7 @@ export default function ResourceFileScreen({
         fetchFolderBundle(route.params.parentFolderId).catch(() => null),
       ]);
       setFile(nextFile);
+      setFileDiscussionCommentCount(nextFile.comments?.length ?? 0);
       setParentName(parentBundle?.folder.name ?? 'Resource');
       setSelectedVersionId(nextFile.materialVersions?.[0]?.id ?? null);
       setSelectedTaskId(nextFile.tasks?.[0]?.id ?? null);
@@ -91,11 +114,30 @@ export default function ResourceFileScreen({
 
   const versions = file?.materialVersions ?? [];
   const tasks = file?.tasks ?? [];
-  const comments = file?.comments ?? [];
 
   const description = useMemo(
     () => (file ? buildFileDescription(file.content, file.language) : ''),
     [file],
+  );
+
+  const discussionTaskOptions = useMemo(
+    () =>
+      discussionTasks.map((task) => ({
+        description: task.status.replace('INPROGRESS', 'IN PROGRESS'),
+        id: task.id,
+        label: task.title,
+      })),
+    [discussionTasks],
+  );
+
+  const discussionFrameOptions = useMemo(
+    () =>
+      discussionFrames.map((frame, index) => ({
+        description: `${Math.round(frame.width)} x ${Math.round(frame.height)}`,
+        id: frame.id,
+        label: frame.name || `Frame ${index + 1}`,
+      })),
+    [discussionFrames],
   );
 
   const selectedVersion = versions.find((version) => version.id === selectedVersionId) ?? versions[0];
@@ -122,13 +164,163 @@ export default function ResourceFileScreen({
     setActiveTab('Materials');
   };
 
-  const handleCreateFileComment = async (text: string) => {
-    await createFileDiscussionComment({
-      fileId: route.params.fileId,
-      text,
-    });
-    const nextFile = await fetchResourceFileBundle(route.params.fileId);
-    setFile(nextFile);
+  const loadFileDiscussionComments = useCallback(async () => {
+    setDiscussionErrorMessage('');
+    setIsDiscussionCommentsLoading(true);
+
+    try {
+      const nextComments = await fetchFileDiscussionComments(route.params.fileId);
+      setDiscussionComments(nextComments);
+      setFileDiscussionCommentCount(nextComments.length);
+    } catch (error) {
+      setDiscussionComments([]);
+      setDiscussionErrorMessage(
+        error instanceof Error ? error.message : 'Không thể tải file comments.',
+      );
+    } finally {
+      setIsDiscussionCommentsLoading(false);
+    }
+  }, [route.params.fileId]);
+
+  const loadDiscussionTasks = useCallback(async () => {
+    setIsDiscussionTasksLoading(true);
+
+    try {
+      const nextTasks = await fetchFileDiscussionTasks(route.params.fileId);
+      setDiscussionTasks(nextTasks);
+    } catch {
+      setDiscussionTasks([]);
+    } finally {
+      setIsDiscussionTasksLoading(false);
+    }
+  }, [route.params.fileId]);
+
+  const handleSelectFileComments = useCallback(async () => {
+    setDiscussionScope('file');
+    setSelectedDiscussionTaskId(null);
+    setSelectedDiscussionFrameId(null);
+    setDiscussionFrames([]);
+    setDiscussionFrameStatusMessage('');
+    setSelectedFrame(null);
+    void loadDiscussionTasks();
+    await loadFileDiscussionComments();
+  }, [loadDiscussionTasks, loadFileDiscussionComments]);
+
+  const loadTaskDiscussion = useCallback(async (taskId: string) => {
+    setDiscussionScope('task');
+    setSelectedDiscussionTaskId(taskId);
+    setSelectedDiscussionFrameId(null);
+    setDiscussionFrames([]);
+    setDiscussionFrameStatusMessage('');
+    setSelectedFrame(null);
+    setDiscussionErrorMessage('');
+    setIsDiscussionCommentsLoading(true);
+    setIsDiscussionFramesLoading(true);
+
+    try {
+      const nextComments = await fetchTaskDiscussionComments(taskId);
+      setDiscussionComments(nextComments);
+    } catch (error) {
+      setDiscussionComments([]);
+      setDiscussionErrorMessage(
+        error instanceof Error ? error.message : 'Không thể tải task comments.',
+      );
+    } finally {
+      setIsDiscussionCommentsLoading(false);
+    }
+
+    try {
+      const nextFrames = await fetchTaskDiscussionFrames(taskId);
+      setDiscussionFrames(nextFrames);
+    } catch {
+      setDiscussionFrames([]);
+      setDiscussionFrameStatusMessage(
+        'Chưa thể tải frames cho task này. Endpoint /tasks/:id/frames đang chờ backend bổ sung.',
+      );
+    } finally {
+      setIsDiscussionFramesLoading(false);
+    }
+  }, []);
+
+  const loadFrameDiscussion = useCallback(async (frameId: string) => {
+    const fallbackFrame = discussionFrames.find((frame) => frame.id === frameId) ?? null;
+    setDiscussionScope('frame');
+    setSelectedDiscussionFrameId(frameId);
+    setDiscussionErrorMessage('');
+    setIsDiscussionCommentsLoading(true);
+
+    try {
+      const frameDetail = await fetchFrameDetail(frameId).catch(() => fallbackFrame);
+      if (frameDetail) {
+        setSelectedFrame(frameDetail);
+      }
+
+      const nextComments = await fetchFrameDiscussionComments(frameId);
+      setDiscussionComments(nextComments);
+    } catch (error) {
+      setDiscussionComments([]);
+      setDiscussionErrorMessage(
+        error instanceof Error ? error.message : 'Không thể tải frame comments.',
+      );
+    } finally {
+      setIsDiscussionCommentsLoading(false);
+    }
+  }, [discussionFrames]);
+
+  useEffect(() => {
+    if (activeTab === 'Discussion') {
+      void handleSelectFileComments();
+    }
+  }, [activeTab, handleSelectFileComments]);
+
+  const handleRetryDiscussionComments = () => {
+    if (discussionScope === 'file') {
+      void loadFileDiscussionComments();
+      return;
+    }
+
+    if (discussionScope === 'task' && selectedDiscussionTaskId) {
+      void loadTaskDiscussion(selectedDiscussionTaskId);
+      return;
+    }
+
+    if (discussionScope === 'frame' && selectedDiscussionFrameId) {
+      void loadFrameDiscussion(selectedDiscussionFrameId);
+    }
+  };
+
+  const handleCreateDiscussionComment = async (text: string) => {
+    if (discussionScope === 'file') {
+      await createFileDiscussionComment({
+        fileId: route.params.fileId,
+        text,
+      });
+      await loadFileDiscussionComments();
+      return;
+    }
+
+    if (discussionScope === 'task' && selectedDiscussionTaskId) {
+      await createDiscussionComment({
+        taskId: selectedDiscussionTaskId,
+        text,
+      });
+      const nextComments = await fetchTaskDiscussionComments(selectedDiscussionTaskId);
+      setDiscussionComments(nextComments);
+      return;
+    }
+
+    if (discussionScope === 'frame' && selectedDiscussionTaskId && selectedDiscussionFrameId) {
+      await createDiscussionComment({
+        frameId: selectedDiscussionFrameId,
+        taskId: selectedDiscussionTaskId,
+        text,
+      });
+      const nextComments = await fetchFrameDiscussionComments(selectedDiscussionFrameId);
+      setDiscussionComments(nextComments);
+      return;
+    }
+
+    throw new Error('Vui lòng chọn task hoặc frame trước khi bình luận.');
   };
 
   if (isLoading) {
@@ -163,7 +355,10 @@ export default function ResourceFileScreen({
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120 }}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingBottom: activeTab === 'Discussion' ? 148 : 120,
+        }}
         showsVerticalScrollIndicator={false}
       >
         <TaskPreviewSection
@@ -195,8 +390,22 @@ export default function ResourceFileScreen({
 
         {activeTab === 'Discussion' && (
           <DiscussionPanel
-            comments={comments}
-            onCreateComment={handleCreateFileComment}
+            activeScope={discussionScope}
+            comments={discussionComments}
+            errorMessage={discussionErrorMessage}
+            fileCommentCount={fileDiscussionCommentCount}
+            frameOptions={discussionFrameOptions}
+            frameStatusMessage={discussionFrameStatusMessage}
+            isCommentsLoading={isDiscussionCommentsLoading}
+            isFramesLoading={isDiscussionFramesLoading}
+            isTasksLoading={isDiscussionTasksLoading}
+            onRetryComments={handleRetryDiscussionComments}
+            onSelectFileComments={handleSelectFileComments}
+            onSelectFrameComments={loadFrameDiscussion}
+            onSelectTaskComments={loadTaskDiscussion}
+            selectedFrameId={selectedDiscussionFrameId}
+            selectedTaskId={selectedDiscussionTaskId}
+            taskOptions={discussionTaskOptions}
           />
         )}
 
@@ -208,6 +417,20 @@ export default function ResourceFileScreen({
           />
         )}
       </ScrollView>
+
+      {activeTab === 'Discussion' ? (
+        <View
+          className="absolute left-0 right-0 px-4"
+          style={{
+            bottom: 24,
+          }}
+        >
+          <DiscussionComposer
+            activeScope={discussionScope}
+            onCreateComment={handleCreateDiscussionComment}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }

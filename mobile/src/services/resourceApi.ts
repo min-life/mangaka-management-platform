@@ -13,6 +13,7 @@ import {
   mapComment,
   mapFile,
   mapFolder,
+  mapFrame,
   mapMaterialVersion,
   mapResourceTask,
   uniqueById,
@@ -34,10 +35,10 @@ export interface ProjectMaterialFile {
 export async function fetchProjectRootFolders(projectId: string) {
   const response = await apiRequest<ApiListResponse<ApiFolder>>(`/projects/${projectId}/folders`, {
     params: {
-      field: 'createdAt',
-      limit: 100,
+      limit: 10,
       order: 'desc',
       page: 1,
+      type: 'ARC',
     },
   });
 
@@ -114,28 +115,70 @@ export async function fetchResourceFileBundle(fileId: string) {
     }),
   );
 
-  return mapFile(
-    file,
-    versionsResponse.data ?? [],
-    uniqueById(tasks),
-    commentsResponse.data ?? [],
-  );
+  return mapFile(file, versionsResponse.data ?? [], uniqueById(tasks), commentsResponse.data ?? []);
 }
 
-export async function createFileDiscussionComment(params: {
-  fileId: string;
-  text: string;
-}) {
+export async function createFileDiscussionComment(params: { fileId: string; text: string }) {
   const text = params.text.trim();
   if (!text) throw new Error('Vui lòng nhập nội dung bình luận.');
 
-  const response = await apiRequest<ApiDataResponse<ApiComment>>(`/files/${params.fileId}/comments`, {
-    body: { content: { text } },
-    method: 'POST',
-  });
+  const response = await apiRequest<ApiDataResponse<ApiComment>>(
+    `/files/${params.fileId}/comments`,
+    {
+      body: { content: { text } },
+      method: 'POST',
+    },
+  );
 
   if (!response.data) throw new Error('Không thể tạo bình luận.');
   return mapComment(response.data);
+}
+
+export async function fetchFileDiscussionComments(fileId: string) {
+  const response = await apiRequest<ApiListResponse<ApiComment>>(`/files/${fileId}/comments`, {
+    params: { field: 'createdAt', limit: 100, order: 'desc', page: 1 },
+  });
+
+  return uniqueById((response.data ?? []).map(mapComment));
+}
+
+export async function fetchFileDiscussionTasks(fileId: string) {
+  const response = await apiRequest<ApiListResponse<ApiTask>>(`/files/${fileId}/tasks`, {
+    params: { field: 'createdAt', limit: 100, order: 'desc', page: 1 },
+  });
+
+  return uniqueById((response.data ?? []).map((task) => mapResourceTask(task)));
+}
+
+export async function fetchTaskDiscussionComments(taskId: string) {
+  const response = await apiRequest<ApiListResponse<ApiComment>>(`/tasks/${taskId}/comments`, {
+    params: { field: 'createdAt', limit: 100, order: 'desc', page: 1 },
+  });
+
+  return uniqueById((response.data ?? []).map(mapComment));
+}
+
+export async function fetchTaskDiscussionFrames(taskId: string) {
+  const response = await apiRequest<ApiListResponse<ApiFrame>>(`/tasks/${taskId}/frames`, {
+    params: { limit: 100, page: 1 },
+  });
+
+  return uniqueById((response.data ?? []).map(mapFrame));
+}
+
+export async function fetchFrameDetail(frameId: string) {
+  const response = await apiRequest<ApiDataResponse<ApiFrame>>(`/frames/${frameId}`);
+
+  if (!response.data) throw new Error('Frame not found.');
+  return mapFrame(response.data);
+}
+
+export async function fetchFrameDiscussionComments(frameId: string) {
+  const response = await apiRequest<ApiListResponse<ApiComment>>(`/frames/${frameId}/comments`, {
+    params: { field: 'createdAt', limit: 100, order: 'desc', page: 1 },
+  });
+
+  return uniqueById((response.data ?? []).map(mapComment));
 }
 
 export async function createDiscussionComment(params: {
@@ -178,7 +221,11 @@ export async function fetchProjectMaterials(projectId: string): Promise<ProjectM
         const versions = uniqueById((versionsResponse.data ?? []).map(mapMaterialVersion));
         const latestVersion = versions[0];
         if (latestVersion) {
-          const file = { ...item, materialVersions: versions, previewImageUri: latestVersion.materials.imageUri } as ResourceFileNode;
+          const file = {
+            ...item,
+            materialVersions: versions,
+            previewImageUri: latestVersion.materials.imageUri,
+          } as ResourceFileNode;
           result.push({
             file,
             folderId: folder.id,
