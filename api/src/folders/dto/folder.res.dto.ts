@@ -25,6 +25,9 @@ export class SimpleFolderResDto {
 
   @ApiPropertyOptional({ example: 'Initial rough sketches.', nullable: true })
   description?: string | null;
+
+  @ApiPropertyOptional({ example: 'https://example.com/image.png', nullable: true })
+  imageUrl?: string | null;
 }
 
 export class FolderResDto {
@@ -36,6 +39,9 @@ export class FolderResDto {
 
   @ApiPropertyOptional({ example: 'Initial rough sketches.', nullable: true })
   description?: string | null;
+
+  @ApiPropertyOptional({ example: 'https://example.com/image.png', nullable: true })
+  imageUrl?: string | null;
 
   @ApiPropertyOptional({ type: SimpleFolderResDto, nullable: true })
   parent?: SimpleFolderResDto | null;

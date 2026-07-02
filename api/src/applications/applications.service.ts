@@ -5,13 +5,16 @@ import {
   InternalServerErrorException,
   Logger,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { APPLICATION_STATUS, APPLICATION_TYPE, Prisma, ACTIVITY_ACTION, ENTITY_TYPE } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { UsersService } from '../users/users.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ACTIVITY_EVENT_NAME, ActivityEventPayload } from '../share/events/activity.event';
 import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 const USER_BASIC_SELECT = {
   id: true,
@@ -43,9 +46,12 @@ const PROJECT_DETAIL_SELECT = {
 
 const APPLICATION_LIST_SELECT = {
   id: true,
+  projectId: true,
   title: true,
   type: true,
   status: true,
+  parentFolderId: true,
+  folderImageUrl: true,
   project: {
     select: PROJECT_BASIC_SELECT,
   },
@@ -78,6 +84,8 @@ export class ApplicationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly usersService: UsersService,
+    private readonly realtimeGateway: RealtimeGateway,
   ) {}
 
   async getApplications(
@@ -247,6 +255,47 @@ export class ApplicationsService {
     try {
       const application = await this.ensureApplication(id);
 
+      // Perform two-stage permission validation for folder creation applications
+      const permissions = await this.usersService.getUserPermissions(data.userId, 'APPLICATION', id);
+
+      if (data.status === APPLICATION_STATUS.INTERNAL_APPROVED) {
+        if (application.status !== APPLICATION_STATUS.PENDING) {
+          throw new BadRequestException('Application status must be PENDING to perform project-level approval');
+        }
+        if (!permissions.includes('project:owner') && !permissions.includes('project:application.approve')) {
+          throw new ForbiddenException('You do not have permission to perform project-level approval');
+        }
+      } else if (data.status === APPLICATION_STATUS.APPROVE) {
+        if (
+          application.type === APPLICATION_TYPE.CREATE_ARC ||
+          application.type === APPLICATION_TYPE.CREATE_CHAPTER
+        ) {
+          if (application.status !== APPLICATION_STATUS.INTERNAL_APPROVED) {
+            throw new BadRequestException('Application must be approved at project-level (INTERNAL_APPROVED) before board-level approval');
+          }
+          if (!permissions.includes('board:leader') && !permissions.includes('board:owner')) {
+            throw new ForbiddenException('You do not have permission to perform board-level approval');
+          }
+        }
+      } else if (data.status === APPLICATION_STATUS.REJECT) {
+        if (
+          application.type === APPLICATION_TYPE.CREATE_ARC ||
+          application.type === APPLICATION_TYPE.CREATE_CHAPTER
+        ) {
+          if (application.status === APPLICATION_STATUS.PENDING) {
+            if (!permissions.includes('project:owner') && !permissions.includes('project:application.approve')) {
+              throw new ForbiddenException('You do not have permission to reject this application at project level');
+            }
+          } else if (application.status === APPLICATION_STATUS.INTERNAL_APPROVED) {
+            if (!permissions.includes('board:leader') && !permissions.includes('board:owner')) {
+              throw new ForbiddenException('You do not have permission to reject this application at board level');
+            }
+          } else {
+            throw new BadRequestException('Cannot reject application in its current status');
+          }
+        }
+      }
+
       if (data.status === APPLICATION_STATUS.SUBMITTED) {
         if (
           application.status !== APPLICATION_STATUS.INTERNAL_APPROVED &&
@@ -264,6 +313,71 @@ export class ApplicationsService {
         },
         select: APPLICATION_SELECT,
       });
+
+      // Auto-create folder, file, and material if approved
+      if (updatedApp.status === APPLICATION_STATUS.APPROVE) {
+        if (
+          application.type === APPLICATION_TYPE.CREATE_ARC ||
+          application.type === APPLICATION_TYPE.CREATE_CHAPTER
+        ) {
+          const folderParentId =
+            application.type === APPLICATION_TYPE.CREATE_CHAPTER ? application.parentFolderId : null;
+
+          if (folderParentId) {
+            const parentFolder = await this.prisma.folder.findUnique({ where: { id: folderParentId } });
+            if (!parentFolder || parentFolder.projectId !== application.projectId) {
+              throw new NotFoundException('Parent folder not found or does not belong to this project');
+            }
+            if (parentFolder.parentId !== null) {
+              throw new BadRequestException('Cannot create a subfolder under a Chapter (maximum depth is 2)');
+            }
+          }
+
+          // Find thumbnail or first image URL from application materials
+          let imageUrl: string | null = null;
+          const materialsData = application.materials as any[];
+          if (Array.isArray(materialsData)) {
+            const thumbnail = materialsData.find((m) => m.isThumbnail) || materialsData.find((m) => m.type === 'IMAGE') || materialsData[0];
+            if (thumbnail && thumbnail.url) {
+              imageUrl = thumbnail.url;
+            }
+          }
+
+          // Create Folder
+          const folder = await this.prisma.folder.create({
+            data: {
+              projectId: application.projectId,
+              title: application.title,
+              description: application.description,
+              parentId: folderParentId,
+              imageUrl: application.folderImageUrl || imageUrl,
+              createdBy: application.createdBy,
+              updatedBy: application.createdBy,
+            },
+          });
+
+          // Create File inside the Folder
+          const file = await this.prisma.file.create({
+            data: {
+              title: application.title,
+              description: application.description,
+              folderId: folder.id,
+              createdBy: application.createdBy,
+              updatedBy: application.createdBy,
+            },
+          });
+
+          // Create FileMaterial inside the File using the application's materials JSON
+          await this.prisma.fileMaterial.create({
+            data: {
+              fileId: file.id,
+              materials: application.materials as Prisma.InputJsonValue,
+              createdBy: application.createdBy,
+              updatedBy: application.createdBy,
+            },
+          });
+        }
+      }
 
       let action: ACTIVITY_ACTION = ACTIVITY_ACTION.APPLICATION_SUBMITTED;
       if (data.status === APPLICATION_STATUS.APPROVE) action = ACTIVITY_ACTION.APPLICATION_APPROVED;
@@ -445,6 +559,8 @@ export class ApplicationsService {
           projectOwnerId: project?.createdBy,
         },
       } satisfies ActivityEventPayload);
+
+      this.realtimeGateway.broadcastComment('APPLICATION', applicationId, 'comment:new', comment);
 
       return comment;
     } catch (error) {

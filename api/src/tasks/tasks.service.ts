@@ -51,26 +51,6 @@ const TASK_SELECT = {
   updatedAt: true,
 } satisfies Prisma.TaskSelect;
 
-const FRAME_SELECT = {
-  id: true,
-  startX: true,
-  startY: true,
-  endX: true,
-  endY: true,
-  task: {
-    select: {
-      id: true,
-      title: true,
-      description: true,
-      status: true,
-    },
-  },
-  createdByUser: USER_SELECT,
-  updatedByUser: USER_SELECT,
-  createdAt: true,
-  updatedAt: true,
-};
-
 const COMMENT_SELECT = {
   id: true,
   content: true,
@@ -156,6 +136,7 @@ export class TasksService {
           entityType: ENTITY_TYPE.TASK,
           entityId: updatedTask.id,
           projectId: fileWithFolder?.folder?.projectId ?? null,
+          fileId: updatedTask.fileId,
           actorId: data.userId,
           metadata: {
             title: updatedTask.title,
@@ -170,6 +151,7 @@ export class TasksService {
           entityType: ENTITY_TYPE.TASK,
           entityId: updatedTask.id,
           projectId: fileWithFolder?.folder?.projectId ?? null,
+          fileId: updatedTask.fileId,
           actorId: data.userId,
           metadata: {
             title: updatedTask.title,
@@ -237,68 +219,7 @@ export class TasksService {
     }
   }
 
-  async getTaskFrames(
-    taskId: number,
-    sort?: { field: 'createdAt'; order: 'asc' | 'desc' },
-    pagination?: Pagination,
-  ) {
-    try {
-      await this.ensureTask(taskId);
 
-      const where: Prisma.TaskCommentFrameWhereInput = { taskId };
-      const orderBy: Prisma.TaskCommentFrameOrderByWithRelationInput = sort
-        ? { [sort.field]: sort.order }
-        : { createdAt: 'desc' };
-      const { page, limit, skip } = this.buildPagination(pagination);
-
-      const [total, frames] = await this.prisma.$transaction([
-        this.prisma.taskCommentFrame.count({ where }),
-        this.prisma.taskCommentFrame.findMany({
-          where,
-          orderBy,
-          skip,
-          take: limit,
-          select: FRAME_SELECT,
-        }),
-      ]);
-
-      return {
-        frames,
-        pagination: this.buildPaginationMeta(total, page, limit),
-      };
-    } catch (error) {
-      this.handleError(error, 'Get task frames fail', ERROR.SVGETTASKFRAMES);
-    }
-  }
-
-  async createFrame(
-    taskId: number,
-    data: {
-      startX: number;
-      startY: number;
-      endX: number;
-      endY: number;
-      userId: number;
-    },
-  ) {
-    try {
-      await this.ensureTask(taskId);
-
-      return await this.prisma.taskCommentFrame.create({
-        data: {
-          startX: data.startX,
-          startY: data.startY,
-          endX: data.endX,
-          endY: data.endY,
-          taskId,
-          createdBy: data.userId,
-        },
-        select: FRAME_SELECT,
-      });
-    } catch (error) {
-      this.handleError(error, 'Create frame fail', ERROR.SVCREATEFRAME);
-    }
-  }
 
   async getMyTasks(
     userId: number,
@@ -388,6 +309,7 @@ export class TasksService {
     data: {
       content: unknown;
       userId: number;
+      mentionedUserIds?: number[];
     },
   ) {
     try {
@@ -421,19 +343,44 @@ export class TasksService {
         entityType: ENTITY_TYPE.COMMENT,
         entityId: comment.id,
         projectId: taskObj?.file?.folder?.projectId ?? null,
+        fileId: taskObj?.file?.id ?? null,
         actorId: data.userId,
         metadata: {
           taskId,
           taskTitle: taskObj?.title,
           assigneeId: taskObj?.assignedBy,
           creatorId: taskObj?.createdBy,
-          mentionedUserIds: [],
+          mentionedUserIds: data.mentionedUserIds || [],
         },
       } satisfies ActivityEventPayload);
 
       return comment;
     } catch (error) {
       this.handleError(error, 'Create comment fail', 'SVCREATECOMMENT');
+    }
+  }
+
+  async getTaskMaterialsForSelect(taskId: number) {
+    try {
+      await this.ensureTask(taskId);
+
+      const materials = await this.prisma.fileMaterial.findMany({
+        where: { taskId },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      return materials.map((m) => {
+        let displayName = m.name;
+        if (!displayName && Array.isArray(m.materials) && m.materials.length > 0) {
+          displayName = (m.materials[0] as any).originalName;
+        }
+        return {
+          id: m.id,
+          name: displayName || `Material #${m.id}`,
+        };
+      });
+    } catch (error) {
+      this.handleError(error, 'Get task materials for select fail', ERROR.SVGETTASK);
     }
   }
 

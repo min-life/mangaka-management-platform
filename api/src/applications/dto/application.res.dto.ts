@@ -53,6 +53,9 @@ export class ApplicationResDto {
   @ApiProperty({ enum: APPLICATION_STATUS, example: APPLICATION_STATUS.PENDING })
   status!: APPLICATION_STATUS;
 
+  @ApiPropertyOptional({ example: 1, description: 'Parent folder ID for CREATE_CHAPTER type', nullable: true })
+  parentFolderId?: number | null;
+
   @ApiPropertyOptional({ type: UserResDto, nullable: true })
   verifiedByUser?: UserResDto | null;
 

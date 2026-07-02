@@ -66,6 +66,7 @@ const APPLICATION_LIST_SELECT = {
   title: true,
   type: true,
   status: true,
+  folderImageUrl: true,
   verifiedByUser: USER_SELECT,
   createdByUser: USER_SELECT,
   updatedByUser: USER_SELECT,
@@ -501,8 +502,16 @@ export class EditorBoardsService {
 
       const where: Prisma.ApplicationWhereInput = {
         project: { editorBoardId },
-        type: APPLICATION_TYPE.PUBLISH_REQUEST,
-        status: { in: [APPLICATION_STATUS.SUBMITTED, APPLICATION_STATUS.APPROVE, APPLICATION_STATUS.REJECT] },
+        OR: [
+          {
+            type: APPLICATION_TYPE.PUBLISH_REQUEST,
+            status: { in: [APPLICATION_STATUS.SUBMITTED, APPLICATION_STATUS.APPROVE, APPLICATION_STATUS.REJECT] },
+          },
+          {
+            type: { in: [APPLICATION_TYPE.CREATE_ARC, APPLICATION_TYPE.CREATE_CHAPTER] },
+            status: { in: [APPLICATION_STATUS.INTERNAL_APPROVED, APPLICATION_STATUS.APPROVE, APPLICATION_STATUS.REJECT] },
+          }
+        ],
         ...(filter?.search && {
           title: { contains: filter.search, mode: 'insensitive' },
         }),

@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { APPLICATION_TYPE } from '@prisma/client';
-import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString, IsNumber } from 'class-validator';
 
 export class CreateProjectApplicationReqDto {
   @ApiProperty({ example: 'Publish request for chapter 01' })
@@ -13,7 +13,12 @@ export class CreateProjectApplicationReqDto {
   @IsString()
   description?: string;
 
-  @ApiProperty({ 
+  @ApiPropertyOptional({ example: 'https://thumbnail.url', description: 'Folder thumbnail URL' })
+  @IsOptional()
+  @IsString()
+  folderImageUrl?: string;
+
+  @ApiPropertyOptional({ 
     example: [
       {
         url: 'https://...',
@@ -27,10 +32,36 @@ export class CreateProjectApplicationReqDto {
       }
     ] 
   })
-  @IsNotEmpty()
-  materials!: unknown;
+  @IsOptional()
+  materials?: unknown;
 
   @ApiProperty({ enum: APPLICATION_TYPE, example: APPLICATION_TYPE.PUBLISH_REQUEST })
   @IsEnum(APPLICATION_TYPE)
   type!: APPLICATION_TYPE;
+
+  @ApiPropertyOptional({ example: 1, description: 'Parent folder ID for CREATE_CHAPTER type' })
+  @IsOptional()
+  @IsNumber()
+  parentFolderId?: number;
+
+  @ApiPropertyOptional({
+    type: 'string',
+    format: 'binary',
+    description: 'Required for CREATE_ARC and CREATE_CHAPTER types',
+  })
+  image?: Express.Multer.File;
+
+  @ApiPropertyOptional({
+    type: 'string',
+    format: 'binary',
+    description: 'Required for CREATE_ARC and CREATE_CHAPTER types',
+  })
+  text?: Express.Multer.File;
+
+  @ApiPropertyOptional({
+    type: 'string',
+    format: 'binary',
+    description: 'Optional source file for CREATE_ARC and CREATE_CHAPTER types',
+  })
+  source?: Express.Multer.File;
 }

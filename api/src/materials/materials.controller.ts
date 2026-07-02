@@ -7,6 +7,7 @@ import {
   ParseIntPipe, 
   Patch, 
   Post, 
+  Query,
   UseInterceptors, 
   UploadedFiles,
   MaxFileSizeValidator,
@@ -26,7 +27,14 @@ import {
 import { CurrentUser, Permissions } from '../share/decorators';
 import type { JwtPayload } from '../auth/interfaces';
 import { MaterialsService } from './materials.service';
-import { MaterialResponseDto, UpdateMaterialReqDto } from './dto';
+import { 
+  MaterialResponseDto, 
+  UpdateMaterialReqDto,
+  CreateFrameReqDto,
+  FrameResponseDto,
+  FramesResponseDto,
+  QueryFramesReqDto,
+} from './dto';
 
 @ApiTags('Materials')
 @ApiBearerAuth()
@@ -36,7 +44,7 @@ export class MaterialsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:read', 'board:leader'],
+    permissions: ['project:read', 'project:owner'],
     resource: 'MATERIAL',
   })
   @ApiOperation({ summary: 'Get material details' })
@@ -55,7 +63,7 @@ export class MaterialsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:material.update', 'board:leader'],
+    permissions: ['project:material.update', 'project:owner'],
     resource: 'MATERIAL',
   })
   @ApiOperation({ summary: 'Update material' })
@@ -78,7 +86,7 @@ export class MaterialsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:material.delete', 'board:leader'],
+    permissions: ['project:material.delete', 'project:owner'],
     resource: 'MATERIAL',
   })
   @ApiOperation({ summary: 'Delete material' })
@@ -91,7 +99,7 @@ export class MaterialsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:material.create', 'board:leader'],
+    permissions: ['project:material.create', 'project:owner'],
     resource: 'MATERIAL',
   })
   @ApiOperation({ summary: 'Restore a material version to create a new latest version' })
@@ -110,7 +118,7 @@ export class MaterialsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:material.update', 'board:leader'],
+    permissions: ['project:material.update', 'project:owner'],
     resource: 'MATERIAL',
   })
   @ApiOperation({ summary: 'Add files to an existing material version (creates a new version)' })
@@ -140,7 +148,7 @@ export class MaterialsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:material.update', 'board:leader'],
+    permissions: ['project:material.update', 'project:owner'],
     resource: 'MATERIAL',
   })
   @ApiOperation({ summary: 'Delete a file item from a material (creates a new version)' })
@@ -161,7 +169,7 @@ export class MaterialsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:material.update', 'board:leader'],
+    permissions: ['project:material.update', 'project:owner'],
     resource: 'MATERIAL',
   })
   @ApiOperation({ summary: 'Set a file item as thumbnail (creates a new version)' })
@@ -177,6 +185,52 @@ export class MaterialsController {
     const material = await this.materialsService.setMaterialThumbnail(id, currentUser.userId, index);
     return {
       data: material,
+    };
+  }
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['project:read', 'project:owner'],
+    resource: 'MATERIAL',
+  })
+  @ApiOperation({ summary: 'Get material frames' })
+  @ApiParam({ name: 'id', type: Number, description: 'Material id' })
+  @ApiOkResponse({
+    description: 'Material frames retrieved successfully',
+    type: FramesResponseDto,
+  })
+  @Get(':id/frames')
+  async getMaterialFrames(@Param('id', ParseIntPipe) id: number, @Query() query: QueryFramesReqDto) {
+    const result = await this.materialsService.getMaterialFrames(
+      id,
+      query.field && query.order ? { field: query.field, order: query.order } : undefined,
+      query.page && query.limit ? { page: query.page, limit: query.limit } : undefined,
+    );
+    return {
+      data: result.frames,
+      pagination: result.pagination,
+    };
+  }
+
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['project:frame.create', 'project:owner'],
+    resource: 'MATERIAL',
+  })
+  @ApiOperation({ summary: 'Create frame for material' })
+  @ApiParam({ name: 'id', type: Number, description: 'Material id' })
+  @ApiCreatedResponse({ description: 'Frame created successfully', type: FrameResponseDto })
+  @Post(':id/frames')
+  async createFrame(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() currentUser: JwtPayload,
+    @Body() data: CreateFrameReqDto,
+  ) {
+    const frame = await this.materialsService.createFrame(id, {
+      ...data,
+      userId: currentUser.userId,
+    });
+    return {
+      data: frame,
     };
   }
 }

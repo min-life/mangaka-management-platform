@@ -9,5 +9,6 @@ export class ActivityEventPayload {
   actorId!: number;
   projectId?: number | null;
   editorBoardId?: number | null;
+  fileId?: number | null;
   metadata?: Prisma.InputJsonValue;
 }
