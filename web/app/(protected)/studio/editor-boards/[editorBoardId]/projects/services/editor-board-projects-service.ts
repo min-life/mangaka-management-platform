@@ -55,7 +55,10 @@ export type EditorBoardProjectsSummary = {
   projectCount: number;
 };
 
-function mapProjectResponse(project: ProjectResponse, editorBoardId: number | string): EditorBoardProject {
+function mapProjectResponse(
+  project: ProjectResponse,
+  editorBoardId: number | string,
+): EditorBoardProject {
   const createdByName =
     project.createdByUser?.displayName ?? project.createdByUser?.email ?? 'Unassigned';
   const updatedByName =
@@ -216,7 +219,9 @@ export async function getEditorBoardProjects(editorBoardId: number | string) {
 
 export async function getEditorBoardProjectsSummary(editorBoardId: number | string) {
   const boardProjects = await getEditorBoardProjects(editorBoardId);
-  const cycleTimes = boardProjects.map((project) => project.projectStats[0]?.metrics.cycleTimeDays ?? 0);
+  const cycleTimes = boardProjects.map(
+    (project) => project.projectStats[0]?.metrics.cycleTimeDays ?? 0,
+  );
   const activeStafferIds = new Set(
     boardProjects.flatMap((project) => project.members.map((member) => member.id)),
   );
@@ -228,7 +233,9 @@ export async function getEditorBoardProjectsSummary(editorBoardId: number | stri
     activeStaffers: activeStafferIds.size,
     averageCycleTimeDays:
       cycleTimes.length > 0
-        ? Number((cycleTimes.reduce((total, value) => total + value, 0) / cycleTimes.length).toFixed(1))
+        ? Number(
+            (cycleTimes.reduce((total, value) => total + value, 0) / cycleTimes.length).toFixed(1),
+          )
         : 0,
     averageCycleTimeTrendPercent: 0,
     criticalDeadlines: 0,

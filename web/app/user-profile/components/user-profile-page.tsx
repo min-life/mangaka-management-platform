@@ -59,7 +59,9 @@ function isSessionExpiredError(error: unknown) {
     return false;
   }
 
-  const response = (error as { response?: { status?: number; data?: { message?: string | string[] } } }).response;
+  const response = (
+    error as { response?: { status?: number; data?: { message?: string | string[] } } }
+  ).response;
   const status = response?.status;
   const rawMessage = response?.data?.message;
   const message = Array.isArray(rawMessage) ? rawMessage.join(' ') : rawMessage;
@@ -666,11 +668,7 @@ export function UserProfilePage() {
       <header className="sticky top-0 z-40 border-b border-[var(--profile-border)] bg-[var(--profile-header)] px-8 py-4">
         <div className="flex items-center justify-between gap-8">
           <div className="flex items-center gap-8">
-            <img
-              alt="Inkly"
-              className="h-[50px] w-auto object-contain"
-              src="/brand/1.png"
-            />
+            <img alt="Inkly" className="h-[50px] w-auto object-contain" src="/brand/1.png" />
             <Separator
               className="hidden h-6 bg-[var(--profile-border)] md:block"
               orientation="vertical"
@@ -803,11 +801,7 @@ export function UserProfilePage() {
                   label={text.securityPassword}
                   onClick={() => setIsPasswordOpen(true)}
                 />
-                <SettingsButton
-                  icon={Languages}
-                  label={text.language}
-                  onClick={toggleLanguage}
-                />
+                <SettingsButton icon={Languages} label={text.language} onClick={toggleLanguage} />
                 <SettingsButton
                   icon={Palette}
                   label={text.appearance(isDarkTheme)}

@@ -38,47 +38,11 @@ type CommentItem = {
   createdAt: string;
 };
 
-const MOCK_COMMENTS: CommentItem[] = [
-  {
-    id: 1,
-    content: { text: 'Bản thảo chương này cần chỉnh lại bố cục trang 3 và trang 7, phần panel chưa cân đối.' },
-    createdByUser: { id: 1, displayName: 'Minh Tran', avatarUrl: null, email: 'minh@example.com' },
-    createdAt: '2026-06-28T10:30:00.000Z',
-  },
-  {
-    id: 2,
-    content: { text: '@Minh Tran Đã note lại, tôi sẽ chỉnh panel trang 3. Trang 7 thì giữ nguyên được không?' },
-    createdByUser: { id: 2, displayName: 'Phuc Le', avatarUrl: null, email: 'phuc@example.com' },
-    createdAt: '2026-06-28T11:15:00.000Z',
-  },
-  {
-    id: 3,
-    content: { text: '@Phuc Le Trang 7 cũng cần sửa, vì kích thước frame không đồng nhất với các trang trước.' },
-    createdByUser: { id: 1, displayName: 'Minh Tran', avatarUrl: null, email: 'minh@example.com' },
-    createdAt: '2026-06-28T14:00:00.000Z',
-  },
-  {
-    id: 4,
-    content: { text: 'Phần dialog ở trang 5 khá tốt, giữ nguyên nhé.' },
-    createdByUser: { id: 3, displayName: 'Huong Nguyen', avatarUrl: null, email: 'huong@example.com' },
-    createdAt: '2026-06-29T09:00:00.000Z',
-  },
-  {
-    id: 5,
-    content: { text: '@Huong Nguyen Cảm ơn chị, em sẽ giữ nguyên phần đó.' },
-    createdByUser: { id: 2, displayName: 'Phuc Le', avatarUrl: null, email: 'phuc@example.com' },
-    createdAt: '2026-06-29T09:30:00.000Z',
-  },
-];
-
 type ApplicationReviewDrawerProps = {
   application: ApplicationResponse | null;
   isSubmitting: boolean;
   onOpenChange: (open: boolean) => void;
-  onUpdateStatus: (
-    application: ApplicationResponse,
-    status: ApplicationStatus,
-  ) => void;
+  onUpdateStatus: (application: ApplicationResponse, status: ApplicationStatus) => void;
 };
 
 function formatFileSize(bytes?: number) {
@@ -116,8 +80,8 @@ export function ApplicationReviewDrawer({
   const [isLoadingVotes, setIsLoadingVotes] = useState(false);
   const [isVoting, setIsVoting] = useState(false);
   const [voteComment, setVoteComment] = useState('');
-  
-  const [comments, setComments] = useState<CommentItem[]>(MOCK_COMMENTS);
+
+  const [comments, setComments] = useState<CommentItem[]>([]);
   const [newComment, setNewComment] = useState('');
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -130,20 +94,22 @@ export function ApplicationReviewDrawer({
 
   const handleSendComment = () => {
     if (!newComment.trim()) return;
-    
-    const nextId = comments.length ? Math.max(...comments.map(c => c.id)) + 1 : 1;
+
+    const nextId = comments.length ? Math.max(...comments.map((c) => c.id)) + 1 : 1;
     const comment: CommentItem = {
       id: nextId,
       content: { text: newComment },
-      createdByUser: user ? {
-        id: user.id,
-        email: user.email,
-        displayName: user.displayName,
-        avatarUrl: user.avatarUrl,
-      } : null,
+      createdByUser: user
+        ? {
+            id: user.id,
+            email: user.email,
+            displayName: user.displayName,
+            avatarUrl: user.avatarUrl,
+          }
+        : null,
       createdAt: new Date().toISOString(),
     };
-    
+
     setComments([...comments, comment]);
     setNewComment('');
   };
@@ -199,7 +165,7 @@ export function ApplicationReviewDrawer({
   };
 
   const uploadedFiles = application ? readUploadedFiles(application.materials) : [];
-  
+
   const submittedBy =
     application?.createdByUser?.displayName ??
     application?.createdByUser?.email ??
@@ -214,21 +180,24 @@ export function ApplicationReviewDrawer({
   // The actual check is enforced by the backend endpoint.
   const canApprove = true;
 
-  const approveVotesCount = votes.filter(v => v.decision === 'APPROVE').length;
-  const rejectVotesCount = votes.filter(v => v.decision === 'REJECT').length;
-  const abstainVotesCount = votes.filter(v => v.decision === 'ABSTAIN').length;
+  const approveVotesCount = votes.filter((v) => v.decision === 'APPROVE').length;
+  const rejectVotesCount = votes.filter((v) => v.decision === 'REJECT').length;
+  const abstainVotesCount = votes.filter((v) => v.decision === 'ABSTAIN').length;
   const hasVoted = user && votes.some((v) => v.userId === user.id);
 
   return (
-    <Sheet onOpenChange={(open) => {
-      onOpenChange(open);
-      if (!open) {
-        setVotes([]);
-        setVoteComment('');
-        setComments(MOCK_COMMENTS);
-        setNewComment('');
-      }
-    }} open={Boolean(application)}>
+    <Sheet
+      onOpenChange={(open) => {
+        onOpenChange(open);
+        if (!open) {
+          setVotes([]);
+          setVoteComment('');
+          setComments([]);
+          setNewComment('');
+        }
+      }}
+      open={Boolean(application)}
+    >
       <SheetContent
         className="w-[540px] max-w-[92vw] gap-0 border-[#39424f] bg-[#101820] p-0 text-white sm:max-w-[540px]"
         showCloseButton={false}
@@ -291,7 +260,8 @@ export function ApplicationReviewDrawer({
                     Reviewed By
                   </p>
                   <p className="mt-3 truncate text-sm font-black text-white">
-                    {reviewedBy ?? (application.status === 'PENDING' ? 'Not reviewed yet' : 'Unknown reviewer')}
+                    {reviewedBy ??
+                      (application.status === 'PENDING' ? 'Not reviewed yet' : 'Unknown reviewer')}
                   </p>
                 </article>
               </div>
@@ -341,7 +311,8 @@ export function ApplicationReviewDrawer({
                     <div>
                       <p className="text-xs font-black text-white">Submitted</p>
                       <p className="mt-1 text-[11px] font-bold text-[#8b94a1]">
-                        {submittedBy} submitted this request on {new Date(application.createdAt).toLocaleDateString()}.
+                        {submittedBy} submitted this request on{' '}
+                        {new Date(application.createdAt).toLocaleDateString()}.
                       </p>
                     </div>
                   </div>
@@ -396,21 +367,33 @@ export function ApplicationReviewDrawer({
                       <div className="flex gap-3 rounded-[4px] bg-[#101820] p-3" key={vote.userId}>
                         {vote.user.avatarUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={vote.user.avatarUrl} alt="Avatar" className="size-8 rounded-full" />
+                          <img
+                            src={vote.user.avatarUrl}
+                            alt="Avatar"
+                            className="size-8 rounded-full"
+                          />
                         ) : (
                           <UserCircle className="size-8 text-[#8b94a1]" />
                         )}
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between">
-                            <p className="text-xs font-black text-white">{vote.user.displayName || vote.user.email || `User #${vote.userId}`}</p>
-                            <span className={`text-[10px] font-black uppercase ${vote.decision === 'APPROVE' ? 'text-[#9df2c7]' : vote.decision === 'REJECT' ? 'text-[#ff9ab3]' : 'text-[#8b94a1]'}`}>
+                            <p className="text-xs font-black text-white">
+                              {vote.user.displayName || vote.user.email || `User #${vote.userId}`}
+                            </p>
+                            <span
+                              className={`text-[10px] font-black uppercase ${vote.decision === 'APPROVE' ? 'text-[#9df2c7]' : vote.decision === 'REJECT' ? 'text-[#ff9ab3]' : 'text-[#8b94a1]'}`}
+                            >
                               {vote.decision}
                             </span>
                           </div>
                           {vote.comment && (
-                            <p className="mt-1 text-xs font-medium text-[#dce7f3]">{vote.comment}</p>
+                            <p className="mt-1 text-xs font-medium text-[#dce7f3]">
+                              {vote.comment}
+                            </p>
                           )}
-                          <p className="mt-1 text-[10px] font-bold text-[#4b535f]">{new Date(vote.createdAt).toLocaleString()}</p>
+                          <p className="mt-1 text-[10px] font-bold text-[#4b535f]">
+                            {new Date(vote.createdAt).toLocaleString()}
+                          </p>
                         </div>
                       </div>
                     ))
@@ -421,8 +404,10 @@ export function ApplicationReviewDrawer({
 
                 {application.status === 'PENDING' ? (
                   <div className="mt-4 border-t border-[#303842] pt-4">
-                    <p className="mb-2 text-xs font-black text-white">{hasVoted ? 'Update Your Vote' : 'Your Vote'}</p>
-                    <Textarea 
+                    <p className="mb-2 text-xs font-black text-white">
+                      {hasVoted ? 'Update Your Vote' : 'Your Vote'}
+                    </p>
+                    <Textarea
                       placeholder="Add an optional comment..."
                       className="min-h-16 resize-none border-[#303842] bg-[#101820] text-xs font-medium text-white placeholder:text-[#4b535f] focus-visible:ring-[#FFD369]"
                       value={voteComment}
@@ -463,32 +448,44 @@ export function ApplicationReviewDrawer({
                 <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8b94a1] mb-4">
                   Comments
                 </p>
-                
+
                 {comments.length === 0 ? (
-                  <p className="text-xs font-bold text-[#8b94a1] mb-4">No comments yet. Start the discussion!</p>
+                  <p className="text-xs font-bold text-[#8b94a1] mb-4">
+                    No comments yet. Start the discussion!
+                  </p>
                 ) : (
                   <div className="space-y-3 mb-4">
                     {comments.map((comment) => (
                       <div className="flex gap-3 rounded-[4px] bg-[#101820] p-3" key={comment.id}>
                         {comment.createdByUser?.avatarUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={comment.createdByUser.avatarUrl} alt="Avatar" className="size-8 rounded-full shrink-0" />
+                          <img
+                            src={comment.createdByUser.avatarUrl}
+                            alt="Avatar"
+                            className="size-8 rounded-full shrink-0"
+                          />
                         ) : (
                           <UserCircle className="size-8 text-[#8b94a1] shrink-0" />
                         )}
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between">
                             <p className="text-xs font-black text-[#FFD369]">
-                              {comment.createdByUser?.displayName || comment.createdByUser?.email || 'Unknown User'}
+                              {comment.createdByUser?.displayName ||
+                                comment.createdByUser?.email ||
+                                'Unknown User'}
                             </p>
                             <span className="text-[10px] font-bold text-[#4b535f]">
-                              {new Date(comment.createdAt).toLocaleDateString()} {new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              {new Date(comment.createdAt).toLocaleDateString()}{' '}
+                              {new Date(comment.createdAt).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
                             </span>
                           </div>
                           <p className="mt-1 text-xs font-medium text-[#dce7f3]">
                             {renderCommentText(comment.content.text)}
                           </p>
-                          <button 
+                          <button
                             className="mt-2 text-[10px] font-bold text-[#8b94a1] hover:text-white transition-colors"
                             onClick={() => handleReply(comment.createdByUser?.displayName)}
                           >
