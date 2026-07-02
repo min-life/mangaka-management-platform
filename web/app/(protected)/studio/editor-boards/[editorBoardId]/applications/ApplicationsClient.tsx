@@ -5,7 +5,11 @@ import { Rocket, Search } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { type ApplicationResponse, updateApplicationStatus } from '@/services/application.service';
+import {
+  type ApplicationResponse,
+  type ApplicationStatus,
+  updateApplicationStatus,
+} from '@/services/application.service';
 import { getEditorBoardApplications } from '@/services/editor-board.service';
 
 import { ApplicationReviewDrawer } from './ApplicationReviewDrawer';
@@ -67,13 +71,13 @@ export function ApplicationsClient({ editorBoardId }: ApplicationsClientProps) {
 
   const handleUpdateStatus = async (
     application: ApplicationResponse,
-    status: string,
+    status: ApplicationStatus,
   ) => {
     setIsSubmitting(true);
     setError(null);
 
     try {
-      await updateApplicationStatus(application.id, status as 'APPROVE' | 'REJECT' | 'CANCELLED');
+      await updateApplicationStatus(application.id, status);
       setSelectedApplication((current) =>
         current?.id === application.id
           ? { ...current, status, updatedAt: new Date().toISOString() }
