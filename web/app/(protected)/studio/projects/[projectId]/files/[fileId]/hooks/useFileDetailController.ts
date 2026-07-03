@@ -12,7 +12,7 @@ import { useCanvasAnnotations } from './useCanvasAnnotations';
 
 import { getProjectFolders, getProjectMembers, getProjectById, type ProjectFolderResponse, type ProjectResponse } from '@/services/project.service';
 import { getFileById, getFileComments, getFileMaterialVersions, getFileTasks } from '@/services/file.service';
-import { getTaskFrames } from '@/services/task.service';
+import { getTaskFrames, getTaskComments } from '@/services/task.service';
 import { getFrameComments } from '@/services/frame.service';
 import { getMaterialFrames } from '@/services/material.service';
 import { useAuth } from '@/hooks/useAuth';
@@ -62,6 +62,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
   const [frameComments, setFrameComments] = useState<SubmissionFrameComment[]>([]);
   const [fileComments, setFileComments] = useState<FileDiscussionComment[]>([]);
+  const [taskComments, setTaskComments] = useState<FileDiscussionComment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingComment, setIsSavingComment] = useState(false);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
@@ -353,8 +354,24 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
         console.error('Failed to load file comments:', err);
       }
 
+      let dbTaskComments: FileDiscussionComment[] = [];
+      if (selectedTaskId) {
+        try {
+          const taskCommentsRes = await getTaskComments(selectedTaskId);
+          dbTaskComments = (taskCommentsRes || []).map((c: any) => ({
+            author: c.createdByUser?.displayName || c.createdByUser?.email || 'Unknown User',
+            content: getCommentText(c.content),
+            id: String(c.id),
+            time: formatFileDate(c.createdAt),
+          }));
+        } catch (err) {
+          console.error('Failed to load task comments:', err);
+        }
+      }
+
       setFrameComments(dbComments);
       setFileComments(dbFileComments);
+      setTaskComments(dbTaskComments);
 
       // Default the main file preview to the current version's thumbnail or file's default preview url
       const currentVersionPreview = dbVersions.find((v) => v.isCurrent)?.previewUrl;
@@ -387,7 +404,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     } finally {
       setIsLoading(false);
     }
-  }, [fileId, projectId]);
+  }, [fileId, projectId, selectedTaskId]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -615,6 +632,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     error,
     file,
     fileComments,
+    taskComments,
     folder,
     focusFileTask,
     focusedTask,

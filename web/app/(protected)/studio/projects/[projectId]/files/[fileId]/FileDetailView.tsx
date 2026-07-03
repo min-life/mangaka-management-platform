@@ -45,6 +45,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
     error,
     file,
     fileComments,
+    taskComments,
     folder,
     focusFileTask,
     focusedTask,
@@ -218,7 +219,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
                   </div>
 
                   <FileCommentsPanel
-                    comments={discussionContextKey === 'file' ? fileComments : []}
+                    comments={discussionContextKey === 'file' ? fileComments : taskComments}
                     fileId={file.id}
                     taskId={focusedTask?.id ? Number(focusedTask.id) : null}
                     contextKey={discussionContextKey}

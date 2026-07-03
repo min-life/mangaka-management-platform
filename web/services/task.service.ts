@@ -101,3 +101,13 @@ export async function getMyTasks(query: { me: boolean; limit?: number; page?: nu
   });
   return response.data ?? [];
 }
+
+export async function getTaskComments(taskId: number | string) {
+  const response = await api.get<{ data: any[] }, { data: any[] }>(`/tasks/${taskId}/comments`);
+  return response.data ?? [];
+}
+
+export async function createTaskComment(taskId: number | string, content: string) {
+  const response = await api.post<{ data: any }, { data: any }>(`/tasks/${taskId}/comments`, { content });
+  return response.data ?? response;
+}

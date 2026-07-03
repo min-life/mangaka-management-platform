@@ -4,6 +4,7 @@ import { toast } from '@/lib/toast';
 import { createFileComment, updateComment, deleteComment } from '@/services/file.service';
 import { createMaterialFrame } from '@/services/material.service';
 import { createFrameComment } from '@/services/frame.service';
+import { createTaskComment } from '@/services/task.service';
 import type { FileExplorerItem, FileVersionItem, SubmissionFrameComment } from '../../file-ui';
 
 type CommentActionsProps = {
@@ -66,11 +67,15 @@ export function useFileDetailCommentActions({
     setIsSavingComment(true);
     setError(null);
     try {
-      await createFileComment(file.id, commentContent);
+      if (selectedTaskId) {
+        await createTaskComment(selectedTaskId, commentContent);
+      } else {
+        await createFileComment(file.id, commentContent);
+      }
       toast.success('Comment posted.');
       await loadFile();
     } catch (err) {
-      console.error('Failed to create file comment:', err);
+      console.error('Failed to create comment:', err);
       toast.error('Failed to post comment.');
       setError('Failed to save comment.');
     } finally {
