@@ -467,6 +467,7 @@ model Task {
 
 model MaterialCommentFrame {
   id         Int      @id @default(autoincrement())
+  name       String?
   startX     Decimal  @map("start_x") @db.Decimal(10, 4)
   startY     Decimal  @map("start_y") @db.Decimal(10, 4)
   endX       Decimal  @map("end_x") @db.Decimal(10, 4)

@@ -261,6 +261,55 @@ export class TasksService {
     }
   }
 
+  async getTaskFrames(
+    taskId: number,
+    sort?: { field: 'createdAt'; order: 'asc' | 'desc' },
+    pagination?: Pagination,
+  ) {
+    try {
+      await this.ensureTask(taskId);
+
+      const where: Prisma.MaterialCommentFrameWhereInput = {
+        material: {
+          taskId,
+        },
+      };
+      const orderBy: Prisma.MaterialCommentFrameOrderByWithRelationInput = sort
+        ? { [sort.field]: sort.order }
+        : { createdAt: 'desc' };
+      const { page, limit, skip } = this.buildPagination(pagination);
+
+      const [total, frames] = await this.prisma.$transaction([
+        this.prisma.materialCommentFrame.count({ where }),
+        this.prisma.materialCommentFrame.findMany({
+          where,
+          orderBy,
+          skip,
+          take: limit,
+          select: {
+            id: true,
+            name: true,
+            startX: true,
+            startY: true,
+            endX: true,
+            endY: true,
+            materialId: true,
+            createdByUser: USER_SELECT,
+            createdAt: true,
+            updatedAt: true,
+          },
+        }),
+      ]);
+
+      return {
+        frames,
+        pagination: this.buildPaginationMeta(total, page, limit),
+      };
+    } catch (error) {
+      this.handleError(error, 'Get task frames fail', 'SVGETTASKFRAMES');
+    }
+  }
+
   async getTaskComments(
     taskId: number,
     sort?: { field: 'createdAt'; order: 'asc' | 'desc' },
@@ -269,7 +318,18 @@ export class TasksService {
     try {
       await this.ensureTask(taskId);
 
-      const where: Prisma.CommentWhereInput = { taskId };
+      const where: Prisma.CommentWhereInput = {
+        OR: [
+          { taskId },
+          {
+            frame: {
+              material: {
+                taskId,
+              },
+            },
+          },
+        ],
+      };
       const orderBy: Prisma.CommentOrderByWithRelationInput = sort
         ? { [sort.field]: sort.order }
         : { createdAt: 'desc' };
@@ -286,6 +346,19 @@ export class TasksService {
             id: true,
             content: true,
             taskId: true,
+            frameId: true,
+            frame: {
+              select: {
+                id: true,
+                name: true,
+                material: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
             createdByUser: {
               select: { id: true, email: true, displayName: true, avatarUrl: true },
             },
@@ -295,8 +368,18 @@ export class TasksService {
         }),
       ]);
 
+      const mappedComments = comments.map(c => {
+        const material = c.frame?.material;
+        const frame = c.frame ? { id: c.frame.id, name: c.frame.name } : null;
+        return {
+          ...c,
+          frame,
+          material,
+        };
+      });
+
       return {
-        comments,
+        comments: mappedComments,
         pagination: this.buildPaginationMeta(total, page, limit),
       };
     } catch (error) {
