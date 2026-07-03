@@ -22,8 +22,6 @@ const USER_SELECT = {
     email: true,
     displayName: true,
     avatarUrl: true,
-    createdAt: true,
-    updatedAt: true,
   },
 };
 
@@ -230,18 +228,13 @@ export class EditorBoardsService {
 
   async addMembersToBoard(editorBoardId: number, userIds: number[], actorId: number) {
     try {
-      const board = await this.ensureBoard(editorBoardId);
+      await this.ensureBoard(editorBoardId);
 
       const uniqueUserIds = this.uniqueIds(userIds);
-      const invitedUsers = await this.prisma.user.findMany({
+      const existingUsers = await this.prisma.user.count({
         where: { id: { in: uniqueUserIds } },
-        select: {
-          id: true,
-          displayName: true,
-          email: true,
-        },
       });
-      if (invitedUsers.length !== uniqueUserIds.length) {
+      if (existingUsers !== uniqueUserIds.length) {
         throw new NotFoundException(ERROR.NFUSER);
       }
 
@@ -260,9 +253,7 @@ export class EditorBoardsService {
         editorBoardId,
         actorId,
         metadata: {
-          editorBoardName: board.name,
           invitedUserIds: uniqueUserIds,
-          invitedUsers,
         },
       } satisfies ActivityEventPayload);
     } catch (error) {
@@ -326,7 +317,7 @@ export class EditorBoardsService {
 
   async removeBoardMember(editorBoardId: number, userId: number, actorId: number) {
     try {
-      const board = await this.ensureBoard(editorBoardId);
+      await this.ensureBoard(editorBoardId);
 
       const owner = await this.prisma.editorBoard.count({
         where: {
@@ -338,7 +329,7 @@ export class EditorBoardsService {
         throw new BadRequestException(ERROR.EVLRMOWNER);
       }
 
-      const member = await this.findBoardMember(editorBoardId, userId);
+      await this.findBoardMember(editorBoardId, userId);
       await this.prisma.userEditorBoard.delete({
         where: {
           userId_editorBoardId: {
@@ -355,13 +346,7 @@ export class EditorBoardsService {
         editorBoardId,
         actorId,
         metadata: {
-          editorBoardName: board.name,
           removedUserId: userId,
-          removedUser: {
-            id: member.user.id,
-            displayName: member.user.displayName,
-            email: member.user.email,
-          },
         },
       } satisfies ActivityEventPayload);
     } catch (error) {

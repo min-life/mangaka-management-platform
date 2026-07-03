@@ -525,17 +525,8 @@ export class ApplicationsService {
       const application = await this.ensureApplication(applicationId);
       const project = await this.prisma.project.findUnique({
         where: { id: application.projectId },
-        select: {
-          createdBy: true,
-          name: true,
-          userProjects: {
-            select: {
-              userId: true,
-            },
-          },
-        },
+        select: { createdBy: true },
       });
-      const projectMemberIds = project?.userProjects.map((member) => member.userId) ?? [];
 
       const comment = await this.prisma.comment.create({
         data: {
@@ -564,9 +555,6 @@ export class ApplicationsService {
         metadata: {
           applicationId,
           applicationTitle: application.title,
-          projectId: application.projectId,
-          projectName: project?.name,
-          projectMemberIds,
           applicantId: application.createdBy,
           projectOwnerId: project?.createdBy,
         },
