@@ -184,7 +184,7 @@ export default function EditorBoardDetailScreen({
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: 112 }}
         showsVerticalScrollIndicator={false}
       >
         <EditorBoardDetailHero

@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
 import ApiStateView from '@/src/components/shared/ApiStateView';
+import AppRefreshControl from '@/src/components/shared/AppRefreshControl';
 import { NotifFilter } from '@/src/types/notifications';
 import { Colors } from '@/src/constants/colors';
 import BottomNavBar from '@/src/components/shared/BottomNavBar';
@@ -21,24 +22,32 @@ export default function NotificationsScreen() {
   const [activeFilter, setActiveFilter] = useState<NotifFilter>('All');
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const loadNotifications = useCallback(async () => {
-    setIsLoading(true);
+  const loadNotifications = useCallback(async (options: { showLoading?: boolean } = {}) => {
+    const showLoading = options.showLoading ?? true;
+    if (showLoading) setIsLoading(true);
+    else setIsRefreshing(true);
     setErrorMessage('');
 
     try {
       const result = await fetchNotifications();
-      setItems((currentItems) => uniqueById([...currentItems, ...result.items]));
+      setItems(uniqueById(result.items));
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Không thể tải notifications.');
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
     void loadNotifications();
+  }, [loadNotifications]);
+
+  const handleRefresh = useCallback(() => {
+    void loadNotifications({ showLoading: false });
   }, [loadNotifications]);
 
   useEffect(() => {
@@ -102,7 +111,25 @@ export default function NotificationsScreen() {
       if (item.target.type === 'application' && item.target.applicationId) {
         navigation.navigate('ApplicationDetail', {
           applicationId: item.target.applicationId,
-          projectId: item.target.projectId ?? '',
+          ...(item.target.projectId ? { projectId: item.target.projectId } : {}),
+        });
+        return;
+      }
+
+      if (item.target.type === 'resourceFolder' && item.target.projectId && item.target.folderId) {
+        navigation.navigate('ResourceFolderDetail', {
+          folderId: item.target.folderId,
+          projectId: item.target.projectId,
+        });
+        return;
+      }
+
+      if (item.target.type === 'resourceFile' && item.target.projectId && item.target.fileId) {
+        navigation.navigate('ResourceFile', {
+          fileId: item.target.fileId,
+          initialTab: item.target.initialTab,
+          parentFolderId: item.target.parentFolderId,
+          projectId: item.target.projectId,
         });
         return;
       }
@@ -127,9 +154,23 @@ export default function NotificationsScreen() {
       ) : errorMessage ? (
         <ApiStateView type="error" message={errorMessage} onRetry={loadNotifications} />
       ) : filteredSections.length > 0 ? (
-        <NotificationList sections={filteredSections} onNotificationPress={handleNotificationPress} />
+        <NotificationList
+          onNotificationPress={handleNotificationPress}
+          onRefresh={handleRefresh}
+          refreshing={isRefreshing}
+          sections={filteredSections}
+        />
       ) : (
-        <NotificationsEmptyState />
+        <ScrollView
+          className="flex-1"
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: 112 }}
+          // refreshControl={
+          //   <AppRefreshControl onRefresh={handleRefresh} refreshing={isRefreshing} />
+          // }
+          showsVerticalScrollIndicator={false}
+        >
+          <NotificationsEmptyState />
+        </ScrollView>
       )}
 
       <BottomNavBar activeTab="inbox" />

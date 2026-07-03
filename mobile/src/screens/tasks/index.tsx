@@ -3,6 +3,7 @@ import { ScrollView, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import ApiStateView from '@/src/components/shared/ApiStateView';
+import AppRefreshControl from '@/src/components/shared/AppRefreshControl';
 import BottomNavBar from '@/src/components/shared/BottomNavBar';
 import { Colors } from '@/src/constants/colors';
 import { RootStackParamList } from '@/src/navigation/types';
@@ -27,10 +28,13 @@ export default function TasksScreen({ navigation, route }: TasksScreenProps) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projectName, setProjectName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const loadTasks = useCallback(async () => {
-    setIsLoading(true);
+  const loadTasks = useCallback(async (options: { showLoading?: boolean } = {}) => {
+    const showLoading = options.showLoading ?? true;
+    if (showLoading) setIsLoading(true);
+    else setIsRefreshing(true);
     setErrorMessage('');
 
     try {
@@ -44,6 +48,7 @@ export default function TasksScreen({ navigation, route }: TasksScreenProps) {
       setErrorMessage(error instanceof Error ? error.message : 'Không thể tải tasks.');
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   }, [projectId, search]);
 
@@ -53,6 +58,10 @@ export default function TasksScreen({ navigation, route }: TasksScreenProps) {
     }, 250);
 
     return () => clearTimeout(timeout);
+  }, [loadTasks]);
+
+  const handleRefresh = useCallback(() => {
+    void loadTasks({ showLoading: false });
   }, [loadTasks]);
 
   const filteredTasks = tasks.filter((t) => {
@@ -73,7 +82,10 @@ export default function TasksScreen({ navigation, route }: TasksScreenProps) {
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 112 }}
+        // refreshControl={
+        //   <AppRefreshControl onRefresh={handleRefresh} refreshing={isRefreshing} />
+        // }
         showsVerticalScrollIndicator={false}
       >
         <TasksSearchBar search={search} onSearchChange={setSearch} />
@@ -89,18 +101,26 @@ export default function TasksScreen({ navigation, route }: TasksScreenProps) {
               title={projectName ? 'Project Tasks' : 'My Tasks'}
             />
 
-            {filteredTasks.map((task) => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                onPress={() => navigation.navigate('TaskDetail', { taskId: task.id })}
+            {filteredTasks.length > 0 ? (
+              filteredTasks.map((task) => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  onPress={() => navigation.navigate('TaskDetail', { taskId: task.id })}
+                />
+              ))
+            ) : (
+              <ApiStateView
+                type="empty"
+                title="Không có task"
+                message="Không tìm thấy task phù hợp với bộ lọc hiện tại."
               />
-            ))}
+            )}
           </>
         )}
       </ScrollView>
 
-      <BottomNavBar activeTab="inbox" />
+      <BottomNavBar activeTab="home" />
     </View>
   );
 }

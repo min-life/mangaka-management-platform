@@ -10,6 +10,11 @@ import {
 } from './apiTypes';
 import { apiRequest } from './apiClient';
 import { mapProject, mapProjectMember, uniqueById } from './mappers';
+import { fetchProjectResourceStats } from './resourceApi';
+
+function emptyListResponse<T>(): ApiListResponse<T> {
+  return { data: [], pagination: undefined };
+}
 
 export async function fetchProjects(params: { name?: string } = {}) {
   const response = await apiRequest<ApiListResponse<ApiProject>>('/projects', {
@@ -30,7 +35,10 @@ export async function fetchProjects(params: { name?: string } = {}) {
   };
 }
 
-export async function fetchProjectBundle(projectId: string) {
+export async function fetchProjectBundle(
+  projectId: string,
+  options: { includeResourceStats?: boolean } = {},
+) {
   const [
     projectResponse,
     boardResponse,
@@ -38,6 +46,8 @@ export async function fetchProjectBundle(projectId: string) {
     statsResponse,
     tasksResponse,
     foldersResponse,
+    membersResponse,
+    resourceStats,
   ] = await Promise.all([
     apiRequest<ApiDataResponse<ApiProject>>(`/projects/${projectId}`),
     apiRequest<ApiDataResponse<ApiEditorBoard | null>>(
@@ -45,34 +55,53 @@ export async function fetchProjectBundle(projectId: string) {
     ).catch(() => ({ data: null })),
     apiRequest<ApiListResponse<ApiApplication>>(`/projects/${projectId}/applications`, {
       params: { field: 'createdAt', limit: 50, order: 'desc', page: 1 },
-    }).catch(() => ({ data: [] })),
+    }).catch(() => emptyListResponse<ApiApplication>()),
     apiRequest<ApiDataResponse<{ metrics?: Record<string, unknown> }>>(
       `/projects/${projectId}/stats`,
     ).catch(() => ({ data: undefined })),
     apiRequest<ApiListResponse<ApiTask>>(`/projects/${projectId}/tasks`, {
       params: { limit: 100, me: true, page: 1 },
-    }).catch(() => ({ data: [] })),
+    }).catch(() => emptyListResponse<ApiTask>()),
     apiRequest<ApiListResponse<ApiFolder>>(`/projects/${projectId}/folders`, {
       params: { limit: 100, page: 1 },
-    }).catch(() => ({ data: [] })),
+    }).catch(() => emptyListResponse<ApiFolder>()),
+    apiRequest<ApiListResponse<ApiProjectMember>>(`/projects/${projectId}/members`, {
+      params: { limit: 1, page: 1 },
+    }).catch(() => emptyListResponse<ApiProjectMember>()),
+    options.includeResourceStats
+      ? fetchProjectResourceStats(projectId).catch(() => null)
+      : Promise.resolve(null),
   ]);
 
   const project = projectResponse.data;
   if (!project) throw new Error('Project not found');
+  const applications = applicationsResponse.data ?? [];
+  const folders = foldersResponse.data ?? [];
+  const tasks = tasksResponse.data ?? [];
 
   return {
-    applications: applicationsResponse.data ?? [],
+    applications,
     board: boardResponse.data ?? null,
-    folders: foldersResponse.data ?? [],
+    folders,
     project: mapProject(project, {
-      applications: applicationsResponse.data ?? [],
+      applicationTotal: applicationsResponse.pagination?.total ?? applications.length,
+      applications,
       board: boardResponse.data ?? null,
-      folders: foldersResponse.data ?? [],
+      folderTotal: foldersResponse.pagination?.total ?? folders.length,
+      folders,
+      memberTotal:
+        membersResponse.pagination?.total ??
+        project.userProjects?.length ??
+        project._count?.userProjects ??
+        0,
+      resourceStats,
       stats: statsResponse.data?.metrics ?? null,
-      tasks: tasksResponse.data ?? [],
+      taskTotal: tasksResponse.pagination?.total ?? tasks.length,
+      tasks,
     }),
+    resourceStats,
     stats: statsResponse.data?.metrics ?? null,
-    tasks: tasksResponse.data ?? [],
+    tasks,
   };
 }
 

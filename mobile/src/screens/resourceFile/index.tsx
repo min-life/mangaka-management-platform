@@ -5,6 +5,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ApiStateView from '@/src/components/shared/ApiStateView';
 import { Colors } from '@/src/constants/colors';
 import { RootStackParamList } from '@/src/navigation/types';
+import { ApiComment } from '@/src/services/apiTypes';
 import {
   ResourceFileMaterialVersion,
   ResourceFileNode,
@@ -24,6 +25,8 @@ import {
   fetchTaskDiscussionComments,
   fetchTaskDiscussionFrames,
 } from '@/src/services/resourceApi';
+import { mapComment } from '@/src/services/mappers';
+import { subscribeToComments } from '@/src/services/realtimeClient';
 
 import {
   C,
@@ -91,10 +94,11 @@ export default function ResourceFileScreen({
     setErrorMessage('');
 
     try {
-      const [nextFile, parentBundle] = await Promise.all([
-        fetchResourceFileBundle(route.params.fileId),
-        fetchFolderBundle(route.params.parentFolderId).catch(() => null),
-      ]);
+      const nextFile = await fetchResourceFileBundle(route.params.fileId);
+      const parentFolderId = route.params.parentFolderId ?? nextFile.folderId;
+      const parentBundle = parentFolderId
+        ? await fetchFolderBundle(parentFolderId).catch(() => null)
+        : null;
       setFile(nextFile);
       setFileDiscussionCommentCount(nextFile.comments?.length ?? 0);
       setParentName(parentBundle?.folder.name ?? 'Resource');
@@ -163,6 +167,25 @@ export default function ResourceFileScreen({
     setSelectedFrame(null);
     setActiveTab('Materials');
   };
+
+  const addRealtimeDiscussionComment = useCallback(
+    (comment: ApiComment, options: { updateFileCount?: boolean } = {}) => {
+      const nextComment = mapComment(comment);
+
+      setDiscussionComments((currentComments) => {
+        if (currentComments.some((item) => item.id === nextComment.id)) {
+          return currentComments;
+        }
+
+        if (options.updateFileCount) {
+          setFileDiscussionCommentCount((count) => count + 1);
+        }
+
+        return [nextComment, ...currentComments];
+      });
+    },
+    [],
+  );
 
   const loadFileDiscussionComments = useCallback(async () => {
     setDiscussionErrorMessage('');
@@ -234,26 +257,22 @@ export default function ResourceFileScreen({
       setDiscussionFrames(nextFrames);
     } catch {
       setDiscussionFrames([]);
-      setDiscussionFrameStatusMessage(
-        'Chưa thể tải frames cho task này. Endpoint /tasks/:id/frames đang chờ backend bổ sung.',
-      );
+      setDiscussionFrameStatusMessage('');
     } finally {
       setIsDiscussionFramesLoading(false);
     }
   }, []);
 
   const loadFrameDiscussion = useCallback(async (frameId: string) => {
-    const fallbackFrame = discussionFrames.find((frame) => frame.id === frameId) ?? null;
     setDiscussionScope('frame');
     setSelectedDiscussionFrameId(frameId);
+    setSelectedFrame(null);
     setDiscussionErrorMessage('');
     setIsDiscussionCommentsLoading(true);
 
     try {
-      const frameDetail = await fetchFrameDetail(frameId).catch(() => fallbackFrame);
-      if (frameDetail) {
-        setSelectedFrame(frameDetail);
-      }
+      const frameDetail = await fetchFrameDetail(frameId);
+      setSelectedFrame(frameDetail);
 
       const nextComments = await fetchFrameDiscussionComments(frameId);
       setDiscussionComments(nextComments);
@@ -265,13 +284,40 @@ export default function ResourceFileScreen({
     } finally {
       setIsDiscussionCommentsLoading(false);
     }
-  }, [discussionFrames]);
+  }, []);
 
   useEffect(() => {
     if (activeTab === 'Discussion') {
       void handleSelectFileComments();
     }
   }, [activeTab, handleSelectFileComments]);
+
+  useEffect(() => {
+    if (activeTab !== 'Discussion') return undefined;
+
+    if (discussionScope === 'file') {
+      return subscribeToComments('FILE', route.params.fileId, (comment) => {
+        addRealtimeDiscussionComment(comment, { updateFileCount: true });
+      });
+    }
+
+    if (discussionScope === 'task' && selectedDiscussionTaskId) {
+      return subscribeToComments('TASK', selectedDiscussionTaskId, addRealtimeDiscussionComment);
+    }
+
+    if (discussionScope === 'frame' && selectedDiscussionFrameId) {
+      return subscribeToComments('FRAME', selectedDiscussionFrameId, addRealtimeDiscussionComment);
+    }
+
+    return undefined;
+  }, [
+    activeTab,
+    addRealtimeDiscussionComment,
+    discussionScope,
+    route.params.fileId,
+    selectedDiscussionFrameId,
+    selectedDiscussionTaskId,
+  ]);
 
   const handleRetryDiscussionComments = () => {
     if (discussionScope === 'file') {
@@ -394,6 +440,11 @@ export default function ResourceFileScreen({
             comments={discussionComments}
             errorMessage={discussionErrorMessage}
             fileCommentCount={fileDiscussionCommentCount}
+            frameCommentCount={
+              discussionScope === 'frame' && selectedDiscussionFrameId
+                ? discussionComments.length
+                : undefined
+            }
             frameOptions={discussionFrameOptions}
             frameStatusMessage={discussionFrameStatusMessage}
             isCommentsLoading={isDiscussionCommentsLoading}
@@ -405,6 +456,11 @@ export default function ResourceFileScreen({
             onSelectTaskComments={loadTaskDiscussion}
             selectedFrameId={selectedDiscussionFrameId}
             selectedTaskId={selectedDiscussionTaskId}
+            taskCommentCount={
+              discussionScope === 'task' && selectedDiscussionTaskId
+                ? discussionComments.length
+                : undefined
+            }
             taskOptions={discussionTaskOptions}
           />
         )}

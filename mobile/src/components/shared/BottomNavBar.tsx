@@ -45,6 +45,12 @@ export default function BottomNavBar({
       edges={['bottom']}
       style={{
         backgroundColor: 'transparent',
+        bottom: 0,
+        elevation: 24,
+        left: 0,
+        position: 'absolute',
+        right: 0,
+        zIndex: 24,
       }}
     >
       <View className="px-4 pb-2 pt-2">

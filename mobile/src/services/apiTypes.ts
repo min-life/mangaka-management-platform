@@ -21,6 +21,12 @@ export interface ApiUserSummary {
   id: number;
 }
 
+export interface ApiCurrentUser extends ApiUserSummary {
+  googleLinked?: boolean;
+  isActive?: boolean;
+  roles?: ApiRoleSummary[];
+}
+
 export interface ApiRoleSummary {
   code?: string;
   id?: number;
@@ -100,6 +106,7 @@ export interface ApiFolder {
   createdByUser?: ApiUserSummary | null;
   description?: string | null;
   id: number;
+  imageUrl?: string | null;
   parent?: { id: number; title: string } | null;
   parentId?: number | null;
   project?: { id: number; name: string } | null;
@@ -222,6 +229,7 @@ export interface ApiNotification {
     editorBoardId?: number | null;
     entityId?: number;
     entityType?: string;
+    fileId?: number | null;
     metadata?: Record<string, unknown> | null;
     projectId?: number | null;
   } | null;

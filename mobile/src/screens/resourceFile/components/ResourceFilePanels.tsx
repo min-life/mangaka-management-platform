@@ -176,6 +176,7 @@ interface CommentSelectOption {
 }
 
 function CommentComboBox({
+  count,
   disabled = false,
   emptyLabel,
   icon,
@@ -188,6 +189,7 @@ function CommentComboBox({
   options,
   selectedId,
 }: {
+  count?: number;
   disabled?: boolean;
   emptyLabel: string;
   icon: string;
@@ -230,6 +232,16 @@ function CommentComboBox({
             {isLoading ? 'Loading...' : displayLabel}
           </Text>
         </View>
+        {count !== undefined ? (
+          <View
+            className="min-w-5 items-center rounded-full px-1.5 py-0.5"
+            style={{ backgroundColor: 'rgba(255,211,105,0.18)' }}
+          >
+            <Text className="text-[10px] font-bold" style={{ color: C.accent }}>
+              {count}
+            </Text>
+          </View>
+        ) : null}
         <MaterialIcon name={isOpen ? 'expand_less' : 'expand_more'} color={C.textMuted} size={18} />
       </TouchableOpacity>
 
@@ -296,6 +308,7 @@ function CommentComboBox({
 function DiscussionScopeControls({
   activeScope,
   commentCount,
+  frameCommentCount,
   frameOptions,
   isFramesLoading,
   isTasksLoading,
@@ -304,10 +317,12 @@ function DiscussionScopeControls({
   onSelectTask,
   selectedFrameId,
   selectedTaskId,
+  taskCommentCount,
   taskOptions,
 }: {
   activeScope: DiscussionScope;
   commentCount: number;
+  frameCommentCount?: number;
   frameOptions: CommentSelectOption[];
   isFramesLoading: boolean;
   isTasksLoading: boolean;
@@ -316,6 +331,7 @@ function DiscussionScopeControls({
   onSelectTask: (taskId: string) => void;
   selectedFrameId: string | null;
   selectedTaskId: string | null;
+  taskCommentCount?: number;
   taskOptions: CommentSelectOption[];
 }) {
   const [openMenu, setOpenMenu] = useState<'task' | 'frame' | null>(null);
@@ -327,6 +343,7 @@ function DiscussionScopeControls({
       </View>
       <View className="flex-row gap-2" style={{ zIndex: openMenu ? 40 : 1 }}>
         <CommentComboBox
+          count={taskCommentCount}
           emptyLabel="No tasks found"
           icon="checklist"
           isActive={activeScope === 'task'}
@@ -339,6 +356,7 @@ function DiscussionScopeControls({
           selectedId={selectedTaskId}
         />
         <CommentComboBox
+          count={frameCommentCount}
           disabled={!selectedTaskId}
           emptyLabel={selectedTaskId ? 'No frames found' : 'Select a task first'}
           icon="frame_person"
@@ -361,6 +379,7 @@ export function DiscussionPanel({
   comments,
   errorMessage: commentsErrorMessage,
   fileCommentCount,
+  frameCommentCount,
   frameOptions,
   frameStatusMessage,
   isCommentsLoading,
@@ -372,12 +391,14 @@ export function DiscussionPanel({
   onSelectTaskComments,
   selectedFrameId,
   selectedTaskId,
+  taskCommentCount,
   taskOptions,
 }: {
   activeScope: DiscussionScope;
   comments: ResourceTaskComment[];
   errorMessage?: string;
   fileCommentCount: number;
+  frameCommentCount?: number;
   frameOptions: CommentSelectOption[];
   frameStatusMessage?: string;
   isCommentsLoading: boolean;
@@ -389,6 +410,7 @@ export function DiscussionPanel({
   onSelectTaskComments: (taskId: string) => void;
   selectedFrameId: string | null;
   selectedTaskId: string | null;
+  taskCommentCount?: number;
   taskOptions: CommentSelectOption[];
 }) {
   return (
@@ -396,6 +418,7 @@ export function DiscussionPanel({
       <DiscussionScopeControls
         activeScope={activeScope}
         commentCount={fileCommentCount}
+        frameCommentCount={frameCommentCount}
         frameOptions={frameOptions}
         isFramesLoading={isFramesLoading}
         isTasksLoading={isTasksLoading}
@@ -404,6 +427,7 @@ export function DiscussionPanel({
         onSelectTask={onSelectTaskComments}
         selectedFrameId={selectedFrameId}
         selectedTaskId={selectedTaskId}
+        taskCommentCount={taskCommentCount}
         taskOptions={taskOptions}
       />
 

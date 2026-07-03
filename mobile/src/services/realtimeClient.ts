@@ -1,10 +1,13 @@
 import { io, Socket } from 'socket.io-client';
 
 import { API_BASE_URL } from './apiClient';
-import { ApiNotification } from './apiTypes';
+import { ApiComment, ApiNotification } from './apiTypes';
 import { refreshAccessToken } from './authApi';
 import { getAccessToken } from './tokenStorage';
 
+export type CommentEntityType = 'APPLICATION' | 'FILE' | 'FRAME' | 'TASK';
+
+type CommentHandler = (comment: ApiComment) => void;
 type NotificationHandler = (notification: ApiNotification) => void;
 
 const REALTIME_URL = `${API_BASE_URL.replace(/\/api\/?$/, '').replace(/\/+$/, '')}/realtime`;
@@ -87,6 +90,39 @@ export function subscribeToNotifications(handler: NotificationHandler) {
   return () => {
     isDisposed = true;
     subscribedSocket?.off('notification:new', handler);
+  };
+}
+
+export function subscribeToComments(
+  entityType: CommentEntityType,
+  entityId: string | number,
+  handler: CommentHandler,
+) {
+  let isDisposed = false;
+  let subscribedSocket: Socket | null = null;
+  const payload = { entityId: Number(entityId), entityType };
+
+  const subscribe = () => {
+    subscribedSocket?.emit('comment:subscribe', payload);
+  };
+
+  void connectRealtime().then((nextSocket) => {
+    if (isDisposed || !nextSocket || Number.isNaN(payload.entityId)) return;
+
+    subscribedSocket = nextSocket;
+    nextSocket.on('comment:new', handler);
+    nextSocket.on('connect', subscribe);
+    subscribe();
+  });
+
+  return () => {
+    isDisposed = true;
+
+    if (subscribedSocket && !Number.isNaN(payload.entityId)) {
+      subscribedSocket.emit('comment:unsubscribe', payload);
+      subscribedSocket.off('comment:new', handler);
+      subscribedSocket.off('connect', subscribe);
+    }
   };
 }
 
