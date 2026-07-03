@@ -1,8 +1,23 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsBoolean, IsOptional } from 'class-validator';
+import { Transform } from 'class-transformer';
 
-export class UpdateMaterialReqDto {
-  @ApiProperty({
-    example: { layers: ['background', 'characters'], colors: ['#FF0000', '#00FF00'] },
-  })
-  materials!: unknown;
+export class UpdateMaterialQueryDto {
+  @ApiPropertyOptional({ description: 'Xóa slot IMAGE', type: Boolean })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true')
+  @IsBoolean()
+  deleteImage?: boolean;
+
+  @ApiPropertyOptional({ description: 'Xóa slot TEXT', type: Boolean })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true')
+  @IsBoolean()
+  deleteText?: boolean;
+
+  @ApiPropertyOptional({ description: 'Xóa slot SOURCE', type: Boolean })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true')
+  @IsBoolean()
+  deleteSource?: boolean;
 }

@@ -15,6 +15,7 @@ import { ProjectsModule } from './projects/projects.module';
 import { EditorBoardsModule } from './editor-boards/editor-boards.module';
 import { ApplicationsModule } from './applications/applications.module';
 import { FoldersModule } from './folders/folders.module';
+import { CommentsModule } from './comments/comments.module';
 import { FilesModule } from './files/files.module';
 import { MaterialsModule } from './materials/materials.module';
 import { TasksModule } from './tasks/tasks.module';
@@ -37,6 +38,7 @@ import { RealtimeModule } from './realtime/realtime.module';
     PermissionsModule,
     ProjectsModule,
     EditorBoardsModule,
+    CommentsModule,
     ApplicationsModule,
     FoldersModule,
     FilesModule,

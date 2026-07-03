@@ -750,6 +750,7 @@ export class UsersService {
     const comment = await this.prisma.comment.findUnique({
       where: { id: commentId },
       select: {
+        createdBy: true,
         file: { select: { folder: { select: { projectId: true } } } },
         task: { select: { file: { select: { folder: { select: { projectId: true } } } } } },
         frame: {
@@ -791,18 +792,21 @@ export class UsersService {
       );
     }
 
+    // Give specific comment permissions if user is creator
+    if (comment.createdBy === userId) {
+      permissions.push('project:comment.update');
+      permissions.push('project:comment.delete');
+    }
+
     return permissions;
   }
 
-  private async getApplicationPermission(
-    userId: number,
-    applicationId: number,
-  ): Promise<Permission[]> {
+  private async getApplicationPermission(userId: number, applicationId: number): Promise<Permission[]> {
     let permissions = [] as Permission[];
     // Get application from applicationId
     const application = await this.prisma.application.findUnique({
       where: { id: applicationId },
-      select: { projectId: true, project: { select: { editorBoardId: true } } },
+      select: { projectId: true, project: { select: { editorBoardId: true, createdBy: true } } },
     });
     if (!application) {
       throw new NotFoundException(ERROR.NFAPPLICATION);

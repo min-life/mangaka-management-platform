@@ -79,7 +79,9 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 ### 7.1 Bảng kéo thả (Kanban)
 1. **Kéo thẻ Task**: Từ PENDING sang IN_PROGRESS -> Gọi `PATCH /api/tasks/:id` với `status = INPROGRESS`.
 2. **Lỗi Dependency**: Nếu task cha chưa xong, backend ném lỗi 400 (Mã `EVLSUBTASKDEP`). Frontend bắt lỗi, hiện Toast và kéo thẻ về vị trí cũ.
-3. **Thảo luận**: Bấm vào Task để chat. Gọi API Comment (`GET/POST /api/tasks/:id/comments`).
+3. **Thảo luận**: Bấm vào Task để chat. Gọi API Comment (`GET/POST /api/tasks/:id/comments`) để lấy hoặc tạo bình luận. API GET `/api/tasks/:id/comments` trả về cả bình luận của task và bình luận được ghim trên bản vẽ (frames).
+4. **Đánh dấu lỗi (Frames)**: Trên giao diện xem trước ảnh (Material), người dùng kéo thả tạo khung (Frame) bằng `POST /api/materials/:id/frames`. Sau đó tạo bình luận ghim trên khung `POST /api/frames/:id/comments`. Có thể xem danh sách khung bằng `GET /api/materials/:id/frames` hoặc `GET /api/tasks/:id/frames`. 
+5. **Chỉnh sửa bình luận**: Người dùng hoặc project owner có thể cập nhật (`PATCH /api/comments/:id`) hoặc xóa bình luận (`DELETE /api/comments/:id`).
 
 ## 8. Luồng Thư mục & Tập tin (Folders & Files Flow)
 
@@ -2158,14 +2160,20 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 | Name | In | Required | Type | Description |
 |------|----|----------|------|-------------|
 | `id` | `path` | `Yes` | `number` | Material id |
+| `deleteImage` | `query` | `No` | `boolean` | Flag to delete IMAGE slot |
+| `deleteText` | `query` | `No` | `boolean` | Flag to delete TEXT slot |
+| `deleteSource` | `query` | `No` | `boolean` | Flag to delete SOURCE slot |
 
 #### Request Body
+`Content-Type: multipart/form-data`
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `materials` | `object` | `Yes` |  |
+| `image` | `file` | `No` | Image material file |
+| `text` | `file` | `No` | Text material file |
+| `source` | `file` | `No` | Source material file |
 
 #### Responses
-- **200**: Material updated successfully
+- **200**: Material updated successfully (creates a new version)
   
   **Response Schema:**
   | Field | Type | Description |
@@ -2188,93 +2196,28 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 
 ---
 
-### Restore a material version to create a new latest version 
+### Restore material to a previous version
 **POST** `/api/materials/{id}/restore`
 
 #### Parameters
 | Name | In | Required | Type | Description |
 |------|----|----------|------|-------------|
-| `id` | `path` | `Yes` | `number` | Material id (the old version to restore) |
+| `id` | `path` | `Yes` | `number` | Material id (the version to restore to) |
 
 #### Responses
-- **201**: Material restored successfully
+- **200**: Material restored successfully
   
   **Response Schema:**
   | Field | Type | Description |
   |-------|------|-------------|
   | `data` | `string` |  |
 
+*Note: This operation deletes all materials (along with their frames and comments) that are newer than the specified material version.*
+
 
 ---
 
----
 
-### Add files to an existing material version 
-**POST** `/api/materials/{id}/add`
-
-#### Parameters
-| Name | In | Required | Type | Description |
-|------|----|----------|------|-------------|
-| `id` | `path` | `Yes` | `number` | Material id |
-
-#### Responses
-- **201**: Material updated successfully
-
----
-
-### Delete a file item from a material 
-**DELETE** `/api/materials/{id}/delete/{index}`
-
-#### Parameters
-| Name | In | Required | Type | Description |
-|------|----|----------|------|-------------|
-| `id` | `path` | `Yes` | `number` | Material id |
-| `index` | `path` | `Yes` | `number` | Index |
-
-#### Responses
-- **200**: Material updated successfully
-
----
-
-### Set a file item as thumbnail 
-**PATCH** `/api/materials/{id}/thumbnail/{index}`
-
-#### Parameters
-| Name | In | Required | Type | Description |
-|------|----|----------|------|-------------|
-| `id` | `path` | `Yes` | `number` | Material id |
-| `index` | `path` | `Yes` | `number` | Index |
-
-#### Responses
-- **200**: Material updated successfully
-
----
-
-### Get material frames 
-**GET** `/api/materials/{id}/frames`
-
-#### Parameters
-| Name | In | Required | Type | Description |
-|------|----|----------|------|-------------|
-| `id` | `path` | `Yes` | `number` | Material id |
-
-#### Responses
-- **200**: Material frames retrieved successfully
-
----
-
-### Create frame for material 
-**POST** `/api/materials/{id}/frames`
-
-#### Parameters
-| Name | In | Required | Type | Description |
-|------|----|----------|------|-------------|
-| `id` | `path` | `Yes` | `number` | Material id |
-
-#### Responses
-- **201**: Frame created successfully
-
----
 
 ## Tasks
 

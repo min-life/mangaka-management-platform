@@ -28,6 +28,7 @@ INSERT INTO "permissions" ("name", "scope", "description") VALUES
   ('project:material.create', 'PRJ', 'Upload material'),
   ('project:material.update', 'PRJ', 'Cập nhật material'),
   ('project:material.delete', 'PRJ', 'Xóa material'),
+  ('project:material.restore', 'PRJ', 'Khôi phục material'),
   ('project:task.create', 'PRJ', 'Tạo công việc'),
   ('project:task.update', 'PRJ', 'Cập nhật công việc'),
   ('project:task.delete', 'PRJ', 'Xóa công việc'),
@@ -81,7 +82,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO "role_permissions" ("role_id", "permission_id")
 SELECT r.id, p.id FROM "roles" r, "permissions" p
 WHERE r.code = 'MANGAKA' AND p.name IN (
-  'project:read', 'project:update', 'project:delete', 'project:member.read', 'project:member.add', 'project:member.update', 'project:member.remove', 'project:folder.create', 'project:folder.update', 'project:folder.delete', 'project:file.create', 'project:file.update', 'project:file.delete', 'project:material.create', 'project:material.update', 'project:material.delete', 'project:task.create', 'project:task.update', 'project:task.delete', 'project:frame.create', 'project:frame.update', 'project:frame.delete', 'project:comment.create', 'project:comment.update', 'project:comment.delete', 'project:application.create', 'project:application.read', 'project:application.update', 'project:application.delete'
+  'project:read', 'project:update', 'project:delete', 'project:member.read', 'project:member.add', 'project:member.update', 'project:member.remove', 'project:folder.create', 'project:folder.update', 'project:folder.delete', 'project:file.create', 'project:file.update', 'project:file.delete', 'project:material.create', 'project:material.update', 'project:material.delete', 'project:material.restore', 'project:task.create', 'project:task.update', 'project:task.delete', 'project:frame.create', 'project:frame.update', 'project:frame.delete', 'project:comment.create', 'project:comment.update', 'project:comment.delete', 'project:application.create', 'project:application.read', 'project:application.update', 'project:application.delete'
 )
 ON CONFLICT DO NOTHING;
 

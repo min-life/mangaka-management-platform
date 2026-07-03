@@ -28,7 +28,7 @@ const FRAME_SELECT = {
   startY: true,
   endX: true,
   endY: true,
-  taskId: true,
+  name: true,
   createdByUser: USER_SELECT,
   updatedByUser: USER_SELECT,
   createdAt: true,
@@ -39,6 +39,19 @@ const COMMENT_SELECT = {
   id: true,
   content: true,
   frameId: true,
+  taskId: true,
+  frame: {
+    select: {
+      id: true,
+      name: true,
+      material: {
+        select: {
+          id: true,
+          name: true,
+        }
+      }
+    }
+  },
   createdByUser: USER_SELECT,
   createdAt: true,
   updatedAt: true,
@@ -62,9 +75,86 @@ export class FramesService {
     }
   }
 
+  async getMaterialFrames(
+    materialId: number,
+    sort?: { field: 'createdAt'; order: 'asc' | 'desc' },
+    pagination?: Pagination,
+  ) {
+    try {
+      const material = await this.prisma.fileMaterial.findUnique({
+        where: { id: materialId },
+      });
+      if (!material) {
+        throw new NotFoundException(ERROR.NFMATERIAL);
+      }
+
+      const where: Prisma.MaterialCommentFrameWhereInput = { materialId };
+      const orderBy: Prisma.MaterialCommentFrameOrderByWithRelationInput = sort
+        ? { [sort.field]: sort.order }
+        : { createdAt: 'desc' };
+      const { page, limit, skip } = this.buildPagination(pagination);
+
+      const [total, frames] = await this.prisma.$transaction([
+        this.prisma.materialCommentFrame.count({ where }),
+        this.prisma.materialCommentFrame.findMany({
+          where,
+          orderBy,
+          skip,
+          take: limit,
+          select: FRAME_SELECT,
+        }),
+      ]);
+
+      return {
+        frames,
+        pagination: this.buildPaginationMeta(total, page, limit),
+      };
+    } catch (error) {
+      this.handleError(error, 'Get material frames fail', 'SVGETMATERIALFRAMES');
+    }
+  }
+
+  async createFrame(
+    materialId: number,
+    data: {
+      name?: string;
+      startX: number;
+      startY: number;
+      endX: number;
+      endY: number;
+      userId: number;
+    },
+  ) {
+    try {
+      const material = await this.prisma.fileMaterial.findUnique({
+        where: { id: materialId },
+      });
+      if (!material) {
+        throw new NotFoundException(ERROR.NFMATERIAL);
+      }
+
+      return await this.prisma.materialCommentFrame.create({
+        data: {
+          name: data.name,
+          startX: data.startX,
+          startY: data.startY,
+          endX: data.endX,
+          endY: data.endY,
+          materialId,
+          createdBy: data.userId,
+          updatedBy: data.userId,
+        },
+        select: FRAME_SELECT,
+      });
+    } catch (error) {
+      this.handleError(error, 'Create frame fail', 'SVCREATEFRAME');
+    }
+  }
+
   async updateFrame(
     id: number,
     data: {
+      name?: string;
       startX?: number;
       startY?: number;
       endX?: number;
@@ -78,6 +168,7 @@ export class FramesService {
       return await this.prisma.materialCommentFrame.update({
         where: { id },
         data: {
+          name: data.name,
           startX: data.startX,
           startY: data.startY,
           endX: data.endX,
@@ -125,8 +216,18 @@ export class FramesService {
         }),
       ]);
 
+      const mappedComments = comments.map(c => {
+        const material = c.frame?.material;
+        const frame = c.frame ? { id: c.frame.id, name: c.frame.name } : null;
+        return {
+          ...c,
+          frame,
+          material,
+        };
+      });
+
       return {
-        comments,
+        comments: mappedComments,
         pagination: this.buildPaginationMeta(total, page, limit),
       };
     } catch (error) {
