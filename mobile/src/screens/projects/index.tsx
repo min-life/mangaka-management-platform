@@ -3,6 +3,7 @@ import { ScrollView, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
 import ApiStateView from '@/src/components/shared/ApiStateView';
+import AppRefreshControl from '@/src/components/shared/AppRefreshControl';
 import BottomNavBar from '@/src/components/shared/BottomNavBar';
 import { Colors } from '@/src/constants/colors';
 import { RootStackNavProp } from '@/src/navigation/types';
@@ -28,10 +29,13 @@ export default function ProjectsScreen() {
   const [viewMode, setViewMode] = useState<ProjectViewMode>('list');
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const loadProjects = useCallback(async () => {
-    setIsLoading(true);
+  const loadProjects = useCallback(async (options: { showLoading?: boolean } = {}) => {
+    const showLoading = options.showLoading ?? true;
+    if (showLoading) setIsLoading(true);
+    else setIsRefreshing(true);
     setErrorMessage('');
 
     try {
@@ -41,6 +45,7 @@ export default function ProjectsScreen() {
       setErrorMessage(error instanceof Error ? error.message : 'Không thể tải projects.');
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   }, [search]);
 
@@ -50,6 +55,10 @@ export default function ProjectsScreen() {
     }, 250);
 
     return () => clearTimeout(timeout);
+  }, [loadProjects]);
+
+  const handleRefresh = useCallback(() => {
+    void loadProjects({ showLoading: false });
   }, [loadProjects]);
 
   const filteredProjects = useMemo(() => {
@@ -66,8 +75,11 @@ export default function ProjectsScreen() {
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: 112 }}
         keyboardShouldPersistTaps="handled"
+        // refreshControl={
+        //   <AppRefreshControl onRefresh={handleRefresh} refreshing={isRefreshing} />
+        // }
         showsVerticalScrollIndicator={false}
       >
         <View className="px-4">

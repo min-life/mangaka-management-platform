@@ -52,18 +52,20 @@ export default function CommentBubble({ comment }: CommentBubbleProps) {
               {comment.time}
             </Text>
           </View>
-          <View
-            className="px-2 py-0.5 rounded-full"
-            style={{
-              backgroundColor: 'rgba(255,211,105,0.15)',
-              borderWidth: 1,
-              borderColor: 'rgba(255,211,105,0.3)',
-            }}
-          >
-            <Text className="text-[10px] font-bold" style={{ color: Colors.accent }}>
-              {comment.authorRole}
-            </Text>
-          </View>
+          {comment.authorRole ? (
+            <View
+              className="px-2 py-0.5 rounded-full"
+              style={{
+                backgroundColor: 'rgba(255,211,105,0.15)',
+                borderWidth: 1,
+                borderColor: 'rgba(255,211,105,0.3)',
+              }}
+            >
+              <Text className="text-[10px] font-bold" style={{ color: Colors.accent }}>
+                {comment.authorRole}
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         {/* Body */}

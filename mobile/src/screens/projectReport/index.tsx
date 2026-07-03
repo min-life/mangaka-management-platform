@@ -98,7 +98,7 @@ export default function ProjectReportScreen({
 
     try {
       const [bundle, applicationsModule] = await Promise.all([
-        fetchProjectBundle(route.params.projectId),
+        fetchProjectBundle(route.params.projectId, { includeResourceStats: true }),
         import('@/src/services/applicationApi'),
       ]);
       const applications = await applicationsModule.fetchApplications({
@@ -209,7 +209,7 @@ export default function ProjectReportScreen({
           <ReportMetric
             label="Files And Materials"
             value={`${project.files} / ${project.materials}`}
-            helper="Current file count and attached material records."
+            helper={`${project.folders} folders with current file count and attached material records.`}
           />
         </View>
 

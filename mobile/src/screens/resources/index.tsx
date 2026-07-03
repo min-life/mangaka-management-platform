@@ -3,6 +3,7 @@ import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import ApiStateView from '@/src/components/shared/ApiStateView';
+import AppRefreshControl from '@/src/components/shared/AppRefreshControl';
 import BottomNavBar from '@/src/components/shared/BottomNavBar';
 import { Colors } from '@/src/constants/colors';
 import { RootStackParamList } from '@/src/navigation/types';
@@ -81,28 +82,39 @@ export default function ResourcesScreen({ navigation, route }: ResourcesScreenPr
   const [rootFolders, setRootFolders] = useState<ResourceFolderNode[]>([]);
   const [materialFiles, setMaterialFiles] = useState<ProjectMaterialFile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const loadResources = useCallback(async () => {
-    setIsLoading(true);
-    setErrorMessage('');
+  const loadResources = useCallback(
+    async (options: { showLoading?: boolean } = {}) => {
+      const showLoading = options.showLoading ?? true;
+      if (showLoading) setIsLoading(true);
+      else setIsRefreshing(true);
+      setErrorMessage('');
 
-    try {
-      const [folders, materials] = await Promise.all([
-        fetchProjectRootFolders(route.params.projectId),
-        fetchProjectMaterials(route.params.projectId),
-      ]);
-      setRootFolders(folders);
-      setMaterialFiles(materials);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải resources.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [route.params.projectId]);
+      try {
+        const [folders, materials] = await Promise.all([
+          fetchProjectRootFolders(route.params.projectId),
+          fetchProjectMaterials(route.params.projectId),
+        ]);
+        setRootFolders(folders);
+        setMaterialFiles(materials);
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : 'Không thể tải resources.');
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
+    },
+    [route.params.projectId],
+  );
 
   useEffect(() => {
     void loadResources();
+  }, [loadResources]);
+
+  const handleRefresh = useCallback(() => {
+    void loadResources({ showLoading: false });
   }, [loadResources]);
 
   const visibleFolders = useMemo(() => {
@@ -139,8 +151,11 @@ export default function ResourcesScreen({ navigation, route }: ResourcesScreenPr
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: 112 }}
         keyboardShouldPersistTaps="handled"
+        // refreshControl={
+        //   <AppRefreshControl onRefresh={handleRefresh} refreshing={isRefreshing} />
+        // }
         showsVerticalScrollIndicator={false}
       >
         <View className="px-4">

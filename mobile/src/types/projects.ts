@@ -43,9 +43,12 @@ export interface ProjectItem {
   branch: string;
   rootFolders: number;
   files: number;
+  folders: number;
   materials: number;
   applications: ProjectApplicationSummary;
+  applicationTotal: number;
   tasks: ProjectTaskSummary;
+  taskTotal: number;
   contributors: number;
   stats: ProjectStatsSummary;
   language: string;

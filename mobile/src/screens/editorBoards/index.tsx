@@ -70,7 +70,7 @@ export default function EditorBoardsScreen({ navigation }: EditorBoardsScreenPro
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: 112 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >

@@ -17,6 +17,7 @@ import {
 } from '@/src/types/resources';
 import { NotificationItem, NotificationSection } from '@/src/types/notifications';
 import { Task, TaskStatus } from '@/src/screens/tasks/components/types';
+import type { ProjectResourceStats } from './resourceApi';
 
 import {
   ApiApplication,
@@ -34,9 +35,6 @@ import {
   ApiUserSummary,
 } from './apiTypes';
 import { absoluteDate, displayName, initials, relativeDate } from './formatters';
-
-const FALLBACK_AVATAR =
-  'https://i.pravatar.cc/160?img=1';
 
 export function uniqueById<T extends { id: string }>(items: T[]): T[] {
   const seen = new Set<string>();
@@ -86,10 +84,15 @@ export function mapProject(
   project: ApiProject,
   extras: {
     applications?: ApiApplication[];
+    applicationTotal?: number;
     board?: ApiEditorBoard | null;
     folders?: ApiFolder[];
+    folderTotal?: number;
+    memberTotal?: number;
+    resourceStats?: ProjectResourceStats | null;
     stats?: Record<string, unknown> | null;
     tasks?: ApiTask[];
+    taskTotal?: number;
   } = {},
 ): ProjectItem {
   if (!project) {
@@ -100,9 +103,20 @@ export function mapProject(
   const completionRate =
     Number(extras.stats?.progress ?? extras.stats?.completionRate ?? extras.stats?.completedTasks) || 0;
   const tasks = taskSummary(extras.tasks);
+  const applicationTotal =
+    extras.applicationTotal ?? extras.applications?.length ?? project._count?.applications ?? 0;
+  const folderTotal =
+    extras.resourceStats?.folders ??
+    extras.folderTotal ??
+    project._count?.folders ??
+    extras.folders?.length ??
+    0;
+  const memberTotal =
+    extras.memberTotal ?? project.userProjects?.length ?? project._count?.userProjects ?? 0;
+  const taskTotal = extras.taskTotal ?? extras.tasks?.length ?? project._count?.tasks ?? 0;
 
   return {
-    activeMembers: project.userProjects?.length ?? project._count?.userProjects ?? 0,
+    activeMembers: memberTotal,
     applications: {
       approved: extras.applications?.filter((item) => item.status === 'APPROVE').length ?? 0,
       cancelled: extras.applications?.filter((item) => item.status === 'CANCELLED').length ?? 0,
@@ -112,10 +126,11 @@ export function mapProject(
         ).length ?? project._count?.applications ?? 0,
       rejected: extras.applications?.filter((item) => item.status === 'REJECT').length ?? 0,
     },
+    applicationTotal,
     avatarBg: Colors.surfaceContainer,
     avatarInitials: initials(project.name),
     branch: 'main',
-    contributors: project.userProjects?.length ?? project._count?.userProjects ?? 0,
+    contributors: memberTotal,
     coverUri: project.imageUrl ?? undefined,
     createdAt: project.createdAt,
     createdBy: creatorId(project),
@@ -126,16 +141,20 @@ export function mapProject(
     editorBoardLeaderInitials: initials(creatorUser(extras.board)?.displayName),
     editorBoardLeaderName: displayName(creatorUser(extras.board)),
     editorBoardLeaderAvatarUri: creatorUser(extras.board)?.avatarUrl ?? undefined,
-    files: project._count?.files ?? 0,
+    files: extras.resourceStats?.files ?? project._count?.files ?? 0,
+    folders: folderTotal,
     forks: 0,
     id: String(project.id),
     language: projectTypeFromName(project.name),
     languageColor: Colors.accent,
-    materials: project._count?.materials ?? 0,
+    materials: extras.resourceStats?.materials ?? project._count?.materials ?? 0,
     name: project.name,
     owner: creator,
-    rootFolders: extras.folders?.filter((folder) => !folder.parent && !folder.parentId).length ?? 0,
-    stars: project.userProjects?.length ?? 0,
+    rootFolders:
+      extras.resourceStats?.rootFolders ??
+      extras.folders?.filter((folder) => !folder.parent && !folder.parentId).length ??
+      0,
+    stars: memberTotal,
     stats: {
       completionRate: Math.min(100, Math.max(0, completionRate)),
       frameComments: Number(extras.stats?.frameComments ?? 0),
@@ -143,6 +162,7 @@ export function mapProject(
       pagesReviewed: Number(extras.stats?.pagesReviewed ?? extras.stats?.completedTasks ?? 0),
     },
     tasks,
+    taskTotal,
     type: projectTypeFromName(project.name),
     updatedAt: project.updatedAt,
     url: `project-${project.id}`,
@@ -244,6 +264,7 @@ export function mapApplication(application: ApiApplication): ApplicationItem {
 export function mapFolder(folder: ApiFolder, children: Array<ResourceFolderNode | ResourceFileNode> = []): ResourceFolderNode {
   return {
     children,
+    coverUri: folder.imageUrl ?? undefined,
     createdAt: folder.createdAt,
     createdBy: creatorId(folder),
     createdByName: displayName(creatorUser(folder)),
@@ -323,8 +344,13 @@ function mapTaskStatus(status: ApiTaskStatus): TaskStatus {
 }
 
 export function mapTaskCard(task: ApiTask): Task {
+  const assignees = [
+    task.assignedByUser?.avatarUrl,
+    creatorUser(task)?.avatarUrl,
+  ].filter((uri): uri is string => Boolean(uri?.trim()));
+
   return {
-    assignees: [task.assignedByUser?.avatarUrl ?? creatorUser(task)?.avatarUrl ?? FALLBACK_AVATAR],
+    assignees,
     dueLabel: task.deadline ? relativeDate(task.deadline) : 'No due date',
     id: String(task.id),
     priority: task.status === 'REVIEW' ? 'HIGH' : task.status === 'INPROGRESS' ? 'MEDIUM' : 'LOW',
@@ -366,7 +392,7 @@ export function mapComment(comment: ApiComment): ResourceTaskComment {
   return {
     applicationId: comment.applicationId === undefined || comment.applicationId === null ? undefined : String(comment.applicationId),
     author,
-    authorRole: 'Reviewer',
+    authorRole: '',
     body: text,
     content: {
       attachments: [],
@@ -429,34 +455,70 @@ function humanizeAction(action?: string) {
     .join(' ');
 }
 
+function stringId(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  if (typeof value === 'string' && value.trim()) return value;
+  return undefined;
+}
+
+function metadataStringId(metadata: Record<string, unknown> | null | undefined, key: string) {
+  return stringId(metadata?.[key]);
+}
+
+function mapNotificationTarget(
+  activityLog?: ApiNotification['activityLog'] | null,
+): NotificationItem['target'] | undefined {
+  const entityType = activityLog?.entityType?.toUpperCase();
+  const entityId = stringId(activityLog?.entityId);
+  const projectId = stringId(activityLog?.projectId);
+  const boardId = stringId(activityLog?.editorBoardId);
+  const fileId = stringId(activityLog?.fileId);
+  const metadata =
+    activityLog?.metadata && typeof activityLog.metadata === 'object'
+      ? activityLog.metadata
+      : null;
+  const metadataApplicationId = metadataStringId(metadata, 'applicationId');
+  const metadataTaskId = metadataStringId(metadata, 'taskId');
+
+  if (entityType === 'PROJECT' && entityId) return { projectId: entityId, type: 'project' };
+  if (entityType === 'EDITOR_BOARD' && entityId) return { boardId: entityId, type: 'board' };
+  if (entityType === 'TASK' && entityId) return { taskId: entityId, type: 'task' };
+  if (entityType === 'APPLICATION' && entityId) {
+    return { applicationId: entityId, projectId, type: 'application' };
+  }
+  if (entityType === 'FOLDER' && entityId && projectId) {
+    return { folderId: entityId, projectId, type: 'resourceFolder' };
+  }
+  if (entityType === 'FILE' && entityId && projectId) {
+    return { fileId: entityId, initialTab: 'Overview', projectId, type: 'resourceFile' };
+  }
+  if (entityType === 'MATERIAL' && fileId && projectId) {
+    return { fileId, initialTab: 'Materials', projectId, type: 'resourceFile' };
+  }
+  if (entityType === 'FRAME' && fileId && projectId) {
+    return { fileId, initialTab: 'Discussion', projectId, type: 'resourceFile' };
+  }
+  if (entityType === 'COMMENT') {
+    if (metadataApplicationId) {
+      return { applicationId: metadataApplicationId, projectId, type: 'application' };
+    }
+    if (metadataTaskId) return { taskId: metadataTaskId, type: 'task' };
+    if (fileId && projectId) {
+      return { fileId, initialTab: 'Discussion', projectId, type: 'resourceFile' };
+    }
+    if (projectId) return { projectId, type: 'project' };
+  }
+  if (projectId) return { projectId, type: 'project' };
+  if (boardId) return { boardId, type: 'board' };
+  return undefined;
+}
+
 export function mapNotification(notification: ApiNotification): NotificationItem {
   const activityLog = notification.activityLog;
   const filter = notification.type
     ? notificationFilter(notification.type)
     : notificationFilterFromEntity(activityLog?.entityType);
-  const entityType = activityLog?.entityType?.toUpperCase();
-  const entityId = activityLog?.entityId === undefined ? undefined : String(activityLog.entityId);
-  const projectId = activityLog?.projectId === undefined || activityLog.projectId === null
-    ? undefined
-    : String(activityLog.projectId);
-  const boardId =
-    activityLog?.editorBoardId === undefined || activityLog.editorBoardId === null
-      ? undefined
-      : String(activityLog.editorBoardId);
-  const target: NotificationItem['target'] | undefined =
-    entityType === 'PROJECT' && entityId
-      ? { projectId: entityId, type: 'project' }
-      : entityType === 'TASK' && entityId
-        ? { taskId: entityId, type: 'task' }
-        : entityType === 'APPLICATION' && entityId
-          ? { applicationId: entityId, projectId: projectId ?? '', type: 'application' }
-          : entityType === 'EDITOR_BOARD' && entityId
-            ? { boardId: entityId, type: 'board' }
-            : projectId
-              ? { projectId, type: 'project' }
-              : boardId
-                ? { boardId, type: 'board' }
-                : undefined;
+  const target = mapNotificationTarget(activityLog);
 
   return {
     filter,
