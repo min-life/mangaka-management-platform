@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { AxiosError } from 'axios';
-import { CheckCircle2, FileText, Plus, Trash2, UploadCloud } from 'lucide-react';
+import { toast } from '@/lib/toast';
+import { Check, CheckCircle2, ChevronDown, FileText, Plus, Search, Trash2, UploadCloud } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -17,12 +18,10 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { Textarea } from '@/components/ui/textarea';
 import { compressImageFile } from '@/lib/image-upload';
 import { createProject, type ProjectResponse } from '@/services/project.service';
@@ -43,6 +42,24 @@ function getErrorMessage(error: unknown) {
   return 'Create project failed.';
 }
 
+function getBoardInitials(name: string) {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word.charAt(0))
+    .join('')
+    .toUpperCase();
+}
+
+function getBoardLeadName(board?: EditorBoardResponse) {
+  return board?.createdByUser?.displayName ?? board?.createdByUser?.email ?? 'Unassigned lead';
+}
+
+function getBoardProjectCount(board: EditorBoardResponse) {
+  return board.numberOfProjects ?? board._count?.projects ?? 0;
+}
+
 type CreateProjectDialogProps = {
   editorBoards?: EditorBoardResponse[];
   onCreated?: (project: ProjectResponse) => void;
@@ -56,12 +73,24 @@ export function CreateProjectDialog({ editorBoards = [], onCreated }: CreateProj
   const [coverImageName, setCoverImageName] = useState('');
   const [coverImageSize, setCoverImageSize] = useState<number | null>(null);
   const [editorBoardId, setEditorBoardId] = useState('none');
+  const [boardPickerOpen, setBoardPickerOpen] = useState(false);
+  const [boardSearch, setBoardSearch] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const canSubmit = name.trim().length > 0 && !isSubmitting;
   const selectedBoard = editorBoards.find((board) => String(board.id) === editorBoardId);
+  const filteredBoards = editorBoards.filter((board) => {
+    const query = boardSearch.trim().toLowerCase();
+
+    if (!query) {
+      return true;
+    }
+
+    return [board.name, board.description ?? '', getBoardLeadName(board)].some((value) =>
+      value.toLowerCase().includes(query),
+    );
+  });
 
   const resetForm = () => {
     setName('');
@@ -70,8 +99,9 @@ export function CreateProjectDialog({ editorBoards = [], onCreated }: CreateProj
     setCoverImageName('');
     setCoverImageSize(null);
     setEditorBoardId('none');
+    setBoardPickerOpen(false);
+    setBoardSearch('');
     setError(null);
-    setSuccessMessage(null);
   };
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -90,7 +120,7 @@ export function CreateProjectDialog({ editorBoards = [], onCreated }: CreateProj
     }
 
     if (!file.type.startsWith('image/')) {
-      setError('Please choose an image file.');
+      toast.error('Please choose an image file.');
       return;
     }
 
@@ -119,7 +149,6 @@ export function CreateProjectDialog({ editorBoards = [], onCreated }: CreateProj
 
     setIsSubmitting(true);
     setError(null);
-    setSuccessMessage(null);
 
     try {
       const project = await createProject({
@@ -129,14 +158,10 @@ export function CreateProjectDialog({ editorBoards = [], onCreated }: CreateProj
         ...(editorBoardId !== 'none' ? { editorBoardId: Number(editorBoardId) } : {}),
       });
 
-      setSuccessMessage(`Created project #${project.id}: ${project.name}`);
       onCreated?.(project);
-      setName('');
-      setDescription('');
-      setCoverImage('');
-      setCoverImageName('');
-      setCoverImageSize(null);
-      setEditorBoardId('none');
+      toast.success(`Project "${project.name}" created successfully.`);
+      setOpen(false);
+      resetForm();
     } catch (submitError) {
       setError(getErrorMessage(submitError));
     } finally {
@@ -196,41 +221,120 @@ export function CreateProjectDialog({ editorBoards = [], onCreated }: CreateProj
 
                 <div className="space-y-3">
                   <label className={labelClassName}>
-                    Editor Board <span className="text-red-300">*</span>
+                    Editor Board
                   </label>
-                  <Select onValueChange={setEditorBoardId} value={editorBoardId}>
-                    <SelectTrigger className="h-[68px] w-full rounded-[5px] border-[#303842] bg-[#101820] px-4 text-left focus:border-[#FFD369] focus:ring-[#FFD369]/20">
-                      <SelectValue placeholder="Select a production board...">
+                  <Popover onOpenChange={setBoardPickerOpen} open={boardPickerOpen}>
+                    <PopoverTrigger asChild>
+                      <button
+                        className="flex h-[68px] w-full items-center justify-between gap-3 rounded-[5px] border border-[#303842] bg-[#101820] px-4 text-left outline-none transition hover:border-[#4b535f] focus:border-[#FFD369] focus:ring-2 focus:ring-[#FFD369]/20"
+                        type="button"
+                      >
                         {selectedBoard ? (
-                          <div className="flex items-center gap-3">
+                          <span className="flex min-w-0 items-center gap-3">
                             <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[#2a2414] text-xs font-black text-[#FFD369]">
-                              {selectedBoard.name
-                                .split(' ')
-                                .slice(0, 2)
-                                .map((word) => word.charAt(0))
-                                .join('')}
+                              {getBoardInitials(selectedBoard.name)}
                             </span>
                             <span className="min-w-0">
                               <span className="block truncate text-sm font-black text-white">
                                 {selectedBoard.name}
                               </span>
                               <span className="block truncate text-xs font-bold text-[#8b94a1]">
-                                Lead: {selectedBoard.createdByUser?.displayName ?? selectedBoard.createdByUser?.email ?? 'Unassigned'}
+                                Lead: {getBoardLeadName(selectedBoard)} - {getBoardProjectCount(selectedBoard)} projects
                               </span>
                             </span>
-                          </div>
+                          </span>
+                        ) : (
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-black text-white">
+                              No editor board yet
+                            </span>
+                            <span className="block truncate text-xs font-bold text-[#8b94a1]">
+                              Search system boards or assign later
+                            </span>
+                          </span>
+                        )}
+                        <ChevronDown className="size-4 shrink-0 text-[#8b94a1]" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      align="start"
+                      className="z-[80] w-[var(--radix-popover-trigger-width)] rounded-[5px] border border-[#4b535f] bg-[#151c25] p-2 text-white shadow-2xl"
+                    >
+                      <div className="flex h-10 items-center gap-2 rounded-[4px] border border-[#303842] bg-[#101820] px-3">
+                        <Search className="size-4 shrink-0 text-[#8b94a1]" />
+                        <input
+                          className="min-w-0 flex-1 bg-transparent text-xs font-bold text-white outline-none placeholder:text-[#8b94a1]"
+                          onChange={(event) => setBoardSearch(event.target.value)}
+                          placeholder="Search board name or lead..."
+                          value={boardSearch}
+                        />
+                      </div>
+
+                      <div className="mt-2 max-h-64 overflow-y-auto pr-1">
+                        <button
+                          className="flex w-full items-center gap-3 rounded-[4px] px-3 py-3 text-left hover:bg-[#202832]"
+                          onClick={() => {
+                            setEditorBoardId('none');
+                            setBoardSearch('');
+                            setBoardPickerOpen(false);
+                          }}
+                          type="button"
+                        >
+                          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[#202832] text-[10px] font-black text-[#8b94a1]">
+                            NA
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-xs font-black text-white">
+                              No editor board yet
+                            </span>
+                            <span className="block text-[11px] font-bold text-[#8b94a1]">
+                              Assign a board after the project is created
+                            </span>
+                          </span>
+                          {editorBoardId === 'none' ? (
+                            <Check className="size-4 shrink-0 text-[#FFD369]" />
+                          ) : null}
+                        </button>
+
+                        {filteredBoards.map((board) => (
+                          <button
+                            className="flex w-full items-center gap-3 rounded-[4px] px-3 py-3 text-left hover:bg-[#202832]"
+                            key={board.id}
+                            onClick={() => {
+                              setEditorBoardId(String(board.id));
+                              setBoardSearch('');
+                              setBoardPickerOpen(false);
+                            }}
+                            type="button"
+                          >
+                            <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[#2a2414] text-xs font-black text-[#FFD369]">
+                              {getBoardInitials(board.name)}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-xs font-black text-white">
+                                {board.name}
+                              </span>
+                              <span className="block truncate text-[11px] font-bold text-[#8b94a1]">
+                                Lead: {getBoardLeadName(board)} - {getBoardProjectCount(board)} projects
+                              </span>
+                            </span>
+                            {String(board.id) === editorBoardId ? (
+                              <Check className="size-4 shrink-0 text-[#FFD369]" />
+                            ) : null}
+                          </button>
+                        ))}
+
+                        {filteredBoards.length === 0 ? (
+                          <p className="px-3 py-4 text-center text-xs font-bold text-[#8b94a1]">
+                            No editor boards match your search.
+                          </p>
                         ) : null}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent className="border-[#4b535f] bg-[#151c25] text-white">
-                      <SelectItem value="none">No editor board yet</SelectItem>
-                      {editorBoards.map((board) => (
-                        <SelectItem key={board.id} value={String(board.id)}>
-                          <span className="font-bold">{board.name}</span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  <p className="text-[11px] font-bold leading-5 text-[#8b94a1]">
+                    Boards are loaded from the system-wide editor board list.
+                  </p>
                 </div>
 
                 <div className="space-y-3">
@@ -348,9 +452,6 @@ export function CreateProjectDialog({ editorBoards = [], onCreated }: CreateProj
 
               {error ? (
                 <p className="text-xs font-bold text-red-300 lg:col-span-2">{error}</p>
-              ) : null}
-              {successMessage ? (
-                <p className="text-xs font-bold text-[#9df2c7] lg:col-span-2">{successMessage}</p>
               ) : null}
             </div>
           </div>

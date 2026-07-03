@@ -13,6 +13,8 @@ import {
   User,
 } from 'lucide-react';
 
+import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
+import { getProjectById, getProjects, type ProjectResponse } from '@/services/project.service';
 
 type ProjectAppHeaderProps = {
   projectId: string;
@@ -29,7 +32,26 @@ type ProjectAppHeaderProps = {
 };
 
 export function ProjectAppHeader({ projectId, projectName }: ProjectAppHeaderProps) {
+  const router = useRouter();
   const { logout, user } = useAuth();
+  const [activeProject, setActiveProject] = useState<ProjectResponse | null>(null);
+  const [allProjects, setAllProjects] = useState<ProjectResponse[]>([]);
+
+  useEffect(() => {
+    if (projectId) {
+      void getProjectById(Number(projectId))
+        .then(setActiveProject)
+        .catch(() => {});
+    }
+    void getProjects()
+      .then((res) => {
+        setAllProjects(res.projects || res || []);
+      })
+      .catch(() => {});
+  }, [projectId]);
+
+  const displayProjectName = activeProject?.name || projectName;
+
   const displayName = user?.displayName || user?.email || 'Current user';
   const email = user?.email ?? 'No email';
   const initials =
@@ -56,23 +78,27 @@ export function ProjectAppHeader({ projectId, projectName }: ProjectAppHeaderPro
               <FolderKanban className="size-4 text-[#FFD369]" />
               <span>Workspace</span>
               <span className="text-[#5b626d]">/</span>
-              <span className="text-[#FFD369]">{projectName}</span>
+              <span className="text-[#FFD369]">{displayProjectName}</span>
               <ChevronDown className="size-3.5 text-[#dce7f3]" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="start"
-            className="min-w-56 rounded-[4px] border border-[#39424f] bg-[#101820] p-1 text-white"
+            className="min-w-56 rounded-[4px] border border-[#39424f] bg-[#101820] p-1 text-white animate-in fade-in-50 duration-100"
           >
-            {['Neon Tokyo Drifters', 'Cyberpunk Ronin', 'Autumn Whisper'].map((name) => (
+            {allProjects.map((p) => (
               <DropdownMenuItem
                 className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold focus:bg-[#303842] focus:text-white"
-                key={name}
+                key={p.id}
+                onSelect={() => router.push(`/studio/projects/${p.id}`)}
               >
                 <FolderKanban className="size-3.5 text-[#8b94a1]" />
-                {name}
+                {p.name}
               </DropdownMenuItem>
             ))}
+            {allProjects.length === 0 && (
+              <p className="px-2 py-1.5 text-[11px] font-bold text-[#8b94a1]">No other workspace projects</p>
+            )}
             <DropdownMenuSeparator className="bg-[#39424f]" />
             <DropdownMenuItem
               asChild
@@ -110,11 +136,11 @@ export function ProjectAppHeader({ projectId, projectName }: ProjectAppHeaderPro
               className="flex items-center gap-2 rounded-full border border-transparent px-1 py-1 hover:border-[#39424f] hover:bg-[#222a34]"
               type="button"
             >
-              {user?.avatarUrl ? (
+              {user?.avatarUrl && user.avatarUrl.trim() !== '' ? (
                 <img
                   alt={displayName}
                   className="size-8 rounded-full border border-[#FFD369] object-cover"
-                  src={user.avatarUrl}
+                  src={user.avatarUrl || undefined}
                 />
               ) : (
                 <span className="grid size-8 place-items-center rounded-full border border-[#FFD369] bg-[#151c25] text-xs font-black text-white">
@@ -146,9 +172,9 @@ export function ProjectAppHeader({ projectId, projectName }: ProjectAppHeaderPro
               asChild
               className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold focus:bg-[#303842] focus:text-white"
             >
-              <Link href={`/studio/projects/${projectId}/settings`}>
+              <Link href={`/studio/projects/${projectId}`}>
                 <Settings className="size-4" />
-                Workspace Settings
+                Workspace Home
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold focus:bg-[#303842] focus:text-white">

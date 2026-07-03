@@ -28,6 +28,10 @@ export async function login(payload: LoginPayload) {
   return await api.post<LoginResponse, LoginResponse>('/auth/login', payload);
 }
 
+export async function logout() {
+  await api.post('/auth/logout');
+}
+
 export async function register(payload: RegisterPayload) {
   return await api.post('/auth/register', payload);
 }

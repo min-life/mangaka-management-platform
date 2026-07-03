@@ -27,6 +27,14 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+      // Force-set at request level first to override instance default ('application/json'),
+      // then delete entirely so the browser auto-sets 'multipart/form-data; boundary=...'
+      config.headers.set('Content-Type', 'multipart/form-data');
+      config.headers.delete('Content-Type');
+    }
+
     return config;
   },
   (error) => Promise.reject(error),
@@ -38,12 +46,23 @@ api.interceptors.response.use(
   (response) => response?.data,
   async (error) => {
     const originalRequest = error.config;
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && !originalRequest._retry && getAccessToken()) {
       originalRequest._retry = true;
+
+      // Compare the token that the failing request used against the current
+      // token in storage. If they differ, another request already refreshed
+      // the token – just retry with the current one (no /auth/refresh needed).
+      const failedToken = originalRequest.headers.Authorization?.replace('Bearer ', '');
+      const currentToken = getAccessToken();
+      if (currentToken && failedToken && currentToken !== failedToken) {
+        originalRequest.headers.Authorization = `Bearer ${currentToken}`;
+        return api(originalRequest);
+      }
+
       try {
         if (!refreshPromise) {
           refreshPromise = axios
-            .post(
+            .post<RefreshResponse>(
               `${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api'}/auth/refresh`,
               {},
               { withCredentials: true },
@@ -59,6 +78,7 @@ api.interceptors.response.use(
                 throw new Error('Refresh response did not include an access token.');
               }
 
+              setAccessToken(nextToken);
               return nextToken;
             })
             .finally(() => {
@@ -66,7 +86,6 @@ api.interceptors.response.use(
             });
         }
         const accessToken = await refreshPromise;
-        setAccessToken(accessToken);
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         return api(originalRequest);
       } catch (rfError) {
@@ -83,3 +102,4 @@ api.interceptors.response.use(
 );
 
 export default api;
+

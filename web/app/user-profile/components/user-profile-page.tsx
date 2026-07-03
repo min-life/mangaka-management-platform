@@ -17,7 +17,7 @@ import {
   Upload,
   UserPlus,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -36,7 +36,6 @@ import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Toaster } from '@/components/ui/sonner';
 import { cn } from '@/lib/utils';
 import {
   getCurrentUserActivities,
@@ -608,7 +607,6 @@ export function UserProfilePage() {
       )}
       style={themeStyle}
     >
-      <Toaster position="top-right" />
       <EditProfileDialog
         isSubmitting={isProfileSubmitting}
         open={isEditProfileOpen}

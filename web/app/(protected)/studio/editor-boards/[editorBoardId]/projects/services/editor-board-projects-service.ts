@@ -1,4 +1,3 @@
-import { projects } from '../const/projects';
 import { getEditorBoardProjects as getEditorBoardProjectsRequest } from '@/services/editor-board.service';
 import type { ProjectResponse } from '@/services/project.service';
 
@@ -47,16 +46,6 @@ export type EditorBoardProjectsSummary = {
   editorialTeamCount: number;
   projectCount: number;
 };
-
-const MOCK_DELAY = 180;
-
-function clone<T>(value: T): T {
-  return structuredClone(value);
-}
-
-async function wait() {
-  await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
-}
 
 function mapProjectResponse(project: ProjectResponse, editorBoardId: number | string): EditorBoardProject {
   const createdByName =
@@ -111,12 +100,9 @@ export async function getEditorBoardProjects(editorBoardId: number | string) {
   try {
     const result = await getEditorBoardProjectsRequest(editorBoardId);
     return result.projects.map((project) => mapProjectResponse(project, editorBoardId));
-  } catch {
-    await wait();
-
-    return clone(projects).filter(
-      (project) => String(project.editorBoardId) === String(editorBoardId),
-    );
+  } catch (err) {
+    console.error('Failed to load editor board projects:', err);
+    return [];
   }
 }
 
@@ -130,9 +116,9 @@ export async function getEditorBoardProjectsSummary(editorBoardId: number | stri
       cycleTimes.length > 0
         ? Number((cycleTimes.reduce((total, value) => total + value, 0) / cycleTimes.length).toFixed(1))
         : 0,
-    averageCycleTimeTrendPercent: 12,
+    averageCycleTimeTrendPercent: 0,
     criticalDeadlines: boardProjects.filter((project) => project.applicationsCount >= 3).length,
-    editorialTeamCount: 4,
+    editorialTeamCount: new Set(boardProjects.flatMap((p) => p.members.map((m) => m.id))).size,
     projectCount: boardProjects.length,
   } satisfies EditorBoardProjectsSummary;
 }

@@ -5,9 +5,7 @@ import {
   setEditorBoardMemberLead,
   type BoardMemberResponse,
 } from '@/services/editor-board.service';
-import { getUsers, type UserResponse } from '@/services/user.service';
-
-import { memberActivities, members } from '../const/members';
+import { getUsers } from '@/services/user.service';
 
 export type MemberStatus = 'AVAILABLE' | 'BUSY' | 'OFFLINE';
 
@@ -48,16 +46,6 @@ export type EditorialMembersSummary = {
   totalMembers: number;
 };
 
-const MOCK_DELAY = 160;
-
-function clone<T>(value: T): T {
-  return structuredClone(value);
-}
-
-async function wait() {
-  await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
-}
-
 function getStatus(memberId: number): MemberStatus {
   if (memberId % 5 === 0) {
     return 'OFFLINE';
@@ -71,7 +59,7 @@ function mapBoardMember(member: BoardMemberResponse, editorBoardId: number | str
   const numericBoardId = Number(editorBoardId);
 
   return {
-    activeProjects: member.isLead ? 8 : 3 + (member.id % 4),
+    activeProjects: 0,
     avatarUrl: member.avatarUrl ?? null,
     displayName: member.displayName ?? memberName,
     email: member.email ?? `${member.id}@inkly.local`,
@@ -80,7 +68,7 @@ function mapBoardMember(member: BoardMemberResponse, editorBoardId: number | str
     joinedAt: undefined,
     lastActiveAt: undefined,
     region: member.isLead ? 'Editorial Lead Desk' : 'Editorial Desk',
-    reviewLoad: member.isLead ? 12 : 2 + (member.id % 8),
+    reviewLoad: 0,
     roleTitle: member.isLead ? 'Lead Editor' : 'Editorial Member',
     status: getStatus(member.id),
     userEditorBoard: {
@@ -101,16 +89,9 @@ export async function getEditorialMembers(editorBoardId: number | string) {
     });
 
     return result.members.map((member) => mapBoardMember(member, editorBoardId));
-  } catch {
-    await wait();
-
-    return clone(members).map((member) => ({
-      ...member,
-      userEditorBoard: {
-        ...member.userEditorBoard,
-        editorBoardId: Number(editorBoardId) || member.userEditorBoard.editorBoardId,
-      },
-    }));
+  } catch (err) {
+    console.error('Failed to load editorial members:', err);
+    return [];
   }
 }
 
@@ -127,26 +108,11 @@ export async function getEditorialMembersSummary(editorBoardId: number | string)
 }
 
 export async function getEditorialMemberActivities() {
-  await wait();
-  return clone(memberActivities);
+  return [] as MemberActivity[];
 }
 
 export async function getAvailableEditorialUsers() {
-  try {
-    return await getUsers();
-  } catch {
-    await wait();
-
-    return clone(members).map(
-      (member) =>
-        ({
-          avatarUrl: member.avatarUrl,
-          displayName: member.displayName,
-          email: member.email,
-          id: member.id,
-        }) satisfies UserResponse,
-    );
-  }
+  return await getUsers();
 }
 
 export async function addEditorialMembers(editorBoardId: number | string, userIds: number[]) {
@@ -158,11 +124,6 @@ export async function removeEditorialMember(editorBoardId: number | string, user
 }
 
 export async function setEditorialMemberAsLead(editorBoardId: number | string, userId: number) {
-  try {
-    const member = await setEditorBoardMemberLead(editorBoardId, userId);
-    return mapBoardMember(member, editorBoardId);
-  } catch {
-    await wait();
-    return null;
-  }
+  const member = await setEditorBoardMemberLead(editorBoardId, userId);
+  return mapBoardMember(member, editorBoardId);
 }

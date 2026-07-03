@@ -1,16 +1,30 @@
+'use client';
+
 import Link from 'next/link';
 import Image from 'next/image';
 import {
   ArrowRight,
   CheckCircle2,
+  ChevronDown,
   ClipboardCheck,
   FileStack,
   FolderKanban,
+  LogOut,
+  UserRound,
   MessageSquareText,
   Rocket,
   Sparkles,
   Users,
 } from 'lucide-react';
+
+import { useAuth } from '@/hooks/useAuth';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const featureItems = [
   {
@@ -227,7 +241,181 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+function getDisplayName(user: ReturnType<typeof useAuth>['user']) {
+  return user?.displayName?.trim() || user?.email || 'Inkly user';
+}
+
+function UserAvatar({ className = 'size-9' }: { className?: string }) {
+  const { user } = useAuth();
+  const displayName = getDisplayName(user);
+  const initials = displayName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('');
+
+  if (user?.avatarUrl && user.avatarUrl.trim() !== '') {
+    return (
+      <img
+        alt={displayName}
+        className={`${className} rounded-full border border-[#FFD369] object-cover`}
+        src={user.avatarUrl || undefined}
+      />
+    );
+  }
+
+  return (
+    <span
+      className={`${className} grid place-items-center rounded-full border border-[#FFD369] bg-[#101820] text-xs font-black text-[#FFD369]`}
+    >
+      {initials || 'I'}
+    </span>
+  );
+}
+
+function LandingNavActions() {
+  const { logout, status, user } = useAuth();
+  const displayName = getDisplayName(user);
+
+  if (status === 'loading') {
+    return (
+      <div className="flex items-center gap-3">
+        <span className="hidden h-5 w-14 animate-pulse rounded bg-[#393E46] sm:inline-block" />
+        <span className="h-9 w-28 animate-pulse rounded-[6px] bg-[#FFD369]/35" />
+      </div>
+    );
+  }
+
+  if (status !== 'authenticated' || !user) {
+    return (
+      <div className="flex items-center gap-3">
+        <Link
+          className="hidden text-sm font-bold text-[#aeb7c2] transition-colors hover:text-white sm:inline"
+          href="/login"
+        >
+          Sign In
+        </Link>
+        <Link
+          className="rounded-[6px] bg-[#FFD369] px-4 py-2 text-sm font-black text-[#222831] transition hover:brightness-110"
+          href="/register"
+        >
+          Get Started
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-3">
+      <Link
+        className="hidden rounded-[6px] border border-[#393E46] px-4 py-2 text-sm font-black text-white transition hover:bg-[#393E46] sm:inline-flex"
+        href="/studio"
+      >
+        Open Workspace
+      </Link>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            className="flex items-center gap-2 rounded-[6px] px-2 py-1.5 transition hover:bg-[#393E46]"
+            type="button"
+          >
+            <UserAvatar />
+            <span className="hidden max-w-36 truncate text-sm font-black text-white md:inline">
+              {displayName}
+            </span>
+            <ChevronDown className="size-4 text-[#aeb7c2]" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="end"
+          className="w-64 border-[#393E46] bg-[#151c25] text-[#eeeeee]"
+        >
+          <div className="px-3 py-2">
+            <p className="truncate text-sm font-black text-white">{displayName}</p>
+            <p className="mt-1 truncate text-xs font-semibold text-[#aeb7c2]">{user.email}</p>
+          </div>
+          <DropdownMenuSeparator className="bg-[#393E46]" />
+          <DropdownMenuItem asChild className="cursor-pointer focus:bg-[#393E46] focus:text-white">
+            <Link href="/user-profile">
+              <UserRound className="mr-2 size-4" />
+              My Profile
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild className="cursor-pointer focus:bg-[#393E46] focus:text-white">
+            <Link href="/studio">
+              <FolderKanban className="mr-2 size-4" />
+              Workspace
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator className="bg-[#393E46]" />
+          <DropdownMenuItem
+            className="cursor-pointer text-red-300 focus:bg-[#393E46] focus:text-red-300"
+            onClick={logout}
+          >
+            <LogOut className="mr-2 size-4" />
+            Sign out
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
+
+function HeroActions() {
+  const { status, user } = useAuth();
+
+  if (status === 'loading') {
+    return (
+      <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
+        <span className="inline-flex h-12 w-full animate-pulse rounded-[6px] bg-[#FFD369]/35 sm:w-40" />
+        <span className="inline-flex h-12 w-full animate-pulse rounded-[6px] border border-[#393E46] bg-[#151c25] sm:w-36" />
+      </div>
+    );
+  }
+
+  if (status === 'authenticated' && user) {
+    return (
+      <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
+        <Link
+          className="inline-flex h-12 items-center justify-center rounded-[6px] bg-[#FFD369] px-8 text-base font-black text-[#222831] transition hover:brightness-110"
+          href="/studio"
+        >
+          Open Workspace
+        </Link>
+        <Link
+          className="inline-flex h-12 items-center justify-center rounded-[6px] border border-[#393E46] px-8 text-base font-black text-white transition hover:bg-[#393E46]"
+          href="/user-profile"
+        >
+          My Profile
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
+      <Link
+        className="inline-flex h-12 items-center justify-center rounded-[6px] bg-[#FFD369] px-8 text-base font-black text-[#222831] transition hover:brightness-110"
+        href="/register"
+      >
+        Start Free
+      </Link>
+      <Link
+        className="inline-flex h-12 items-center justify-center rounded-[6px] border border-[#393E46] px-8 text-base font-black text-white transition hover:bg-[#393E46]"
+        href="/login"
+      >
+        Book Demo
+      </Link>
+    </div>
+  );
+}
+
 export default function Home() {
+  const { status, user } = useAuth();
+  const isSignedIn = status === 'authenticated' && user;
+  const displayName = getDisplayName(user);
+
   return (
     <main className="min-h-screen bg-[#222831] text-[#eeeeee]">
       <nav className="sticky top-0 z-50 border-b border-[#393E46] bg-[#222831]/85 backdrop-blur-xl">
@@ -254,20 +442,7 @@ export default function Home() {
               ))}
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Link
-              className="hidden text-sm font-bold text-[#aeb7c2] transition-colors hover:text-white sm:inline"
-              href="/login"
-            >
-              Sign In
-            </Link>
-            <Link
-              className="rounded-[6px] bg-[#FFD369] px-4 py-2 text-sm font-black text-[#222831] transition hover:brightness-110"
-              href="/register"
-            >
-              Get Started
-            </Link>
-          </div>
+          <LandingNavActions />
         </div>
       </nav>
 
@@ -282,29 +457,25 @@ export default function Home() {
           </div>
 
           <h1 className="mx-auto max-w-5xl text-5xl font-black leading-tight text-white md:text-7xl">
-            Manage every chapter,{' '}
-            <span className="text-[#FFD369]">from sketch to release.</span>
+            {isSignedIn ? (
+              <>
+                Welcome back,{' '}
+                <span className="text-[#FFD369]">{displayName.split(' ')[0]}.</span>
+              </>
+            ) : (
+              <>
+                Manage every chapter,{' '}
+                <span className="text-[#FFD369]">from sketch to release.</span>
+              </>
+            )}
           </h1>
           <p className="mx-auto mt-6 max-w-3xl text-lg font-medium leading-8 text-[#aeb7c2]">
-            Inkly is the unified workspace built specifically for professional manga studios.
-            Streamline file management, team reviews, and publishing schedules in one technical
-            environment.
+            {isSignedIn
+              ? 'Continue where you left off. Your production workspace, review queues, files, and project tasks are ready.'
+              : 'Inkly is the unified workspace built specifically for professional manga studios. Streamline file management, team reviews, and publishing schedules in one technical environment.'}
           </p>
 
-          <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
-            <Link
-              className="inline-flex h-12 items-center justify-center rounded-[6px] bg-[#FFD369] px-8 text-base font-black text-[#222831] transition hover:brightness-110"
-              href="/register"
-            >
-              Start Free
-            </Link>
-            <Link
-              className="inline-flex h-12 items-center justify-center rounded-[6px] border border-[#393E46] px-8 text-base font-black text-white transition hover:bg-[#393E46]"
-              href="/login"
-            >
-              Book Demo
-            </Link>
-          </div>
+          <HeroActions />
 
           <ProductMockup />
         </div>
@@ -340,9 +511,9 @@ export default function Home() {
             </div>
             <Link
               className="inline-flex items-center gap-2 text-sm font-black text-[#FFD369]"
-              href="/register"
+              href={isSignedIn ? '/studio' : '/register'}
             >
-              Explore platform <ArrowRight className="size-4" />
+              {isSignedIn ? 'Open workspace' : 'Explore platform'} <ArrowRight className="size-4" />
             </Link>
           </div>
 
@@ -558,15 +729,15 @@ export default function Home() {
           <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
             <Link
               className="inline-flex h-12 items-center justify-center rounded-[6px] bg-[#FFD369] px-8 text-base font-black text-[#222831]"
-              href="/register"
+              href={isSignedIn ? '/studio' : '/register'}
             >
-              Create Studio Workspace
+              {isSignedIn ? 'Open Workspace' : 'Create Studio Workspace'}
             </Link>
             <Link
               className="inline-flex h-12 items-center justify-center rounded-[6px] border border-[#393E46] px-8 text-base font-black text-white hover:bg-[#393E46]"
-              href="/login"
+              href={isSignedIn ? '/user-profile' : '/login'}
             >
-              Talk to an Expert
+              {isSignedIn ? 'My Profile' : 'Talk to an Expert'}
             </Link>
           </div>
         </div>
