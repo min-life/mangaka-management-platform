@@ -161,6 +161,13 @@ export class ActivityLogsService {
           if ('projectOwnerId' in payload.metadata && payload.metadata.projectOwnerId !== payload.actorId && payload.metadata.projectOwnerId !== null) {
             usersToNotify.add(payload.metadata.projectOwnerId as number);
           }
+          if ('projectMemberIds' in payload.metadata) {
+            getNumberArray(payload.metadata.projectMemberIds).forEach((id) => {
+              if (id !== payload.actorId) {
+                usersToNotify.add(id);
+              }
+            });
+          }
         }
       }
 

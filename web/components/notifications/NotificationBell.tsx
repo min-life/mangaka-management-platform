@@ -69,6 +69,20 @@ function getEditorBoardName(notification: NotificationResponse) {
   return editorBoardId ? `#${editorBoardId}` : '';
 }
 
+function getApplicationTitle(notification: NotificationResponse) {
+  const metadata = notification.activityLog?.metadata;
+
+  if (
+    isRecord(metadata) &&
+    typeof metadata.applicationTitle === 'string' &&
+    metadata.applicationTitle.trim()
+  ) {
+    return metadata.applicationTitle;
+  }
+
+  return '';
+}
+
 function getNotificationText(notification: NotificationResponse) {
   const activity = notification.activityLog;
   const actorName =
@@ -96,6 +110,17 @@ function getNotificationText(notification: NotificationResponse) {
     return {
       description: `${actorName} removed you from editor board "${boardName}".`,
       title: 'You were removed from an editor board',
+    };
+  }
+
+  if (activity.action === 'COMMENT_CREATED') {
+    const applicationTitle = getApplicationTitle(notification);
+
+    return {
+      description: applicationTitle
+        ? `${actorName} commented on application "${applicationTitle}".`
+        : `${actorName} commented on an application.`,
+      title: 'New application comment',
     };
   }
 

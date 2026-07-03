@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
 
+import { useRealtimeComments } from '@/hooks/use-realtime-activity';
 import { useAuth } from '@/hooks/useAuth';
 import {
   getApplicationVotes,
@@ -25,18 +26,13 @@ import {
 } from '@/services/application.service';
 
 import { getStatusLabel, getStatusStyle } from './application-ui';
+import {
+  createApplicationComment,
+  getApplicationComments,
+  type ApplicationCommentResponse,
+} from './services/application-comments-service';
 
-type CommentItem = {
-  id: number;
-  content: { text: string };
-  createdByUser?: {
-    id: number;
-    email?: string;
-    displayName?: string | null;
-    avatarUrl?: string | null;
-  } | null;
-  createdAt: string;
-};
+type CommentItem = ApplicationCommentResponse;
 
 type ApplicationReviewDrawerProps = {
   application: ApplicationResponse | null;
@@ -82,8 +78,28 @@ export function ApplicationReviewDrawer({
   const [voteComment, setVoteComment] = useState('');
 
   const [comments, setComments] = useState<CommentItem[]>([]);
+  const [commentsError, setCommentsError] = useState('');
+  const [isLoadingComments, setIsLoadingComments] = useState(false);
+  const [isSendingComment, setIsSendingComment] = useState(false);
   const [newComment, setNewComment] = useState('');
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
+  const { createdComments } = useRealtimeComments('APPLICATION', application?.id);
+
+  const mergeComment = (comment: CommentItem) => {
+    setComments((currentComments) => {
+      const exists = currentComments.some((currentComment) => currentComment.id === comment.id);
+      if (exists) {
+        return currentComments.map((currentComment) =>
+          currentComment.id === comment.id ? comment : currentComment,
+        );
+      }
+
+      return [...currentComments, comment].sort(
+        (first, second) =>
+          new Date(first.createdAt).getTime() - new Date(second.createdAt).getTime(),
+      );
+    });
+  };
 
   const handleReply = (displayName: string | null | undefined) => {
     if (displayName) {
@@ -92,26 +108,24 @@ export function ApplicationReviewDrawer({
     }
   };
 
-  const handleSendComment = () => {
+  const handleSendComment = async () => {
+    if (!application) return;
     if (!newComment.trim()) return;
 
-    const nextId = comments.length ? Math.max(...comments.map((c) => c.id)) + 1 : 1;
-    const comment: CommentItem = {
-      id: nextId,
-      content: { text: newComment },
-      createdByUser: user
-        ? {
-            id: user.id,
-            email: user.email,
-            displayName: user.displayName,
-            avatarUrl: user.avatarUrl,
-          }
-        : null,
-      createdAt: new Date().toISOString(),
-    };
+    setIsSendingComment(true);
+    setCommentsError('');
 
-    setComments([...comments, comment]);
-    setNewComment('');
+    try {
+      const comment = await createApplicationComment(application.id, newComment.trim());
+      if (comment) {
+        mergeComment(comment);
+      }
+      setNewComment('');
+    } catch {
+      setCommentsError('Unable to send comment.');
+    } finally {
+      setIsSendingComment(false);
+    }
   };
 
   const renderCommentText = (text: string) => {
@@ -149,6 +163,49 @@ export function ApplicationReviewDrawer({
       void loadVotes(application.id);
     }
   }, [application?.id]);
+
+  useEffect(() => {
+    if (!application?.id) {
+      return;
+    }
+
+    const applicationId = application.id;
+    let isMounted = true;
+
+    async function loadComments() {
+      setIsLoadingComments(true);
+      setCommentsError('');
+
+      try {
+        const nextComments = await getApplicationComments(applicationId);
+        if (isMounted) {
+          setComments(nextComments);
+        }
+      } catch {
+        if (isMounted) {
+          setComments([]);
+          setCommentsError('Unable to load comments.');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingComments(false);
+        }
+      }
+    }
+
+    void loadComments();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [application?.id]);
+
+  useEffect(() => {
+    const newestComment = createdComments.at(-1) as CommentItem | undefined;
+    if (newestComment) {
+      mergeComment(newestComment);
+    }
+  }, [createdComments]);
 
   const handleVote = async (decision: VoteDecision) => {
     if (!application) return;
@@ -449,51 +506,81 @@ export function ApplicationReviewDrawer({
                   Comments
                 </p>
 
-                {comments.length === 0 ? (
+                {commentsError ? (
+                  <p className="mb-4 rounded-[4px] border border-red-400/30 bg-red-950/20 px-3 py-2 text-xs font-bold text-red-300">
+                    {commentsError}
+                  </p>
+                ) : null}
+
+                {isLoadingComments ? (
+                  <p className="mb-4 text-xs font-bold text-[#8b94a1]">Loading comments...</p>
+                ) : comments.length === 0 ? (
                   <p className="text-xs font-bold text-[#8b94a1] mb-4">
                     No comments yet. Start the discussion!
                   </p>
                 ) : (
                   <div className="space-y-3 mb-4">
-                    {comments.map((comment) => (
-                      <div className="flex gap-3 rounded-[4px] bg-[#101820] p-3" key={comment.id}>
-                        {comment.createdByUser?.avatarUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={comment.createdByUser.avatarUrl}
-                            alt="Avatar"
-                            className="size-8 rounded-full shrink-0"
-                          />
-                        ) : (
-                          <UserCircle className="size-8 text-[#8b94a1] shrink-0" />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between">
-                            <p className="text-xs font-black text-[#FFD369]">
-                              {comment.createdByUser?.displayName ||
-                                comment.createdByUser?.email ||
-                                'Unknown User'}
+                    {comments.map((comment) => {
+                      const isCurrentUserComment = comment.createdByUser?.id === user?.id;
+                      const commentText = comment.content.text ?? '';
+
+                      return (
+                        <div
+                          className={`flex gap-3 rounded-[4px] border p-3 ${
+                            isCurrentUserComment
+                              ? 'border-[#FFD369]/35 bg-[#1d2630]'
+                              : 'border-transparent bg-[#101820]'
+                          }`}
+                          key={comment.id}
+                        >
+                          {comment.createdByUser?.avatarUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={comment.createdByUser.avatarUrl}
+                              alt="Avatar"
+                              className="size-8 rounded-full shrink-0"
+                            />
+                          ) : (
+                            <UserCircle className="size-8 text-[#8b94a1] shrink-0" />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-3">
+                              <p
+                                className={`text-xs ${
+                                  isCurrentUserComment
+                                    ? 'font-black text-[#FFD369]'
+                                    : 'font-bold text-[#dce7f3]'
+                                }`}
+                              >
+                                {comment.createdByUser?.displayName ||
+                                  comment.createdByUser?.email ||
+                                  'Unknown User'}
+                              </p>
+                              <span className="text-[10px] font-bold text-[#4b535f]">
+                                {new Date(comment.createdAt).toLocaleDateString()}{' '}
+                                {new Date(comment.createdAt).toLocaleTimeString([], {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </span>
+                            </div>
+                            <p
+                              className={`mt-1 text-xs text-[#dce7f3] ${
+                                isCurrentUserComment ? 'font-semibold' : 'font-medium'
+                              }`}
+                            >
+                              {renderCommentText(commentText)}
                             </p>
-                            <span className="text-[10px] font-bold text-[#4b535f]">
-                              {new Date(comment.createdAt).toLocaleDateString()}{' '}
-                              {new Date(comment.createdAt).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                            </span>
+                            <button
+                              className="mt-2 text-[10px] font-bold text-[#8b94a1] hover:text-white transition-colors"
+                              onClick={() => handleReply(comment.createdByUser?.displayName)}
+                            >
+                              Reply
+                            </button>
                           </div>
-                          <p className="mt-1 text-xs font-medium text-[#dce7f3]">
-                            {renderCommentText(comment.content.text)}
-                          </p>
-                          <button
-                            className="mt-2 text-[10px] font-bold text-[#8b94a1] hover:text-white transition-colors"
-                            onClick={() => handleReply(comment.createdByUser?.displayName)}
-                          >
-                            Reply
-                          </button>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
 
@@ -509,10 +596,10 @@ export function ApplicationReviewDrawer({
                     <Button
                       className="h-8 rounded-[4px] bg-[#FFD369] px-4 text-[11px] font-black text-[#222831] hover:bg-[#eac04f]"
                       onClick={handleSendComment}
-                      disabled={!newComment.trim()}
+                      disabled={!newComment.trim() || isSendingComment}
                     >
                       <Check className="mr-1.5 size-3" />
-                      Send
+                      {isSendingComment ? 'Sending...' : 'Send'}
                     </Button>
                   </div>
                 </div>
