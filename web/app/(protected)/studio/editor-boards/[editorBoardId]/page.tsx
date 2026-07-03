@@ -130,46 +130,14 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
   const isActivityRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null && !Array.isArray(value);
 
-  const getActivityUserName = (value: unknown) => {
-    if (!isActivityRecord(value)) {
+  const formatUserIdList = (ids: unknown) => {
+    if (!Array.isArray(ids)) {
       return null;
     }
 
-    const displayName = value.displayName;
-    const email = value.email;
-    const id = value.id;
-
-    if (typeof displayName === 'string' && displayName.trim()) {
-      return displayName;
-    }
-
-    if (typeof email === 'string' && email.trim()) {
-      return email;
-    }
-
-    return typeof id === 'number' ? `User #${id}` : null;
-  };
-
-  const getActivityBoardName = (metadata: Record<string, unknown>) => {
-    const editorBoardName = metadata.editorBoardName;
-
-    if (typeof editorBoardName === 'string' && editorBoardName.trim()) {
-      return editorBoardName;
-    }
-
-    return board.name;
-  };
-
-  const formatInvitedUsers = (metadata: Record<string, unknown>) => {
-    const invitedUsers = metadata.invitedUsers;
-
-    if (!Array.isArray(invitedUsers)) {
-      return null;
-    }
-
-    const names = invitedUsers
-      .map(getActivityUserName)
-      .filter((name): name is string => Boolean(name));
+    const names = ids
+      .filter((id): id is number => typeof id === 'number' && Number.isFinite(id))
+      .map((id) => `User #${id}`);
 
     if (names.length === 0) {
       return null;
@@ -184,10 +152,10 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
 
   const formatActivityDescription = (activity: ActivityLogResponse) => {
     const metadata = isActivityRecord(activity.metadata) ? activity.metadata : {};
-    const boardName = getActivityBoardName(metadata);
+    const boardName = board.name;
 
     if (activity.action === 'MEMBER_INVITED') {
-      const invitedUserNames = formatInvitedUsers(metadata);
+      const invitedUserNames = formatUserIdList(metadata.invitedUserIds);
 
       if (invitedUserNames) {
         return `${invitedUserNames} joined editor board "${boardName}"`;
@@ -195,10 +163,10 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
     }
 
     if (activity.action === 'MEMBER_REMOVED') {
-      const removedUserName = getActivityUserName(metadata.removedUser);
+      const removedUserId = metadata.removedUserId;
 
-      if (removedUserName) {
-        return `${removedUserName} left editor board "${boardName}"`;
+      if (typeof removedUserId === 'number' && Number.isFinite(removedUserId)) {
+        return `User #${removedUserId} left editor board "${boardName}"`;
       }
     }
 

@@ -53,16 +53,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function getEditorBoardName(notification: NotificationResponse) {
-  const metadata = notification.activityLog?.metadata;
-
-  if (
-    isRecord(metadata) &&
-    typeof metadata.editorBoardName === 'string' &&
-    metadata.editorBoardName.trim()
-  ) {
-    return metadata.editorBoardName;
-  }
-
   const editorBoardId =
     notification.activityLog?.editorBoardId ?? notification.activityLog?.entityId ?? null;
 

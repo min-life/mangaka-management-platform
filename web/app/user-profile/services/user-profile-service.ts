@@ -248,9 +248,7 @@ export function mapActivityLogToUserActivity(
   const boardId =
     activity.editorBoardId ?? (activity.entityType === 'EDITOR_BOARD' ? activity.entityId : null);
   const editorBoardName =
-    getMetadataLabel(activity.metadata, ['editorBoardName']) ??
-    options?.editorBoards?.find((board) => board.id === boardId)?.name ??
-    null;
+    options?.editorBoards?.find((board) => board.id === boardId)?.name ?? null;
   const projectName =
     getMetadataLabel(activity.metadata, ['projectName', 'fileName', 'folderName']) ??
     editorBoardName ??
@@ -279,9 +277,7 @@ export function mapActivityLogToUserActivity(
           (id): id is number => typeof id === 'number' && Number.isFinite(id),
         )
       : [];
-    const invitedNames = Array.isArray(metadata.invitedUsers)
-      ? metadata.invitedUsers.map((user) => getActivityParticipantName(user))
-      : invitedIds.map((id) => getActivityParticipantName(null, id));
+    const invitedNames = invitedIds.map((id) => getActivityParticipantName(null, id));
     const invitedList = formatUserNameList(
       invitedNames.filter((name): name is string => Boolean(name)),
     );
@@ -290,9 +286,7 @@ export function mapActivityLogToUserActivity(
       description = `${actorName} added ${invitedList} to ${scopeLabel}.`;
     }
   } else if (activity.action === 'MEMBER_REMOVED') {
-    const removedName =
-      getActivityParticipantName(metadata.removedUser) ??
-      getActivityParticipantName(null, metadata.removedUserId);
+    const removedName = getActivityParticipantName(null, metadata.removedUserId);
 
     if (removedName) {
       description = `${actorName} removed ${removedName} from ${scopeLabel}.`;
