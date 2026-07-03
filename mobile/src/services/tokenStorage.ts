@@ -28,3 +28,7 @@ export async function clearAccessToken(): Promise<void> {
 
   await AsyncStorage.removeItem(ACCESS_TOKEN_KEY);
 }
+
+export async function clearSession(): Promise<void> {
+  await clearAccessToken();
+}

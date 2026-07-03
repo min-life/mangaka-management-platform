@@ -50,6 +50,7 @@ export type Permission =
   | 'project:material.create'
   | 'project:material.update'
   | 'project:material.delete'
+  | 'project:material.restore'
   | 'project:task.create'
   | 'project:task.update'
   | 'project:task.delete'

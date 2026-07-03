@@ -33,11 +33,20 @@ export default function ResourceMaterialCardItem({
       }}
     >
       <View className="h-[176px] w-full overflow-hidden" style={{ backgroundColor: Colors.iconBg }}>
-        <Image
-          source={{ uri: latestVersion.materials.imageUri }}
-          className="h-full w-full"
-          resizeMode="cover"
-        />
+        {latestVersion.materials.imageUri ? (
+          <Image
+            source={{ uri: latestVersion.materials.imageUri }}
+            className="h-full w-full"
+            resizeMode="cover"
+          />
+        ) : (
+          <View className="h-full w-full items-center justify-center gap-2">
+            <MaterialIcon name="image" color={Colors.textFaint} size={32} />
+            <Text className="text-[12px] font-semibold" style={{ color: Colors.textMuted }}>
+              No preview image
+            </Text>
+          </View>
+        )}
       </View>
 
       <View className="p-4">

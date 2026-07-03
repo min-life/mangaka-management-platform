@@ -10,37 +10,43 @@ import { fetchTasks } from './taskApi';
 
 export async function fetchHomeSummary() {
   const [projects, tasks, applications, boards, notifications] = await Promise.all([
-    fetchProjects().catch(() => ({ projects: [] })),
-    fetchTasks().catch(() => ({ tasks: [] })),
-    fetchApplications().catch(() => ({ applications: [] })),
-    fetchEditorBoards().catch(() => ({ boards: [] })),
+    fetchProjects(),
+    fetchTasks(),
+    fetchApplications(),
+    fetchEditorBoards(),
     fetchNotifications().catch(() => ({ items: [] })),
   ]);
 
+  const projectCount = projects.pagination?.total ?? projects.projects.length;
+  console.log(projectCount);
+  const taskCount = tasks.pagination?.total ?? tasks.tasks.length;
+  const applicationCount = applications.pagination?.total ?? applications.applications.length;
+  const boardCount = boards.pagination?.total ?? boards.boards.length;
+
   const workItems: WorkItem[] = [
     {
-      badge: String(tasks.tasks.length),
+      badge: String(taskCount),
       icon: 'checklist',
       iconColor: Colors.iconTask,
       id: 'tasks',
       label: 'Tasks',
     },
     {
-      badge: String(projects.projects.length),
+      badge: String(projectCount),
       icon: 'folder',
       iconColor: Colors.iconFolder,
       id: 'projects',
       label: 'Projects',
     },
     {
-      badge: String(applications.applications.length),
+      badge: String(applicationCount),
       icon: 'send',
       iconColor: Colors.iconApp,
       id: 'applications',
       label: 'Applications',
     },
     {
-      badge: String(boards.boards.length),
+      badge: String(boardCount),
       icon: 'groups',
       iconColor: Colors.text,
       id: 'editor-board',
@@ -61,4 +67,3 @@ export async function fetchHomeSummary() {
 
   return { activities, workItems };
 }
-

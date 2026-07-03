@@ -5,7 +5,7 @@ import { FrameAnnotation } from '@/src/types/taskDetail';
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
 
 interface MangaPreviewCardProps {
-  imageUri: string;
+  imageUri?: string;
   status: string;
   selectedFrame?: FrameAnnotation | null;
   showStatusBadge?: boolean;
@@ -65,12 +65,21 @@ export default function MangaPreviewCard({
         aspectRatio: 3 / 4,
       }}
     >
-      <Image
-        source={{ uri: imageUri }}
-        className="w-full h-full"
-        resizeMode="contain"
-        style={{ opacity: 0.9 }}
-      />
+      {imageUri ? (
+        <Image
+          source={{ uri: imageUri }}
+          className="w-full h-full"
+          resizeMode="contain"
+          style={{ opacity: 0.9 }}
+        />
+      ) : (
+        <View className="h-full w-full items-center justify-center gap-3">
+          <MaterialIcon name="image" color={Colors.textFaint} size={36} />
+          <Text className="text-[13px] font-semibold" style={{ color: Colors.textMuted }}>
+            No preview image
+          </Text>
+        </View>
+      )}
 
       {/* ── Bounding box đỏ cho frame được chọn ───────────────── */}
       {selectedFrame && (

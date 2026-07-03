@@ -144,17 +144,6 @@ export default function ResourcesScreen({ navigation, route }: ResourcesScreenPr
         showsVerticalScrollIndicator={false}
       >
         <View className="px-4">
-          <View className="pb-2 pt-3">
-            <Text className="text-[30px] font-black" style={{ color: Colors.text }}>
-              {activeMode === 'arcs' ? 'Story arcs' : 'Materials'}
-            </Text>
-            <Text className="mt-2 text-[14px] leading-6" style={{ color: Colors.textMuted }}>
-              {activeMode === 'arcs'
-                ? 'Browse this project by arc, then open chapters and manga pages.'
-                : 'Review latest material renders and open their version history.'}
-            </Text>
-          </View>
-          <ResourceLibraryToggle activeMode={activeMode} onModeChange={setActiveMode} />
           <ResourceSearchBar search={search} onSearchChange={setSearch} />
         </View>
 

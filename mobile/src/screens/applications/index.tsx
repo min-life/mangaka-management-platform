@@ -5,10 +5,6 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ApiStateView from '@/src/components/shared/ApiStateView';
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
-import {
-  APPLICATION_STATUS_FILTERS,
-  APPLICATION_TYPE_FILTERS,
-} from '@/src/constants/applicationsData';
 import { RootStackParamList } from '@/src/navigation/types';
 import { fetchApplications } from '@/src/services/applicationApi';
 import { fetchProjectBundle } from '@/src/services/projectApi';
@@ -27,6 +23,20 @@ type ApplicationsScreenProps = NativeStackScreenProps<RootStackParamList, 'Appli
 type StatusFilter = ApplicationStatus | 'ALL';
 type TypeFilter = ApplicationType | 'ALL';
 type OpenFilter = 'status' | 'type' | null;
+
+const APPLICATION_STATUS_FILTERS: StatusFilter[] = [
+  'ALL',
+  'PENDING',
+  'APPROVE',
+  'REJECT',
+  'CANCELLED',
+];
+
+const APPLICATION_TYPE_FILTERS: TypeFilter[] = [
+  'ALL',
+  'MANUSCRIPT_REVIEW',
+  'PUBLISH_REQUEST',
+];
 
 const statusOptions = APPLICATION_STATUS_FILTERS.map((status) => ({
   label: status === 'ALL' ? 'All status' : getApplicationStatusLabel(status),

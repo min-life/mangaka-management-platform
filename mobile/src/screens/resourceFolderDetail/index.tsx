@@ -101,7 +101,7 @@ export default function ResourceFolderDetailScreen({
           {folderItems.length > 0 ? (
             folderItems.map((node, index) => (
               <ResourceDetailRow
-                key={node.id}
+                key={`${node.type}-${node.id}`}
                 node={node}
                 isLast={index === folderItems.length - 1}
                 onPress={() => handleNodePress(node)}

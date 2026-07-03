@@ -1,4 +1,3 @@
-export { default as CreateTaskFab } from './CreateTaskFab';
 export { default as FilterChipBar } from './FilterChipBar';
 export { default as TaskCard } from './TaskCard';
 export { default as TasksSearchBar } from './TasksSearchBar';

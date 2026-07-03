@@ -2,8 +2,16 @@ import React from 'react';
 import { ScrollView, Text, TouchableOpacity } from 'react-native';
 
 import { Colors } from '@/src/constants/colors';
-import { NOTIF_FILTERS } from '@/src/constants/notificationsData';
 import { NotifFilter } from '@/src/types/notifications';
+
+const NOTIF_FILTERS: NotifFilter[] = [
+  'All',
+  'Unread',
+  'Tasks',
+  'Reviews',
+  'Projects',
+  'Applications',
+];
 
 interface NotificationFilterBarProps {
   activeFilter: NotifFilter;
