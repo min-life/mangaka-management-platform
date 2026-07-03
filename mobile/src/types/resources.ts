@@ -18,7 +18,10 @@ export interface ResourceTaskFrame {
 
 export interface ResourceTaskComment {
   id: string;
+  fileId?: string;
+  taskId?: string;
   frameId: string;
+  applicationId?: string;
   initials: string;
   author: string;
   authorRole: string;
@@ -57,7 +60,7 @@ export interface ResourceFileMaterialVersion {
   materials: {
     title: string;
     note?: string;
-    imageUri: string;
+    imageUri?: string;
     layers?: string[];
     pages?: Array<{ index: number; url: string }>;
     editorState?: Record<string, unknown>;
@@ -98,6 +101,7 @@ export interface ResourceFileNode extends ResourceNodeBase {
   previewImageUri?: string;
   tasks?: ResourceFileTask[];
   materialVersions?: ResourceFileMaterialVersion[];
+  comments?: ResourceTaskComment[];
 }
 
 export type ResourceNode = ResourceFolderNode | ResourceFileNode;

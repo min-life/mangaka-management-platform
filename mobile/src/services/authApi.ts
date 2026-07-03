@@ -1,4 +1,5 @@
 import { apiRequest } from './apiClient';
+import { saveAccessToken } from './tokenStorage';
 
 export interface LoginPayload {
   email: string;
@@ -6,6 +7,10 @@ export interface LoginPayload {
 }
 
 export interface LoginResponse {
+  accessToken: string;
+}
+
+export interface RefreshAccessTokenResponse {
   accessToken: string;
 }
 
@@ -34,6 +39,21 @@ export async function forgotPassword(email: string): Promise<void> {
     body: { email },
     method: 'POST',
   });
+}
+
+export async function refreshAccessToken(): Promise<string> {
+  const body = await apiRequest<RefreshAccessTokenResponse>('/auth/refresh', {
+    method: 'POST',
+    skipAuthRefresh: true,
+  });
+
+  const accessToken = body.accessToken;
+  if (typeof accessToken !== 'string' || !accessToken.trim()) {
+    throw new Error('Phản hồi làm mới phiên đăng nhập không hợp lệ.');
+  }
+
+  await saveAccessToken(accessToken);
+  return accessToken;
 }
 
 export async function logout(accessToken?: string | null): Promise<void> {

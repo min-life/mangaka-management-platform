@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import ApiStateView from '@/src/components/shared/ApiStateView';
@@ -18,6 +19,7 @@ import {
 type ProjectDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'ProjectDetail'>;
 
 export default function ProjectDetailScreen({ navigation, route }: ProjectDetailScreenProps) {
+  const scrollViewRef = useRef<ScrollView>(null);
   const [project, setProject] = useState<ProjectItem | null>(null);
   const [boardId, setBoardId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -41,6 +43,14 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
   useEffect(() => {
     void loadProject();
   }, [loadProject]);
+
+  useFocusEffect(
+    useCallback(() => {
+      requestAnimationFrame(() => {
+        scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+      });
+    }, []),
+  );
 
   if (isLoading) {
     return (
@@ -116,6 +126,7 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
       icon: 'group_add',
       iconColor: '#FFFFFF',
       iconBg: '#DB2777',
+      onPress: () => navigation.navigate('ProjectContributors', { projectId: project.id }),
     },
     {
       label: 'Report',
@@ -139,6 +150,7 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
       <ProjectDetailTopBar onBack={() => navigation.goBack()} />
 
       <ScrollView
+        ref={scrollViewRef}
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}

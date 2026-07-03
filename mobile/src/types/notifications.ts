@@ -13,6 +13,13 @@ export interface NotificationItem {
   time: string;
   isUnread: boolean;
   filter: Exclude<NotifFilter, 'All' | 'Unread'>;
+  target?: {
+    applicationId?: string;
+    boardId?: string;
+    projectId?: string;
+    taskId?: string;
+    type: 'application' | 'board' | 'project' | 'task';
+  };
 }
 
 export interface NotificationSection {

@@ -3,7 +3,6 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { Colors } from '@/src/constants/colors';
 import { FrameAnnotation } from '@/src/types/taskDetail';
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
-import { COMMENTS } from '@/src/constants/taskDetailData';
 import { Comment } from '@/src/types/taskDetail';
 
 interface FrameListPanelProps {
@@ -18,7 +17,7 @@ interface FrameListPanelProps {
  * Click vào frame → khoanh vùng đỏ trên ảnh + hiển thị comments của frame đó.
  */
 export default function FrameListPanel({
-  comments = COMMENTS,
+  comments = [],
   frames,
   selectedFrameId,
   onSelectFrame,
@@ -31,7 +30,7 @@ export default function FrameListPanel({
 
         return (
           <TouchableOpacity
-            key={frame.id}
+            key={`${frame.id}-${index}`}
             activeOpacity={0.75}
             onPress={() => onSelectFrame(frame)}
             style={{

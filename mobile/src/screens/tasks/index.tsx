@@ -9,7 +9,6 @@ import { RootStackParamList } from '@/src/navigation/types';
 import { fetchProjectBundle } from '@/src/services/projectApi';
 import { fetchTasks } from '@/src/services/taskApi';
 import {
-  CreateTaskFab,
   FilterChip,
   FilterChipBar,
   TaskCard,
@@ -101,7 +100,6 @@ export default function TasksScreen({ navigation, route }: TasksScreenProps) {
         )}
       </ScrollView>
 
-      <CreateTaskFab />
       <BottomNavBar activeTab="inbox" />
     </View>
   );

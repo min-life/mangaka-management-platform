@@ -1,7 +1,6 @@
 import React from 'react';
-import { View, Text, Image, TouchableOpacity } from 'react-native';
+import { View, Text, Image } from 'react-native';
 import { Colors } from '@/src/constants/colors';
-import { PROFILE_USER, PROFILE_STATS } from '@/src/constants/profileData';
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
 
 interface ProfileHeaderCardProps {
@@ -20,9 +19,14 @@ export default function ProfileHeaderCard({
   name,
   onSettingsPress,
 }: ProfileHeaderCardProps) {
-  const displayName = name || PROFILE_USER.name;
-  const displayEmail = email || PROFILE_USER.email;
-  const displayAvatar = avatarUri || PROFILE_USER.avatarUri;
+  const displayName = name || 'Current user';
+  const displayEmail = email || 'No email';
+  const initials = displayName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('') || 'U';
 
   return (
     <View
@@ -37,14 +41,20 @@ export default function ProfileHeaderCard({
       <View className="flex-row items-start gap-4">
         {/* Avatar */}
         <View
-          className="w-16 h-16 rounded-full overflow-hidden"
+          className="w-16 h-16 rounded-full overflow-hidden items-center justify-center"
           style={{ borderWidth: 2, borderColor: Colors.surface }}
         >
-          <Image
-            source={{ uri: displayAvatar }}
-            className="w-full h-full"
-            resizeMode="cover"
-          />
+          {avatarUri ? (
+            <Image
+              source={{ uri: avatarUri }}
+              className="w-full h-full"
+              resizeMode="cover"
+            />
+          ) : (
+            <Text className="text-[20px] font-bold" style={{ color: Colors.accent }}>
+              {initials}
+            </Text>
+          )}
         </View>
 
         {/* Name / email / badge */}
@@ -63,35 +73,17 @@ export default function ProfileHeaderCard({
               style={{ backgroundColor: Colors.surfaceContainer }}
             >
               <Text className="text-[11px] font-medium" style={{ color: Colors.text }}>
-                {PROFILE_USER.role}
+                Viewer
               </Text>
             </View>
             <View className="flex-row items-center gap-1">
               <MaterialIcon name="apartment" color={Colors.textMuted} size={13} />
               <Text className="text-[11px]" style={{ color: Colors.textMuted }}>
-                {PROFILE_USER.studio}
+                Mangaka workspace
               </Text>
             </View>
           </View>
         </View>
-      </View>
-
-      {/* Stats row */}
-      <View className="flex-row gap-2 mt-5">
-        {PROFILE_STATS.map((stat) => (
-          <View
-            key={stat.id}
-            className="flex-1 rounded-xl p-3 items-center justify-center"
-            style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}
-          >
-            <Text className="text-[20px] font-semibold" style={{ color: Colors.text }}>
-              {stat.value}
-            </Text>
-            <Text className="text-[11px] mt-0.5" style={{ color: Colors.textMuted }}>
-              {stat.label}
-            </Text>
-          </View>
-        ))}
       </View>
     </View>
   );
