@@ -30,7 +30,11 @@ export type ApplicationResponse = {
   id: number;
   materials: unknown;
   parentFolderId?: number | null;
-  project?: unknown;
+  project?: {
+    id: number;
+    name: string;
+    imageUrl?: string | null;
+  } | null;
   projectId: number;
   status: ApplicationStatus;
   title: string;
@@ -58,16 +62,6 @@ type ApplicationItemResponse = {
   data?: ApplicationResponse;
 };
 
-export type ApplicationVoteResponse = {
-  applicationId: number;
-  comment?: string | null;
-  createdAt: string;
-  decision: VoteDecision;
-  updatedAt: string;
-  user?: UserSummary | null;
-  userId: number;
-};
-
 export type ApplicationCommentResponse = {
   content: unknown;
   createdAt: string;
@@ -75,10 +69,6 @@ export type ApplicationCommentResponse = {
   updatedAt: string;
   user?: UserSummary | null;
   userId?: number;
-};
-
-type ApplicationVotesResponse = {
-  data?: ApplicationVoteResponse[];
 };
 
 type ApplicationCommentsResponse = {
@@ -102,6 +92,26 @@ export type UpdateApplicationPayload = {
   description?: string;
   materials?: unknown;
   title?: string;
+};
+
+export type ApplicationVoteResponse = {
+  applicationId: number;
+  userId: number;
+  decision: VoteDecision;
+  comment?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  user: {
+    id: number;
+    displayName?: string | null;
+    avatarUrl?: string | null;
+    email?: string;
+  };
+};
+
+export type VoteApplicationPayload = {
+  decision: VoteDecision;
+  comment?: string;
 };
 
 export async function getProjectApplications(projectId: number | string) {
@@ -234,21 +244,20 @@ export async function updateApplicationStatus(
 }
 
 export async function getApplicationVotes(applicationId: number | string) {
-  const response = await api.get<ApplicationVotesResponse, ApplicationVotesResponse>(
+  const response = await api.get<{ data: ApplicationVoteResponse[] }, { data: ApplicationVoteResponse[] }>(
     `/applications/${applicationId}/votes`,
   );
-
-  return response.data ?? [];
+  return response.data;
 }
 
-export async function castApplicationVote(
+export async function voteApplication(
   applicationId: number | string,
-  payload: { comment?: string; decision: VoteDecision },
+  payload: VoteApplicationPayload,
 ) {
-  const response = await api.post<
-    { data?: ApplicationVoteResponse },
-    { data?: ApplicationVoteResponse }
-  >(`/applications/${applicationId}/votes`, payload);
+  const response = await api.post<{ data: ApplicationVoteResponse }, { data: ApplicationVoteResponse }>(
+    `/applications/${applicationId}/votes`,
+    payload,
+  );
 
   return response.data;
 }

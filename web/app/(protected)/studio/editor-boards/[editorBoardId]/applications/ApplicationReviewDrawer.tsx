@@ -1,6 +1,7 @@
 'use client';
 
-import { Check, FileUp, X, Ban } from 'lucide-react';
+import { Check, FileUp, X, UserCircle } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,32 +12,40 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { Textarea } from '@/components/ui/textarea';
 
-import { getStatusLabel, getStatusStyle } from './application-ui';
+import { useRealtimeComments } from '@/hooks/use-realtime-activity';
+import { useAuth } from '@/hooks/useAuth';
+import {
+  getApplicationVotes,
+  voteApplication,
+  type ApplicationStatus,
+  type ApplicationVoteResponse,
+  type VoteDecision,
+} from '@/services/application.service';
 
-type ApplicationResponse = {
-  createdAt: string;
-  createdByUser?: { avatarUrl?: string; displayName?: string; email?: string };
-  description?: string;
-  id: number;
-  materials?: any;
-  project?: { id: number; name: string };
-  status: string;
-  title: string;
-  type: string;
-  updatedAt: string;
-  verifiedByUser?: { displayName?: string; email?: string };
-  verifyBy?: number;
-  createdBy?: number;
-};
+import type { EditorBoardApplicationResponse } from './ApplicationsClient';
+import {
+  getApplicationTypeLabel,
+  getStatusLabel,
+  getStatusStyle,
+  isBoardReviewableStatus,
+} from './application-ui';
+import {
+  createApplicationComment,
+  getApplicationComments,
+  type ApplicationCommentResponse,
+} from './services/application-comments-service';
+
+type CommentItem = ApplicationCommentResponse;
 
 type ApplicationReviewDrawerProps = {
-  application: ApplicationResponse | null;
+  application: EditorBoardApplicationResponse | null;
   isSubmitting: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdateStatus: (
-    application: ApplicationResponse,
-    status: string,
+    application: EditorBoardApplicationResponse,
+    status: ApplicationStatus,
   ) => void;
 };
 
@@ -50,10 +59,44 @@ function formatFileSize(bytes?: number) {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
-function readUploadedFiles(materials: any) {
-  if (!materials || !materials.uploadedFiles || !Array.isArray(materials.uploadedFiles)) {
+type UploadedApplicationFile = {
+  name: string;
+  mimeType?: string;
+  sizeBytes?: number;
+  type?: string;
+  url?: string;
+};
+
+function readUploadedFiles(materials: unknown) {
+  if (Array.isArray(materials)) {
+    return materials.map((material) => {
+      const item = material as {
+        mimeType?: string;
+        originalName?: string;
+        size?: number;
+        type?: string;
+        url?: string;
+      };
+
+      return {
+        mimeType: item.mimeType,
+        name: item.originalName ?? item.url ?? 'Uploaded material',
+        sizeBytes: item.size,
+        type: item.type,
+        url: item.url,
+      } satisfies UploadedApplicationFile;
+    });
+  }
+
+  if (
+    !materials ||
+    typeof materials !== 'object' ||
+    !('uploadedFiles' in materials) ||
+    !Array.isArray(materials.uploadedFiles)
+  ) {
     return [];
   }
+
   return materials.uploadedFiles as Array<{
     name: string;
     mimeType: string;
@@ -69,8 +112,160 @@ export function ApplicationReviewDrawer({
   onOpenChange,
   onUpdateStatus,
 }: ApplicationReviewDrawerProps) {
+  const { user } = useAuth();
+  const [votes, setVotes] = useState<ApplicationVoteResponse[]>([]);
+  const [isLoadingVotes, setIsLoadingVotes] = useState(false);
+  const [isVoting, setIsVoting] = useState(false);
+  const [voteError, setVoteError] = useState<string | null>(null);
+  const [voteComment, setVoteComment] = useState('');
+
+  const [comments, setComments] = useState<CommentItem[]>([]);
+  const [commentsError, setCommentsError] = useState('');
+  const [isLoadingComments, setIsLoadingComments] = useState(false);
+  const [isSendingComment, setIsSendingComment] = useState(false);
+  const [newComment, setNewComment] = useState('');
+  const commentInputRef = useRef<HTMLTextAreaElement>(null);
+  const { createdComments } = useRealtimeComments('APPLICATION', application?.id);
+
+  const mergeComment = (comment: CommentItem) => {
+    setComments((currentComments) => {
+      const exists = currentComments.some((currentComment) => currentComment.id === comment.id);
+      if (exists) {
+        return currentComments.map((currentComment) =>
+          currentComment.id === comment.id ? comment : currentComment,
+        );
+      }
+
+      return [...currentComments, comment].sort(
+        (first, second) =>
+          new Date(first.createdAt).getTime() - new Date(second.createdAt).getTime(),
+      );
+    });
+  };
+
+  const handleReply = (displayName: string | null | undefined) => {
+    if (displayName) {
+      setNewComment(`@${displayName} `);
+      commentInputRef.current?.focus();
+    }
+  };
+
+  const handleSendComment = async () => {
+    if (!application) return;
+    if (!newComment.trim()) return;
+
+    setIsSendingComment(true);
+    setCommentsError('');
+
+    try {
+      const comment = await createApplicationComment(application.id, newComment.trim());
+      if (comment) {
+        mergeComment(comment);
+      }
+      setNewComment('');
+    } catch {
+      setCommentsError('Unable to send comment.');
+    } finally {
+      setIsSendingComment(false);
+    }
+  };
+
+  const renderCommentText = (text: string) => {
+    if (text.startsWith('@')) {
+      const firstSpaceIndex = text.indexOf(' ', text.indexOf(' ') + 1);
+      if (firstSpaceIndex !== -1) {
+        const mention = text.substring(0, firstSpaceIndex);
+        const rest = text.substring(firstSpaceIndex);
+        return (
+          <>
+            <span className="font-medium text-[#FFD369]">{mention}</span>
+            {rest}
+          </>
+        );
+      }
+    }
+    return text;
+  };
+
+  const loadVotes = async (id: number) => {
+    setIsLoadingVotes(true);
+    try {
+      const data = await getApplicationVotes(id);
+      setVotes(data);
+    } catch {
+      setVotes([]);
+    } finally {
+      setIsLoadingVotes(false);
+    }
+  };
+
+  useEffect(() => {
+    if (application?.id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      void loadVotes(application.id);
+    }
+  }, [application?.id]);
+
+  useEffect(() => {
+    if (!application?.id) {
+      return;
+    }
+
+    const applicationId = application.id;
+    let isMounted = true;
+
+    async function loadComments() {
+      setIsLoadingComments(true);
+      setCommentsError('');
+
+      try {
+        const nextComments = await getApplicationComments(applicationId);
+        if (isMounted) {
+          setComments(nextComments);
+        }
+      } catch {
+        if (isMounted) {
+          setComments([]);
+          setCommentsError('Unable to load comments.');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingComments(false);
+        }
+      }
+    }
+
+    void loadComments();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [application?.id]);
+
+  useEffect(() => {
+    const newestComment = createdComments.at(-1) as CommentItem | undefined;
+    if (newestComment) {
+      mergeComment(newestComment);
+    }
+  }, [createdComments]);
+
+  const handleVote = async (decision: VoteDecision) => {
+    if (!application) return;
+    setIsVoting(true);
+    setVoteError(null);
+    try {
+      await voteApplication(application.id, { decision, comment: voteComment });
+      await loadVotes(application.id);
+      setVoteComment('');
+    } catch {
+      setVoteError('Unable to submit your vote.');
+    } finally {
+      setIsVoting(false);
+    }
+  };
+
   const uploadedFiles = application ? readUploadedFiles(application.materials) : [];
-  
+
   const submittedBy =
     application?.createdByUser?.displayName ??
     application?.createdByUser?.email ??
@@ -81,12 +276,28 @@ export function ApplicationReviewDrawer({
     application?.verifiedByUser?.email ??
     (application?.verifyBy ? `User #${application.verifyBy}` : null);
 
-  // We consider that the user viewing this page is an owner or lead who can approve.
-  // The actual check is enforced by the backend endpoint.
   const canApprove = true;
+  const isReviewable = application ? isBoardReviewableStatus(application.status) : false;
+
+  const approveVotesCount = votes.filter((v) => v.decision === 'APPROVE').length;
+  const rejectVotesCount = votes.filter((v) => v.decision === 'REJECT').length;
+  const abstainVotesCount = votes.filter((v) => v.decision === 'ABSTAIN').length;
+  const hasVoted = user && votes.some((v) => v.userId === user.id);
 
   return (
-    <Sheet onOpenChange={onOpenChange} open={Boolean(application)}>
+    <Sheet
+      onOpenChange={(open) => {
+        onOpenChange(open);
+        if (!open) {
+          setVotes([]);
+          setVoteError(null);
+          setVoteComment('');
+          setComments([]);
+          setNewComment('');
+        }
+      }}
+      open={Boolean(application)}
+    >
       <SheetContent
         className="w-[540px] max-w-[92vw] gap-0 border-[#39424f] bg-[#101820] p-0 text-white sm:max-w-[540px]"
         showCloseButton={false}
@@ -149,10 +360,19 @@ export function ApplicationReviewDrawer({
                     Reviewed By
                   </p>
                   <p className="mt-3 truncate text-sm font-black text-white">
-                    {reviewedBy ?? (application.status === 'PENDING' ? 'Not reviewed yet' : 'Unknown reviewer')}
+                    {reviewedBy ?? (isReviewable ? 'Not reviewed yet' : 'Unknown reviewer')}
                   </p>
                 </article>
               </div>
+
+              <section className="mt-4 rounded-[4px] border border-[#303842] bg-[#151c25] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8b94a1]">
+                  Request Type
+                </p>
+                <p className="mt-3 text-sm font-black text-white">
+                  {getApplicationTypeLabel(application.type)}
+                </p>
+              </section>
 
               <section className="mt-4 rounded-[4px] border border-[#303842] bg-[#151c25] p-4">
                 <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8b94a1]">
@@ -199,11 +419,12 @@ export function ApplicationReviewDrawer({
                     <div>
                       <p className="text-xs font-black text-white">Submitted</p>
                       <p className="mt-1 text-[11px] font-bold text-[#8b94a1]">
-                        {submittedBy} submitted this request on {new Date(application.createdAt).toLocaleDateString()}.
+                        {submittedBy} submitted this request on{' '}
+                        {new Date(application.createdAt).toLocaleDateString()}.
                       </p>
                     </div>
                   </div>
-                  {application.status === 'PENDING' ? (
+                  {isReviewable ? (
                     <div className="flex gap-3">
                       <span className="mt-1 size-2 rounded-full bg-[#4b535f]" />
                       <div>
@@ -234,12 +455,216 @@ export function ApplicationReviewDrawer({
                 </div>
               </section>
 
-              {canApprove && application.status === 'PENDING' ? (
+              <section className="mt-4 rounded-[4px] border border-[#303842] bg-[#151c25] p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8b94a1]">
+                    Team Votes
+                  </p>
+                  <div className="flex gap-3 text-xs font-bold text-[#aeb7c2]">
+                    <span className="text-[#9df2c7]">{approveVotesCount} Approve</span>
+                    <span className="text-[#ff9ab3]">{rejectVotesCount} Reject</span>
+                    <span>{abstainVotesCount} Abstain</span>
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  {isLoadingVotes ? (
+                    <p className="text-xs font-bold text-[#8b94a1]">Loading votes...</p>
+                  ) : votes.length ? (
+                    votes.map((vote) => (
+                      <div className="flex gap-3 rounded-[4px] bg-[#101820] p-3" key={vote.userId}>
+                        {vote.user.avatarUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={vote.user.avatarUrl}
+                            alt="Avatar"
+                            className="size-8 rounded-full"
+                          />
+                        ) : (
+                          <UserCircle className="size-8 text-[#8b94a1]" />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-black text-white">
+                              {vote.user.displayName || vote.user.email || `User #${vote.userId}`}
+                            </p>
+                            <span
+                              className={`text-[10px] font-black uppercase ${vote.decision === 'APPROVE' ? 'text-[#9df2c7]' : vote.decision === 'REJECT' ? 'text-[#ff9ab3]' : 'text-[#8b94a1]'}`}
+                            >
+                              {vote.decision}
+                            </span>
+                          </div>
+                          {vote.comment && (
+                            <p className="mt-1 text-xs font-medium text-[#dce7f3]">
+                              {vote.comment}
+                            </p>
+                          )}
+                          <p className="mt-1 text-[10px] font-bold text-[#4b535f]">
+                            {new Date(vote.createdAt).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs font-bold text-[#8b94a1]">No votes casted yet.</p>
+                  )}
+                </div>
+
+                {isReviewable ? (
+                  <div className="mt-4 border-t border-[#303842] pt-4">
+                    <p className="mb-2 text-xs font-black text-white">
+                      {hasVoted ? 'Update Your Vote' : 'Your Vote'}
+                    </p>
+                    {voteError ? (
+                      <p className="mb-2 text-[11px] font-bold text-[#ff9ab3]">{voteError}</p>
+                    ) : null}
+                    <Textarea
+                      placeholder="Add an optional comment..."
+                      className="min-h-16 resize-none border-[#303842] bg-[#101820] text-xs font-medium text-white placeholder:text-[#4b535f] focus-visible:ring-[#FFD369]"
+                      value={voteComment}
+                      onChange={(e) => setVoteComment(e.target.value)}
+                      disabled={isVoting}
+                    />
+                    <div className="mt-3 flex gap-2">
+                      <Button
+                        className="h-8 flex-1 rounded-[4px] bg-[#222a34] text-[11px] font-black text-[#dce7f3] hover:bg-[#303842]"
+                        disabled={isVoting}
+                        onClick={() => handleVote('ABSTAIN')}
+                      >
+                        Abstain
+                      </Button>
+                      <Button
+                        className="h-8 flex-1 rounded-[4px] border-[#6b2637] bg-[#371522] text-[11px] font-black text-[#ff9ab3] hover:bg-[#4a1d2c]"
+                        disabled={isVoting}
+                        onClick={() => handleVote('REJECT')}
+                        variant="outline"
+                      >
+                        <X className="mr-1.5 size-3" />
+                        Reject
+                      </Button>
+                      <Button
+                        className="h-8 flex-1 rounded-[4px] bg-[#14291f] text-[11px] font-black text-[#9df2c7] hover:bg-[#1b3628]"
+                        disabled={isVoting}
+                        onClick={() => handleVote('APPROVE')}
+                      >
+                        <Check className="mr-1.5 size-3" />
+                        Approve
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+              </section>
+
+              <section className="mt-4 rounded-[4px] border border-[#303842] bg-[#151c25] p-4 flex flex-col">
+                <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8b94a1] mb-4">
+                  Comments
+                </p>
+
+                {commentsError ? (
+                  <p className="mb-4 rounded-[4px] border border-red-400/30 bg-red-950/20 px-3 py-2 text-xs font-bold text-red-300">
+                    {commentsError}
+                  </p>
+                ) : null}
+
+                {isLoadingComments ? (
+                  <p className="mb-4 text-xs font-bold text-[#8b94a1]">Loading comments...</p>
+                ) : comments.length === 0 ? (
+                  <p className="text-xs font-bold text-[#8b94a1] mb-4">
+                    No comments yet. Start the discussion!
+                  </p>
+                ) : (
+                  <div className="space-y-3 mb-4">
+                    {comments.map((comment) => {
+                      const isCurrentUserComment = comment.createdByUser?.id === user?.id;
+                      const commentText = comment.content.text ?? '';
+
+                      return (
+                        <div
+                          className={`flex gap-3 rounded-[4px] border p-3 ${
+                            isCurrentUserComment
+                              ? 'border-[#FFD369]/35 bg-[#1d2630]'
+                              : 'border-transparent bg-[#101820]'
+                          }`}
+                          key={comment.id}
+                        >
+                          {comment.createdByUser?.avatarUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={comment.createdByUser.avatarUrl}
+                              alt="Avatar"
+                              className="size-8 rounded-full shrink-0"
+                            />
+                          ) : (
+                            <UserCircle className="size-8 text-[#8b94a1] shrink-0" />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-3">
+                              <p
+                                className={`text-xs ${
+                                  isCurrentUserComment
+                                    ? 'font-black text-[#FFD369]'
+                                    : 'font-bold text-[#dce7f3]'
+                                }`}
+                              >
+                                {comment.createdByUser?.displayName ||
+                                  comment.createdByUser?.email ||
+                                  'Unknown User'}
+                              </p>
+                              <span className="text-[10px] font-bold text-[#4b535f]">
+                                {new Date(comment.createdAt).toLocaleDateString()}{' '}
+                                {new Date(comment.createdAt).toLocaleTimeString([], {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </span>
+                            </div>
+                            <p
+                              className={`mt-1 text-xs text-[#dce7f3] ${
+                                isCurrentUserComment ? 'font-semibold' : 'font-medium'
+                              }`}
+                            >
+                              {renderCommentText(commentText)}
+                            </p>
+                            <button
+                              className="mt-2 text-[10px] font-bold text-[#8b94a1] hover:text-white transition-colors"
+                              onClick={() => handleReply(comment.createdByUser?.displayName)}
+                            >
+                              Reply
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="mt-auto border-t border-[#303842] pt-4">
+                  <Textarea
+                    ref={commentInputRef}
+                    placeholder="Write a comment..."
+                    className="min-h-16 resize-none border-[#303842] bg-[#101820] text-xs font-medium text-white placeholder:text-[#4b535f] focus-visible:ring-[#FFD369]"
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                  />
+                  <div className="mt-3 flex justify-end">
+                    <Button
+                      className="h-8 rounded-[4px] bg-[#FFD369] px-4 text-[11px] font-black text-[#222831] hover:bg-[#eac04f]"
+                      onClick={handleSendComment}
+                      disabled={!newComment.trim() || isSendingComment}
+                    >
+                      <Check className="mr-1.5 size-3" />
+                      {isSendingComment ? 'Sending...' : 'Send'}
+                    </Button>
+                  </div>
+                </div>
+              </section>
+
+              {canApprove && isReviewable ? (
                 <section className="mt-4 rounded-[4px] border border-[#303842] bg-[#151c25] p-4">
                   <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8b94a1]">
                     Review Actions
                   </p>
-                  <div className="mt-3 grid grid-cols-3 gap-3">
+                  <div className="mt-3 grid grid-cols-2 gap-3">
                     <Button
                       className="h-10 rounded-[4px] border-[#6b2637] bg-[#371522] px-4 text-xs font-black text-[#ff9ab3] hover:bg-[#4a1d2c]"
                       disabled={isSubmitting}
@@ -249,16 +674,6 @@ export function ApplicationReviewDrawer({
                     >
                       <X className="mr-1.5 size-4" />
                       Reject
-                    </Button>
-                    <Button
-                      className="h-10 rounded-[4px] border-[#4a4f55] bg-[#20282b] px-4 text-xs font-black text-[#dce7f3] hover:bg-[#2b3539]"
-                      disabled={isSubmitting}
-                      onClick={() => onUpdateStatus(application, 'CANCELLED')}
-                      type="button"
-                      variant="outline"
-                    >
-                      <Ban className="mr-1.5 size-4" />
-                      Cancel
                     </Button>
                     <Button
                       className="h-10 rounded-[4px] bg-[#FFD369] px-4 text-xs font-black text-[#222831] hover:bg-[#eac04f]"

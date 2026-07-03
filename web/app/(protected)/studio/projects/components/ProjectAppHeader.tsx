@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import {
   ArrowLeft,
-  Bell,
   ChevronDown,
   FolderKanban,
   HelpCircle,
@@ -23,6 +22,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { useAuth } from '@/hooks/useAuth';
 import { getProjectById, getProjects, type ProjectResponse } from '@/services/project.service';
 
@@ -119,10 +119,10 @@ export function ProjectAppHeader({ projectId, projectName }: ProjectAppHeaderPro
       </div>
 
       <div className="flex items-center gap-4">
-        <button className="relative text-white" type="button">
-          <Bell className="size-5" />
-          <span className="absolute -right-0.5 -top-1 size-2 rounded-full bg-[#FFD369]" />
-        </button>
+        <NotificationBell
+          dotClassName="-right-0.5 -top-1 size-2 border-0"
+          triggerClassName="rounded-[4px] p-1.5 text-white hover:bg-[#222a34]"
+        />
         <button
           aria-label="Help"
           className="grid size-8 place-items-center rounded-[4px] text-white hover:bg-[#222a34]"
