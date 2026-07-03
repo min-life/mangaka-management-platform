@@ -7,6 +7,7 @@ import { RootStackNavProp } from '@/src/navigation/types';
 import { Colors } from '@/src/constants/colors';
 import BottomNavBar from '@/src/components/shared/BottomNavBar';
 import { logout } from '@/src/services/authApi';
+import { disconnectRealtime } from '@/src/services/realtimeClient';
 import { clearAccessToken, getAccessToken } from '@/src/services/tokenStorage';
 import { fetchMe } from '@/src/services/userApi';
 import { AccountMenuItem } from '@/src/types/profile';
@@ -59,6 +60,7 @@ export default function ProfileScreen() {
         error,
       );
     } finally {
+      disconnectRealtime();
       await clearAccessToken();
       setIsSigningOut(false);
       navigation.replace('Login');
