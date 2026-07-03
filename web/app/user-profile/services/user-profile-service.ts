@@ -114,9 +114,7 @@ function normalizeProfile(user: ApiUserProfile): UserProfile {
 }
 
 function normalizeProject(project: ApiUserProject): UserProject {
-  const apiMetrics = project.projectStats?.[0]?.metrics as
-    | { progress?: unknown }
-    | undefined;
+  const apiMetrics = project.projectStats?.[0]?.metrics as { progress?: unknown } | undefined;
   const progress = typeof apiMetrics?.progress === 'number' ? apiMetrics.progress : 0;
 
   return {
@@ -248,8 +246,7 @@ export function mapActivityLogToUserActivity(
   const title = formatActionTitle(activity.action);
   const metadata = isRecord(activity.metadata) ? activity.metadata : {};
   const boardId =
-    activity.editorBoardId ??
-    (activity.entityType === 'EDITOR_BOARD' ? activity.entityId : null);
+    activity.editorBoardId ?? (activity.entityType === 'EDITOR_BOARD' ? activity.entityId : null);
   const editorBoardName =
     getMetadataLabel(activity.metadata, ['editorBoardName']) ??
     options?.editorBoards?.find((board) => board.id === boardId)?.name ??
@@ -357,10 +354,10 @@ export async function updateCurrentUserProfile(payload: UpdateProfilePayload) {
 }
 
 export async function updateCurrentUserPassword(payload: UpdatePasswordPayload) {
-  const response = await api.patch<ApiResponse<{ success: boolean }>, ApiResponse<{ success: boolean }>>(
-    '/users/me/password',
-    payload,
-  );
+  const response = await api.patch<
+    ApiResponse<{ success: boolean }>,
+    ApiResponse<{ success: boolean }>
+  >('/users/me/password', payload);
 
   return unwrapData<{ success: boolean }>(response);
 }

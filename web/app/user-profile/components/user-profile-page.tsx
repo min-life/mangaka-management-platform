@@ -610,7 +610,9 @@ export function UserProfilePage() {
   // the full list is already in memory, so "loading more" is just widening the
   // visible window, no network round trip.
   const loadMoreActivities = useCallback(() => {
-    setVisibleActivityCount((current) => Math.min(current + ACTIVITY_PAGE_SIZE, allActivities.length));
+    setVisibleActivityCount((current) =>
+      Math.min(current + ACTIVITY_PAGE_SIZE, allActivities.length),
+    );
   }, [allActivities.length]);
 
   // Auto-fill: if container isn't overflowing but we have more data, load more.
@@ -835,10 +837,7 @@ export function UserProfilePage() {
             {isLoading ? (
               <EmptyState message={text.activityLoading} />
             ) : activities.length > 0 ? (
-              <div
-                className="max-h-[600px] overflow-y-auto pr-1"
-                ref={activityScrollRef}
-              >
+              <div className="max-h-[600px] overflow-y-auto pr-1" ref={activityScrollRef}>
                 <ActivityTimeline activities={activities} />
               </div>
             ) : (
