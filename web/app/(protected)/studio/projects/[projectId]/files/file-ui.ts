@@ -29,6 +29,7 @@ export type FileMaterialItem = {
 
 export type FileTaskItem = {
   assignedTo: string;
+  assignedToUserId?: number | null;
   description: string;
   dueDate?: string;
   id: string;
@@ -36,6 +37,7 @@ export type FileTaskItem = {
   status: FileStatus;
   targetVersion?: string;
   title: string;
+  updatedAt?: string;
   submissions?: TaskSubmission[];
   parent?: {
     id: string;
@@ -55,12 +57,13 @@ export type FileTaskRegion = {
 export type SubmissionFrameComment = {
   author: string;
   content: string;
+  frameId?: string;
   id: string;
+  materialId?: string;
+  materialVersion?: string;
   region: FileTaskRegion;
-  submissionId: string;
   taskId?: string;
   time: string;
-  version?: string;
 };
 
 export type FileActivityItem = {

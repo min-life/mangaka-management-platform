@@ -1,21 +1,20 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from '@/lib/toast';
 import {
   ChevronLeft,
   ChevronRight,
-  Database,
   FolderOpen,
 } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
 import {
   createFolderFile,
   getFolderChildren,
   getFolderFiles,
   getProjectFolders,
+  getProjectById,
   type ProjectFolderResponse,
   type ProjectFileResponse,
 } from '@/services/project.service';
@@ -64,10 +63,19 @@ function mapApiFileToExplorerItem(file: ProjectFileResponse, folderId: number): 
 
 export function FilesClient({ projectId }: FilesClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const [selectedArcId, setSelectedArcId] = useState<number | null>(() => {
+    const val = searchParams.get('arcId');
+    return val ? Number(val) : null;
+  });
+  const [selectedChapterId, setSelectedChapterId] = useState<number | null>(() => {
+    const val = searchParams.get('chapterId');
+    return val ? Number(val) : null;
+  });
+  const [projectName, setProjectName] = useState<string>('');
   const [folders, setFolders] = useState<ProjectFolderResponse[]>([]);
   const [files, setFiles] = useState<FileExplorerItem[]>([]);
-  const [selectedArcId, setSelectedArcId] = useState<number | null>(null);
-  const [selectedChapterId, setSelectedChapterId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<FileViewMode>('table');
   const [folderCovers, setFolderCovers] = useState<Record<number, string>>({});
@@ -80,6 +88,11 @@ export function FilesClient({ projectId }: FilesClientProps) {
     setError(null);
 
     try {
+      // Fetch project name for breadcrumb
+      void getProjectById(projectId)
+        .then((proj) => setProjectName(proj.name))
+        .catch(() => {});
+
       const result = await getProjectFolders(projectId, { type: 'ARC' });
       const rootFolders = result.folders.map((folder) => ({
         ...normalizeFolder(folder, projectId),
@@ -232,26 +245,47 @@ export function FilesClient({ projectId }: FilesClientProps) {
     }
   };
 
+  const updateUrlParams = (arc: number | null, chap: number | null) => {
+    const params = new URLSearchParams(window.location.search);
+    if (arc !== null) {
+      params.set('arcId', String(arc));
+    } else {
+      params.delete('arcId');
+    }
+    if (chap !== null) {
+      params.set('chapterId', String(chap));
+    } else {
+      params.delete('chapterId');
+    }
+    const newSearch = params.toString();
+    const newUrl = `${window.location.pathname}${newSearch ? `?${newSearch}` : ''}`;
+    window.history.replaceState(null, '', newUrl);
+  };
+
   const handleSelectArc = (arcId: number) => {
     setSelectedArcId(arcId);
     setSelectedChapterId(null);
     setSearchQuery('');
+    updateUrlParams(arcId, null);
   };
 
   const handleSelectChapter = (chapterId: number) => {
     setSelectedChapterId(chapterId);
     setSearchQuery('');
+    updateUrlParams(selectedArcId, chapterId);
   };
 
   const handleBackToArcs = () => {
     setSelectedArcId(null);
     setSelectedChapterId(null);
     setSearchQuery('');
+    updateUrlParams(null, null);
   };
 
   const handleBackToChapters = () => {
     setSelectedChapterId(null);
     setSearchQuery('');
+    updateUrlParams(selectedArcId, null);
   };
 
   return (
@@ -274,7 +308,7 @@ export function FilesClient({ projectId }: FilesClientProps) {
       </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-2 text-xs font-bold text-[#8b94a1]">
-        <span>Project #{projectId}</span>
+        <span>{projectName || `Project #${projectId}`}</span>
         <ChevronRight className="size-3.5" />
         <span className="text-white">Files</span>
         {selectedArc ? (
@@ -299,16 +333,6 @@ export function FilesClient({ projectId }: FilesClientProps) {
         </p>
       ) : null}
 
-
-      <div className="mt-4 flex items-center justify-between border-y border-[#26303b] bg-[#151c25] px-4 py-2">
-        <div className="flex items-center gap-2 text-xs font-bold text-[#aeb7c2]">
-          <Database className="size-4 text-[#FFD369]" />
-          Folders and files use live API data.
-        </div>
-        <Badge className="rounded-[3px] border border-[#6c5516] bg-[#30270d] text-[#ffd35b]">
-          Production Ready
-        </Badge>
-      </div>
 
       <div className="mt-4 min-h-[560px] flex-1 overflow-hidden rounded-[5px] border border-[#26303b] bg-[#101820]">
         {isLoading ? (
@@ -338,7 +362,9 @@ export function FilesClient({ projectId }: FilesClientProps) {
                   files={visibleFiles}
                   onSearchChange={setSearchQuery}
                   onSelectFile={(file) =>
-                    router.push(`/studio/projects/${projectId}/files/${file.id}`)
+                    router.push(
+                      `/studio/projects/${projectId}/files/${file.id}?arcId=${selectedArcId ?? ''}&chapterId=${selectedChapterId ?? ''}`
+                    )
                   }
                   onViewModeChange={setViewMode}
                   searchQuery={searchQuery}

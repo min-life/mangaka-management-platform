@@ -6,6 +6,7 @@ import { Circle, CircleCheck, Crosshair, FileText, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
+import { useAuth } from '@/hooks/useAuth';
 import { fileStatusClassName, fileStatusLabels, type FileTaskItem } from '../file-ui';
 
 type TaskFilter = 'ALL' | 'MINE' | 'REVIEW';
@@ -27,11 +28,12 @@ export function FileTasksPanel({
   selectedTaskId,
   tasks,
 }: FileTasksPanelProps) {
+  const { user } = useAuth();
   const [filter, setFilter] = useState<TaskFilter>('ALL');
   const visibleTasks = tasks.filter(
     (task) =>
       filter === 'ALL' ||
-      (filter === 'MINE' && /current|sarah/i.test(task.assignedTo)) ||
+      (filter === 'MINE' && user?.id != null && task.assignedToUserId === user.id) ||
       (filter === 'REVIEW' && task.status === 'REVIEW'),
   );
 

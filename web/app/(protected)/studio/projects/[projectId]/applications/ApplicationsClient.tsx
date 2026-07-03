@@ -1,12 +1,20 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useAuth } from '@/hooks/useAuth';
 import { AxiosError } from 'axios';
 import { toast } from '@/lib/toast';
 import { FileCheck2, FileUp, Rocket, Search } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   addApplicationMaterial,
   createApplicationComment,
@@ -40,14 +48,16 @@ type ApplicationsClientProps = {
   projectId: number;
 };
 
-type ApplicationStatusFilter = 'ALL' | 'APPROVED' | 'IN_REVIEW' | 'PENDING' | 'REJECTED';
+type ApplicationStatusFilter = 'ALL' | ApplicationStatus;
 
 const applicationStatusTabs: Array<{ label: string; value: ApplicationStatusFilter }> = [
-  { label: 'All', value: 'ALL' },
-  { label: 'Pending', value: 'PENDING' },
-  { label: 'In Review', value: 'IN_REVIEW' },
-  { label: 'Approved', value: 'APPROVED' },
-  { label: 'Rejected', value: 'REJECTED' },
+  { label: 'All Requests', value: 'ALL' },
+  { label: 'Pending Draft', value: 'PENDING' },
+  { label: 'Submitted to Board', value: 'SUBMITTED' },
+  { label: 'Internal Approved', value: 'INTERNAL_APPROVED' },
+  { label: 'Approved', value: 'APPROVE' },
+  { label: 'Rejected', value: 'REJECT' },
+  { label: 'Cancelled', value: 'CANCELLED' },
 ];
 
 function ApplicationListSkeleton() {
@@ -79,6 +89,7 @@ function ApplicationListSkeleton() {
 }
 
 export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
+  const { user } = useAuth();
   const [applications, setApplications] = useState<ApplicationResponse[]>([]);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -89,7 +100,6 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
   const [selectedApplication, setSelectedApplication] = useState<ApplicationResponse | null>(null);
   const [selectedComments, setSelectedComments] = useState<ApplicationCommentResponse[]>([]);
-  const [mockRejectionReasons, setMockRejectionReasons] = useState<Record<number, string>>({});
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [type, setType] = useState<ApplicationType>('CREATE_ARC');
@@ -140,12 +150,7 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
 
     return applications.filter((application) => {
       const matchesStatus =
-        statusFilter === 'ALL' ||
-        (statusFilter === 'PENDING' && application.status === 'PENDING') ||
-        (statusFilter === 'IN_REVIEW' &&
-          (application.status === 'INTERNAL_APPROVED' || application.status === 'SUBMITTED')) ||
-        (statusFilter === 'APPROVED' && application.status === 'APPROVE') ||
-        (statusFilter === 'REJECTED' && application.status === 'REJECT');
+        statusFilter === 'ALL' || application.status === statusFilter;
       const matchesSearch =
         !normalizedQuery ||
         [application.title, application.description ?? '', application.type, application.status].some(
@@ -263,21 +268,19 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
           kind: 'REJECTION_REASON',
           text: options.rejectionReason,
         });
-        setMockRejectionReasons((currentReasons) => ({
-          ...currentReasons,
-          [application.id]: options.rejectionReason ?? '',
-        }));
       }
       setSelectedApplication((currentApplication) =>
         currentApplication?.id === application.id
           ? { ...currentApplication, status: nextStatus, updatedAt: new Date().toISOString() }
           : currentApplication,
       );
-      await loadApplications();
+      await refreshSelectedApplication(application.id);
       if (status === 'APPROVE') {
         toast.success('Application approved.');
       } else if (status === 'REJECT') {
         toast.success('Application rejected.');
+      } else if (status === 'CANCELLED') {
+        toast.success('Application cancelled.');
       } else {
         toast.success('Status updated.');
       }
@@ -287,6 +290,7 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
       setIsSubmitting(false);
     }
   };
+
 
   const handleOpenApplication = async (application: ApplicationResponse) => {
     setSelectedApplication(application);
@@ -457,7 +461,7 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
         </article>
       </div>
 
-      <div className="mt-5 flex items-center justify-between gap-4">
+      <div className="mt-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <div className="flex h-10 min-w-0 flex-1 items-center gap-3 rounded-[4px] border border-[#39424f] bg-[#151c25] px-4 text-[#8b94a1]">
           <Search className="size-4 text-[#dce7f3]" />
           <input
@@ -467,24 +471,26 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
             value={searchQuery}
           />
         </div>
-      </div>
-
-      <div className="mt-4 flex h-10 items-center gap-2 border-b border-[#26303b]">
-        {applicationStatusTabs.map((tab) => (
-          <button
-            className={`relative h-full px-2 text-xs font-black ${
-              statusFilter === tab.value ? 'text-[#FFD369]' : 'text-[#aeb7c2] hover:text-white'
-            }`}
-            key={tab.value}
-            onClick={() => setStatusFilter(tab.value)}
-            type="button"
-          >
-            {tab.label}
-            {statusFilter === tab.value ? (
-              <span className="absolute inset-x-0 bottom-[-1px] h-[2px] bg-[#FFD369]" />
-            ) : null}
-          </button>
-        ))}
+        
+        <Select
+          value={statusFilter}
+          onValueChange={(val) => setStatusFilter(val as ApplicationStatusFilter)}
+        >
+          <SelectTrigger className="h-10 w-full sm:w-44 rounded-[4px] border-[#39424f] bg-[#151c25] text-xs text-white">
+            <SelectValue placeholder="Filter by status" />
+          </SelectTrigger>
+          <SelectContent className="border-[#39424f] bg-[#151c25] text-white">
+            {applicationStatusTabs.map((tab) => (
+              <SelectItem
+                key={tab.value}
+                value={tab.value}
+                className="text-xs hover:bg-[#1f2937] focus:bg-[#1f2937] text-white"
+              >
+                {tab.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <section className="mt-4 space-y-3">
@@ -548,6 +554,14 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
       <ApplicationReviewDrawer
         application={selectedApplication}
         canApprove={canApprove}
+        canCancel={
+          selectedApplication
+            ? selectedApplication.createdByUser?.id === user?.id ||
+              permissions.includes('admin') ||
+              permissions.includes('project:owner') ||
+              permissions.includes('project:application.approve')
+            : false
+        }
         isSubmitting={isSubmitting}
         onOpenChange={(open) => {
           if (!open) {
@@ -556,10 +570,21 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
           }
         }}
         rejectionReason={
-          selectedApplication ? mockRejectionReasons[selectedApplication.id] : undefined
+          (() => {
+            const comment = selectedComments.find(
+              (c) =>
+                c.content &&
+                typeof c.content === 'object' &&
+                (c.content as any).kind === 'REJECTION_REASON'
+            );
+            return comment ? (comment.content as any).text : undefined;
+          })()
         }
         onUpdateStatus={(application, status, options) =>
           void handleUpdateStatus(application, status, options)
+        }
+        onDeleteApplication={(application) =>
+          void handleDeleteApplication(application)
         }
       />
     </section>

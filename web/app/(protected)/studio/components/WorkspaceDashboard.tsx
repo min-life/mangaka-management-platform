@@ -4,16 +4,15 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ChevronDown,
   Grid2X2,
   ImageIcon,
   List,
   MoreVertical,
   Pencil,
-  Plus,
   Search,
   Settings,
   Trash2,
+  Loader2,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -113,6 +112,7 @@ export function WorkspaceDashboard() {
   const searchParams = useSearchParams();
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('projects');
+  const [searchQuery, setSearchQuery] = useState('');
   const [apiProjects, setApiProjects] = useState<ProjectResponse[]>([]);
   const [apiBoards, setApiBoards] = useState<EditorBoardResponse[]>([]);
   const [apiTasks, setApiTasks] = useState<any[]>([]);
@@ -121,6 +121,7 @@ export function WorkspaceDashboard() {
     const tab = searchParams.get('tab');
     if (tab === 'editorBoards' || tab === 'myTasks' || tab === 'projects') {
       setActiveTab(tab);
+      setSearchQuery('');
     }
   }, [searchParams]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
@@ -131,30 +132,38 @@ export function WorkspaceDashboard() {
   const [taskError, setTaskError] = useState<string | null>(null);
   const [activeActionId, setActiveActionId] = useState<string | null>(null);
   const isProjectsTab = activeTab === 'projects';
-  const projectRows = useMemo(
-    () =>
-      apiProjects.map((project) => {
-        return {
-          editorBoard: project.editorBoard?.name ?? 'No board',
-          id: `PRJ-${project.id}`,
-          image: project.imageUrl ?? '',
-          description: project.description ?? 'No description',
-          memberCount: project.userProjects?.length ?? 0,
-          name: project.name,
-          projectId: project.id,
-          progress: 0,
-          createdBy: formatUserName(project.createdByUser),
-          createdByUser: project.createdByUser,
-          status: 'PENDING',
-          updated: formatUpdatedAt(project.updatedAt),
-        };
-      }),
-    [apiProjects],
-  );
+  const projectRows = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    return apiProjects
+      .map((project) => ({
+        editorBoard: project.editorBoard?.name ?? 'No board',
+        id: `PRJ-${project.id}`,
+        image: project.imageUrl ?? '',
+        description: project.description ?? 'No description',
+        memberCount: project.userProjects?.length ?? 0,
+        name: project.name,
+        projectId: project.id,
+        progress: 0,
+        createdBy: formatUserName(project.createdByUser),
+        createdByUser: project.createdByUser,
+        status: 'PENDING',
+        updated: formatUpdatedAt(project.updatedAt),
+      }))
+      .filter((project) => {
+        if (!normalizedQuery || activeTab !== 'projects') return true;
+        return [
+          project.name,
+          project.editorBoard,
+          project.createdBy,
+          project.id,
+        ].some((v) => v.toLowerCase().includes(normalizedQuery));
+      });
+  }, [apiProjects, searchQuery, activeTab]);
   const projectTotal = projectRows.length;
-  const boardRows = useMemo(
-    () =>
-      apiBoards.map((board) => ({
+  const boardRows = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    return apiBoards
+      .map((board) => ({
         id: `BRD-${board.id}`,
         boardId: board.id,
         name: board.name,
@@ -163,14 +172,20 @@ export function WorkspaceDashboard() {
         projectCount: board.numberOfProjects ?? board._count?.projects ?? 0,
         createdBy: formatUserName(board.createdByUser),
         updated: formatUpdatedAt(board.updatedAt),
-      })),
-    [apiBoards],
-  );
+      }))
+      .filter((board) => {
+        if (!normalizedQuery || activeTab !== 'editorBoards') return true;
+        return [board.name, board.createdBy, board.id].some((v) =>
+          v.toLowerCase().includes(normalizedQuery),
+        );
+      });
+  }, [apiBoards, searchQuery, activeTab]);
   const boardTotal = boardRows.length;
 
-  const mappedTasks = useMemo(
-    () =>
-      apiTasks.map((t) => {
+  const mappedTasks = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    return apiTasks
+      .map((t) => {
         const assigneeName = t.assignedByUser?.displayName || t.assignedByUser?.email || 'Unassigned';
         const assigneeInitials = assigneeName.slice(0, 2).toUpperCase();
         return {
@@ -187,9 +202,14 @@ export function WorkspaceDashboard() {
           due: t.deadline ? new Date(t.deadline).toLocaleDateString() : 'No due date',
           updated: formatUpdatedAt(t.updatedAt),
         };
-      }),
-    [apiTasks],
-  );
+      })
+      .filter((task) => {
+        if (!normalizedQuery || activeTab !== 'myTasks') return true;
+        return [task.title, task.file, task.project, task.assignee.name].some((v) =>
+          v.toLowerCase().includes(normalizedQuery),
+        );
+      });
+  }, [apiTasks, searchQuery, activeTab]);
 
   const headerContent = {
     editorBoards: {
@@ -260,7 +280,7 @@ export function WorkspaceDashboard() {
       void loadEditorBoards();
       void loadTasks();
     });
-  }, [loadEditorBoards, loadProjects]);
+  }, [loadEditorBoards, loadProjects, loadTasks]);
 
   const handleRenameBoard = async (board: { boardId: number; name: string }) => {
     const nextName = window.prompt('Rename editor board', board.name)?.trim();
@@ -361,21 +381,28 @@ export function WorkspaceDashboard() {
         <div className="mt-5 flex flex-wrap items-center gap-3">
           <div className="flex h-9 w-full max-w-[360px] items-center gap-3 rounded-[4px] border border-[#4b535f] bg-[#393E46] px-4 text-[#aeb7c2] sm:w-[360px]">
             <Search className="size-4 text-white" />
-            <span className="text-xs">
-              {activeTab === 'myTasks'
-                ? 'Search tasks...'
-                : activeTab === 'editorBoards'
-                  ? 'Search boards...'
-                  : 'Search projects...'}
-            </span>
+            <input
+              className="min-w-0 flex-1 bg-transparent text-xs font-medium text-white outline-none placeholder:text-[#aeb7c2]"
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={
+                activeTab === 'myTasks'
+                  ? 'Search tasks...'
+                  : activeTab === 'editorBoards'
+                    ? 'Search boards...'
+                    : 'Search projects...'
+              }
+              value={searchQuery}
+            />
+            {searchQuery ? (
+              <button
+                className="text-[#aeb7c2] hover:text-white"
+                onClick={() => setSearchQuery('')}
+                type="button"
+              >
+                ×
+              </button>
+            ) : null}
           </div>
-          <Button
-            className="h-9 w-[160px] rounded-[4px] border-[#4b535f] bg-[#101820] px-4 text-xs font-black text-white hover:bg-[#393E46]"
-            variant="outline"
-          >
-            {activeTab === 'myTasks' ? 'Task: All' : 'Status: All'}
-            <ChevronDown className="size-3.5" />
-          </Button>
 
           {isProjectsTab ? (
             <>
@@ -409,12 +436,7 @@ export function WorkspaceDashboard() {
                 }}
               />
             </>
-          ) : activeTab === 'myTasks' ? (
-            <Button className="ml-auto h-9 rounded-[4px] bg-[#FFD369] px-4 text-xs font-black text-[#222831] hover:bg-[#eac04f]">
-              <Plus className="size-4" />
-              New Task
-            </Button>
-          ) : (
+          ) : activeTab === 'myTasks' ? null : (
             <div className="ml-auto">
               <CreateBoardDialog onCreated={() => void loadEditorBoards()} />
             </div>
@@ -428,23 +450,9 @@ export function WorkspaceDashboard() {
         ) : null}
 
 
-
-        {isProjectsTab ? (
-          <p className="mt-3 text-[11px] font-bold text-[#8b94a1]">
-            * Status and progress use UI fallback until the project summary API returns
-            production metrics.
-          </p>
-        ) : null}
-
         {activeTab === 'editorBoards' && boardError ? (
           <p className="mt-4 rounded-[4px] border border-red-400/30 bg-red-950/20 px-4 py-3 text-xs font-bold text-red-300">
             {boardError}
-          </p>
-        ) : null}
-
-        {activeTab === 'editorBoards' ? (
-          <p className="mt-4 text-[11px] font-bold text-[#8b94a1]">
-            Editor board metadata is loaded from the updated board API.
           </p>
         ) : null}
 
@@ -474,43 +482,60 @@ export function WorkspaceDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mappedTasks.map((task) => (
-                  <TableRow
-                    className="h-[72px] border-l-4 border-l-transparent border-r-0 border-t-0 border-b-[#393E46] bg-[#0b1118] hover:border-l-[#FFD369] hover:bg-[#202832]"
-                    key={task.id}
-                  >
-                    <TableCell className="px-5">
-                      <div>
-                        <p className="text-sm font-black leading-5 text-white">{task.title}</p>
-                        <p className="mt-1 text-xs font-bold text-[#aeb7c2]">
-                          {task.file} <span className="text-[#5b626d]">-</span> {task.id}
-                        </p>
+                {isLoadingTasks ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-40 text-center">
+                      <div className="flex flex-col items-center justify-center space-y-3">
+                        <Loader2 className="size-6 animate-spin text-[#FFD369]" />
+                        <span className="text-xs font-bold text-[#8b94a1]">Loading tasks...</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs font-bold text-white">{task.project}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="grid size-7 place-items-center rounded-full border border-[#121820] text-[9px] font-black text-white"
-                          style={{ backgroundColor: task.assignee.color }}
-                        >
-                          {task.assignee.initials}
-                        </span>
-                        <span className="text-xs font-bold text-white">{task.assignee.name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        className={`h-7 rounded-full border px-3 text-[11px] font-bold ${taskStatusClassName[task.status]}`}
-                        variant="outline"
-                      >
-                        {formatStatus(task.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-xs font-bold text-white">{task.due}</TableCell>
-                    <TableCell className="text-xs font-bold text-white">{task.updated}</TableCell>
                   </TableRow>
-                ))}
+                ) : mappedTasks.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-40 text-center text-xs font-bold text-[#8b94a1]">
+                      No tasks found.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  mappedTasks.map((task) => (
+                    <TableRow
+                      className="h-[72px] border-l-4 border-l-transparent border-r-0 border-t-0 border-b-[#393E46] bg-[#0b1118] hover:border-l-[#FFD369] hover:bg-[#202832]"
+                      key={task.id}
+                    >
+                      <TableCell className="px-5">
+                        <div>
+                          <p className="text-sm font-black leading-5 text-white">{task.title}</p>
+                          <p className="mt-1 text-xs font-bold text-[#aeb7c2]">
+                            {task.file} <span className="text-[#5b626d]">-</span> {task.id}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs font-bold text-white">{task.project}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="grid size-7 place-items-center rounded-full border border-[#121820] text-[9px] font-black text-white"
+                            style={{ backgroundColor: task.assignee.color }}
+                          >
+                            {task.assignee.initials}
+                          </span>
+                          <span className="text-xs font-bold text-white">{task.assignee.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          className={`h-7 rounded-full border px-3 text-[11px] font-bold ${taskStatusClassName[task.status]}`}
+                          variant="outline"
+                        >
+                          {formatStatus(task.status)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs font-bold text-white">{task.due}</TableCell>
+                      <TableCell className="text-xs font-bold text-white">{task.updated}</TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </section>
@@ -537,87 +562,103 @@ export function WorkspaceDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {boardRows.map((board) => (
-                  <TableRow
-                    className="h-[72px] border-l-4 border-l-transparent border-r-0 border-t-0 border-b-[#393E46] bg-[#0b1118] hover:border-l-[#FFD369] hover:bg-[#202832]"
-                    key={board.id}
-                  >
-                    <TableCell className="px-5">
-                      <Link
-                        className="flex items-center gap-4 rounded-[4px] outline-none transition-opacity hover:opacity-85 focus-visible:ring-2 focus-visible:ring-[#FFD369]"
-                        href={`/studio/editor-boards/${board.boardId}/projects`}
-                      >
-                        {board.image ? (
-                          <img
-                            alt=""
-                            className="size-12 rounded-[5px] border border-[#393E46] object-cover"
-                            src={board.image}
-                          />
-                        ) : (
-                          <span className="grid size-12 place-items-center rounded-[5px] border border-[#393E46] bg-[#151c25] text-xs font-black text-[#FFD369]">
-                            {board.name
-                              .split(' ')
-                              .slice(0, 2)
-                              .map((word) => word.charAt(0))
-                              .join('')}
-                          </span>
-                        )}
-                        <div>
-                          <p className="text-sm font-black leading-5 text-white">{board.name}</p>
-                          <p className="mt-1 text-xs font-bold text-[#aeb7c2]">{board.id}</p>
-                        </div>
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-xs font-bold text-white">
-                      {board.createdBy}
-                    </TableCell>
-                    <TableCell className="text-xs font-bold text-white">
-                      {board.projectCount} {board.projectCount === 1 ? 'project' : 'projects'}
-                    </TableCell>
-                    <TableCell className="text-xs font-bold text-white">
-                      {board.updated}
-                    </TableCell>
-                    <TableCell className="pr-5 text-right">
-                      <Can
-                        any={['admin', 'board:owner']}
-                        resource="BOARD"
-                        resourceId={board.boardId}
-                      >
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              className="size-7 text-white hover:bg-[#393E46]"
-                              disabled={activeActionId === `board-${board.boardId}`}
-                              size="icon"
-                              variant="ghost"
-                            >
-                              <MoreVertical className="size-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent
-                            align="end"
-                            className="min-w-36 rounded-[4px] border border-[#393E46] bg-[#101820] p-1 text-white"
-                          >
-                            <DropdownMenuItem
-                              className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold focus:bg-[#393E46] focus:text-white"
-                              onSelect={() => void handleRenameBoard(board)}
-                            >
-                              <Pencil className="size-3.5" />
-                              Rename
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold text-red-300 focus:bg-red-950/30 focus:text-red-200"
-                              onSelect={() => void handleDeleteBoard(board)}
-                            >
-                              <Trash2 className="size-3.5" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </Can>
+                {isLoadingBoards ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-40 text-center">
+                      <div className="flex flex-col items-center justify-center space-y-3">
+                        <Loader2 className="size-6 animate-spin text-[#FFD369]" />
+                        <span className="text-xs font-bold text-[#8b94a1]">Loading editor boards...</span>
+                      </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : boardRows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-40 text-center text-xs font-bold text-[#8b94a1]">
+                      No editor boards found.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  boardRows.map((board) => (
+                    <TableRow
+                      className="h-[72px] border-l-4 border-l-transparent border-r-0 border-t-0 border-b-[#393E46] bg-[#0b1118] hover:border-l-[#FFD369] hover:bg-[#202832]"
+                      key={board.id}
+                    >
+                      <TableCell className="px-5">
+                        <Link
+                          className="flex items-center gap-4 rounded-[4px] outline-none transition-opacity hover:opacity-85 focus-visible:ring-2 focus-visible:ring-[#FFD369]"
+                          href={`/studio/editor-boards/${board.boardId}/projects`}
+                        >
+                          {board.image && board.image.trim() !== '' ? (
+                            <img
+                              alt=""
+                              className="size-12 rounded-[5px] border border-[#393E46] object-cover"
+                              src={board.image || undefined}
+                            />
+                          ) : (
+                            <span className="grid size-12 place-items-center rounded-[5px] border border-[#393E46] bg-[#151c25] text-xs font-black text-[#FFD369]">
+                              {board.name
+                                .split(' ')
+                                .slice(0, 2)
+                                .map((word) => word.charAt(0))
+                                .join('')}
+                            </span>
+                          )}
+                          <div>
+                            <p className="text-sm font-black leading-5 text-white">{board.name}</p>
+                            <p className="mt-1 text-xs font-bold text-[#aeb7c2]">{board.id}</p>
+                          </div>
+                        </Link>
+                      </TableCell>
+                      <TableCell className="text-xs font-bold text-white">
+                        {board.createdBy}
+                      </TableCell>
+                      <TableCell className="text-xs font-bold text-white">
+                        {board.projectCount} {board.projectCount === 1 ? 'project' : 'projects'}
+                      </TableCell>
+                      <TableCell className="text-xs font-bold text-white">
+                        {board.updated}
+                      </TableCell>
+                      <TableCell className="pr-5 text-right">
+                        <Can
+                          any={['admin', 'board:owner']}
+                          resource="BOARD"
+                          resourceId={board.boardId}
+                        >
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                className="size-7 text-white hover:bg-[#393E46]"
+                                size="icon"
+                                variant="ghost"
+                              >
+                                <MoreVertical className="size-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                              align="end"
+                              className="min-w-36 rounded-[4px] border border-[#393E46] bg-[#101820] p-1 text-white"
+                            >
+                              <DropdownMenuItem
+                                className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold focus:bg-[#393E46] focus:text-white"
+                                onSelect={() => void handleRenameBoard(board)}
+                              >
+                                <Pencil className="size-3.5" />
+                                Rename
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold text-red-300 focus:bg-red-950/30 focus:text-red-200"
+                                onSelect={() => void handleDeleteBoard(board)}
+                              >
+                                <Trash2 className="size-3.5" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </Can>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
 
@@ -630,66 +671,78 @@ export function WorkspaceDashboard() {
             </footer>
           </section>
         ) : viewMode === 'gallery' ? (
-          <section className="mx-auto mt-4 grid max-w-[1600px] grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
-            {projectRows.map((project) => (
-              <article
-                className="group overflow-hidden rounded-[7px] border border-[#393E46] bg-[#0c1219] transition-colors hover:border-[#FFD369]/60 hover:bg-[#101820]"
-                key={project.id}
-              >
-                <div className="relative">
-                  <Link
-                    className="relative block aspect-[3/4] w-full overflow-hidden bg-[#101820]"
-                    href={`/studio/projects/${project.projectId}`}
-                  >
-                    <ProjectCoverImage imageUrl={project.image} />
-                    <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#0c1219] to-transparent" />
-                    <Badge
-                      className={`absolute right-3 top-3 h-6 rounded-full border px-2.5 text-[10px] font-black ${statusClassName[project.status]}`}
-                      variant="outline"
+          isLoadingProjects ? (
+            <div className="flex min-h-[300px] w-full flex-col items-center justify-center space-y-3">
+              <Loader2 className="size-8 animate-spin text-[#FFD369]" />
+              <span className="text-xs font-bold text-[#8b94a1]">Loading projects...</span>
+            </div>
+          ) : projectRows.length === 0 ? (
+            <div className="flex min-h-[300px] w-full flex-col items-center justify-center space-y-2">
+              <ImageIcon className="size-8 text-[#8b94a1]/55" />
+              <span className="text-xs font-bold text-[#8b94a1]">No projects found.</span>
+            </div>
+          ) : (
+            <section className="mx-auto mt-4 grid max-w-[1600px] grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
+              {projectRows.map((project) => (
+                <article
+                  className="group overflow-hidden rounded-[7px] border border-[#393E46] bg-[#0c1219] transition-colors hover:border-[#FFD369]/60 hover:bg-[#101820]"
+                  key={project.id}
+                >
+                  <div className="relative">
+                    <Link
+                      className="relative block aspect-[3/4] w-full overflow-hidden bg-[#101820]"
+                      href={`/studio/projects/${project.projectId}`}
                     >
-                      {formatStatus(project.status)} *
-                    </Badge>
-                  </Link>
-                  <Can
-                    any={['admin', 'project:owner', 'project:update']}
-                    resource="PROJECT"
-                    resourceId={project.projectId}
-                  >
-                    <Button
-                      className="absolute bottom-3 right-3 size-7 shrink-0 rounded-full bg-[#101820]/80 text-white hover:bg-[#393E46]"
-                      size="icon"
-                      variant="ghost"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        router.push(`/studio/projects/${project.projectId}/settings`);
-                      }}
+                      <ProjectCoverImage imageUrl={project.image} />
+                      <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#0c1219] to-transparent" />
+                      <Badge
+                        className={`absolute right-3 top-3 h-6 rounded-full border px-2.5 text-[10px] font-black ${statusClassName[project.status]}`}
+                        variant="outline"
+                      >
+                        {formatStatus(project.status)} *
+                      </Badge>
+                    </Link>
+                    <Can
+                      any={['admin', 'project:owner', 'project:update']}
+                      resource="PROJECT"
+                      resourceId={project.projectId}
                     >
-                      <Settings className="size-4" />
-                    </Button>
-                  </Can>
-                </div>
+                      <Button
+                        className="absolute bottom-3 right-3 size-7 shrink-0 rounded-full bg-[#101820]/80 text-white hover:bg-[#393E46]"
+                        size="icon"
+                        variant="ghost"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          router.push(`/studio/projects/${project.projectId}`);
+                        }}
+                      >
+                        <Settings className="size-4" />
+                      </Button>
+                    </Can>
+                  </div>
 
-                <div className="p-3.5">
-                  <Link href={`/studio/projects/${project.projectId}`}>
-                    <h2 className="truncate text-sm font-black leading-5 text-white hover:text-[#FFD369]">
-                      {project.name}
-                    </h2>
-                  </Link>
-                  <p className="mt-1 truncate text-[11px] font-bold text-[#aeb7c2]">
-                    {project.id}
-                    <span className="text-[#5b626d]"> • </span>
-                    {project.createdBy}
-                  </p>
-                  <p className="mt-2 truncate text-[11px] font-bold text-[#8b94a1]">
-                    Updated {project.updated}
-                    <span className="text-[#5b626d]"> • </span>
-                    {project.memberCount} {project.memberCount === 1 ? 'member' : 'members'}
-                  </p>
-                </div>
-              </article>
-            ))}
-          </section>
+                  <div className="p-3.5">
+                    <Link href={`/studio/projects/${project.projectId}`}>
+                      <h2 className="truncate text-sm font-black leading-5 text-white hover:text-[#FFD369]">
+                        {project.name}
+                      </h2>
+                    </Link>
+                    <p className="mt-1 truncate text-[11px] font-bold text-[#aeb7c2]">
+                      {project.id}
+                      <span className="text-[#5b626d]"> • </span>
+                      {project.createdBy}
+                    </p>
+                    <p className="mt-2 truncate text-[11px] font-bold text-[#8b94a1]">
+                      Updated {project.updated}
+                      <span className="text-[#5b626d]"> • </span>
+                      {project.memberCount} {project.memberCount === 1 ? 'member' : 'members'}
+                    </p>
+                  </div>
+                </article>
+              ))}
+            </section>
+          )
         ) : (
           <section className="mt-4 overflow-hidden rounded-[7px] border border-[#393E46] bg-[#0c1219]">
             <Table>
@@ -716,72 +769,95 @@ export function WorkspaceDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {projectRows.map((project) => (
-                  <TableRow
-                    className="h-[86px] cursor-pointer border-l-4 border-l-transparent border-r-0 border-t-0 border-b-[#393E46] bg-[#0b1118] transition-colors duration-150 hover:border-l-[#FFD369] hover:bg-[#202832]"
-                    key={project.id}
-                    onClick={() => router.push(`/studio/projects/${project.projectId}`)}
-                  >
-                    <TableCell className="px-5 py-3">
-                      <div className="flex w-fit items-center gap-3">
-                        <img
-                          alt=""
-                          className="size-14 rounded-md border border-[#393E46] object-cover"
-                          src={project.image}
-                        />
-                        <div>
-                          <p className="text-sm font-black leading-5 text-white hover:text-[#FFD369]">
-                            {project.name}
-                          </p>
-                          <p className="mt-1 text-xs font-bold text-[#aeb7c2]">
-                            {project.id}
-                          </p>
-                        </div>
+                {isLoadingProjects ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-40 text-center">
+                      <div className="flex flex-col items-center justify-center space-y-3">
+                        <Loader2 className="size-6 animate-spin text-[#FFD369]" />
+                        <span className="text-xs font-bold text-[#8b94a1]">Loading projects...</span>
                       </div>
-                    </TableCell>
-                    <TableCell className="text-xs font-bold text-white">
-                      <div className="flex items-center gap-2">
-                        {project.createdByUser?.avatarUrl ? (
-                          <img
-                            src={project.createdByUser.avatarUrl}
-                            alt=""
-                            className="size-7 rounded-full border border-[#393E46] object-cover"
-                          />
-                        ) : (
-                          <span className="grid size-7 place-items-center rounded-full border border-[#26303b] bg-[#393E46] text-[9px] font-black text-white">
-                            {formatUserName(project.createdByUser).charAt(0).toUpperCase()}
-                          </span>
-                        )}
-                        <span>{project.createdBy}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-xs font-bold text-white">
-                      {project.editorBoard}
-                    </TableCell>
-                    <TableCell className="text-center text-xs font-bold text-white">
-                      {project.memberCount} {project.memberCount === 1 ? 'member' : 'members'}
-                    </TableCell>
-                    <TableCell className="text-xs font-bold text-white">
-                      {project.updated}
-                    </TableCell>
-                    <TableCell className="pr-5 text-right" onClick={(e) => e.stopPropagation()}>
-                      <Can
-                        any={['admin', 'project:owner', 'project:update']}
-                        resource="PROJECT"
-                        resourceId={project.projectId}
-                      >
-                        <Button
-                          className="size-7 text-white hover:bg-[#393E46]"
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => router.push(`/studio/projects/${project.projectId}/settings`)}
-                        >
-                          <Settings className="size-4" />
-                        </Button>
-                      </Can>
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : projectRows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-40 text-center text-xs font-bold text-[#8b94a1]">
+                      No projects found.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  projectRows.map((project) => (
+                    <TableRow
+                      className="h-[86px] cursor-pointer border-l-4 border-l-transparent border-r-0 border-t-0 border-b-[#393E46] bg-[#0b1118] transition-colors duration-150 hover:border-l-[#FFD369] hover:bg-[#202832]"
+                      key={project.id}
+                      onClick={() => router.push(`/studio/projects/${project.projectId}`)}
+                    >
+                      <TableCell className="px-5 py-3">
+                        <div className="flex w-fit items-center gap-3">
+                          {project.image && project.image.trim() !== '' ? (
+                            <img
+                              alt=""
+                              className="size-14 rounded-md border border-[#393E46] object-cover"
+                              src={project.image || undefined}
+                            />
+                          ) : (
+                            <div className="grid size-14 place-items-center rounded-md border border-[#393E46] bg-[#111923] text-[#8b94a1]">
+                              <ImageIcon className="size-6 text-[#8b94a1]/55" />
+                            </div>
+                          )}
+                          <div>
+                            <p className="text-sm font-black leading-5 text-white hover:text-[#FFD369]">
+                              {project.name}
+                            </p>
+                            <p className="mt-1 text-xs font-bold text-[#aeb7c2]">
+                              {project.id}
+                            </p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs font-bold text-white">
+                        <div className="flex items-center gap-2">
+                          {project.createdByUser?.avatarUrl && project.createdByUser.avatarUrl.trim() !== '' ? (
+                            <img
+                              src={project.createdByUser.avatarUrl || undefined}
+                              alt=""
+                              className="size-7 rounded-full border border-[#393E46] object-cover"
+                            />
+                          ) : (
+                            <span className="grid size-7 place-items-center rounded-full border border-[#26303b] bg-[#393E46] text-[9px] font-black text-white">
+                              {formatUserName(project.createdByUser).charAt(0).toUpperCase()}
+                            </span>
+                          )}
+                          <span>{project.createdBy}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs font-bold text-white">
+                        {project.editorBoard}
+                      </TableCell>
+                      <TableCell className="text-center text-xs font-bold text-white">
+                        {project.memberCount} {project.memberCount === 1 ? 'member' : 'members'}
+                      </TableCell>
+                      <TableCell className="text-xs font-bold text-white">
+                        {project.updated}
+                      </TableCell>
+                      <TableCell className="pr-5 text-right" onClick={(e) => e.stopPropagation()}>
+                        <Can
+                          any={['admin', 'project:owner', 'project:update']}
+                          resource="PROJECT"
+                          resourceId={project.projectId}
+                        >
+                          <Button
+                            className="size-7 text-white hover:bg-[#393E46]"
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => router.push(`/studio/projects/${project.projectId}`)}
+                          >
+                            <Settings className="size-4" />
+                          </Button>
+                        </Can>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
 

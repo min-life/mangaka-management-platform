@@ -24,6 +24,7 @@ import {
   getFileMaterialVersions,
 } from '@/services/file.service';
 import { LoadingState } from '@/components/ui/loading-state';
+import { useAuth } from '@/hooks/useAuth';
 
 import { CreateTaskDialog } from './CreateTaskDialog';
 import { TaskKanban } from './TaskKanban';
@@ -49,6 +50,7 @@ const scopeLabels: Record<TaskScope, string> = {
 
 export function TasksClient({ projectId }: TasksClientProps) {
   const router = useRouter();
+  const { user } = useAuth();
   const [tasks, setTasks] = useState<TaskWorkspaceItem[]>([]);
   const [projectFiles, setProjectFiles] = useState<{ id: number; title: string }[]>([]);
   const [members, setMembers] = useState<{ id: number; name: string }[]>([]);
@@ -158,7 +160,7 @@ export function TasksClient({ projectId }: TasksClientProps) {
               fileId: file.id,
               fileTitle: file.title,
               id: String(t.id),
-              isMine: /current|sarah/i.test(assigneeName),
+              isMine: user?.id != null && t.assignedByUser?.id === user.id,
               previewUrl,
               priority: 'MEDIUM',
               region,

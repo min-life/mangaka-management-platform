@@ -34,6 +34,7 @@ import {
 type ApplicationReviewDrawerProps = {
   application: ApplicationResponse | null;
   canApprove: boolean;
+  canCancel: boolean;
   isSubmitting: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdateStatus: (
@@ -41,19 +42,23 @@ type ApplicationReviewDrawerProps = {
     status: ApplicationStatus,
     options?: { rejectionReason?: string },
   ) => void;
+  onDeleteApplication: (application: ApplicationResponse) => void;
   rejectionReason?: string;
 };
 
 export function ApplicationReviewDrawer({
   application,
   canApprove,
+  canCancel,
   isSubmitting,
   onOpenChange,
   onUpdateStatus,
+  onDeleteApplication,
   rejectionReason,
 }: ApplicationReviewDrawerProps) {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [draftRejectReason, setDraftRejectReason] = useState('');
   const uploadedFiles = application ? readUploadedFiles(application.materials) : [];
   const submittedBy =
@@ -279,6 +284,30 @@ export function ApplicationReviewDrawer({
                   </div>
                 </section>
               ) : null}
+
+              {canCancel &&
+              application &&
+              (application.status === 'PENDING' ||
+                application.status === 'SUBMITTED' ||
+                application.status === 'INTERNAL_APPROVED') ? (
+                <section className="mt-4 rounded-[4px] border border-[#303842] bg-[#151c25] p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8b94a1]">
+                    Actions
+                  </p>
+                  <div className="mt-3">
+                    <Button
+                      className="h-10 w-full rounded-[4px] border-[#6b2637] bg-[#371522] px-4 text-xs font-black text-[#ff9ab3] hover:bg-[#4a1d2c]"
+                      disabled={isSubmitting}
+                      onClick={() => setCancelDialogOpen(true)}
+                      type="button"
+                      variant="outline"
+                    >
+                      <X className="mr-1.5 size-4" />
+                      Cancel Request
+                    </Button>
+                  </div>
+                </section>
+              ) : null}
             </div>
             </>
           ) : null}
@@ -310,9 +339,7 @@ export function ApplicationReviewDrawer({
                 value={draftRejectReason}
               />
             </label>
-            <p className="mt-2 text-[11px] font-bold text-[#8b94a1]">
-              * Mock only until backend adds review note or application history.
-            </p>
+
           </div>
           <DialogFooter className="mx-0 mb-0 rounded-none border-[#39424f] bg-[#151c25] px-6 py-4">
             <Button
@@ -372,6 +399,48 @@ export function ApplicationReviewDrawer({
               type="button"
             >
               {isSubmitting ? 'Approving...' : 'Confirm Approve'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog onOpenChange={setCancelDialogOpen} open={cancelDialogOpen}>
+        <DialogContent
+          className="max-w-md gap-0 overflow-hidden rounded-[7px] border border-[#39424f] bg-[#101820] p-0 text-white"
+          showCloseButton={false}
+        >
+          <DialogHeader className="border-b border-[#39424f] px-6 py-5">
+            <div className="mb-3 grid size-10 place-items-center rounded-[4px] border border-red-500/30 bg-red-950/20 text-red-400">
+              <AlertTriangle className="size-5" />
+            </div>
+            <DialogTitle className="text-xl font-black text-white">Cancel Request</DialogTitle>
+            <DialogDescription className="text-sm font-medium text-[#aeb7c2]">
+              Are you sure you want to cancel this request? This action will permanently remove it from the project and stop the review process.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="mx-0 mb-0 rounded-none border-[#39424f] bg-[#151c25] px-6 py-4">
+            <Button
+              className="h-9 rounded-[4px] border-[#4b535f] bg-[#101820] px-4 text-xs font-black text-white hover:bg-[#303842]"
+              onClick={() => setCancelDialogOpen(false)}
+              type="button"
+              variant="outline"
+              disabled={isSubmitting}
+            >
+              Close
+            </Button>
+            <Button
+              className="h-9 rounded-[4px] bg-red-600 px-4 text-xs font-black text-white hover:bg-red-700"
+              disabled={isSubmitting}
+              onClick={() => {
+                if (application) {
+                  onDeleteApplication(application);
+                  setCancelDialogOpen(false);
+                }
+              }}
+              type="button"
+            >
+              {isSubmitting ? 'Cancelling...' : 'Confirm Cancel'}
             </Button>
           </DialogFooter>
         </DialogContent>

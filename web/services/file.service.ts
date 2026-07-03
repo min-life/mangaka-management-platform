@@ -136,6 +136,18 @@ export async function createFileComment(fileId: number | string, content: string
   return response.data;
 }
 
+export async function updateComment(commentId: number | string, content: string) {
+  const response = await api.patch<{ data: unknown }, { data: unknown }>(`/comments/${commentId}`, {
+    content,
+  });
+  return response.data;
+}
+
+export async function deleteComment(commentId: number | string) {
+  const response = await api.delete<{ data: unknown }, { data: unknown }>(`/comments/${commentId}`);
+  return response.data;
+}
+
 export type ActivityLogActor = {
   id: number;
   displayName: string | null;

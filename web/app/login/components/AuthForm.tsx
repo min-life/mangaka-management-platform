@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AxiosError } from 'axios';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 
@@ -65,6 +65,14 @@ export function AuthForm({
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<LoginErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+
+  useEffect(() => {
+    if (status === 'authenticated') {
+      setIsRedirecting(true);
+      router.replace(submitHref);
+    }
+  }, [status, router, submitHref]);
   const apiBaseUrl = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api').replace(
     /\/$/,
     '',
@@ -75,8 +83,7 @@ export function AuthForm({
       : searchParams.get('error') === 'oauth_failed'
         ? 'Unable to sign in with Google. Please try again.'
         : null;
-
-  const validate = () => {
+  const validate = () => {
     const nextErrors = validateLogin(email, password);
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -100,6 +107,7 @@ export function AuthForm({
 
       setAccessToken(response.accessToken);
       await refreshUser();
+      setIsRedirecting(true);
       router.push(submitHref);
     } catch (error) {
       const axiosError = error as AxiosError<{ message?: string }>;
@@ -111,7 +119,6 @@ export function AuthForm({
             ? 'Please verify your email before logging in.'
             : (message ?? 'Unable to sign in. Please check your email and password.'),
       });
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -124,6 +131,19 @@ export function AuthForm({
     .map((part) => part.charAt(0).toUpperCase())
     .join('');
 
+  if (status === 'loading' || status === 'authenticated' || isRedirecting) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#222831] text-white">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className="size-10 animate-spin text-[#FFD369]" />
+          <p className="text-sm font-bold tracking-wider text-[#aeb7c2]">
+            Loading Inkly workspace...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <section className={authPanelClassName}>
       <div className="mb-8">
@@ -135,60 +155,6 @@ export function AuthForm({
         <p className="text-sm leading-5 text-[#EEEEEE]">{description}</p>
       </div>
 
-      {status === 'loading' ? (
-        <div className="space-y-5">
-          <div className="h-12 animate-shimmer rounded-[4px] bg-[linear-gradient(110deg,#393E46_8%,#4A5260_18%,#393E46_33%)] bg-[length:200%_100%]" />
-          <div className="h-12 animate-shimmer rounded-[4px] bg-[linear-gradient(110deg,#393E46_8%,#4A5260_18%,#393E46_33%)] bg-[length:200%_100%]" />
-          <div className="h-14 animate-shimmer rounded-[4px] bg-[linear-gradient(110deg,#FFD36966_8%,#FFD369_18%,#FFD36966_33%)] bg-[length:200%_100%]" />
-        </div>
-      ) : null}
-
-      {status === 'authenticated' && user ? (
-        <div className="space-y-5">
-          <div className="rounded-[6px] border border-[#4A5260] bg-[#101820] p-4">
-            <p className="text-xs font-black uppercase tracking-[0.12em] text-[#FFD369]">
-              You&apos;re already signed in
-            </p>
-            <div className="mt-4 flex items-center gap-4">
-              {user.avatarUrl ? (
-                <img
-                  alt={displayName}
-                  className="size-12 rounded-full border border-[#FFD369] object-cover"
-                  src={user.avatarUrl}
-                />
-              ) : (
-                <span className="grid size-12 place-items-center rounded-full border border-[#FFD369] bg-[#0c1219] text-sm font-black text-[#FFD369]">
-                  {userInitials || 'I'}
-                </span>
-              )}
-              <div className="min-w-0">
-                <p className="truncate text-base font-black text-white">{displayName}</p>
-                <p className="mt-1 truncate text-sm font-semibold text-[#aeb7c2]">
-                  {user.email}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <Button
-            className={authPrimaryButtonClassName}
-            onClick={() => router.push('/studio')}
-            type="button"
-          >
-            Continue to Workspace
-          </Button>
-
-          <button
-            className="h-12 w-full rounded-[4px] border border-[#4A5260] text-xs font-black uppercase tracking-[0.12em] text-white hover:bg-[#393E46]"
-            onClick={() => void logout()}
-            type="button"
-          >
-            Sign out and use another account
-          </button>
-        </div>
-      ) : null}
-
-      {status !== 'loading' && status !== 'authenticated' ? (
       <form className="space-y-5" onSubmit={handleSubmit}>
         {fields.map((field) => (
           <div className="space-y-2" key={field.id}>
@@ -258,9 +224,7 @@ export function AuthForm({
 
         {showSocialLogin ? <SocialLogin /> : null}
       </form>
-      ) : null}
 
-      {status !== 'authenticated' && status !== 'loading' ? (
       <footer className="mt-10 text-center">
         <p className="text-xs font-medium text-[#EEEEEE]">
           {footerText}{' '}
@@ -269,7 +233,6 @@ export function AuthForm({
           </Link>
         </p>
       </footer>
-      ) : null}
     </section>
   );
 }

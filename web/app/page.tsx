@@ -255,12 +255,12 @@ function UserAvatar({ className = 'size-9' }: { className?: string }) {
     .map((part) => part.charAt(0).toUpperCase())
     .join('');
 
-  if (user?.avatarUrl) {
+  if (user?.avatarUrl && user.avatarUrl.trim() !== '') {
     return (
       <img
         alt={displayName}
         className={`${className} rounded-full border border-[#FFD369] object-cover`}
-        src={user.avatarUrl}
+        src={user.avatarUrl || undefined}
       />
     );
   }
