@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, FileUp, X, Ban, UserCircle } from 'lucide-react';
+import { Check, FileUp, X, UserCircle } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 
 import { Badge } from '@/components/ui/badge';
@@ -18,13 +18,18 @@ import { useAuth } from '@/hooks/useAuth';
 import {
   getApplicationVotes,
   voteApplication,
-  type ApplicationResponse,
   type ApplicationStatus,
   type ApplicationVoteResponse,
   type VoteDecision,
 } from '@/services/application.service';
 
-import { getStatusLabel, getStatusStyle } from './application-ui';
+import type { EditorBoardApplicationResponse } from './ApplicationsClient';
+import {
+  getApplicationTypeLabel,
+  getStatusLabel,
+  getStatusStyle,
+  isBoardReviewableStatus,
+} from './application-ui';
 
 type CommentItem = {
   id: number;
@@ -72,11 +77,11 @@ const MOCK_COMMENTS: CommentItem[] = [
 ];
 
 type ApplicationReviewDrawerProps = {
-  application: ApplicationResponse | null;
+  application: EditorBoardApplicationResponse | null;
   isSubmitting: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdateStatus: (
-    application: ApplicationResponse,
+    application: EditorBoardApplicationResponse,
     status: ApplicationStatus,
   ) => void;
 };
@@ -91,11 +96,44 @@ function formatFileSize(bytes?: number) {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function readUploadedFiles(materials: any) {
-  if (!materials || !materials.uploadedFiles || !Array.isArray(materials.uploadedFiles)) {
+type UploadedApplicationFile = {
+  name: string;
+  mimeType?: string;
+  sizeBytes?: number;
+  type?: string;
+  url?: string;
+};
+
+function readUploadedFiles(materials: unknown) {
+  if (Array.isArray(materials)) {
+    return materials.map((material) => {
+      const item = material as {
+        mimeType?: string;
+        originalName?: string;
+        size?: number;
+        type?: string;
+        url?: string;
+      };
+
+      return {
+        mimeType: item.mimeType,
+        name: item.originalName ?? item.url ?? 'Uploaded material',
+        sizeBytes: item.size,
+        type: item.type,
+        url: item.url,
+      } satisfies UploadedApplicationFile;
+    });
+  }
+
+  if (
+    !materials ||
+    typeof materials !== 'object' ||
+    !('uploadedFiles' in materials) ||
+    !Array.isArray(materials.uploadedFiles)
+  ) {
     return [];
   }
+
   return materials.uploadedFiles as Array<{
     name: string;
     mimeType: string;
@@ -115,6 +153,7 @@ export function ApplicationReviewDrawer({
   const [votes, setVotes] = useState<ApplicationVoteResponse[]>([]);
   const [isLoadingVotes, setIsLoadingVotes] = useState(false);
   const [isVoting, setIsVoting] = useState(false);
+  const [voteError, setVoteError] = useState<string | null>(null);
   const [voteComment, setVoteComment] = useState('');
   
   const [comments, setComments] = useState<CommentItem[]>(MOCK_COMMENTS);
@@ -170,8 +209,8 @@ export function ApplicationReviewDrawer({
     try {
       const data = await getApplicationVotes(id);
       setVotes(data);
-    } catch (e) {
-      console.error(e);
+    } catch {
+      setVotes([]);
     } finally {
       setIsLoadingVotes(false);
     }
@@ -187,12 +226,13 @@ export function ApplicationReviewDrawer({
   const handleVote = async (decision: VoteDecision) => {
     if (!application) return;
     setIsVoting(true);
+    setVoteError(null);
     try {
       await voteApplication(application.id, { decision, comment: voteComment });
       await loadVotes(application.id);
       setVoteComment('');
-    } catch (e) {
-      console.error(e);
+    } catch {
+      setVoteError('Unable to submit your vote.');
     } finally {
       setIsVoting(false);
     }
@@ -210,9 +250,8 @@ export function ApplicationReviewDrawer({
     application?.verifiedByUser?.email ??
     (application?.verifyBy ? `User #${application.verifyBy}` : null);
 
-  // We consider that the user viewing this page is an owner or lead who can approve.
-  // The actual check is enforced by the backend endpoint.
   const canApprove = true;
+  const isReviewable = application ? isBoardReviewableStatus(application.status) : false;
 
   const approveVotesCount = votes.filter(v => v.decision === 'APPROVE').length;
   const rejectVotesCount = votes.filter(v => v.decision === 'REJECT').length;
@@ -224,6 +263,7 @@ export function ApplicationReviewDrawer({
       onOpenChange(open);
       if (!open) {
         setVotes([]);
+        setVoteError(null);
         setVoteComment('');
         setComments(MOCK_COMMENTS);
         setNewComment('');
@@ -291,10 +331,19 @@ export function ApplicationReviewDrawer({
                     Reviewed By
                   </p>
                   <p className="mt-3 truncate text-sm font-black text-white">
-                    {reviewedBy ?? (application.status === 'PENDING' ? 'Not reviewed yet' : 'Unknown reviewer')}
+                    {reviewedBy ?? (isReviewable ? 'Not reviewed yet' : 'Unknown reviewer')}
                   </p>
                 </article>
               </div>
+
+              <section className="mt-4 rounded-[4px] border border-[#303842] bg-[#151c25] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8b94a1]">
+                  Request Type
+                </p>
+                <p className="mt-3 text-sm font-black text-white">
+                  {getApplicationTypeLabel(application.type)}
+                </p>
+              </section>
 
               <section className="mt-4 rounded-[4px] border border-[#303842] bg-[#151c25] p-4">
                 <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8b94a1]">
@@ -345,7 +394,7 @@ export function ApplicationReviewDrawer({
                       </p>
                     </div>
                   </div>
-                  {application.status === 'PENDING' ? (
+                  {isReviewable ? (
                     <div className="flex gap-3">
                       <span className="mt-1 size-2 rounded-full bg-[#4b535f]" />
                       <div>
@@ -419,9 +468,12 @@ export function ApplicationReviewDrawer({
                   )}
                 </div>
 
-                {application.status === 'PENDING' ? (
+                {isReviewable ? (
                   <div className="mt-4 border-t border-[#303842] pt-4">
                     <p className="mb-2 text-xs font-black text-white">{hasVoted ? 'Update Your Vote' : 'Your Vote'}</p>
+                    {voteError ? (
+                      <p className="mb-2 text-[11px] font-bold text-[#ff9ab3]">{voteError}</p>
+                    ) : null}
                     <Textarea 
                       placeholder="Add an optional comment..."
                       className="min-h-16 resize-none border-[#303842] bg-[#101820] text-xs font-medium text-white placeholder:text-[#4b535f] focus-visible:ring-[#FFD369]"
@@ -521,12 +573,12 @@ export function ApplicationReviewDrawer({
                 </div>
               </section>
 
-              {canApprove && application.status === 'PENDING' ? (
+              {canApprove && isReviewable ? (
                 <section className="mt-4 rounded-[4px] border border-[#303842] bg-[#151c25] p-4">
                   <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8b94a1]">
                     Review Actions
                   </p>
-                  <div className="mt-3 grid grid-cols-3 gap-3">
+                  <div className="mt-3 grid grid-cols-2 gap-3">
                     <Button
                       className="h-10 rounded-[4px] border-[#6b2637] bg-[#371522] px-4 text-xs font-black text-[#ff9ab3] hover:bg-[#4a1d2c]"
                       disabled={isSubmitting}
@@ -536,16 +588,6 @@ export function ApplicationReviewDrawer({
                     >
                       <X className="mr-1.5 size-4" />
                       Reject
-                    </Button>
-                    <Button
-                      className="h-10 rounded-[4px] border-[#4a4f55] bg-[#20282b] px-4 text-xs font-black text-[#dce7f3] hover:bg-[#2b3539]"
-                      disabled={isSubmitting}
-                      onClick={() => onUpdateStatus(application, 'CANCELLED')}
-                      type="button"
-                      variant="outline"
-                    >
-                      <Ban className="mr-1.5 size-4" />
-                      Cancel
                     </Button>
                     <Button
                       className="h-10 rounded-[4px] bg-[#FFD369] px-4 text-xs font-black text-[#222831] hover:bg-[#eac04f]"

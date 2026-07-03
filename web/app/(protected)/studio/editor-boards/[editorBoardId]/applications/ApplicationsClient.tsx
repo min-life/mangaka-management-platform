@@ -1,10 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Rocket, Search } from 'lucide-react';
+import { BookOpen, FileText, FolderPlus, Search, Send, type LucideIcon } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import api from '@/lib/api';
 import {
   type ApplicationResponse,
   type ApplicationStatus,
@@ -13,28 +14,80 @@ import {
 import { getEditorBoardApplications } from '@/services/editor-board.service';
 
 import { ApplicationReviewDrawer } from './ApplicationReviewDrawer';
-import { getStatusLabel, getStatusStyle } from './application-ui';
+import {
+  getApplicationTypeLabel,
+  getStatusLabel,
+  getStatusStyle,
+  isBoardReviewableStatus,
+} from './application-ui';
 
 type ApplicationsClientProps = {
   editorBoardId: number;
 };
 
+export type EditorBoardApplicationStatus =
+  | ApplicationStatus
+  | 'INTERNAL_APPROVED'
+  | 'SUBMITTED';
+
+export type EditorBoardApplicationType =
+  | 'CREATE_ARC'
+  | 'CREATE_CHAPTER'
+  | 'MANUSCRIPT_REVIEW'
+  | 'PUBLISH_REQUEST';
+
+export type EditorBoardApplicationResponse = Omit<ApplicationResponse, 'status' | 'type'> & {
+  parentFolderId?: number | null;
+  folderImageUrl?: string | null;
+  status: EditorBoardApplicationStatus;
+  type: EditorBoardApplicationType;
+};
+
+const STATUS_FILTERS = [
+  'ALL',
+  'SUBMITTED',
+  'INTERNAL_APPROVED',
+  'APPROVE',
+  'REJECT',
+] as const;
+
+const APPLICATION_TYPE_ICONS: Record<EditorBoardApplicationType, LucideIcon> = {
+  CREATE_ARC: FolderPlus,
+  CREATE_CHAPTER: BookOpen,
+  MANUSCRIPT_REVIEW: FileText,
+  PUBLISH_REQUEST: Send,
+};
+
+type ApplicationDetailResponse = {
+  data?: EditorBoardApplicationResponse;
+};
+
+async function getApplicationDetails(applicationId: number | string) {
+  const response = await api.get<ApplicationDetailResponse, ApplicationDetailResponse>(
+    `/applications/${applicationId}`,
+  );
+
+  return response.data ?? (response as EditorBoardApplicationResponse);
+}
+
 // PhucTD #editor-board start
 export function ApplicationsClient({ editorBoardId }: ApplicationsClientProps) {
-  const [applications, setApplications] = useState<ApplicationResponse[]>([]);
+  const [applications, setApplications] = useState<EditorBoardApplicationResponse[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedApplication, setSelectedApplication] = useState<ApplicationResponse | null>(null);
+  const [selectedApplication, setSelectedApplication] =
+    useState<EditorBoardApplicationResponse | null>(null);
 
   const loadApplications = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const response = await getEditorBoardApplications(editorBoardId);
+      const response =
+        await getEditorBoardApplications<EditorBoardApplicationResponse>(editorBoardId);
       setApplications(response.applications);
     } catch {
       setError('Unable to load applications.');
@@ -65,12 +118,12 @@ export function ApplicationsClient({ editorBoardId }: ApplicationsClientProps) {
     });
   }, [applications, searchQuery, statusFilter]);
 
-  const pendingCount = applications.filter((app) => app.status === 'PENDING').length;
+  const pendingCount = applications.filter((app) => isBoardReviewableStatus(app.status)).length;
   const approvedCount = applications.filter((app) => app.status === 'APPROVE').length;
   const rejectedCount = applications.filter((app) => app.status === 'REJECT').length;
 
   const handleUpdateStatus = async (
-    application: ApplicationResponse,
+    application: EditorBoardApplicationResponse,
     status: ApplicationStatus,
   ) => {
     setIsSubmitting(true);
@@ -91,13 +144,24 @@ export function ApplicationsClient({ editorBoardId }: ApplicationsClientProps) {
     }
   };
 
+  const handleOpenApplication = async (application: EditorBoardApplicationResponse) => {
+    setSelectedApplication(application);
+
+    try {
+      const details = await getApplicationDetails(application.id);
+      setSelectedApplication((current) => (current?.id === application.id ? details : current));
+    } catch {
+      setSelectedApplication((current) => current ?? application);
+    }
+  };
+
   return (
     <section className="px-5 py-6">
       <div className="flex items-end justify-between">
         <div>
           <h1 className="text-[24px] font-black leading-8 text-white">Publication Reviews</h1>
           <p className="mt-1 text-sm font-medium text-[#aeb7c2]">
-            Review and approve publish requests from your projects
+            Review submitted publish, arc, and chapter requests from your projects
           </p>
         </div>
       </div>
@@ -111,21 +175,21 @@ export function ApplicationsClient({ editorBoardId }: ApplicationsClientProps) {
       <div className="mt-5 grid grid-cols-3 gap-4">
         <article className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-4">
           <p className="text-xs font-black uppercase tracking-[0.08em] text-[#aeb7c2]">
-            Pending Review
+            Board Queue
           </p>
           <p className="mt-3 text-2xl font-black text-white">{pendingCount}</p>
           <p className="mt-1 text-[11px] font-bold text-[#FFD369]">Need attention</p>
         </article>
         <article className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-4">
           <p className="text-xs font-black uppercase tracking-[0.08em] text-[#aeb7c2]">
-            Approved Requests
+            Approved
           </p>
           <p className="mt-3 text-2xl font-black text-white">{approvedCount}</p>
           <p className="mt-1 text-[11px] font-bold text-[#9df2c7]">Cleared for production</p>
         </article>
         <article className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-4">
           <p className="text-xs font-black uppercase tracking-[0.08em] text-[#aeb7c2]">
-            Rejected Requests
+            Rejected
           </p>
           <p className="mt-3 text-2xl font-black text-white">{rejectedCount}</p>
           <p className="mt-1 text-[11px] font-bold text-[#ff9ab3]">Needs revision</p>
@@ -145,7 +209,7 @@ export function ApplicationsClient({ editorBoardId }: ApplicationsClientProps) {
       </div>
 
       <div className="mt-4 flex h-10 items-center gap-2 border-b border-[#26303b]">
-        {(['ALL', 'PENDING', 'APPROVE', 'REJECT', 'CANCELLED'] as const).map((status) => (
+        {STATUS_FILTERS.map((status) => (
           <button
             className={`relative h-full px-2 text-xs font-black ${
               statusFilter === status ? 'text-[#FFD369]' : 'text-[#aeb7c2] hover:text-white'
@@ -168,47 +232,58 @@ export function ApplicationsClient({ editorBoardId }: ApplicationsClientProps) {
             Loading applications...
           </article>
         ) : filteredApplications.length ? (
-          filteredApplications.map((application) => (
-            <article
-              className="rounded-[5px] border border-[#39424f] bg-[#101820] px-5 py-4 transition-colors hover:border-[#FFD369]/60 hover:bg-[#17202b]"
-              key={application.id}
-            >
-              <div className="flex items-start justify-between gap-5">
-                <div className="flex min-w-0 gap-4">
-                  <span className="grid size-11 shrink-0 place-items-center rounded-[4px] border border-[#39424f] bg-[#202832] text-[#FFD369]">
-                    <Rocket className="size-5" />
-                  </span>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <h2 className="text-base font-black leading-6 text-white">
-                        {application.title}
-                      </h2>
-                      <Badge
-                        className={`h-7 rounded-full border px-3 text-[11px] font-bold ${getStatusStyle(application.status)}`}
-                        variant="outline"
-                      >
-                        {getStatusLabel(application.status)}
-                      </Badge>
+          filteredApplications.map((application) => {
+            const ApplicationTypeIcon = APPLICATION_TYPE_ICONS[application.type] ?? FileText;
+
+            return (
+              <article
+                className="rounded-[5px] border border-[#39424f] bg-[#101820] px-5 py-4 transition-colors hover:border-[#FFD369]/60 hover:bg-[#17202b]"
+                key={application.id}
+              >
+                <div className="flex items-start justify-between gap-5">
+                  <div className="flex min-w-0 gap-4">
+                    <span className="grid size-11 shrink-0 place-items-center rounded-[4px] border border-[#39424f] bg-[#202832] text-[#FFD369]">
+                      <ApplicationTypeIcon className="size-5" />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <h2 className="text-base font-black leading-6 text-white">
+                          {application.title}
+                        </h2>
+                        <Badge
+                          className="h-7 rounded-full border border-[#39424f] bg-[#1a222d] px-3 text-[11px] font-bold text-[#dce7f3]"
+                          variant="outline"
+                        >
+                          {getApplicationTypeLabel(application.type)}
+                        </Badge>
+                        <Badge
+                          className={`h-7 rounded-full border px-3 text-[11px] font-bold ${getStatusStyle(application.status)}`}
+                          variant="outline"
+                        >
+                          {getStatusLabel(application.status)}
+                        </Badge>
+                      </div>
+                      <p className="mt-1 text-xs font-bold text-[#aeb7c2]">
+                        {application.project?.name} - By{' '}
+                        {application.createdByUser?.displayName || 'Unknown'} -{' '}
+                        {new Date(application.createdAt).toLocaleDateString()}
+                      </p>
+                      <p className="mt-2 line-clamp-2 text-sm font-medium text-[#dce7f3]">
+                        {application.description ?? 'No description provided.'}
+                      </p>
                     </div>
-                    <p className="mt-1 text-xs font-bold text-[#aeb7c2]">
-                      {application.project?.name} - By {application.createdByUser?.displayName || 'Unknown'} -{' '}
-                      {new Date(application.createdAt).toLocaleDateString()}
-                    </p>
-                    <p className="mt-2 line-clamp-2 text-sm font-medium text-[#dce7f3]">
-                      {application.description ?? 'No description provided.'}
-                    </p>
                   </div>
+                  <Button
+                    className="h-9 shrink-0 rounded-[4px] border-[#4b535f] bg-[#101820] px-4 text-xs font-black text-white hover:bg-[#303842]"
+                    onClick={() => void handleOpenApplication(application)}
+                    variant="outline"
+                  >
+                    Review
+                  </Button>
                 </div>
-                <Button
-                  className="h-9 shrink-0 rounded-[4px] border-[#4b535f] bg-[#101820] px-4 text-xs font-black text-white hover:bg-[#303842]"
-                  onClick={() => setSelectedApplication(application)}
-                  variant="outline"
-                >
-                  Review
-                </Button>
-              </div>
-            </article>
-          ))
+              </article>
+            );
+          })
         ) : (
           <article className="rounded-[5px] border border-[#39424f] bg-[#101820] px-5 py-5 text-xs font-bold text-[#aeb7c2]">
             No applications found.
