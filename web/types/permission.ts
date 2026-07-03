@@ -26,6 +26,7 @@ export type PermissionName =
   | 'project:frame.update'
   | 'project:material.create'
   | 'project:material.delete'
+  | 'project:material.restore'
   | 'project:material.update'
   | 'project:member.add'
   | 'project:member.read'

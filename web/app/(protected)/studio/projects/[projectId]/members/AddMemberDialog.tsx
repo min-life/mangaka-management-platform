@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AxiosError } from 'axios';
 import { Plus, Search, UserPlus, X } from 'lucide-react';
+import { toast } from '@/lib/toast';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -56,7 +57,6 @@ export function AddMemberDialog({ onAdded, projectId, roles }: AddMemberDialogPr
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const defaultRoleId = roles.find((role) => role.isDefault)?.id ?? roles[0]?.id;
   const selectedRoleId = roleId || (defaultRoleId ? String(defaultRoleId) : '');
 
@@ -107,7 +107,6 @@ export function AddMemberDialog({ onAdded, projectId, roles }: AddMemberDialogPr
     setSearchQuery('');
     setRoleId('');
     setError(null);
-    setSuccessMessage(null);
   };
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -127,19 +126,21 @@ export function AddMemberDialog({ onAdded, projectId, roles }: AddMemberDialogPr
 
     setIsSubmitting(true);
     setError(null);
-    setSuccessMessage(null);
 
     try {
       await addProjectMembers(projectId, {
         roleId: Number(selectedRoleId),
         userIds,
       });
-      setSuccessMessage(`Added ${userIds.length} member${userIds.length > 1 ? 's' : ''}.`);
+      toast.success('Member invited.');
       setSelectedUsers([]);
       setSearchQuery('');
       onAdded?.();
+      setOpen(false);
     } catch (submitError) {
-      setError(getErrorMessage(submitError));
+      const errMsg = getErrorMessage(submitError);
+      setError(errMsg);
+      toast.error(errMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -189,7 +190,17 @@ export function AddMemberDialog({ onAdded, projectId, roles }: AddMemberDialogPr
 
                 <div className="h-[292px] overflow-y-auto rounded-[4px] border border-[#39424f] bg-[#101820] p-1">
                   {isLoadingUsers ? (
-                    <p className="px-3 py-3 text-xs font-bold text-[#8b94a1]">Loading users...</p>
+                    <div className="space-y-1 px-2 py-2">
+                      {Array.from({ length: 5 }).map((_, index) => (
+                        <div className="flex items-center gap-3 rounded-[3px] px-1 py-2.5" key={index}>
+                          <div className="size-8 animate-pulse rounded-full bg-[#1f2937]" />
+                          <div className="min-w-0 flex-1 space-y-2">
+                            <div className="h-3 w-32 animate-pulse rounded-[4px] bg-[#1f2937]" />
+                            <div className="h-3 w-44 animate-pulse rounded-[4px] bg-[#1f2937]" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   ) : filteredUsers.length ? (
                     filteredUsers.map((user) => (
                       <button
@@ -316,9 +327,6 @@ export function AddMemberDialog({ onAdded, projectId, roles }: AddMemberDialogPr
               </div>
 
               {error ? <p className="md:col-span-2 text-xs font-bold text-red-300">{error}</p> : null}
-              {successMessage ? (
-                <p className="md:col-span-2 text-xs font-bold text-[#9df2c7]">{successMessage}</p>
-              ) : null}
             </div>
           </div>
 

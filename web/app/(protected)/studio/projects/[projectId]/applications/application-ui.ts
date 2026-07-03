@@ -8,6 +8,8 @@ export type UploadedMaterialFile = {
 };
 
 export const applicationTypeLabels: Record<ApplicationType, string> = {
+  CREATE_ARC: 'Create Story Arc',
+  CREATE_CHAPTER: 'Create Chapter',
   MANUSCRIPT_REVIEW: 'Manuscript Review',
   PUBLISH_REQUEST: 'Publish Request',
 };
@@ -15,8 +17,10 @@ export const applicationTypeLabels: Record<ApplicationType, string> = {
 export const applicationStatusClassName: Record<ApplicationStatus, string> = {
   APPROVE: 'border-[#315846] bg-[#14291f] text-[#9df2c7]',
   CANCELLED: 'border-[#4a4f55] bg-[#20282b] text-[#dce7f3]',
+  INTERNAL_APPROVED: 'border-[#365984] bg-[#132236] text-[#9cc9ff]',
   PENDING: 'border-[#6c5516] bg-[#30270d] text-[#ffd35b]',
   REJECT: 'border-[#6b2637] bg-[#371522] text-[#ff9ab3]',
+  SUBMITTED: 'border-[#725621] bg-[#2d220f] text-[#ffd369]',
 };
 
 export function formatDate(value: string) {
@@ -46,12 +50,49 @@ export function formatStatus(status: ApplicationStatus) {
     return 'Cancelled';
   }
 
+  if (status === 'INTERNAL_APPROVED') {
+    return 'Project Approved';
+  }
+
+  if (status === 'SUBMITTED') {
+    return 'Submitted';
+  }
+
   return 'Pending';
 }
 
 export function readUploadedFiles(materials: unknown): UploadedMaterialFile[] {
   if (!materials || typeof materials !== 'object') {
     return [];
+  }
+
+  if (Array.isArray(materials)) {
+    return materials.map((material) => {
+      if (!material || typeof material !== 'object') {
+        return { name: 'Attached material' };
+      }
+
+      const name =
+        'originalName' in material && typeof material.originalName === 'string'
+          ? material.originalName
+          : 'name' in material && typeof material.name === 'string'
+            ? material.name
+            : 'Attached material';
+
+      return {
+        mimeType:
+          'mimeType' in material && typeof material.mimeType === 'string'
+            ? material.mimeType
+            : undefined,
+        name,
+        sizeBytes:
+          'size' in material && typeof material.size === 'number'
+            ? material.size
+            : 'sizeBytes' in material && typeof material.sizeBytes === 'number'
+              ? material.sizeBytes
+              : undefined,
+      };
+    });
   }
 
   if ('uploadedFiles' in materials && Array.isArray(materials.uploadedFiles)) {

@@ -14,7 +14,7 @@ import {
   Upload,
   UserPlus,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
@@ -31,7 +31,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Toaster } from '@/components/ui/sonner';
 import { usePlatformLanguage, type PlatformLanguage } from '@/contexts/language-context';
 import { useRealtimeNotifications } from '@/hooks/use-realtime-notifications';
 import { clearAccessToken, getAccessToken } from '@/lib/auth-storage';
@@ -703,7 +702,6 @@ export function UserProfilePage() {
       )}
       style={themeStyle}
     >
-      <Toaster position="top-right" />
       <EditProfileDialog
         isSubmitting={isProfileSubmitting}
         open={isEditProfileOpen}

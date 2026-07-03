@@ -92,7 +92,7 @@ export default function ResourceFolderDetailScreen({
 
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: 112 }}
         showsVerticalScrollIndicator={false}
       >
         <ResourceFolderDetailHero folder={folder} />

@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AxiosError } from 'axios';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 
+import { useAuth } from '@/hooks/useAuth';
 import { setAccessToken } from '@/lib/auth-storage';
 import { validateLogin, type LoginErrors } from '@/lib/validators/auth';
 import { login } from '@/services/auth.service';
@@ -58,11 +59,20 @@ export function AuthForm({
 }: AuthFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { logout, refreshUser, status, user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<LoginErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+
+  useEffect(() => {
+    if (status === 'authenticated') {
+      setIsRedirecting(true);
+      router.replace(submitHref);
+    }
+  }, [status, router, submitHref]);
   const apiBaseUrl = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api').replace(
     /\/$/,
     '',
@@ -73,8 +83,7 @@ export function AuthForm({
       : searchParams.get('error') === 'oauth_failed'
         ? 'Unable to sign in with Google. Please try again.'
         : null;
-
-  const validate = () => {
+  const validate = () => {
     const nextErrors = validateLogin(email, password);
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -97,6 +106,8 @@ export function AuthForm({
       });
 
       setAccessToken(response.accessToken);
+      await refreshUser();
+      setIsRedirecting(true);
       router.push(submitHref);
     } catch (error) {
       const axiosError = error as AxiosError<{ message?: string }>;
@@ -108,10 +119,30 @@ export function AuthForm({
             ? 'Please verify your email before logging in.'
             : (message ?? 'Unable to sign in. Please check your email and password.'),
       });
-    } finally {
       setIsSubmitting(false);
     }
   };
+
+  const displayName = user?.displayName?.trim() || user?.email || 'Inkly user';
+  const userInitials = displayName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('');
+
+  if (status === 'loading' || status === 'authenticated' || isRedirecting) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#222831] text-white">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className="size-10 animate-spin text-[#FFD369]" />
+          <p className="text-sm font-bold tracking-wider text-[#aeb7c2]">
+            Loading Inkly workspace...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <section className={authPanelClassName}>

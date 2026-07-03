@@ -3,6 +3,7 @@ import { ScrollView, Text, TextInput, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import ApiStateView from '@/src/components/shared/ApiStateView';
+import AppRefreshControl from '@/src/components/shared/AppRefreshControl';
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
 import { RootStackParamList } from '@/src/navigation/types';
@@ -58,10 +59,13 @@ export default function ApplicationsScreen({ navigation, route }: ApplicationsSc
   const [applications, setApplications] = useState<ApplicationItem[]>([]);
   const [projectName, setProjectName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const loadApplications = useCallback(async () => {
-    setIsLoading(true);
+  const loadApplications = useCallback(async (options: { showLoading?: boolean } = {}) => {
+    const showLoading = options.showLoading ?? true;
+    if (showLoading) setIsLoading(true);
+    else setIsRefreshing(true);
     setErrorMessage('');
 
     try {
@@ -80,6 +84,7 @@ export default function ApplicationsScreen({ navigation, route }: ApplicationsSc
       setErrorMessage(error instanceof Error ? error.message : 'Không thể tải applications.');
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   }, [projectId, search, statusFilter, typeFilter]);
 
@@ -89,6 +94,10 @@ export default function ApplicationsScreen({ navigation, route }: ApplicationsSc
     }, 250);
 
     return () => clearTimeout(timeout);
+  }, [loadApplications]);
+
+  const handleRefresh = useCallback(() => {
+    void loadApplications({ showLoading: false });
   }, [loadApplications]);
 
   return (
@@ -102,6 +111,9 @@ export default function ApplicationsScreen({ navigation, route }: ApplicationsSc
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 40 }}
+        // refreshControl={
+        //   <AppRefreshControl onRefresh={handleRefresh} refreshing={isRefreshing} />
+        // }
         showsVerticalScrollIndicator={false}
       >
         <View className="px-4 pt-4" style={{ zIndex: 20 }}>

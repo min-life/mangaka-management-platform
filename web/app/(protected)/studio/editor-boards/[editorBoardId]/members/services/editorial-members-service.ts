@@ -123,7 +123,8 @@ async function getMemberWorkloads(editorBoardId: number | string) {
 
           workloads.set(member.id, {
             activeProjects: current.activeProjects + 1,
-            reviewLoad: current.reviewLoad + (member.taskOverview?.review ?? member.numberOfTasks ?? 0),
+            reviewLoad:
+              current.reviewLoad + (member.taskOverview?.review ?? member.numberOfTasks ?? 0),
           });
         });
       }),
@@ -146,7 +147,9 @@ export async function getEditorialMembers(editorBoardId: number | string) {
 
     const workloads = await getMemberWorkloads(editorBoardId);
 
-    return result.members.map((member) => mapBoardMember(member, editorBoardId, workloads.get(member.id)));
+    return result.members.map((member) =>
+      mapBoardMember(member, editorBoardId, workloads.get(member.id)),
+    );
   } catch {
     return [];
   }
@@ -185,10 +188,7 @@ function formatActionTitle(action: ActivityLogResponse['action']) {
 }
 
 function getActivityDescription(activity: ActivityLogResponse) {
-  const entityLabel = activity.entityType
-    .toLowerCase()
-    .split('_')
-    .join(' ');
+  const entityLabel = activity.entityType.toLowerCase().split('_').join(' ');
 
   return `${formatActionTitle(activity.action)} on ${entityLabel} #${activity.entityId}.`;
 }

@@ -8,6 +8,7 @@ interface ProfileHeaderCardProps {
   email?: string;
   name?: string | null;
   onSettingsPress?: () => void;
+  roleLabel?: string;
 }
 
 /**
@@ -18,6 +19,7 @@ export default function ProfileHeaderCard({
   email,
   name,
   onSettingsPress,
+  roleLabel,
 }: ProfileHeaderCardProps) {
   const displayName = name || 'Current user';
   const displayEmail = email || 'No email';
@@ -73,7 +75,7 @@ export default function ProfileHeaderCard({
               style={{ backgroundColor: Colors.surfaceContainer }}
             >
               <Text className="text-[11px] font-medium" style={{ color: Colors.text }}>
-                Viewer
+                {roleLabel || 'Viewer'}
               </Text>
             </View>
             <View className="flex-row items-center gap-1">

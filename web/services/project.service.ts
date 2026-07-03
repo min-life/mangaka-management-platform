@@ -24,6 +24,7 @@ export type UpdateProjectMemberPayload = {
 
 export type CreateProjectFolderPayload = {
   description?: string;
+  imageUrl?: string;
   parentId?: number;
   title: string;
 };
@@ -124,25 +125,40 @@ export type ProjectStatResponse = {
 
 export type ProjectFolderResponse = {
   createdAt: string;
-  createdBy: number | null;
+  createdBy?: number | null;
+  createdByUser?: UserSummaryResponse | null;
   description: string | null;
   id: number;
-  parentId: number | null;
-  projectId: number;
+  imageUrl?: string | null;
+  parent?: {
+    description?: string | null;
+    id: number;
+    imageUrl?: string | null;
+    title: string;
+  } | null;
+  parentId?: number | null;
+  projectId?: number;
   title: string;
   updatedAt: string;
-  updatedBy: number | null;
+  updatedBy?: number | null;
+  updatedByUser?: UserSummaryResponse | null;
 };
 
 export type ProjectFileResponse = {
   createdAt: string;
-  createdBy: number | null;
+  createdBy?: number | null;
+  createdByUser?: UserSummaryResponse | null;
   description: string | null;
-  folderId: number;
+  folder?: {
+    id: number;
+    title: string;
+  } | null;
+  folderId?: number;
   id: number;
   title: string;
   updatedAt: string;
-  updatedBy: number | null;
+  updatedBy?: number | null;
+  updatedByUser?: UserSummaryResponse | null;
 };
 
 type ApiResponse<T> = {
@@ -327,13 +343,27 @@ export async function removeProjectMember(projectId: number, userId: number) {
   await api.delete(`/projects/${projectId}/members/${userId}`);
 }
 
-export async function getProjectFolders(projectId: number | string) {
+export async function getProjectFolders(
+  projectId: number | string,
+  options?: {
+    limit?: number;
+    page?: number;
+    parentId?: number;
+    search?: string;
+    type?: 'ARC' | 'CHAPTER';
+  },
+) {
   const response = await api.get<ProjectFoldersResponse, ProjectFoldersResponse>(
     `/projects/${projectId}/folders`,
     {
       params: {
         field: 'createdAt',
+        limit: options?.limit ?? 100,
         order: 'desc',
+        ...(options?.page ? { page: options.page } : {}),
+        ...(options?.parentId ? { parentId: options.parentId } : {}),
+        ...(options?.search ? { search: options.search } : {}),
+        ...(options?.type ? { type: options.type } : {}),
       },
     },
   );
@@ -350,6 +380,7 @@ export async function getFolderFiles(folderId: number | string) {
     {
       params: {
         field: 'createdAt',
+        limit: 100,
         order: 'desc',
       },
     },
@@ -359,6 +390,21 @@ export async function getFolderFiles(folderId: number | string) {
     files: response.data ?? [],
     pagination: response.pagination,
   };
+}
+
+export async function createFolderFile(
+  folderId: number | string,
+  payload: {
+    description?: string;
+    title: string;
+  },
+) {
+  const response = await api.post<ApiResponse<ProjectFileResponse>, ApiResponse<ProjectFileResponse>>(
+    `/folders/${folderId}/files`,
+    payload,
+  );
+
+  return response.data ?? (response as ProjectFileResponse);
 }
 
 export async function createProjectFolder(

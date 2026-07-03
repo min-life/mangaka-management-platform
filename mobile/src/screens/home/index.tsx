@@ -3,6 +3,7 @@ import { Animated, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
 import ApiStateView from '@/src/components/shared/ApiStateView';
+import AppRefreshControl from '@/src/components/shared/AppRefreshControl';
 import { RootStackNavProp } from '@/src/navigation/types';
 import { Colors } from '@/src/constants/colors';
 import BottomNavBar from '@/src/components/shared/BottomNavBar';
@@ -19,10 +20,13 @@ export default function HomeScreen() {
   const [workItems, setWorkItems] = useState<WorkItem[]>([]);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const loadHome = useCallback(async () => {
-    setIsLoading(true);
+  const loadHome = useCallback(async (options: { showLoading?: boolean } = {}) => {
+    const showLoading = options.showLoading ?? true;
+    if (showLoading) setIsLoading(true);
+    else setIsRefreshing(true);
     setErrorMessage('');
 
     try {
@@ -33,11 +37,16 @@ export default function HomeScreen() {
       setErrorMessage(error instanceof Error ? error.message : 'Không thể tải Home.');
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
     void loadHome();
+  }, [loadHome]);
+
+  const handleRefresh = useCallback(() => {
+    void loadHome({ showLoading: false });
   }, [loadHome]);
 
   const headerBg = scrollY.interpolate({
@@ -52,13 +61,16 @@ export default function HomeScreen() {
 
       <Animated.ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: false },
-        )}
+        contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 16, paddingBottom: 112 }}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+          useNativeDriver: false,
+        })}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
+        // style={{ flex: 1 }}
+        // refreshControl={
+        //   <AppRefreshControl onRefresh={handleRefresh} refreshing={isRefreshing} />
+        // }
       >
         <HomeSectionTitle />
         {isLoading ? (
@@ -79,10 +91,7 @@ export default function HomeScreen() {
         )}
       </Animated.ScrollView>
 
-      <BottomNavBar
-        activeTab="home"
-        avatarUri="https://lh3.googleusercontent.com/aida-public/AB6AXuBvoZtwFybJZ9npCO41F6kO9bybsgqsNHyXJ2HW0hWsX9BSoeoMW65x6pH5JnYX_gQ1pZthmnVoQKkggIT8YoenvD235m0gTXlwjJYTB6EmUhqmXPelUkJQg6S4pHLTDtqDVtHmBIvPnU1lhUq-AyMvKO3opDCerwY85EIRqkDxaLCWiDJ_rxc3zQ6GCrTJWsCAmXjZfZDNI_tkghRo9fMzNNzl6rta9Z6fGbgxrYzVkcPzdefaqdaueVxSehW6S7q4LezAoU1vYqq9"
-      />
+      <BottomNavBar activeTab="home" />
     </View>
   );
 }

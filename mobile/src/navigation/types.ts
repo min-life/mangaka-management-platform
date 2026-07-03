@@ -13,7 +13,7 @@ export type RootStackParamList = {
   ProjectContributors: { projectId: string };
   ProjectReport: { projectId: string };
   Applications: { projectId?: string } | undefined;
-  ApplicationDetail: { projectId: string; applicationId: string };
+  ApplicationDetail: { projectId?: string; applicationId: string };
   EditorBoards: undefined;
   EditorBoardDetail: { boardId: string };
   EditorBoardProjects: { boardId: string };
@@ -24,7 +24,7 @@ export type RootStackParamList = {
   ResourceFile: {
     projectId: string;
     fileId: string;
-    parentFolderId: string;
+    parentFolderId?: string;
     initialTab?: 'Overview' | 'Tasks' | 'Discussion' | 'Materials';
   };
   TaskDetail: { taskId: string } | undefined;

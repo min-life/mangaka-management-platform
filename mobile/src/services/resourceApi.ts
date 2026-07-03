@@ -32,14 +32,50 @@ export interface ProjectMaterialFile {
   versionCount: number;
 }
 
+export interface ProjectResourceStats {
+  files: number;
+  folders: number;
+  materials: number;
+  rootFolders: number;
+}
+
+type ListParams = Record<string, boolean | number | string | undefined | null>;
+
+function emptyListResponse<T>(): ApiListResponse<T> {
+  return { data: [], pagination: undefined };
+}
+
+async function fetchAllList<T>(path: string, params: ListParams = {}) {
+  const firstResponse = await apiRequest<ApiListResponse<T>>(path, {
+    params: { ...params, limit: params.limit ?? 100, page: 1 },
+  });
+  const totalPages = firstResponse.pagination?.totalPages ?? 1;
+  const data = [...(firstResponse.data ?? [])];
+
+  if (totalPages > 1) {
+    const remainingResponses = await Promise.all(
+      Array.from({ length: totalPages - 1 }, (_, index) =>
+        apiRequest<ApiListResponse<T>>(path, {
+          params: { ...params, limit: params.limit ?? 100, page: index + 2 },
+        }),
+      ),
+    );
+    remainingResponses.forEach((response) => {
+      data.push(...(response.data ?? []));
+    });
+  }
+
+  return {
+    data,
+    pagination: firstResponse.pagination,
+  };
+}
+
 export async function fetchProjectRootFolders(projectId: string) {
-  const response = await apiRequest<ApiListResponse<ApiFolder>>(`/projects/${projectId}/folders`, {
-    params: {
-      limit: 10,
-      order: 'desc',
-      page: 1,
-      type: 'ARC',
-    },
+  const response = await fetchAllList<ApiFolder>(`/projects/${projectId}/folders`, {
+    field: 'createdAt',
+    order: 'desc',
+    type: 'ARC',
   });
 
   return uniqueById(
@@ -47,6 +83,48 @@ export async function fetchProjectRootFolders(projectId: string) {
       .filter((folder) => !folder.parent && !folder.parentId)
       .map((folder) => mapFolder(folder)),
   );
+}
+
+export async function fetchProjectResourceStats(projectId: string): Promise<ProjectResourceStats> {
+  const [folderResponse, rootFolderResponse] = await Promise.all([
+    fetchAllList<ApiFolder>(`/projects/${projectId}/folders`, {
+      field: 'createdAt',
+      order: 'desc',
+    }),
+    apiRequest<ApiListResponse<ApiFolder>>(`/projects/${projectId}/folders`, {
+      params: { limit: 1, page: 1, type: 'ARC' },
+    }).catch(() => emptyListResponse<ApiFolder>()),
+  ]);
+  const folders = folderResponse.data;
+  const fileResponses = await Promise.all(
+    folders.map((folder) =>
+      fetchAllList<ApiFile>(`/folders/${folder.id}/files`, {
+        field: 'createdAt',
+        order: 'desc',
+      }).catch(() => emptyListResponse<ApiFile>()),
+    ),
+  );
+  const files = uniqueById(
+    fileResponses.flatMap((response) => response.data ?? []).map((file) => mapFile(file)),
+  );
+  const materialCounts = await Promise.all(
+    files.map((file) =>
+      apiRequest<ApiListResponse<ApiMaterial>>(`/files/${file.id}/versions`, {
+        params: { limit: 1, page: 1 },
+      })
+        .then((response) => response.pagination?.total ?? response.data?.length ?? 0)
+        .catch(() => 0),
+    ),
+  );
+
+  return {
+    files: files.length,
+    folders: folderResponse.pagination?.total ?? folders.length,
+    materials: materialCounts.reduce((sum, count) => sum + count, 0),
+    rootFolders:
+      rootFolderResponse.pagination?.total ??
+      folders.filter((folder) => !folder.parent && !folder.parentId).length,
+  };
 }
 
 export async function fetchFolderBundle(folderId: string) {

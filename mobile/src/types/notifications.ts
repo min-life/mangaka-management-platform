@@ -16,9 +16,13 @@ export interface NotificationItem {
   target?: {
     applicationId?: string;
     boardId?: string;
+    fileId?: string;
+    folderId?: string;
+    initialTab?: 'Overview' | 'Tasks' | 'Discussion' | 'Materials';
+    parentFolderId?: string;
     projectId?: string;
     taskId?: string;
-    type: 'application' | 'board' | 'project' | 'task';
+    type: 'application' | 'board' | 'project' | 'resourceFile' | 'resourceFolder' | 'task';
   };
 }
 

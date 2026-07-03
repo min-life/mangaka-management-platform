@@ -1,6 +1,6 @@
 'use client';
 
-import { Eye, History } from 'lucide-react';
+import { Eye, History, RotateCcw } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import type { FileVersionItem } from '../file-ui';
 
 type VersionHistoryDrawerProps = {
   onOpenChange: (open: boolean) => void;
+  onRestoreVersion?: (version: FileVersionItem) => void;
   onViewVersion: (version: FileVersionItem) => void;
   open: boolean;
   versions: FileVersionItem[];
@@ -23,6 +24,7 @@ type VersionHistoryDrawerProps = {
 
 export function VersionHistoryDrawer({
   onOpenChange,
+  onRestoreVersion,
   onViewVersion,
   open,
   versions,
@@ -36,7 +38,7 @@ export function VersionHistoryDrawer({
         <SheetHeader className="border-b border-[#303842] px-5 py-5 pr-12">
           <SheetTitle className="flex items-center gap-2 text-lg font-black text-white">
             <History className="size-5 text-[#FFD369]" />
-            Version History *
+            Version History
           </SheetTitle>
           <SheetDescription className="text-xs font-bold text-[#aeb7c2]">
             View immutable snapshots of this production file.
@@ -65,24 +67,40 @@ export function VersionHistoryDrawer({
                       {version.author} · {version.createdAt}
                     </p>
                   </div>
-                  <Button
-                    className="size-8 shrink-0 rounded-[4px] border-[#4b535f] bg-[#101820] text-white hover:bg-[#303842]"
-                    onClick={() => {
-                      onViewVersion(version);
-                      onOpenChange(false);
-                    }}
-                    size="icon"
-                    variant="outline"
-                  >
-                    <Eye className="size-4" />
-                  </Button>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {!version.isCurrent && onRestoreVersion ? (
+                      <Button
+                        className="size-8 rounded-[4px] border-[#6c5516] bg-[#30270d] text-[#ffd35b] hover:bg-[#3a3011]"
+                        onClick={() => {
+                          onRestoreVersion(version);
+                          onOpenChange(false);
+                        }}
+                        size="icon"
+                        title={`Restore v${version.version}`}
+                        variant="outline"
+                      >
+                        <RotateCcw className="size-4" />
+                      </Button>
+                    ) : null}
+                    <Button
+                      className="size-8 rounded-[4px] border-[#4b535f] bg-[#101820] text-white hover:bg-[#303842]"
+                      onClick={() => {
+                        onViewVersion(version);
+                        onOpenChange(false);
+                      }}
+                      size="icon"
+                      title={`View v${version.version}`}
+                      variant="outline"
+                    >
+                      <Eye className="size-4" />
+                    </Button>
+                  </div>
                 </div>
               </article>
             ))}
           </div>
           <p className="mt-4 text-[11px] font-bold leading-5 text-[#8b94a1]">
-            * Version data is UI fallback. Restore is intentionally unavailable until backend
-            version transactions exist.
+            Restoring an older material version rolls this file back to that snapshot.
           </p>
         </div>
       </SheetContent>
