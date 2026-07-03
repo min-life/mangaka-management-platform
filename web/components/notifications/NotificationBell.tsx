@@ -83,6 +83,16 @@ function getApplicationTitle(notification: NotificationResponse) {
   return '';
 }
 
+function getEntityName(notification: NotificationResponse) {
+  const metadata = notification.activityLog?.metadata;
+
+  if (isRecord(metadata) && typeof metadata.entityName === 'string' && metadata.entityName.trim()) {
+    return metadata.entityName;
+  }
+
+  return '';
+}
+
 function getNotificationText(notification: NotificationResponse) {
   const activity = notification.activityLog;
   const actorName =
@@ -124,8 +134,13 @@ function getNotificationText(notification: NotificationResponse) {
     };
   }
 
+  const entityLabel = activity.entityType.toLowerCase().split('_').join(' ');
+  const entityName = getEntityName(notification);
+
   return {
-    description: `${actorName} performed ${activity.entityType.toLowerCase()} #${activity.entityId}.`,
+    description: entityName
+      ? `${actorName} performed ${entityLabel} "${entityName}".`
+      : `${actorName} performed ${entityLabel} #${activity.entityId}.`,
     title: formatActionTitle(activity.action),
   };
 }

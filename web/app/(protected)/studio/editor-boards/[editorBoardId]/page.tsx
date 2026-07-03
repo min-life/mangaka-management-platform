@@ -203,7 +203,11 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
     }
 
     const entityLabel = activity.entityType.toLowerCase().split('_').join(' ');
-    return `${formatActivityTitle(activity.action)} on ${entityLabel} #${activity.entityId}.`;
+    const entityName =
+      typeof metadata.entityName === 'string' && metadata.entityName.trim()
+        ? `"${metadata.entityName}"`
+        : `#${activity.entityId}`;
+    return `${formatActivityTitle(activity.action)} on ${entityLabel} ${entityName}.`;
   };
 
   const formatActivityDate = (value: string) => {

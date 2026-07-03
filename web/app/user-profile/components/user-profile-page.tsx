@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   CheckCheck,
@@ -38,7 +38,7 @@ import { clearAccessToken, getAccessToken } from '@/lib/auth-storage';
 import { cn } from '@/lib/utils';
 import { AUTH_LOGOUT_EVENT } from '@/types/auth';
 import {
-  getCurrentUserActivities,
+  getCurrentUserContextActivities,
   getCurrentUserProfile,
   getApiErrorMessage,
   mapActivityLogToUserActivity,
@@ -53,6 +53,8 @@ import {
 type ProfileTheme = 'dark' | 'light';
 
 const USER_PROFILE_THEME_KEY = 'mangaka:user-profile-theme';
+
+const ACTIVITY_PAGE_SIZE = 7;
 
 function isSessionExpiredError(error: unknown) {
   if (typeof error !== 'object' || !error) {
@@ -503,7 +505,9 @@ export function UserProfilePage() {
   const { language, toggleLanguage } = usePlatformLanguage();
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const { notifications } = useRealtimeNotifications(Boolean(currentUser));
-  const [activities, setActivities] = useState<UserActivity[]>([]);
+  const [allActivities, setAllActivities] = useState<UserActivity[]>([]);
+  const [visibleActivityCount, setVisibleActivityCount] = useState(ACTIVITY_PAGE_SIZE);
+  const activityScrollRef = useRef<HTMLDivElement | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
@@ -547,13 +551,16 @@ export function UserProfilePage() {
     }
 
     const nextActivity = mapActivityLogToUserActivity(activityLog);
-    setActivities((currentActivities) => {
+    setAllActivities((currentActivities) => {
       if (currentActivities.some((activity) => activity.id === nextActivity.id)) {
         return currentActivities;
       }
 
-      return [nextActivity, ...currentActivities].slice(0, 3);
+      return [nextActivity, ...currentActivities];
     });
+    // Bump the visible window by one so the new item is shown immediately
+    // instead of silently pushing an already-visible item out of view.
+    setVisibleActivityCount((current) => current + 1);
   }, [notifications]);
 
   const themeStyle = useMemo(() => themeTokens[theme], [theme]);
@@ -563,6 +570,11 @@ export function UserProfilePage() {
   const roleName = getPrimaryRole(currentUser);
   const initials = getInitials(displayName);
   const isDarkTheme = theme === 'dark';
+  const activities = useMemo(
+    () => allActivities.slice(0, visibleActivityCount),
+    [allActivities, visibleActivityCount],
+  );
+  const hasMoreActivities = visibleActivityCount < allActivities.length;
 
   async function loadProfileData() {
     setIsLoading(true);
@@ -576,10 +588,11 @@ export function UserProfilePage() {
 
     try {
       const profileData = await getCurrentUserProfile();
-      const activityData = await getCurrentUserActivities();
+      const activityData = await getCurrentUserContextActivities();
 
       setCurrentUser(profileData);
-      setActivities(activityData);
+      setAllActivities(activityData);
+      setVisibleActivityCount(ACTIVITY_PAGE_SIZE);
     } catch (loadError) {
       if (isSessionExpiredError(loadError)) {
         clearAccessToken();
@@ -592,6 +605,44 @@ export function UserProfilePage() {
       setIsLoading(false);
     }
   }
+
+  // Pagination happens entirely client-side (see getCurrentUserContextActivities):
+  // the full list is already in memory, so "loading more" is just widening the
+  // visible window, no network round trip.
+  const loadMoreActivities = useCallback(() => {
+    setVisibleActivityCount((current) => Math.min(current + ACTIVITY_PAGE_SIZE, allActivities.length));
+  }, [allActivities.length]);
+
+  // Auto-fill: if container isn't overflowing but we have more data, load more.
+  useEffect(() => {
+    const container = activityScrollRef.current;
+    if (!container || !hasMoreActivities) {
+      return;
+    }
+
+    if (container.scrollHeight <= container.clientHeight) {
+      loadMoreActivities();
+    }
+  }, [activities, hasMoreActivities, loadMoreActivities]);
+
+  // Scroll-based load: trigger load-more when user scrolls near the bottom.
+  useEffect(() => {
+    const container = activityScrollRef.current;
+    if (!container || !hasMoreActivities) {
+      return;
+    }
+
+    const handleScroll = () => {
+      const nearBottom =
+        container.scrollTop + container.clientHeight >= container.scrollHeight - 80;
+      if (nearBottom) {
+        loadMoreActivities();
+      }
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [hasMoreActivities, loadMoreActivities]);
 
   async function handleShareProfile() {
     try {
@@ -784,7 +835,12 @@ export function UserProfilePage() {
             {isLoading ? (
               <EmptyState message={text.activityLoading} />
             ) : activities.length > 0 ? (
-              <ActivityTimeline activities={activities} />
+              <div
+                className="max-h-[600px] overflow-y-auto pr-1"
+                ref={activityScrollRef}
+              >
+                <ActivityTimeline activities={activities} />
+              </div>
             ) : (
               <EmptyState message={text.noActivities} />
             )}

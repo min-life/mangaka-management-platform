@@ -1,6 +1,7 @@
 import api from '@/lib/api';
 import { compressImageFile } from '@/lib/image-upload';
 import { getActivityLogs, type ActivityLogResponse } from '@/services/activity-log.service';
+import { getNotifications } from '@/services/notification.service';
 
 export type Scope = 'SYS' | 'PRJ' | string;
 export type ProgressStatus = 'PENDING' | 'INPROGRESS' | 'REVIEW' | 'DONE';
@@ -201,6 +202,43 @@ function getMetadataLabel(metadata: unknown, keys: string[]) {
   return null;
 }
 
+// Resolves a participant's display label from either a full user object
+// (present when the backend already enriched the metadata, e.g. editor-board
+// member events) or a raw numeric id (all we get for other actions/scopes).
+function getActivityParticipantName(value: unknown, fallbackId?: unknown): string | null {
+  if (isRecord(value)) {
+    const displayName = value.displayName;
+    const email = value.email;
+    const id = value.id;
+
+    if (typeof displayName === 'string' && displayName.trim()) {
+      return displayName;
+    }
+
+    if (typeof email === 'string' && email.trim()) {
+      return email;
+    }
+
+    if (typeof id === 'number') {
+      return `User #${id}`;
+    }
+  }
+
+  return typeof fallbackId === 'number' ? `User #${fallbackId}` : null;
+}
+
+function formatUserNameList(names: string[]): string | null {
+  if (names.length === 0) {
+    return null;
+  }
+
+  if (names.length === 1) {
+    return names[0];
+  }
+
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
 export function mapActivityLogToUserActivity(
   activity: ActivityLogResponse,
   options?: {
@@ -208,6 +246,7 @@ export function mapActivityLogToUserActivity(
   },
 ): UserActivity {
   const title = formatActionTitle(activity.action);
+  const metadata = isRecord(activity.metadata) ? activity.metadata : {};
   const boardId =
     activity.editorBoardId ??
     (activity.entityType === 'EDITOR_BOARD' ? activity.entityId : null);
@@ -225,15 +264,48 @@ export function mapActivityLogToUserActivity(
         : activity.entityType);
   const actorName =
     activity.actor?.displayName ?? activity.actor?.email ?? `User #${activity.actorId}`;
+  const resolvedEntityName = getMetadataLabel(activity.metadata, ['entityName']);
+  const entityLabel = activity.entityType.toLowerCase().replaceAll('_', ' ');
   const entityName =
     activity.entityType === 'EDITOR_BOARD' && editorBoardName
       ? `editor board "${editorBoardName}"`
-      : `${activity.entityType.toLowerCase().replaceAll('_', ' ')} #${activity.entityId}`;
+      : resolvedEntityName
+        ? `${entityLabel} "${resolvedEntityName}"`
+        : `${entityLabel} #${activity.entityId}`;
+  const scopeLabel = editorBoardName ? `editor board "${editorBoardName}"` : entityName;
+
+  let description = `${actorName} performed ${title.toLowerCase()} on ${entityName}.`;
+
+  if (activity.action === 'MEMBER_INVITED') {
+    const invitedIds = Array.isArray(metadata.invitedUserIds)
+      ? metadata.invitedUserIds.filter(
+          (id): id is number => typeof id === 'number' && Number.isFinite(id),
+        )
+      : [];
+    const invitedNames = Array.isArray(metadata.invitedUsers)
+      ? metadata.invitedUsers.map((user) => getActivityParticipantName(user))
+      : invitedIds.map((id) => getActivityParticipantName(null, id));
+    const invitedList = formatUserNameList(
+      invitedNames.filter((name): name is string => Boolean(name)),
+    );
+
+    if (invitedList) {
+      description = `${actorName} added ${invitedList} to ${scopeLabel}.`;
+    }
+  } else if (activity.action === 'MEMBER_REMOVED') {
+    const removedName =
+      getActivityParticipantName(metadata.removedUser) ??
+      getActivityParticipantName(null, metadata.removedUserId);
+
+    if (removedName) {
+      description = `${actorName} removed ${removedName} from ${scopeLabel}.`;
+    }
+  }
 
   return {
     id: activity.id,
     title,
-    description: `${actorName} performed ${title.toLowerCase()} on ${entityName}.`,
+    description,
     status: 'DONE',
     projectName,
     createdAt: activity.createdAt,
@@ -242,11 +314,37 @@ export function mapActivityLogToUserActivity(
   };
 }
 
-export async function getCurrentUserActivities(editorBoards?: UserEditorBoard[]): Promise<UserActivity[]> {
-  const result = await getActivityLogs({ limit: 3, page: 1 });
-  return result.activities.map((activity) =>
-    mapActivityLogToUserActivity(activity, { editorBoards }),
-  );
+// GET /activity-logs only returns logs where the current user is the actor, and
+// GET /notifications (no pagination on that endpoint) is the only source for logs
+// where the user is a participant (assigned, mentioned, project owner, etc). There
+// is no backend endpoint that unions the two, so we merge them here: fetch a
+// generous page of the user's own activity plus their full notification list, dedupe
+// by activity log id (a user can be both actor and recipient), and sort by recency.
+// Callers page through the result on the client (see ActivityTimeline in
+// user-profile-page.tsx) instead of requesting further pages from the server.
+const CONTEXT_ACTOR_ACTIVITY_LIMIT = 200;
+
+export async function getCurrentUserContextActivities(
+  editorBoards?: UserEditorBoard[],
+): Promise<UserActivity[]> {
+  const [actorResult, notifications] = await Promise.all([
+    getActivityLogs({ limit: CONTEXT_ACTOR_ACTIVITY_LIMIT, page: 1 }),
+    getNotifications(),
+  ]);
+
+  const activityById = new Map<number, ActivityLogResponse>();
+  for (const activity of actorResult.activities) {
+    activityById.set(activity.id, activity);
+  }
+  for (const notification of notifications) {
+    if (notification.activityLog) {
+      activityById.set(notification.activityLog.id, notification.activityLog);
+    }
+  }
+
+  return [...activityById.values()]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .map((activity) => mapActivityLogToUserActivity(activity, { editorBoards }));
 }
 
 export async function updateCurrentUserProfile(payload: UpdateProfilePayload) {
