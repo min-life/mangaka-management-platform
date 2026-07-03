@@ -19,6 +19,7 @@ import {
   type ActivityLogResponse,
 } from '@/services/activity-log.service';
 import type { ProjectResponse } from '@/services/project.service';
+import { getUsers, type UserResponse } from '@/services/user.service';
 
 import { getStatusLabel, getStatusStyle } from './applications/application-ui';
 
@@ -46,6 +47,7 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
   const [activities, setActivities] = useState<ActivityLogResponse[]>([]);
   const [activityError, setActivityError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [users, setUsers] = useState<UserResponse[]>([]);
 
   useEffect(() => {
     const loadActivityLogs = async () => {
@@ -70,14 +72,16 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
         const projectsData = await getEditorBoardProjects(editorBoardId);
         setProjects(projectsData.projects.slice(0, 5));
 
-        const [appsRes, activityResult] = await Promise.all([
+        const [appsRes, activityResult, usersData] = await Promise.all([
           api.get<{ data?: ApplicationResponse[] }, { data?: ApplicationResponse[] }>(
             `/editor-boards/${editorBoardId}/applications`,
           ),
           loadActivityLogs().catch(() => null),
+          getUsers({ limit: 200 }).catch(() => []),
         ]);
 
         setApplications(appsRes.data ?? []);
+        setUsers(usersData);
         if (!activityResult) {
           setActivities([]);
           setActivityError('Unable to load recent activity.');
@@ -130,6 +134,11 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
   const isActivityRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null && !Array.isArray(value);
 
+  const userById = new Map(users.map((user) => [user.id, user] as const));
+
+  const getUserName = (id: number) =>
+    userById.get(id)?.displayName || userById.get(id)?.email || `User #${id}`;
+
   const formatUserIdList = (ids: unknown) => {
     if (!Array.isArray(ids)) {
       return null;
@@ -137,7 +146,7 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
 
     const names = ids
       .filter((id): id is number => typeof id === 'number' && Number.isFinite(id))
-      .map((id) => `User #${id}`);
+      .map(getUserName);
 
     if (names.length === 0) {
       return null;
@@ -166,7 +175,7 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
       const removedUserId = metadata.removedUserId;
 
       if (typeof removedUserId === 'number' && Number.isFinite(removedUserId)) {
-        return `User #${removedUserId} left editor board "${boardName}"`;
+        return `${getUserName(removedUserId)} left editor board "${boardName}"`;
       }
     }
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { Bell, CheckCheck, Circle } from 'lucide-react';
 
 import {
@@ -13,6 +14,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useRealtimeNotifications } from '@/hooks/use-realtime-notifications';
 import { cn } from '@/lib/utils';
+import { getEditorBoards } from '@/services/editor-board.service';
 import type { NotificationResponse } from '@/services/notification.service';
 
 type NotificationBellProps = {
@@ -52,11 +54,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function getEditorBoardName(notification: NotificationResponse) {
+function getEditorBoardName(notification: NotificationResponse, boardNameById: Map<number, string>) {
   const editorBoardId =
     notification.activityLog?.editorBoardId ?? notification.activityLog?.entityId ?? null;
 
-  return editorBoardId ? `#${editorBoardId}` : '';
+  if (!editorBoardId) {
+    return '';
+  }
+
+  return boardNameById.get(editorBoardId) ?? `#${editorBoardId}`;
 }
 
 function getApplicationTitle(notification: NotificationResponse) {
@@ -83,7 +89,7 @@ function getEntityName(notification: NotificationResponse) {
   return '';
 }
 
-function getNotificationText(notification: NotificationResponse) {
+function getNotificationText(notification: NotificationResponse, boardNameById: Map<number, string>) {
   const activity = notification.activityLog;
   const actorName =
     activity?.actor?.displayName ?? activity?.actor?.email ?? `User #${activity?.actorId ?? ''}`;
@@ -96,7 +102,7 @@ function getNotificationText(notification: NotificationResponse) {
   }
 
   if (activity.action === 'MEMBER_INVITED') {
-    const boardName = getEditorBoardName(notification);
+    const boardName = getEditorBoardName(notification, boardNameById);
 
     return {
       description: `${actorName} added you to editor board "${boardName}".`,
@@ -105,7 +111,7 @@ function getNotificationText(notification: NotificationResponse) {
   }
 
   if (activity.action === 'MEMBER_REMOVED') {
-    const boardName = getEditorBoardName(notification);
+    const boardName = getEditorBoardName(notification, boardNameById);
 
     return {
       description: `${actorName} removed you from editor board "${boardName}".`,
@@ -142,6 +148,23 @@ export function NotificationBell({
 }: NotificationBellProps) {
   const { error, isConnected, isLoading, markAllAsRead, markAsRead, notifications, unreadCount } =
     useRealtimeNotifications();
+  const [boardNameById, setBoardNameById] = useState<Map<number, string>>(new Map());
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getEditorBoards({ limit: 200 })
+      .then((result) => {
+        if (isMounted) {
+          setBoardNameById(new Map(result.boards.map((board) => [board.id, board.name])));
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <DropdownMenu>
@@ -199,7 +222,7 @@ export function NotificationBell({
             </div>
           ) : notifications.length ? (
             notifications.slice(0, 12).map((notification) => {
-              const text = getNotificationText(notification);
+              const text = getNotificationText(notification, boardNameById);
 
               return (
                 <DropdownMenuItem

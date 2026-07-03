@@ -513,14 +513,16 @@ export function UserProfilePage() {
   const [isPasswordOpen, setIsPasswordOpen] = useState(false);
   const [isProfileSubmitting, setIsProfileSubmitting] = useState(false);
   const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
-  const [theme, setTheme] = useState<ProfileTheme>(() => {
-    if (typeof window === 'undefined') {
-      return 'dark';
-    }
+  // Always start with the server-rendered default ('dark') so the client's first
+  // render matches SSR output; the stored preference is applied after mount below.
+  const [theme, setTheme] = useState<ProfileTheme>('dark');
 
+  useEffect(() => {
     const storedTheme = window.localStorage.getItem(USER_PROFILE_THEME_KEY);
-    return storedTheme === 'light' ? 'light' : 'dark';
-  });
+    if (storedTheme === 'light') {
+      setTheme('light');
+    }
+  }, []);
 
   useEffect(() => {
     void loadProfileData();
@@ -587,7 +589,7 @@ export function UserProfilePage() {
 
     try {
       const profileData = await getCurrentUserProfile();
-      const activityData = await getCurrentUserContextActivities();
+      const activityData = await getCurrentUserContextActivities(profileData.id);
 
       setCurrentUser(profileData);
       setAllActivities(activityData);

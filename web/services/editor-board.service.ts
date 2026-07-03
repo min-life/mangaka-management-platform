@@ -110,8 +110,17 @@ export async function createEditorBoard(payload: CreateEditorBoardPayload) {
   return response.data ?? (response as EditorBoardResponse);
 }
 
-export async function getEditorBoards() {
-  const response = await api.get<EditorBoardsResponse, EditorBoardsResponse>('/editor-boards');
+export async function getEditorBoards(params?: {
+  field?: 'name' | 'createdAt';
+  limit?: number;
+  me?: boolean;
+  name?: string;
+  order?: 'asc' | 'desc';
+  page?: number;
+}) {
+  const response = await api.get<EditorBoardsResponse, EditorBoardsResponse>('/editor-boards', {
+    params,
+  });
 
   return {
     boards: response.data ?? [],

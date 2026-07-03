@@ -14,16 +14,19 @@ const PLATFORM_LANGUAGE_KEY = 'mangaka:platform-language';
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
-function getInitialLanguage(): PlatformLanguage {
-  if (typeof window === 'undefined') {
-    return 'en';
-  }
-
-  return window.localStorage.getItem(PLATFORM_LANGUAGE_KEY) === 'vi' ? 'vi' : 'en';
-}
-
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguage] = useState<PlatformLanguage>(getInitialLanguage);
+  // Always start with the server-rendered default ('en') so the client's first
+  // render matches SSR output. The stored preference (if any) is applied after
+  // mount below — reading localStorage during the initial render would diverge
+  // from the server and trigger a hydration mismatch.
+  const [language, setLanguage] = useState<PlatformLanguage>('en');
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(PLATFORM_LANGUAGE_KEY);
+    if (stored === 'vi') {
+      setLanguage('vi');
+    }
+  }, []);
 
   useEffect(() => {
     window.localStorage.setItem(PLATFORM_LANGUAGE_KEY, language);

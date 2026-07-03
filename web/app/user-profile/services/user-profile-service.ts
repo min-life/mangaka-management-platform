@@ -2,6 +2,7 @@ import api from '@/lib/api';
 import { compressImageFile } from '@/lib/image-upload';
 import { getActivityLogs, type ActivityLogResponse } from '@/services/activity-log.service';
 import { getNotifications } from '@/services/notification.service';
+import { getUsers, type UserResponse } from '@/services/user.service';
 
 export type Scope = 'SYS' | 'PRJ' | string;
 export type ProgressStatus = 'PENDING' | 'INPROGRESS' | 'REVIEW' | 'DONE';
@@ -200,29 +201,15 @@ function getMetadataLabel(metadata: unknown, keys: string[]) {
   return null;
 }
 
-// Resolves a participant's display label from either a full user object
-// (present when the backend already enriched the metadata, e.g. editor-board
-// member events) or a raw numeric id (all we get for other actions/scopes).
-function getActivityParticipantName(value: unknown, fallbackId?: unknown): string | null {
-  if (isRecord(value)) {
-    const displayName = value.displayName;
-    const email = value.email;
-    const id = value.id;
-
-    if (typeof displayName === 'string' && displayName.trim()) {
-      return displayName;
-    }
-
-    if (typeof email === 'string' && email.trim()) {
-      return email;
-    }
-
-    if (typeof id === 'number') {
-      return `User #${id}`;
-    }
+// Resolves a participant's display label from a raw numeric id, looking it up
+// in the directory of users passed by the caller (see getCurrentUserContextActivities).
+function getParticipantName(id: unknown, usersById?: Map<number, UserResponse>): string | null {
+  if (typeof id !== 'number' || !Number.isFinite(id)) {
+    return null;
   }
 
-  return typeof fallbackId === 'number' ? `User #${fallbackId}` : null;
+  const user = usersById?.get(id);
+  return user?.displayName || user?.email || `User #${id}`;
 }
 
 function formatUserNameList(names: string[]): string | null {
@@ -241,10 +228,14 @@ export function mapActivityLogToUserActivity(
   activity: ActivityLogResponse,
   options?: {
     editorBoards?: UserEditorBoard[];
+    users?: UserResponse[];
   },
 ): UserActivity {
   const title = formatActionTitle(activity.action);
   const metadata = isRecord(activity.metadata) ? activity.metadata : {};
+  const usersById = options?.users
+    ? new Map(options.users.map((user) => [user.id, user] as const))
+    : undefined;
   const boardId =
     activity.editorBoardId ?? (activity.entityType === 'EDITOR_BOARD' ? activity.entityId : null);
   const editorBoardName =
@@ -277,7 +268,7 @@ export function mapActivityLogToUserActivity(
           (id): id is number => typeof id === 'number' && Number.isFinite(id),
         )
       : [];
-    const invitedNames = invitedIds.map((id) => getActivityParticipantName(null, id));
+    const invitedNames = invitedIds.map((id) => getParticipantName(id, usersById));
     const invitedList = formatUserNameList(
       invitedNames.filter((name): name is string => Boolean(name)),
     );
@@ -286,7 +277,7 @@ export function mapActivityLogToUserActivity(
       description = `${actorName} added ${invitedList} to ${scopeLabel}.`;
     }
   } else if (activity.action === 'MEMBER_REMOVED') {
-    const removedName = getActivityParticipantName(null, metadata.removedUserId);
+    const removedName = getParticipantName(metadata.removedUserId, usersById);
 
     if (removedName) {
       description = `${actorName} removed ${removedName} from ${scopeLabel}.`;
@@ -315,12 +306,12 @@ export function mapActivityLogToUserActivity(
 // user-profile-page.tsx) instead of requesting further pages from the server.
 const CONTEXT_ACTOR_ACTIVITY_LIMIT = 200;
 
-export async function getCurrentUserContextActivities(
-  editorBoards?: UserEditorBoard[],
-): Promise<UserActivity[]> {
-  const [actorResult, notifications] = await Promise.all([
+export async function getCurrentUserContextActivities(userId?: number): Promise<UserActivity[]> {
+  const [actorResult, notifications, editorBoards, users] = await Promise.all([
     getActivityLogs({ limit: CONTEXT_ACTOR_ACTIVITY_LIMIT, page: 1 }),
     getNotifications(),
+    getCurrentUserEditorBoards(userId).catch(() => []),
+    getUsers({ limit: 200 }).catch(() => []),
   ]);
 
   const activityById = new Map<number, ActivityLogResponse>();
@@ -335,7 +326,7 @@ export async function getCurrentUserContextActivities(
 
   return [...activityById.values()]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .map((activity) => mapActivityLogToUserActivity(activity, { editorBoards }));
+    .map((activity) => mapActivityLogToUserActivity(activity, { editorBoards, users }));
 }
 
 export async function updateCurrentUserProfile(payload: UpdateProfilePayload) {
