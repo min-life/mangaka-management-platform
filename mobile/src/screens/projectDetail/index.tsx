@@ -30,7 +30,9 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
     setErrorMessage('');
 
     try {
-      const bundle = await fetchProjectBundle(route.params.projectId);
+      const bundle = await fetchProjectBundle(route.params.projectId, {
+        includeResourceStats: true,
+      });
       setProject(bundle.project);
       setBoardId(bundle.board ? String(bundle.board.id) : null);
     } catch (error) {
@@ -77,7 +79,7 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
   const menuItems = [
     {
       label: 'Resource',
-      subtitle: `${project.files} files - ${project.materials} materials`,
+      subtitle: `${project.folders} folders - ${project.files} files - ${project.materials} materials`,
       count: project.files,
       icon: 'folder',
       iconColor: '#FFFFFF',
@@ -86,11 +88,7 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
     },
     {
       label: 'Application',
-      count:
-        project.applications.pending +
-        project.applications.approved +
-        project.applications.rejected +
-        project.applications.cancelled,
+      count: project.applicationTotal,
       icon: 'apps',
       iconColor: '#FFFFFF',
       iconBg: Colors.statusProgress,
@@ -98,11 +96,7 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
     },
     {
       label: 'Task',
-      count:
-        project.tasks.pending +
-        project.tasks.inProgress +
-        project.tasks.review +
-        project.tasks.done,
+      count: project.taskTotal,
       icon: 'checklist',
       iconColor: '#FFFFFF',
       iconBg: Colors.accent,
@@ -152,7 +146,7 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
       <ScrollView
         ref={scrollViewRef}
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: 112 }}
         showsVerticalScrollIndicator={false}
       >
         <ProjectDetailHero project={project} />
