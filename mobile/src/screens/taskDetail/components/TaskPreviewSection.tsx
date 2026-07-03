@@ -2,7 +2,6 @@ import React from 'react';
 import { View } from 'react-native';
 
 import MangaPreviewCard from '@/src/components/sub-component/MangaPreviewCard';
-import { TASK_INFO } from '@/src/constants/taskDetailData';
 import { FrameAnnotation } from '@/src/types/taskDetail';
 
 interface TaskPreviewSectionProps {
@@ -13,10 +12,10 @@ interface TaskPreviewSectionProps {
 }
 
 export default function TaskPreviewSection({
-  imageUri = TASK_INFO.previewImageUri,
+  imageUri,
   selectedFrame,
   showStatusBadge = true,
-  status = TASK_INFO.status,
+  status = 'Preview',
 }: TaskPreviewSectionProps) {
   return (
     <>

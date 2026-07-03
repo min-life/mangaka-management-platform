@@ -5,12 +5,21 @@ import { useNavigation } from '@react-navigation/native';
 import ApiStateView from '@/src/components/shared/ApiStateView';
 import { RootStackNavProp } from '@/src/navigation/types';
 import { Colors } from '@/src/constants/colors';
-import { ACCOUNT_MENU_ITEMS } from '@/src/constants/profileData';
 import BottomNavBar from '@/src/components/shared/BottomNavBar';
 import { logout } from '@/src/services/authApi';
 import { clearAccessToken, getAccessToken } from '@/src/services/tokenStorage';
 import { fetchMe } from '@/src/services/userApi';
+import { AccountMenuItem } from '@/src/types/profile';
 import { ProfileHeaderSection, ProfileMenuSection, ProfileTopBar } from './components';
+
+const ACCOUNT_MENU_ITEMS: AccountMenuItem[] = [
+  { id: 'info', icon: 'person', label: 'Personal Information' },
+  { id: 'notifs', icon: 'notifications', label: 'Notifications' },
+  { id: 'security', icon: 'security', label: 'Security' },
+  { id: 'appearance', icon: 'palette', label: 'Appearance' },
+  { id: 'help', icon: 'help', label: 'Help & Support' },
+  { id: 'logout', icon: 'logout', label: 'Sign Out', isDestructive: true },
+];
 
 export default function ProfileScreen() {
   const navigation = useNavigation<RootStackNavProp>();

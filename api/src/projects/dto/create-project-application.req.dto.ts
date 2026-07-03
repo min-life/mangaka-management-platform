@@ -49,6 +49,7 @@ export class CreateProjectApplicationReqDto {
     format: 'binary',
     description: 'Required for CREATE_ARC and CREATE_CHAPTER types',
   })
+  @IsOptional()
   image?: Express.Multer.File;
 
   @ApiPropertyOptional({
@@ -56,6 +57,7 @@ export class CreateProjectApplicationReqDto {
     format: 'binary',
     description: 'Required for CREATE_ARC and CREATE_CHAPTER types',
   })
+  @IsOptional()
   text?: Express.Multer.File;
 
   @ApiPropertyOptional({
@@ -63,5 +65,6 @@ export class CreateProjectApplicationReqDto {
     format: 'binary',
     description: 'Optional source file for CREATE_ARC and CREATE_CHAPTER types',
   })
+  @IsOptional()
   source?: Express.Multer.File;
 }

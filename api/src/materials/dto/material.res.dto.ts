@@ -37,6 +37,14 @@ export class MaterialResDto {
         size: 2048,
         mimeType: 'application/pdf',
         type: 'TEXT',
+      },
+      {
+        url: 'https://...',
+        downloadUrl: 'https://...',
+        originalName: 'source.zip',
+        size: 4096,
+        mimeType: 'application/zip',
+        type: 'SOURCE',
       }
     ]
   })

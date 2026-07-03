@@ -10,20 +10,22 @@ export type RootStackParamList = {
   Tasks: { projectId?: string } | undefined;
   Projects: undefined;
   ProjectDetail: { projectId: string };
+  ProjectContributors: { projectId: string };
   ProjectReport: { projectId: string };
   Applications: { projectId?: string } | undefined;
   ApplicationDetail: { projectId: string; applicationId: string };
-  ApplicationCreate: { projectId: string };
   EditorBoards: undefined;
   EditorBoardDetail: { boardId: string };
-  EditorBoardAttachProject: { boardId: string };
+  EditorBoardProjects: { boardId: string };
+  EditorBoardMembers: { boardId: string };
+  EditorBoardApplications: { boardId: string };
   Resources: { projectId: string };
   ResourceFolderDetail: { projectId: string; folderId: string };
   ResourceFile: {
     projectId: string;
     fileId: string;
     parentFolderId: string;
-    initialTab?: 'Overview' | 'Tasks' | 'Materials';
+    initialTab?: 'Overview' | 'Tasks' | 'Discussion' | 'Materials';
   };
   TaskDetail: { taskId: string } | undefined;
   Profile: undefined;

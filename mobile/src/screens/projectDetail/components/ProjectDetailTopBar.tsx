@@ -27,15 +27,6 @@ export default function ProjectDetailTopBar({ onBack }: ProjectDetailTopBarProps
           <TouchableOpacity
             activeOpacity={0.72}
             accessibilityRole="button"
-            accessibilityLabel="Add project item"
-            className="h-10 w-10 items-center justify-center rounded-full"
-          >
-            <MaterialIcon name="add" color={Colors.statusProgress} size={27} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            activeOpacity={0.72}
-            accessibilityRole="button"
             accessibilityLabel="More project actions"
             className="h-10 w-10 items-center justify-center rounded-full"
           >

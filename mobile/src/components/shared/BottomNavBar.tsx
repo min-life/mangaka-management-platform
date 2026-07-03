@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
-import { RootStackNavProp } from '@/src/navigation/types';
+import { RootStackNavProp, RootStackParamList } from '@/src/navigation/types';
 
 export type BottomTab = 'inbox' | 'home' | 'profile';
 
@@ -13,11 +13,17 @@ interface BottomNavBarProps {
   avatarUri?: string;
 }
 
-/**
- * BottomNavBar — Thanh điều hướng dưới cùng dùng chung cho toàn app.
- * Tự navigate bằng useNavigation — không cần truyền onTabPress từ ngoài.
- * Tab "Home" được nâng lên (elevated pill) giống mẫu Stitch.
- */
+const TABS: Array<{
+  key: BottomTab;
+  label: string;
+  icon: string;
+  route: keyof Pick<RootStackParamList, 'Home' | 'Notifications' | 'Profile'>;
+}> = [
+  { key: 'inbox', label: 'Inbox', icon: 'mail', route: 'Notifications' },
+  { key: 'home', label: 'Home', icon: 'dashboard', route: 'Home' },
+  { key: 'profile', label: 'Profile', icon: 'person', route: 'Profile' },
+];
+
 export default function BottomNavBar({
   activeTab = 'home',
   avatarUri,
@@ -25,100 +31,92 @@ export default function BottomNavBar({
   const navigation = useNavigation<RootStackNavProp>();
 
   const handlePress = (tab: BottomTab) => {
-    if (tab === 'home')    navigation.navigate('Home');
-    if (tab === 'profile') navigation.navigate('Profile');
-    if (tab === 'inbox')   navigation.navigate('Notifications');
+    const target = TABS.find((item) => item.key === tab);
+    if (target) {
+      navigation.navigate(target.route);
+    }
   };
 
-  const activeColor   = Colors.text;
+  const activeColor = '#1F2329';
   const inactiveColor = Colors.textPlaceholder;
 
   return (
     <SafeAreaView
       edges={['bottom']}
       style={{
-        backgroundColor: Colors.bg,
-        borderTopWidth: 1,
-        borderTopColor: Colors.borderFaint,
+        backgroundColor: 'transparent',
       }}
     >
-      <View className="flex-row justify-around items-center px-2 h-14">
-
-        {/* ── Inbox ─────────────────────────────────────────── */}
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => handlePress('inbox')}
-          className="flex-col items-center justify-center flex-1"
+      <View className="px-4 pb-2 pt-2">
+        <View
+          className="flex-row items-center justify-between rounded-full px-2 py-2"
+          style={{
+            backgroundColor: 'rgba(57, 62, 70, 0.96)',
+            borderWidth: 1,
+            borderColor: Colors.borderFaint,
+            boxShadow: '0 12px 28px rgba(0, 0, 0, 0.34)',
+          }}
         >
-          <MaterialIcon
-            name="mail"
-            color={activeTab === 'inbox' ? activeColor : inactiveColor}
-            size={22}
-          />
-          <Text
-            className="text-[11px] mt-1 font-medium"
-            style={{ color: activeTab === 'inbox' ? activeColor : inactiveColor }}
-          >
-            Inbox
-          </Text>
-        </TouchableOpacity>
+          {TABS.map((tab) => {
+            const isActive = activeTab === tab.key;
+            const iconColor = isActive ? activeColor : inactiveColor;
+            const textColor = isActive ? activeColor : Colors.textMuted;
 
-        {/* ── Home — elevated pill ──────────────────────────── */}
-        <View className="flex-1 items-center justify-center" style={{ marginTop: -20 }}>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => handlePress('home')}
-            className="flex-col items-center justify-center rounded-full w-[58px] h-[58px]"
-            style={{
-              backgroundColor: Colors.bg,
-              borderWidth: 1,
-              borderColor: Colors.borderFaint,
-            }}
-          >
-            <MaterialIcon
-              name="dashboard"
-              color={activeTab === 'home' ? activeColor : inactiveColor}
-              size={26}
-            />
-            <Text
-              className="text-[12px] mt-0.5 font-medium"
-              style={{ color: activeTab === 'home' ? activeColor : inactiveColor }}
-            >
-              Home
-            </Text>
-          </TouchableOpacity>
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                activeOpacity={0.78}
+                onPress={() => handlePress(tab.key)}
+                className="min-w-0 flex-1 flex-row items-center justify-center rounded-full"
+                style={{
+                  height: 48,
+                  gap: 7,
+                  backgroundColor: isActive ? Colors.accent : 'transparent',
+                  borderWidth: isActive ? 1 : 0,
+                  borderColor: isActive ? 'rgba(255, 255, 255, 0.38)' : 'transparent',
+                }}
+              >
+                {tab.key === 'profile' && avatarUri ? (
+                  <View
+                    className="h-7 w-7 overflow-hidden rounded-full"
+                    style={{
+                      borderWidth: 1,
+                      borderColor: isActive ? 'rgba(31, 35, 41, 0.2)' : Colors.borderFaint,
+                    }}
+                  >
+                    <Image
+                      source={{ uri: avatarUri }}
+                      className="h-full w-full"
+                      style={{ resizeMode: 'cover' }}
+                    />
+                  </View>
+                ) : (
+                  <View
+                    className="h-7 w-7 items-center justify-center rounded-full"
+                    style={{
+                      backgroundColor: isActive
+                        ? 'rgba(31, 35, 41, 0.1)'
+                        : 'rgba(237, 241, 251, 0.08)',
+                    }}
+                  >
+                    <MaterialIcon name={tab.icon} color={iconColor} size={18} />
+                  </View>
+                )}
+                <Text
+                  className="text-[11px] font-semibold"
+                  numberOfLines={1}
+                  style={{
+                    color: textColor,
+                    letterSpacing: 0,
+                    maxWidth: 58,
+                  }}
+                >
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
-
-        {/* ── Profile ───────────────────────────────────────── */}
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => handlePress('profile')}
-          className="flex-col items-center justify-center flex-1"
-        >
-          {avatarUri ? (
-            <View className="w-6 h-6 rounded-full overflow-hidden border border-white/20">
-              <Image
-                source={{ uri: avatarUri }}
-                className="w-full h-full"
-                style={{ resizeMode: 'cover' }}
-              />
-            </View>
-          ) : (
-            <View
-              className="w-6 h-6 rounded-full items-center justify-center border border-white/20"
-              style={{ backgroundColor: Colors.overlayLight }}
-            >
-              <MaterialIcon name="person" color={inactiveColor} size={14} />
-            </View>
-          )}
-          <Text
-            className="text-[11px] mt-1 font-medium"
-            style={{ color: activeTab === 'profile' ? activeColor : inactiveColor }}
-          >
-            Profile
-          </Text>
-        </TouchableOpacity>
-
       </View>
     </SafeAreaView>
   );

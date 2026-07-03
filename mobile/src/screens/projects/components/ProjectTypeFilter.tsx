@@ -3,10 +3,10 @@ import { ScrollView, Text, TouchableOpacity } from 'react-native';
 
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
-import { PROJECT_TYPE_FILTERS } from '@/src/constants/projectsData';
 import { ProjectType } from '@/src/types/projects';
 
 export type ProjectTypeFilterValue = ProjectType | 'All';
+const PROJECT_TYPE_FILTERS: ProjectTypeFilterValue[] = ['All', 'Manga', 'Tooling', 'Service'];
 
 interface ProjectTypeFilterProps {
   activeType: ProjectTypeFilterValue;

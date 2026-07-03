@@ -1,29 +1,24 @@
 import React from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import CommentBubble from '@/src/components/sub-component/CommentBubble';
 import FrameListPanel from '@/src/components/sub-component/FrameListPanel';
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
-import { COMMENTS, FRAMES } from '@/src/constants/taskDetailData';
 import { Comment, FrameAnnotation } from '@/src/types/taskDetail';
 import { Colors } from '@/src/constants/colors';
 
 import { C } from './theme';
 
 interface DiscussionTabProps {
-  comment: string;
-  comments?: Comment[];
-  frames?: FrameAnnotation[];
-  onCommentChange: (comment: string) => void;
+  comments: Comment[];
+  frames: FrameAnnotation[];
   selectedFrame: FrameAnnotation | null;
   onSelectFrame: (frame: FrameAnnotation) => void;
 }
 
 export default function DiscussionTab({
-  comment,
-  comments = COMMENTS,
-  frames = FRAMES,
-  onCommentChange,
+  comments,
+  frames,
   selectedFrame,
   onSelectFrame,
 }: DiscussionTabProps) {
@@ -70,8 +65,8 @@ export default function DiscussionTab({
 
           {visibleComments.length > 0 ? (
             <View className="gap-3">
-              {visibleComments.map((commentItem) => (
-                <CommentBubble key={commentItem.id} comment={commentItem} />
+              {visibleComments.map((commentItem, index) => (
+                <CommentBubble key={`${commentItem.id}-${index}`} comment={commentItem} />
               ))}
             </View>
           ) : (
@@ -88,37 +83,6 @@ export default function DiscussionTab({
               </Text>
             </View>
           )}
-
-          <View
-            className="flex-row items-center gap-3 rounded-xl px-4 py-2"
-            style={{
-              backgroundColor: C.surface,
-              borderWidth: 1,
-              borderColor: Colors.borderFaint,
-            }}
-          >
-            <View
-              className="h-8 w-8 items-center justify-center rounded-full"
-              style={{ backgroundColor: C.surfaceHighest }}
-            >
-              <Text className="text-[10px] font-bold" style={{ color: C.text }}>
-                ME
-              </Text>
-            </View>
-            <TextInput
-              value={comment}
-              onChangeText={onCommentChange}
-              placeholder={
-                selectedFrame
-                  ? `Nhận xét về "${selectedFrame.name}"...`
-                  : 'Trao đổi với team về task này...'
-              }
-              placeholderTextColor={C.textFaint}
-              className="flex-1 py-2 text-sm"
-              style={{ color: C.text }}
-              multiline
-            />
-          </View>
         </View>
       </View>
     </View>

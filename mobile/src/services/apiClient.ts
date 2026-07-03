@@ -1,6 +1,8 @@
 import { Platform } from 'react-native';
 
-import { clearAccessToken, getAccessToken } from './tokenStorage';
+import { resetToLogin } from '@/src/navigation/navigationRef';
+
+import { clearSession, getAccessToken, saveAccessToken } from './tokenStorage';
 
 interface ApiErrorBody {
   message?: string | string[];
@@ -9,6 +11,16 @@ interface ApiErrorBody {
 interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown;
   params?: Record<string, boolean | number | string | undefined | null>;
+  skipAuthRefresh?: boolean;
+}
+
+interface ApiFetchResult {
+  body: unknown;
+  response: Response;
+}
+
+interface RefreshResponse {
+  accessToken?: unknown;
 }
 
 export class ApiClientError extends Error {
@@ -23,6 +35,18 @@ export class ApiClientError extends Error {
 
 const DEFAULT_API_BASE_URL =
   Platform.OS === 'android' ? 'http://10.0.2.2:3000/api' : 'http://localhost:3000/api';
+
+const AUTH_REFRESH_PATH = '/auth/refresh';
+const AUTH_LOGOUT_PATH = '/auth/logout';
+const AUTH_REFRESH_EXCLUDED_PATHS = new Set([
+  '/auth/forgot',
+  '/auth/login',
+  AUTH_LOGOUT_PATH,
+  AUTH_REFRESH_PATH,
+]);
+
+let refreshPromise: Promise<string> | null = null;
+let sessionExpirationPromise: Promise<void> | null = null;
 
 export const API_BASE_URL = (
   process.env.EXPO_PUBLIC_API_BASE_URL?.trim() ||
@@ -43,6 +67,30 @@ function buildUrl(path: string, params?: RequestOptions['params']) {
   return url.toString();
 }
 
+function normalizeApiPath(path: string) {
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  const withoutTrailingSlash = cleanPath.replace(/\/+$/, '') || '/';
+
+  return withoutTrailingSlash.startsWith('/api/')
+    ? withoutTrailingSlash.replace(/^\/api/, '')
+    : withoutTrailingSlash;
+}
+
+function normalizeMethod(method?: string) {
+  return (method ?? 'GET').toUpperCase();
+}
+
+function isPostEndpoint(path: string, options: RequestOptions, endpoint: string) {
+  return normalizeMethod(options.method) === 'POST' && normalizeApiPath(path) === endpoint;
+}
+
+function shouldAttemptRefresh(path: string, options: RequestOptions, hasRetried: boolean) {
+  if (hasRetried || options.skipAuthRefresh) return false;
+  if (normalizeMethod(options.method) !== 'POST') return true;
+
+  return !AUTH_REFRESH_EXCLUDED_PATHS.has(normalizeApiPath(path));
+}
+
 function getErrorMessage(status: number, body?: ApiErrorBody) {
   if (status === 401) return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
 
@@ -59,7 +107,11 @@ function getErrorMessage(status: number, body?: ApiErrorBody) {
   return 'Không thể tải dữ liệu. Vui lòng thử lại.';
 }
 
-export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+async function performApiFetch(
+  path: string,
+  options: RequestOptions = {},
+  accessTokenOverride?: string | null,
+): Promise<ApiFetchResult> {
   const token = await getAccessToken();
   const headers = new Headers(options.headers);
 
@@ -67,16 +119,18 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     headers.set('Content-Type', 'application/json');
   }
 
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
+  const accessToken = accessTokenOverride ?? token;
+  if (accessToken) {
+    headers.set('Authorization', `Bearer ${accessToken}`);
   }
 
   let response: Response;
+  const { body: requestBody, params, skipAuthRefresh: _skipAuthRefresh, ...fetchOptions } = options;
 
   try {
-    response = await fetch(buildUrl(path, options.params), {
-      ...options,
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    response = await fetch(buildUrl(path, params), {
+      ...fetchOptions,
+      body: requestBody === undefined ? undefined : JSON.stringify(requestBody),
       credentials: 'include',
       headers,
     });
@@ -94,13 +148,95 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     body = undefined;
   }
 
-  if (!response.ok) {
-    if (response.status === 401) {
-      await clearAccessToken();
-    }
-    throw new ApiClientError(getErrorMessage(response.status, body as ApiErrorBody), response.status);
+  return { body, response };
+}
+
+async function handleSessionExpired() {
+  if (!sessionExpirationPromise) {
+    sessionExpirationPromise = (async () => {
+      try {
+        await performApiFetch(AUTH_LOGOUT_PATH, {
+          method: 'POST',
+          skipAuthRefresh: true,
+        });
+      } catch {
+        // Best-effort logout: local session cleanup and navigation still happen below.
+      }
+
+      await clearSession();
+      resetToLogin();
+    })();
   }
 
-  return body as T;
+  await sessionExpirationPromise;
+}
+
+async function requestFreshAccessToken() {
+  const body = await apiRequest<RefreshResponse>(AUTH_REFRESH_PATH, {
+    method: 'POST',
+    skipAuthRefresh: true,
+  });
+
+  const accessToken = body.accessToken;
+  if (typeof accessToken !== 'string' || !accessToken.trim()) {
+    throw new ApiClientError('Phản hồi làm mới phiên đăng nhập không hợp lệ.', 401);
+  }
+
+  await saveAccessToken(accessToken);
+  return accessToken;
+}
+
+async function refreshSession() {
+  if (!refreshPromise) {
+    refreshPromise = requestFreshAccessToken().finally(() => {
+      refreshPromise = null;
+    });
+  }
+
+  return refreshPromise;
+}
+
+async function requestWithAuth<T>(
+  path: string,
+  options: RequestOptions,
+  hasRetried: boolean,
+  accessTokenOverride?: string | null,
+): Promise<T> {
+  const { body, response } = await performApiFetch(path, options, accessTokenOverride);
+
+  if (response.ok) {
+    if (
+      isPostEndpoint(path, options, '/auth/login') ||
+      isPostEndpoint(path, options, AUTH_REFRESH_PATH)
+    ) {
+      sessionExpirationPromise = null;
+    }
+
+    return body as T;
+  }
+
+  if (isPostEndpoint(path, options, AUTH_REFRESH_PATH)) {
+    await handleSessionExpired();
+  }
+
+  if (response.status === 401 && shouldAttemptRefresh(path, options, hasRetried)) {
+    try {
+      const refreshedAccessToken = await refreshSession();
+      return requestWithAuth<T>(path, options, true, refreshedAccessToken);
+    } catch {
+      await handleSessionExpired();
+      throw new ApiClientError(getErrorMessage(response.status, body as ApiErrorBody), response.status);
+    }
+  }
+
+  if (response.status === 401 && hasRetried) {
+    await handleSessionExpired();
+  }
+
+  throw new ApiClientError(getErrorMessage(response.status, body as ApiErrorBody), response.status);
+}
+
+export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  return requestWithAuth<T>(path, options, false);
 }
 

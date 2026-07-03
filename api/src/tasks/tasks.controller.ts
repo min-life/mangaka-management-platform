@@ -28,7 +28,7 @@ import {
   UpdateTaskReqDto,
 } from './dto';
 
-import { CommentResponseDto, CommentsResponseDto, CreateCommentReqDto, QueryCommentsReqDto } from '../frames/dto';
+import { CommentResponseDto, CommentsResponseDto, CreateCommentReqDto, QueryCommentsReqDto, FramesResponseDto, QueryFramesReqDto } from '../frames/dto';
 
 @ApiTags('Tasks')
 @ApiBearerAuth()
@@ -59,6 +59,33 @@ export class TasksController {
     );
     return {
       data: result.comments,
+      pagination: result.pagination,
+    };
+  }
+
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['project:read', 'project:owner'],
+    resource: 'TASK',
+  })
+  @ApiOperation({ summary: 'Get task frames' })
+  @ApiParam({ name: 'id', type: Number, description: 'Task id' })
+  @ApiOkResponse({
+    description: 'Task frames retrieved successfully',
+    type: FramesResponseDto,
+  })
+  @Get(':id/frames')
+  async getTaskFrames(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: QueryFramesReqDto,
+  ) {
+    const result = await this.tasksService.getTaskFrames(
+      id,
+      query.field && query.order ? { field: query.field, order: query.order } : undefined,
+      query.page && query.limit ? { page: query.page, limit: query.limit } : undefined,
+    );
+    return {
+      data: result.frames,
       pagination: result.pagination,
     };
   }

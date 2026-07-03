@@ -3,7 +3,6 @@ import { View } from 'react-native';
 
 import WorkItemRow from '@/src/components/sub-component/WorkItemRow';
 import { Colors } from '@/src/constants/colors';
-import { WORK_ITEMS } from '@/src/constants/homeData';
 import { WorkItem } from '@/src/types/home';
 
 interface WorkItemsSectionProps {
@@ -11,7 +10,7 @@ interface WorkItemsSectionProps {
   onEditorBoardsPress: () => void;
   onTasksPress: () => void;
   onProjectsPress: () => void;
-  workItems?: WorkItem[];
+  workItems: WorkItem[];
 }
 
 export default function WorkItemsSection({
@@ -19,7 +18,7 @@ export default function WorkItemsSection({
   onEditorBoardsPress,
   onTasksPress,
   onProjectsPress,
-  workItems = WORK_ITEMS,
+  workItems,
 }: WorkItemsSectionProps) {
   return (
     <View

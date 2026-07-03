@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { ScrollView, Text, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import ApiStateView from '@/src/components/shared/ApiStateView';
@@ -8,11 +9,6 @@ import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
 import { RootStackParamList } from '@/src/navigation/types';
 import { fetchEditorBoardBundle } from '@/src/services/editorBoardApi';
-import {
-  ApplicationStatusBadge,
-  ApplicationTypeBadge,
-} from '@/src/screens/applications/components';
-import { BoardMemberRow, BoardProjectRow } from '@/src/screens/editorBoards/components';
 import {
   ProjectDetailMenuItem,
   ProjectDetailTopBar,
@@ -92,80 +88,6 @@ function EditorBoardDetailHero({
   );
 }
 
-function SectionTitle({ title, count }: { title: string; count: number }) {
-  return (
-    <View className="flex-row items-center justify-between px-4 pb-3 pt-6">
-      <Text
-        className="text-[13px] font-bold uppercase"
-        style={{ color: Colors.textMuted, letterSpacing: 1 }}
-      >
-        {title}
-      </Text>
-      <Text className="text-[12px] font-bold" style={{ color: Colors.textFaint }}>
-        {count}
-      </Text>
-    </View>
-  );
-}
-
-function PublishRequestRow({
-  application,
-  onPress,
-}: {
-  application: ApplicationItem;
-  onPress: () => void;
-}) {
-  return (
-    <View className="px-4">
-      <View
-        className="rounded-xl p-4"
-        style={{
-          backgroundColor: Colors.surface,
-          borderWidth: 1,
-          borderColor: Colors.borderSubtle,
-        }}
-      >
-        <View className="flex-row items-start justify-between gap-3">
-          <View className="flex-1 gap-2">
-            <ApplicationTypeBadge type={application.type} />
-            <Text
-              className="text-[15px] font-bold"
-              style={{ color: Colors.text }}
-              numberOfLines={2}
-            >
-              {application.title}
-            </Text>
-          </View>
-          <ApplicationStatusBadge status={application.status} />
-        </View>
-        <Text
-          className="mt-3 text-[13px] leading-5"
-          style={{ color: Colors.textMuted }}
-          numberOfLines={2}
-        >
-          {application.description}
-        </Text>
-        <TouchableOpacity
-          activeOpacity={0.75}
-          onPress={onPress}
-          accessibilityRole="button"
-          accessibilityLabel={`Open application ${application.title}`}
-          className="mt-4 flex-row items-center justify-between rounded-lg px-3 py-2"
-          style={{ backgroundColor: Colors.overlayLight }}
-        >
-          <View className="flex-row items-center gap-2">
-            <MaterialIcon name="apps" color={Colors.accent} size={18} />
-            <Text className="text-[13px] font-bold" style={{ color: Colors.text }}>
-              Open application
-            </Text>
-          </View>
-          <MaterialIcon name="chevron_right" color={Colors.textFaint} size={21} />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
-
 export default function EditorBoardDetailScreen({
   navigation,
   route,
@@ -194,9 +116,11 @@ export default function EditorBoardDetailScreen({
     }
   }, [route.params.boardId]);
 
-  useEffect(() => {
-    void loadBoard();
-  }, [loadBoard]);
+  useFocusEffect(
+    useCallback(() => {
+      void loadBoard();
+    }, [loadBoard]),
+  );
 
   if (isLoading) {
     return (
@@ -221,6 +145,7 @@ export default function EditorBoardDetailScreen({
   }
 
   const lead = members.find((member) => member.role === 'Lead');
+  const primaryProject = boardProjects[0];
 
   const menuItems = [
     {
@@ -229,10 +154,10 @@ export default function EditorBoardDetailScreen({
       icon: 'folder',
       iconColor: '#FFFFFF',
       iconBg: Colors.accent,
-      onPress:
-        boardProjects.length === 1
-          ? () => navigation.navigate('ProjectDetail', { projectId: boardProjects[0].id })
-          : undefined,
+      onPress: () =>
+        boardProjects.length === 1 && primaryProject
+          ? navigation.navigate('ProjectReport', { projectId: primaryProject.id })
+          : navigation.navigate('EditorBoardProjects', { boardId: route.params.boardId }),
     },
     {
       label: 'Members',
@@ -240,6 +165,7 @@ export default function EditorBoardDetailScreen({
       icon: 'group_add',
       iconColor: '#FFFFFF',
       iconBg: '#DB2777',
+      onPress: () => navigation.navigate('EditorBoardMembers', { boardId: route.params.boardId }),
     },
     {
       label: 'Application',
@@ -247,14 +173,8 @@ export default function EditorBoardDetailScreen({
       icon: 'apps',
       iconColor: '#FFFFFF',
       iconBg: '#22C55E',
-      onPress:
-        publishRequests.length === 1
-          ? () =>
-              navigation.navigate('ApplicationDetail', {
-                applicationId: publishRequests[0].id,
-                projectId: publishRequests[0].projectId,
-              })
-          : undefined,
+      onPress: () =>
+        navigation.navigate('EditorBoardApplications', { boardId: route.params.boardId }),
     },
   ];
 
@@ -292,40 +212,6 @@ export default function EditorBoardDetailScreen({
               count={item.count}
               onPress={item.onPress}
               isLast={index === menuItems.length - 1}
-            />
-          ))}
-        </View>
-
-        <SectionTitle title="Projects" count={boardProjects.length} />
-        <View className="gap-3 px-4">
-          {boardProjects.map((project) => (
-            <BoardProjectRow
-              key={project.id}
-              project={project}
-              onPress={() => navigation.navigate('ProjectDetail', { projectId: project.id })}
-            />
-          ))}
-        </View>
-
-        <SectionTitle title="Members" count={members.length} />
-        <View className="gap-3 px-4">
-          {members.map((member) => (
-            <BoardMemberRow key={member.id} member={member} />
-          ))}
-        </View>
-
-        <SectionTitle title="Publish Requests" count={publishRequests.length} />
-        <View className="gap-3">
-          {publishRequests.map((application) => (
-            <PublishRequestRow
-              key={application.id}
-              application={application}
-              onPress={() =>
-                navigation.navigate('ApplicationDetail', {
-                  applicationId: application.id,
-                  projectId: application.projectId,
-                })
-              }
             />
           ))}
         </View>

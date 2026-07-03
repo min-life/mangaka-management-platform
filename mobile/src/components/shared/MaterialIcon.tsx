@@ -42,6 +42,7 @@ const ICON_MAP: Record<string, MaterialIconName> = {
   bell:          'notifications-none',
   code:          'code',
   file:          'insert-drive-file',
+  article:       'article',
   image:         'image',
   close:         'close',
   check:         'check',

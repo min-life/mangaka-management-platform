@@ -19,6 +19,9 @@ export class FrameResDto {
   @ApiProperty({ example: 1 })
   id!: number;
 
+  @ApiPropertyOptional({ example: 'Frame 1', nullable: true })
+  name?: string | null;
+
   @ApiProperty({ example: 10.5, type: Number })
   startX!: number;
 
@@ -77,9 +80,44 @@ export class CommentResponseDto {
   data!: CommentResDto;
 }
 
+export class SimpleMaterialContextDto {
+  @ApiProperty({ example: 1 })
+  id!: number;
+
+  @ApiPropertyOptional({ example: 'Material Name', nullable: true })
+  name?: string | null;
+}
+
+export class SimpleFrameContextDto {
+  @ApiProperty({ example: 1 })
+  id!: number;
+
+  @ApiPropertyOptional({ example: 'Frame 1', nullable: true })
+  name?: string | null;
+}
+
+export class CommentWithContextResDto extends CommentResDto {
+  @ApiPropertyOptional({ example: 1, nullable: true })
+  taskId?: number | null;
+
+  @ApiPropertyOptional({ type: () => SimpleFrameContextDto, nullable: true })
+  frame?: SimpleFrameContextDto | null;
+
+  @ApiPropertyOptional({ type: () => SimpleMaterialContextDto, nullable: true })
+  material?: SimpleMaterialContextDto | null;
+}
+
+export class FramesResponseDto {
+  @ApiProperty({ type: [FrameResDto] })
+  data!: FrameResDto[];
+
+  @ApiProperty({ type: PaginationResDto })
+  pagination!: PaginationResDto;
+}
+
 export class CommentsResponseDto {
-  @ApiProperty({ type: [CommentResDto] })
-  data!: CommentResDto[];
+  @ApiProperty({ type: [CommentWithContextResDto] })
+  data!: CommentWithContextResDto[];
 
   @ApiProperty({ type: PaginationResDto })
   pagination!: PaginationResDto;
