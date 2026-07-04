@@ -1,5 +1,4 @@
 import api from '@/lib/api';
-import { compressImageFile } from '@/lib/image-upload';
 import { getActivityLogs, type ActivityLogResponse } from '@/services/activity-log.service';
 import { getNotifications } from '@/services/notification.service';
 import { getUsers, type UserResponse } from '@/services/user.service';
@@ -347,14 +346,35 @@ export async function updateCurrentUserPassword(payload: UpdatePasswordPayload) 
   return unwrapData<{ success: boolean }>(response);
 }
 
-export async function uploadAvatarToDataUrl(file: File) {
-  return {
-    avatarUrl: await compressImageFile(file, {
-      maxHeight: 320,
-      maxInlineImageLength: 120_000,
-      maxWidth: 320,
-    }),
-  };
+export async function uploadAvatarImage(file: File) {
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+  const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+
+  if (!cloudName || !uploadPreset) {
+    throw new Error('Cloudinary is not configured.');
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', uploadPreset);
+  formData.append('folder', 'avatars');
+
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+    { body: formData, method: 'POST' },
+  );
+
+  if (!response.ok) {
+    throw new Error('Unable to upload avatar image.');
+  }
+
+  const data = (await response.json()) as { secure_url?: string };
+
+  if (!data.secure_url) {
+    throw new Error('Unable to upload avatar image.');
+  }
+
+  return { avatarUrl: data.secure_url };
 }
 
 export function getApiErrorMessage(error: unknown, fallback: string) {
