@@ -303,7 +303,7 @@ export class AuthService {
   async refresh(refreshToken?: string) {
     try {
       if (!refreshToken) {
-        throw new UnauthorizedException(ERROR.EVLLOGIN);
+        throw new UnauthorizedException(ERROR.EVLREFRESHTOKEN_INVALID);
       }
 
       const storedToken = await this.prisma.refreshToken.findUnique({
@@ -315,7 +315,7 @@ export class AuthService {
         if (storedToken) {
           await this.prisma.refreshToken.delete({ where: { token: refreshToken } });
         }
-        throw new UnauthorizedException(ERROR.EVLLOGIN);
+        throw new UnauthorizedException(ERROR.EVLREFRESHTOKEN_EXPIRED);
       }
 
       try {

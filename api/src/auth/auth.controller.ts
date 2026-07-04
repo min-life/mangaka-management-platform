@@ -24,7 +24,7 @@ import { requireEnv } from '../share/helpers/env';
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
   sameSite: 'none' as const,
-  secure: requireEnv('NODE_ENV') === 'production',
+  secure: true, // SameSite=None requires Secure=true even on localhost
   path: '/api/auth',
 };
 
