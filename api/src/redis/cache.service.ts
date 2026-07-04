@@ -18,6 +18,7 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
       port: this.configService.get<number>('REDIS_PORT', 6379),
       password: this.configService.get<string>('REDIS_PASSWORD'),
       db: this.configService.get<number>('REDIS_DB', 0),
+      keyPrefix: this.configService.get<string>('REDIS_PREFIX', ''), // Prefix to separate devs' cache
       enableOfflineQueue: false, // Bypass Redis immediately if disconnected
       connectTimeout: 5000,
       maxRetriesPerRequest: 1, // Only retry once before throwing error

@@ -311,10 +311,12 @@ export class AuthService {
         include: { user: true },
       });
 
-      if (!storedToken || storedToken.expiresAt <= new Date()) {
-        if (storedToken) {
-          await this.prisma.refreshToken.delete({ where: { token: refreshToken } });
-        }
+      if (!storedToken) {
+        throw new UnauthorizedException(ERROR.EVLREFRESHTOKEN_INVALID);
+      }
+
+      if (storedToken.expiresAt <= new Date()) {
+        await this.prisma.refreshToken.delete({ where: { token: refreshToken } });
         throw new UnauthorizedException(ERROR.EVLREFRESHTOKEN_EXPIRED);
       }
 
