@@ -6,6 +6,7 @@ import {
   InternalServerErrorException,
   Logger,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { APPLICATION_STATUS, APPLICATION_TYPE, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -15,6 +16,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ACTIVITY_EVENT_NAME, ActivityEventPayload } from '../share/events/activity.event';
 import { ACTIVITY_ACTION, ENTITY_TYPE } from '@prisma/client';
 import type { FilterBoards, OrderBoards } from './interfaces/get-editor-boards.interface';
+import { CacheService } from '../redis/cache.service';
+import { UseCache, InvalidateCache } from '../share/decorators/cache.decorator';
 
 const USER_SELECT = {
   select: {
@@ -79,8 +82,10 @@ export class EditorBoardsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly cacheService: CacheService,
   ) {}
 
+  @InvalidateCache((args) => [`board:list:*`])
   async createEditorBoard(data: {
     name: string;
     description?: string;
@@ -116,6 +121,7 @@ export class EditorBoardsService {
     }
   }
 
+  @UseCache((args) => `board:list`)
   async getEditorBoards(
     userId: number,
     filter?: FilterBoards,
@@ -167,6 +173,7 @@ export class EditorBoardsService {
     }
   }
 
+  @UseCache((args) => `board:${args[0]}`)
   async getBoardById(id: number) {
     try {
       const board = await this.prisma.editorBoard.findUnique({
@@ -182,6 +189,7 @@ export class EditorBoardsService {
     }
   }
 
+  @InvalidateCache((args) => [`board:${args[0]}`, `board:list:*`])
   async deleteBoard(id: number) {
     try {
       await this.ensureBoard(id);
@@ -199,6 +207,7 @@ export class EditorBoardsService {
     }
   }
 
+  @InvalidateCache((args) => [`board:${args[0]}`, `board:list:*`])
   async updateBoard(
     id: number,
     data: {
@@ -226,6 +235,7 @@ export class EditorBoardsService {
     }
   }
 
+  @InvalidateCache((args) => [`board:${args[0]}:members:*`])
   async addMembersToBoard(editorBoardId: number, userIds: number[], actorId: number) {
     try {
       await this.ensureBoard(editorBoardId);
@@ -261,6 +271,7 @@ export class EditorBoardsService {
     }
   }
 
+  @UseCache((args) => `board:${args[0]}:members`)
   async getBoardMembers(
     editorBoardId: number,
     filter?: { search?: string },
@@ -306,6 +317,7 @@ export class EditorBoardsService {
     }
   }
 
+  @UseCache((args) => `board:${args[0]}:members:${args[1]}`)
   async getBoardMember(editorBoardId: number, userId: number) {
     try {
       const member = await this.findBoardMember(editorBoardId, userId);
@@ -315,6 +327,7 @@ export class EditorBoardsService {
     }
   }
 
+  @InvalidateCache((args) => [`board:${args[0]}:members:*`])
   async removeBoardMember(editorBoardId: number, userId: number, actorId: number) {
     try {
       await this.ensureBoard(editorBoardId);
@@ -354,6 +367,7 @@ export class EditorBoardsService {
     }
   }
 
+  @InvalidateCache((args) => [`board:${args[0]}:members:*`])
   async leaveBoard(editorBoardId: number, userId: number) {
     try {
       const board = await this.ensureBoard(editorBoardId);
@@ -375,6 +389,7 @@ export class EditorBoardsService {
     }
   }
 
+  @InvalidateCache((args) => [`board:${args[0]}:members:*`])
   async setToLead(editorBoardId: number, userId: number) {
     try {
       await this.findBoardMember(editorBoardId, userId);
@@ -404,6 +419,7 @@ export class EditorBoardsService {
     }
   }
 
+  @UseCache((args) => `board:${args[0]}:projects`)
   async getBoardProjects(
     editorBoardId: number,
     filter?: { search?: string },
@@ -441,17 +457,30 @@ export class EditorBoardsService {
     }
   }
 
+  @InvalidateCache((args) => [`board:${args[0]}:projects:*`])
   async addProjectsToBoard(editorBoardId: number, projectIds: number[]) {
     try {
       await this.ensureBoard(editorBoardId);
 
       const uniqueProjectIds = this.uniqueIds(projectIds);
       const projects = await this.prisma.$transaction(async (prisma) => {
-        const existingProjects = await prisma.project.count({
-          where: { id: { in: uniqueProjectIds } },
+        const board = await prisma.editorBoard.findUnique({
+          where: { id: editorBoardId },
+          select: { createdBy: true },
         });
-        if (existingProjects !== uniqueProjectIds.length) {
+
+        const existingProjects = await prisma.project.findMany({
+          where: { id: { in: uniqueProjectIds } },
+          select: { id: true, createdBy: true },
+        });
+
+        if (existingProjects.length !== uniqueProjectIds.length) {
           throw new NotFoundException(ERROR.NFPROJECT);
+        }
+
+        const invalidCreatorProjects = existingProjects.filter(p => p.createdBy !== board?.createdBy);
+        if (invalidCreatorProjects.length > 0) {
+          throw new ForbiddenException('All projects must be created by the same creator as the editor board');
         }
 
         const cflProjects = await prisma.project.count({
@@ -476,6 +505,7 @@ export class EditorBoardsService {
     }
   }
 
+  @UseCache((args) => `board:${args[0]}:applications`)
   async getBoardApplications(
     editorBoardId: number,
     filter?: { search?: string },
@@ -487,16 +517,8 @@ export class EditorBoardsService {
 
       const where: Prisma.ApplicationWhereInput = {
         project: { editorBoardId },
-        OR: [
-          {
-            type: APPLICATION_TYPE.PUBLISH_REQUEST,
-            status: { in: [APPLICATION_STATUS.SUBMITTED, APPLICATION_STATUS.APPROVE, APPLICATION_STATUS.REJECT] },
-          },
-          {
-            type: { in: [APPLICATION_TYPE.CREATE_ARC, APPLICATION_TYPE.CREATE_CHAPTER] },
-            status: { in: [APPLICATION_STATUS.INTERNAL_APPROVED, APPLICATION_STATUS.APPROVE, APPLICATION_STATUS.REJECT] },
-          }
-        ],
+        type: { in: [APPLICATION_TYPE.CREATE_ARC, APPLICATION_TYPE.CREATE_CHAPTER] },
+        status: { in: [APPLICATION_STATUS.INTERNAL_APPROVED, APPLICATION_STATUS.SUBMITTED, APPLICATION_STATUS.APPROVE, APPLICATION_STATUS.REJECT] },
         ...(filter?.search && {
           title: { contains: filter.search, mode: 'insensitive' },
         }),

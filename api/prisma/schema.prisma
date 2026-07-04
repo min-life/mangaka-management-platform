@@ -33,8 +33,6 @@ enum APPLICATION_STATUS {
 }
 
 enum APPLICATION_TYPE {
-  MANUSCRIPT_REVIEW
-  PUBLISH_REQUEST
   CREATE_ARC
   CREATE_CHAPTER
 }
@@ -532,6 +530,7 @@ model Application {
   updatedBy   Int?               @map("updated_by")
   createdAt   DateTime           @default(now()) @map("created_at")
   updatedAt   DateTime           @default(now()) @updatedAt @map("updated_at")
+  voteDeadline DateTime?         @map("vote_deadline")
 
   parentFolderId Int?               @map("parent_folder_id")
   parentFolder   Folder?            @relation("ApplicationParentFolder", fields: [parentFolderId], references: [id], onDelete: SetNull)

@@ -11,6 +11,8 @@ import { ERROR } from '../share/constants/message-error';
 import { randomUUID } from 'crypto';
 import sizeOf from 'image-size';
 import { AwsS3Service } from '../share/services/aws-s3.service';
+import { CacheService } from '../redis/cache.service';
+import { UseCache, InvalidateCache } from '../share/decorators/cache.decorator';
 
 const USER_SELECT = {
   select: {
@@ -42,8 +44,10 @@ export class MaterialsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly awsS3Service: AwsS3Service,
+    private readonly cacheService: CacheService,
   ) {}
 
+  @UseCache((args) => `material:${args[0]}`)
   async getMaterialById(id: number) {
     try {
       const material = await this.ensureMaterial(id);
@@ -53,6 +57,7 @@ export class MaterialsService {
     }
   }
 
+  @InvalidateCache((args) => [`material:${args[0]}`, `file:*:versions:*`, `file:*:materials:*`])
   async updateMaterial(
     id: number,
     data: {
@@ -159,6 +164,7 @@ export class MaterialsService {
     }
   }
 
+  @InvalidateCache((args) => [`material:${args[0]}`, `file:*:versions:*`, `file:*:materials:*`])
   async deleteMaterial(id: number) {
     try {
       await this.ensureMaterial(id);

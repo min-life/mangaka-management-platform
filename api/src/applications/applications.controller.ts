@@ -186,6 +186,8 @@ export class ApplicationsController {
     const application = await this.applicationsService.updateApplicationStatus(id, {
       status: data.status,
       userId: currentUser.userId,
+      voteDeadline: data.voteDeadline,
+      comment: data.comment,
     });
     return {
       data: application,

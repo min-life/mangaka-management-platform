@@ -9,7 +9,7 @@ export class QueryProjectApplicationsReqDto {
   @IsString()
   search?: string;
 
-  @ApiPropertyOptional({ enum: APPLICATION_TYPE, example: APPLICATION_TYPE.PUBLISH_REQUEST })
+  @ApiPropertyOptional({ enum: APPLICATION_TYPE, example: APPLICATION_TYPE.CREATE_CHAPTER })
   @IsOptional()
   @IsEnum(APPLICATION_TYPE)
   type?: APPLICATION_TYPE;

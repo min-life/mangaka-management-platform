@@ -35,7 +35,7 @@ export class CreateProjectApplicationReqDto {
   @IsOptional()
   materials?: unknown;
 
-  @ApiProperty({ enum: APPLICATION_TYPE, example: APPLICATION_TYPE.PUBLISH_REQUEST })
+  @ApiProperty({ enum: APPLICATION_TYPE, example: APPLICATION_TYPE.CREATE_CHAPTER })
   @IsEnum(APPLICATION_TYPE)
   type!: APPLICATION_TYPE;
 

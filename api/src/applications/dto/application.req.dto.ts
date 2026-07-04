@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { APPLICATION_STATUS } from '@prisma/client';
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsDateString } from 'class-validator';
 
 export class UpdateApplicationReqDto {
   @ApiPropertyOptional({ example: 'Updated title for application' })
@@ -35,6 +35,16 @@ export class UpdateApplicationStatusReqDto {
   @ApiProperty({ enum: APPLICATION_STATUS, example: APPLICATION_STATUS.APPROVE })
   @IsEnum(APPLICATION_STATUS)
   status!: APPLICATION_STATUS;
+
+  @ApiPropertyOptional({ example: '2026-07-10T12:00:00Z', description: 'Applicable only when status is SUBMITTED' })
+  @IsOptional()
+  @IsDateString()
+  voteDeadline?: string;
+
+  @ApiPropertyOptional({ example: 'Looks good to me' })
+  @IsOptional()
+  @IsString()
+  comment?: string;
 }
 
 export class ApplicationMaterialReqDto {

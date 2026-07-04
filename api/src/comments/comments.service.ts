@@ -2,12 +2,17 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
 import { HttpException, InternalServerErrorException, Logger } from '@nestjs/common';
+import { CacheService } from '../redis/cache.service';
+import { InvalidateCache } from '../share/decorators/cache.decorator';
 
 @Injectable()
 export class CommentsService {
   private readonly logger = new Logger(CommentsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cacheService: CacheService,
+  ) {}
 
   async ensureComment(id: number) {
     const comment = await this.prisma.comment.findUnique({
@@ -19,6 +24,7 @@ export class CommentsService {
     return comment;
   }
 
+  @InvalidateCache((args) => [`task:*:comments:*`, `frame:*:comments:*`, `file:*:comments:*`])
   async updateComment(id: number, data: { content?: string }) {
     try {
       await this.ensureComment(id);
@@ -33,6 +39,7 @@ export class CommentsService {
     }
   }
 
+  @InvalidateCache((args) => [`task:*:comments:*`, `frame:*:comments:*`, `file:*:comments:*`])
   async deleteComment(id: number) {
     try {
       await this.ensureComment(id);

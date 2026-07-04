@@ -12,6 +12,8 @@ import { ACTIVITY_EVENT_NAME, ActivityEventPayload } from '../share/events/activ
 import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
+import { CacheService } from '../redis/cache.service';
+import { UseCache, InvalidateCache } from '../share/decorators/cache.decorator';
 
 const USER_SELECT = {
   select: {
@@ -67,8 +69,10 @@ export class TasksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly cacheService: CacheService,
   ) {}
 
+  @UseCache((args) => `task:${args[0]}`)
   async getTaskById(id: number) {
     try {
       const task = await this.prisma.task.findUnique({
@@ -84,6 +88,7 @@ export class TasksService {
     }
   }
 
+  @InvalidateCache((args) => [`task:${args[0]}`, `task:list:*`, `file:*:tasks:*`])
   async updateTask(
     id: number,
     data: {
@@ -168,6 +173,7 @@ export class TasksService {
     }
   }
 
+  @InvalidateCache((args) => [`task:${args[0]}`, `task:list:*`, `file:*:tasks:*`])
   async deleteTask(id: number) {
     try {
       await this.ensureTask(id);
@@ -177,6 +183,7 @@ export class TasksService {
     }
   }
 
+  @UseCache((args) => `task:${args[0]}:children`)
   async getTaskChildren(
     taskId: number,
     filter?: {
@@ -221,6 +228,7 @@ export class TasksService {
 
 
 
+  @UseCache((args) => `task:list:${args[0]}`)
   async getMyTasks(
     userId: number,
     filter?: {
@@ -261,6 +269,7 @@ export class TasksService {
     }
   }
 
+  @UseCache((args) => `task:${args[0]}:frames`)
   async getTaskFrames(
     taskId: number,
     sort?: { field: 'createdAt'; order: 'asc' | 'desc' },
@@ -310,6 +319,7 @@ export class TasksService {
     }
   }
 
+  @UseCache((args) => `task:${args[0]}:comments`)
   async getTaskComments(
     taskId: number,
     sort?: { field: 'createdAt'; order: 'asc' | 'desc' },
@@ -387,6 +397,7 @@ export class TasksService {
     }
   }
 
+  @InvalidateCache((args) => [`task:${args[0]}:comments:*`])
   async createComment(
     taskId: number,
     data: {
@@ -443,6 +454,7 @@ export class TasksService {
     }
   }
 
+  @UseCache((args) => `task:${args[0]}:materials-select`)
   async getTaskMaterialsForSelect(taskId: number) {
     try {
       await this.ensureTask(taskId);

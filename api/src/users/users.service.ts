@@ -22,8 +22,10 @@ import {
   requireNumberEnv,
 } from '../share/helpers/env';
 import { serializeRole } from '../share/utils/role-serializer';
-import { Resource, Permission, GoogleUser } from '../auth/interfaces';
-import { Pagination } from '../share/interfaces';
+import { Resource, Permission, GoogleUser, JwtPayload } from '../auth/interfaces';
+import { CacheService } from '../redis/cache.service';
+import { UseCache, InvalidateCache } from '../share/decorators/cache.decorator';
+import type { Pagination } from '../share/interfaces';
 import { CreateStaffUserDto } from './dto/create-staff-user.dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -41,8 +43,10 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly cacheService: CacheService,
   ) {}
 
+  @UseCache((args) => `user:list`)
   async findAll(
     filter?: { search?: string; isActive?: boolean },
     sort?: { field?: 'createdAt' | 'displayName' | 'email'; order?: 'asc' | 'desc' },
@@ -86,6 +90,7 @@ export class UsersService {
     }
   }
 
+  @UseCache((args) => `user:${args[0]}`)
   async findOne(userId: number) {
     try {
       const user = await this.prisma.user.findUnique({
@@ -110,10 +115,12 @@ export class UsersService {
     }
   }
 
+  @UseCache((args) => `user:me:${args[0]}`)
   async getMe(userId: number) {
     return this.findOne(userId);
   }
 
+  @InvalidateCache((args) => [`user:list:*`])
   async createStaffUser(currentUserId: number, dto: CreateStaffUserDto) {
     try {
       const email = dto.email.trim().toLowerCase();
@@ -153,6 +160,7 @@ export class UsersService {
     }
   }
 
+  @InvalidateCache((args) => [`user:${args[0]}`, `user:me:${args[0]}`, `user:list:*`])
   async update(userId: number, data: UpdateUserDto & { updatedBy?: number }) {
     try {
       await this.ensureUser(userId);
@@ -178,6 +186,7 @@ export class UsersService {
     }
   }
 
+  @InvalidateCache((args) => [`user:${args[0]}`, `user:me:${args[0]}`, `user:list:*`])
   async updateMe(userId: number, dto: UpdateProfileDto) {
     try {
       const user = await this.prisma.user.update({
@@ -195,6 +204,7 @@ export class UsersService {
     }
   }
 
+  @InvalidateCache((args) => [`user:${args[0]}`, `user:me:${args[0]}`])
   async updatePassword(userId: number, dto: UpdatePasswordDto) {
     try {
       const user = await this.ensureUser(userId);
@@ -247,18 +257,32 @@ export class UsersService {
 
   async getStats() {
     try {
-      const [total, active, inactive] = await Promise.all([
+      const [total, active, inactive, users] = await Promise.all([
         this.prisma.user.count(),
         this.prisma.user.count({ where: { isActive: true } }),
         this.prisma.user.count({ where: { isActive: false } }),
+        this.prisma.user.findMany({ select: { createdAt: true } }),
       ]);
 
-      return { data: { total, active, inactive } };
+      const growthByMonth: Record<string, number> = {};
+      const growthByYear: Record<string, number> = {};
+
+      users.forEach(user => {
+        const date = user.createdAt;
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const yearKey = date.getFullYear().toString();
+
+        growthByMonth[monthKey] = (growthByMonth[monthKey] || 0) + 1;
+        growthByYear[yearKey] = (growthByYear[yearKey] || 0) + 1;
+      });
+
+      return { data: { total, active, inactive, growthByMonth, growthByYear } };
     } catch (error) {
       this.handleError(error, 'Get users stats fail', ERROR.SVGETUSERS);
     }
   }
 
+  @InvalidateCache((args) => [`user:${args[0]}`, `user:me:${args[0]}`])
   async forceResetPassword(userId: number) {
     try {
       await this.ensureUser(userId);
@@ -283,6 +307,7 @@ export class UsersService {
     }
   }
 
+  @UseCache((args) => `user:${args[0]}:roles`)
   async findRoles(userId: number) {
     try {
       await this.ensureUser(userId);
@@ -299,6 +324,7 @@ export class UsersService {
     }
   }
 
+  @InvalidateCache((args) => [`user:${args[0]}:roles:*`])
   async appendRoles(userId: number, roleIds: number[]) {
     try {
       await this.ensureUser(userId);
@@ -315,6 +341,7 @@ export class UsersService {
     }
   }
 
+  @InvalidateCache((args) => [`user:${args[0]}:roles:*`])
   async replaceRoles(userId: number, roleIds: number[]) {
     try {
       await this.ensureUser(userId);
@@ -337,6 +364,7 @@ export class UsersService {
     }
   }
 
+  @UseCache((args) => `user:${args[0]}:projects`)
   async findProjects(userId: number) {
     try {
       await this.ensureUser(userId);
@@ -360,6 +388,7 @@ export class UsersService {
     }
   }
 
+  @UseCache((args) => `user:${args[0]}:editor-boards`)
   async findEditorBoards(userId: number) {
     try {
       await this.ensureUser(userId);

@@ -13,6 +13,8 @@ import { PermissionFilterDto } from './dto/permission-filter.dto';
 import { UpdatePermissionDto } from './dto/update-permission.dto';
 import { UserPermissionsResponseDto } from './dto/user-permissions-response.dto';
 import { UsersService } from '../users/users.service';
+import { CacheService } from '../redis/cache.service';
+import { UseCache, InvalidateCache } from '../share/decorators/cache.decorator';
 
 @Injectable()
 export class PermissionsService {
@@ -21,8 +23,10 @@ export class PermissionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly usersService: UsersService,
+    private readonly cacheService: CacheService,
   ) {}
 
+  @UseCache((args) => `permission:list`)
   async findAll(query: PermissionFilterDto): Promise<PermissionResponseDto[]> {
     try {
       const where: Prisma.PermissionWhereInput = {};
@@ -46,6 +50,7 @@ export class PermissionsService {
     }
   }
 
+  @UseCache((args) => `permission:${args[0]}`)
   async findOne(id: number): Promise<PermissionResponseDto> {
     try {
       const permission = await this.ensurePermission(id);
@@ -55,6 +60,7 @@ export class PermissionsService {
     }
   }
 
+  @InvalidateCache((args) => [`permission:list:*`, `permission:${args[0]}`])
   async update(id: number, data: UpdatePermissionDto): Promise<PermissionResponseDto> {
     try {
       await this.ensurePermission(id);
@@ -73,6 +79,7 @@ export class PermissionsService {
     }
   }
 
+  @UseCache((args) => `permission:sys:${args[0]}`)
   async getMySysPermissions(userId: number): Promise<UserPermissionsResponseDto> {
     try {
       const permissions = await this.usersService.getUserPermissions(userId);
@@ -82,6 +89,7 @@ export class PermissionsService {
     }
   }
 
+  @UseCache((args) => `permission:project:${args[1]}:${args[0]}`)
   async getMyProjectPermissions(
     userId: number,
     projectId: number,
@@ -94,6 +102,7 @@ export class PermissionsService {
     }
   }
 
+  @UseCache((args) => `permission:board:${args[1]}:${args[0]}`)
   async getMyBoardPermissions(
     userId: number,
     boardId: number,

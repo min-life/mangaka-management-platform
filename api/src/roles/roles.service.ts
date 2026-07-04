@@ -13,13 +13,19 @@ import { ERROR } from '../share/constants/message-error';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { serializeRole } from '../share/utils/role-serializer';
+import { CacheService } from '../redis/cache.service';
+import { UseCache, InvalidateCache } from '../share/decorators/cache.decorator';
 
 @Injectable()
 export class RolesService {
   private readonly logger = new Logger(RolesService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cacheService: CacheService,
+  ) {}
 
+  @UseCache((args) => `role:list:${args[0] || 'all'}`)
   async findRoles(scope?: SCOPE) {
     try {
       const roles = await this.prisma.role.findMany({
@@ -33,6 +39,7 @@ export class RolesService {
     }
   }
 
+  @UseCache((args) => `role:${args[0]}`)
   async findOne(roleId: number) {
     try {
       const role = await this.ensureRole(roleId);
@@ -42,6 +49,7 @@ export class RolesService {
     }
   }
 
+  @InvalidateCache((args) => [`role:list:*`])
   async createRole(currentUserId: number, dto: CreateRoleDto) {
     try {
       const role = await this.prisma.$transaction(async (tx) => {
@@ -71,6 +79,7 @@ export class RolesService {
     }
   }
 
+  @InvalidateCache((args) => [`role:${args[0]}`, `role:list:*`, `permission:*`])
   async updateRole(roleId: number, dto: UpdateRoleDto) {
     const currentRole = await this.ensureRole(roleId);
     const nextScope = dto.scope ?? currentRole.scope;
@@ -114,6 +123,7 @@ export class RolesService {
     }
   }
 
+  @InvalidateCache((args) => [`role:${args[0]}`, `role:list:*`, `permission:*`])
   async deleteRole(roleId: number) {
     try {
       await this.ensureRole(roleId);
@@ -136,6 +146,7 @@ export class RolesService {
     }
   }
 
+  @UseCache((args) => `role:${args[0]}:permissions`)
   async findPermissions(roleId: number) {
     try {
       await this.ensureRole(roleId);
@@ -156,6 +167,7 @@ export class RolesService {
     }
   }
 
+  @InvalidateCache((args) => [`role:${args[0]}:permissions:*`, `permission:*`])
   async replacePermissions(roleId: number, permissionIds: number[]) {
     try {
       const role = await this.ensureRole(roleId);

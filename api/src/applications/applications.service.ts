@@ -15,6 +15,8 @@ import { ACTIVITY_EVENT_NAME, ActivityEventPayload } from '../share/events/activ
 import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { CacheService } from '../redis/cache.service';
+import { UseCache, InvalidateCache } from '../share/decorators/cache.decorator';
 
 const USER_BASIC_SELECT = {
   id: true,
@@ -86,8 +88,10 @@ export class ApplicationsService {
     private readonly eventEmitter: EventEmitter2,
     private readonly usersService: UsersService,
     private readonly realtimeGateway: RealtimeGateway,
+    private readonly cacheService: CacheService,
   ) {}
 
+  @UseCache((args) => `application:list`)
   async getApplications(
     filter?: {
       projectId?: number;
@@ -130,6 +134,7 @@ export class ApplicationsService {
     }
   }
 
+  @UseCache((args) => `application:${args[0]}`)
   async getApplicationById(id: number) {
     try {
       const application = await this.prisma.application.findUnique({
@@ -145,6 +150,7 @@ export class ApplicationsService {
     }
   }
 
+  @InvalidateCache((args) => [`application:${args[0]}`, `application:list:*`, `project:*:applications:*`])
   async updateApplication(
     id: number,
     data: {
@@ -192,6 +198,7 @@ export class ApplicationsService {
     }
   }
 
+  @InvalidateCache((args) => [`application:${args[0]}`, `application:list:*`, `project:*:applications:*`])
   async updateApplicationMaterial(id: number, userId: number, index: number, materialItem: any) {
     try {
       const application = await this.ensureApplication(id);
@@ -214,6 +221,7 @@ export class ApplicationsService {
     }
   }
 
+  @InvalidateCache((args) => [`application:${args[0]}`, `application:list:*`, `project:*:applications:*`])
   async deleteApplicationMaterial(id: number, userId: number, index: number) {
     try {
       const application = await this.ensureApplication(id);
@@ -236,6 +244,7 @@ export class ApplicationsService {
     }
   }
 
+  @InvalidateCache((args) => [`application:${args[0]}`, `application:list:*`, `project:*:applications:*`])
   async deleteApplication(id: number) {
     try {
       await this.ensureApplication(id);
@@ -245,11 +254,14 @@ export class ApplicationsService {
     }
   }
 
+  @InvalidateCache((args) => [`application:${args[0]}`, `application:list:*`, `project:*:applications:*`])
   async updateApplicationStatus(
     id: number,
     data: {
       status: APPLICATION_STATUS;
       userId: number;
+      voteDeadline?: string;
+      comment?: string;
     },
   ) {
     try {
@@ -303,14 +315,23 @@ export class ApplicationsService {
         ) {
           throw new BadRequestException(ERROR.EVLINTERNALAPPROVAL);
         }
+        if (data.voteDeadline && !permissions.includes('board:leader') && !permissions.includes('board:owner')) {
+          throw new ForbiddenException('Only board leaders and owners can set a vote deadline');
+        }
+      }
+
+      const updateData: any = {
+        status: data.status,
+        verifyBy: data.userId,
+      };
+
+      if (data.status === APPLICATION_STATUS.SUBMITTED && data.voteDeadline) {
+        updateData.voteDeadline = new Date(data.voteDeadline);
       }
 
       const updatedApp = await this.prisma.application.update({
         where: { id },
-        data: {
-          status: data.status,
-          verifyBy: data.userId,
-        },
+        data: updateData,
         select: APPLICATION_SELECT,
       });
 
@@ -379,6 +400,13 @@ export class ApplicationsService {
         }
       }
 
+      if (data.comment) {
+        await this.createComment(id, {
+          content: data.comment,
+          userId: data.userId,
+        });
+      }
+
       let action: ACTIVITY_ACTION = ACTIVITY_ACTION.APPLICATION_SUBMITTED;
       if (data.status === APPLICATION_STATUS.APPROVE) action = ACTIVITY_ACTION.APPLICATION_APPROVED;
       else if (data.status === APPLICATION_STATUS.REJECT) action = ACTIVITY_ACTION.APPLICATION_REJECTED;
@@ -402,6 +430,7 @@ export class ApplicationsService {
     }
   }
 
+  @UseCache((args) => `application:${args[0]}:votes`)
   async getVotes(applicationId: number) {
     try {
       await this.ensureApplication(applicationId);
@@ -434,7 +463,19 @@ export class ApplicationsService {
     comment?: string,
   ) {
     try {
-      await this.ensureApplication(applicationId);
+      const application = await this.ensureApplication(applicationId);
+
+      if (application.status !== APPLICATION_STATUS.SUBMITTED) {
+        throw new BadRequestException('Voting is only allowed when application is SUBMITTED');
+      }
+
+      if (!application.voteDeadline) {
+        throw new BadRequestException('Voting cannot start until a deadline is set by the board leader');
+      }
+
+      if (new Date() > new Date(application.voteDeadline)) {
+        throw new BadRequestException('The voting deadline has passed');
+      }
 
       const vote = await this.prisma.applicationVote.upsert({
         where: {
@@ -471,6 +512,7 @@ export class ApplicationsService {
     }
   }
 
+  @UseCache((args) => `application:${args[0]}:comments`)
   async getApplicationComments(
     applicationId: number,
     sort?: { field: 'createdAt'; order: 'asc' | 'desc' },
@@ -514,6 +556,7 @@ export class ApplicationsService {
     }
   }
 
+  @InvalidateCache((args) => [`application:${args[0]}:comments:*`])
   async createComment(
     applicationId: number,
     data: {
