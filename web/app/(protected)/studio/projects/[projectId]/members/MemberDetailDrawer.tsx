@@ -25,6 +25,7 @@ type MemberDetailDrawerProps = {
   onClose: () => void;
   onRemoveMember: (member: ProjectMemberResponse) => void;
   projectId: number;
+  project: any;
 };
 
 type InfoRowProps = {
@@ -66,6 +67,7 @@ export function MemberDetailDrawer({
   onClose,
   onRemoveMember,
   projectId,
+  project,
 }: MemberDetailDrawerProps) {
   const [detailMember, setDetailMember] = useState<ProjectMemberResponse | null>(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
@@ -88,7 +90,18 @@ export function MemberDetailDrawer({
     void getProjectMember(projectId, member.id)
       .then((result) => {
         if (isMounted) {
-          setDetailMember(result);
+          const isOwner = project && (project.createdBy === result.id || project.createdByUser?.id === result.id);
+          if (isOwner) {
+            setDetailMember({
+              ...result,
+              role: {
+                ...result.role,
+                name: 'Owner',
+              },
+            });
+          } else {
+            setDetailMember(result);
+          }
         }
       })
       .catch(() => {
@@ -105,7 +118,7 @@ export function MemberDetailDrawer({
     return () => {
       isMounted = false;
     };
-  }, [member, projectId]);
+  }, [member, projectId, project]);
 
   const activeMember = detailMember ?? member;
   const taskOverview = activeMember?.taskOverview;
@@ -248,45 +261,47 @@ export function MemberDetailDrawer({
                 </div>
               </section>
 
-              <section>
-                <h3 className="text-xs font-black uppercase tracking-[0.08em] text-white">
-                  Actions
-                </h3>
-                <div className="mt-3 overflow-hidden rounded-lg border border-[#303842] bg-[#151c25]">
-                  <div className="divide-y divide-[#303842]">
-                    <Can
-                      any={['project:member.update', 'project:owner']}
-                      resource="PROJECT"
-                      resourceId={projectId}
-                    >
-                      <button
-                        className="flex h-10 w-full items-center gap-3 px-4 text-left text-xs font-black text-[#dce7f3] transition-colors hover:bg-[#202832] hover:text-white"
-                        onClick={() => onChangeRole(activeMember)}
-                        type="button"
+              {activeMember.role.name !== 'Owner' && (
+                <section>
+                  <h3 className="text-xs font-black uppercase tracking-[0.08em] text-white">
+                    Actions
+                  </h3>
+                  <div className="mt-3 overflow-hidden rounded-lg border border-[#303842] bg-[#151c25]">
+                    <div className="divide-y divide-[#303842]">
+                      <Can
+                        any={['project:member.update', 'project:owner']}
+                        resource="PROJECT"
+                        resourceId={projectId}
                       >
-                        <UserCog className="size-4 text-[#FFD369]" />
-                        Change Role
-                      </button>
-                    </Can>
-                  </div>
-                  <div className="border-t border-[#303842]">
-                    <Can
-                      any={['project:member.remove', 'project:owner']}
-                      resource="PROJECT"
-                      resourceId={projectId}
-                    >
-                      <button
-                        className="flex h-10 w-full items-center gap-3 px-4 text-left text-xs font-black text-red-300 transition-colors hover:bg-red-950/30 hover:text-red-200"
-                        onClick={() => onRemoveMember(activeMember)}
-                        type="button"
+                        <button
+                          className="flex h-10 w-full items-center gap-3 px-4 text-left text-xs font-black text-[#dce7f3] transition-colors hover:bg-[#202832] hover:text-white"
+                          onClick={() => onChangeRole(activeMember)}
+                          type="button"
+                        >
+                          <UserCog className="size-4 text-[#FFD369]" />
+                          Change Role
+                        </button>
+                      </Can>
+                    </div>
+                    <div className="border-t border-[#303842]">
+                      <Can
+                        any={['project:member.remove', 'project:owner']}
+                        resource="PROJECT"
+                        resourceId={projectId}
                       >
-                        <Trash2 className="size-4" />
-                        Remove Member
-                      </button>
-                    </Can>
+                        <button
+                          className="flex h-10 w-full items-center gap-3 px-4 text-left text-xs font-black text-red-300 transition-colors hover:bg-red-950/30 hover:text-red-200"
+                          onClick={() => onRemoveMember(activeMember)}
+                          type="button"
+                        >
+                          <Trash2 className="size-4" />
+                          Remove Member
+                        </button>
+                      </Can>
+                    </div>
                   </div>
-                </div>
-              </section>
+                </section>
+              )}
             </div>
           </>
         ) : null}

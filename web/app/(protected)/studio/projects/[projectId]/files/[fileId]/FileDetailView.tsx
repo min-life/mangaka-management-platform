@@ -320,6 +320,8 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
           selectedVersion={selectedVersion}
           tasks={tasks}
           versions={versions}
+          members={members}
+          onRefresh={loadFile}
         />
 
         <MobileTaskDrawer
@@ -357,6 +359,8 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
           selectedVersion={selectedVersion}
           tasks={tasks}
           versions={versions}
+          members={members}
+          onRefresh={loadFile}
         />
       </div>
 
@@ -369,6 +373,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
       />
       <CreateAnnotatedTaskDialog
         members={members}
+        tasks={tasks}
         onCancel={() => {
           setPendingTaskRegion(null);
           setDraftRegion(null);

@@ -383,12 +383,12 @@ export function FileCanvas({ controller }: FileCanvasProps) {
               return (
                 <button
                   aria-label={`Open task ${task.title}`}
-                  className={`absolute border-2 bg-[#FFD369]/10 text-left transition-all ${
+                  className={`absolute border-2 transition-all ${
                     selectedTaskId === task.id
                       ? 'z-20 border-[#FFD369] bg-[#FFD369]/20'
                       : selectedTaskId
-                      ? 'z-10 border-[#FFD369]/30 opacity-35 hover:opacity-75'
-                      : 'z-10 border-[#FFD369]/70 hover:bg-[#FFD369]/20'
+                      ? 'z-10 border-transparent bg-transparent opacity-30 hover:opacity-100 hover:border-[#FFD369]/30 hover:bg-[#FFD369]/5'
+                      : 'z-10 border-transparent bg-transparent hover:border-[#FFD369]/50 hover:bg-[#FFD369]/10'
                   }`}
                   key={task.id}
                   onClick={(event) => {

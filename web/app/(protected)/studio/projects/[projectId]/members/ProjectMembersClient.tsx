@@ -7,7 +7,9 @@ import {
   getProjectMembers,
   removeProjectMember,
   updateProjectMember,
+  getProjectById,
   type ProjectMemberResponse,
+  type ProjectResponse,
 } from '@/services/project.service';
 import { getRoles, type RoleResponse } from '@/services/role.service';
 import { toast } from '@/lib/toast';
@@ -34,6 +36,8 @@ export function ProjectMembersClient({ projectId }: ProjectMembersClientProps) {
   const [removeDialogMember, setRemoveDialogMember] = useState<ProjectMemberResponse | null>(null);
   const [isSubmittingMemberAction, setIsSubmittingMemberAction] = useState(false);
 
+  const [project, setProject] = useState<ProjectResponse | null>(null);
+
   const loadMembers = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -51,6 +55,15 @@ export function ProjectMembersClient({ projectId }: ProjectMembersClientProps) {
     }
   }, [projectId]);
 
+  const loadProject = useCallback(async () => {
+    try {
+      const result = await getProjectById(projectId);
+      setProject(result);
+    } catch {
+      setProject(null);
+    }
+  }, [projectId]);
+
   const loadProjectRoles = useCallback(async () => {
     try {
       const roles = await getRoles('PRJ');
@@ -64,22 +77,37 @@ export function ProjectMembersClient({ projectId }: ProjectMembersClientProps) {
     queueMicrotask(() => {
       void loadMembers();
       void loadProjectRoles();
+      void loadProject();
     });
-  }, [loadMembers, loadProjectRoles]);
+  }, [loadMembers, loadProjectRoles, loadProject]);
 
   const filteredMembers = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
 
+    const mappedMembers = members.map((member) => {
+      const isOwner = project && (project.createdBy === member.id || project.createdByUser?.id === member.id);
+      if (isOwner) {
+        return {
+          ...member,
+          role: {
+            ...member.role,
+            name: 'Owner',
+          },
+        };
+      }
+      return member;
+    });
+
     if (!normalizedQuery) {
-      return members;
+      return mappedMembers;
     }
 
-    return members.filter((member) =>
+    return mappedMembers.filter((member) =>
       [member.displayName ?? '', member.email, member.role.name].some((value) =>
         value.toLowerCase().includes(normalizedQuery),
       ),
     );
-  }, [members, searchQuery]);
+  }, [members, searchQuery, project]);
 
   const subtitle = 'Manage project access and roles for this production workspace.';
 
@@ -179,6 +207,7 @@ export function ProjectMembersClient({ projectId }: ProjectMembersClientProps) {
         onClose={() => setSelectedMember(null)}
         onRemoveMember={handleOpenRemoveDialog}
         projectId={projectId}
+        project={project}
       />
       <ChangeMemberRoleDialog
         isSubmitting={isSubmittingMemberAction}

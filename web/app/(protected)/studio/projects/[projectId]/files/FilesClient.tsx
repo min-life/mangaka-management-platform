@@ -23,6 +23,8 @@ import { createMaterial } from '@/services/file.service';
 import { CreateProductionItemDialog } from './CreateProductionItemDialog';
 import { FileCollection, type FileViewMode } from './FileCollection';
 import { LoadingState } from '@/components/ui/loading-state';
+import { RefreshingIndicator } from '@/components/ui/refreshing-indicator';
+import { useAsyncResource } from '@/hooks/useAsyncResource';
 import { ArcGrid, ChapterGrid, ChapterWorkspaceHeader } from './FileFolderViews';
 import {
   getFolderBranchIds,
@@ -73,75 +75,71 @@ export function FilesClient({ projectId }: FilesClientProps) {
     const val = searchParams.get('chapterId');
     return val ? Number(val) : null;
   });
-  const [projectName, setProjectName] = useState<string>('');
-  const [folders, setFolders] = useState<ProjectFolderResponse[]>([]);
-  const [files, setFiles] = useState<FileExplorerItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<FileViewMode>('table');
-  const [folderCovers, setFolderCovers] = useState<Record<number, string>>({});
-  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const loadFolders = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
+  const { data, setData, error, isInitialLoading, isRefreshing, reload } = useAsyncResource(async () => {
+    let projName = '';
     try {
-      // Fetch project name for breadcrumb
-      void getProjectById(projectId)
-        .then((proj) => setProjectName(proj.name))
-        .catch(() => {});
+      const proj = await getProjectById(projectId);
+      projName = proj.name;
+    } catch {}
 
-      const result = await getProjectFolders(projectId, { type: 'ARC' });
-      const rootFolders = result.folders.map((folder) => ({
-        ...normalizeFolder(folder, projectId),
-        parentId: null,
-      }));
-      const childFolderGroups = await Promise.all(
-        rootFolders.map(async (folder) => {
-          try {
-            const childResult = await getFolderChildren(folder.id);
-            return childResult.folders.map((child) => ({
-              ...normalizeFolder(child, projectId),
-              parentId: folder.id,
-            }));
-          } catch {
-            return [];
-          }
-        }),
-      );
-      const apiFolders = [...rootFolders, ...childFolderGroups.flat()];
-      const productionFolders = apiFolders;
-      const apiFilesByFolder = await Promise.all(
-        apiFolders.map(async (folder) => {
-          try {
-            const folderFiles = await getFolderFiles(folder.id);
-            return folderFiles.files.map((file) => mapApiFileToExplorerItem(file, folder.id));
-          } catch {
-            return [];
-          }
-        }),
-      );
-      const apiFiles = apiFilesByFolder.flat();
+    const result = await getProjectFolders(projectId, { type: 'ARC' });
+    const rootFolders = result.folders.map((folder) => ({
+      ...normalizeFolder(folder, projectId),
+      parentId: null,
+    }));
+    const childFolderGroups = await Promise.all(
+      rootFolders.map(async (folder) => {
+        try {
+          const childResult = await getFolderChildren(folder.id);
+          return childResult.folders.map((child) => ({
+            ...normalizeFolder(child, projectId),
+            parentId: folder.id,
+          }));
+        } catch {
+          return [];
+        }
+      }),
+    );
+    const apiFolders = [...rootFolders, ...childFolderGroups.flat()];
+    const apiFilesByFolder = await Promise.all(
+      apiFolders.map(async (folder) => {
+        try {
+          const folderFiles = await getFolderFiles(folder.id);
+          return folderFiles.files.map((file) => mapApiFileToExplorerItem(file, folder.id));
+        } catch {
+          return [];
+        }
+      }),
+    );
+    const apiFiles = apiFilesByFolder.flat();
 
-      setFolders(productionFolders);
-      setFolderCovers(readStoredFolderCovers(projectId));
-      setFiles(apiFiles);
-    } catch {
-      setFolders([]);
-      setFiles([]);
-      setError('Unable to load project folders.');
-    } finally {
-      setIsLoading(false);
-    }
+    return {
+      projectName: projName,
+      folders: apiFolders,
+      files: apiFiles,
+      folderCovers: readStoredFolderCovers(projectId)
+    };
   }, [projectId]);
 
+  const folders = data?.folders ?? [];
+  const files = data?.files ?? [];
+  const projectName = data?.projectName ?? '';
+  const folderCovers = data?.folderCovers ?? {};
+
   useEffect(() => {
-    queueMicrotask(() => {
-      void loadFolders();
-    });
-  }, [loadFolders]);
+    if (selectedArcId && !selectedChapterId && folders.length > 0) {
+      const hasChapters = folders.some((folder) => folder.parentId === selectedArcId);
+      if (!hasChapters) {
+        setSelectedChapterId(selectedArcId);
+        updateUrlParams(selectedArcId, selectedArcId);
+      }
+    }
+  }, [selectedArcId, selectedChapterId, folders]);
+
 
   const visibleFiles = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -181,8 +179,7 @@ export function FilesClient({ projectId }: FilesClientProps) {
       return [];
     }
 
-    const directChildren = folders.filter((folder) => folder.parentId === selectedArc.id);
-    return directChildren.length ? directChildren : [selectedArc];
+    return folders.filter((folder) => folder.parentId === selectedArc.id);
   }, [folders, selectedArc]);
   const chapterFileCounts = useMemo(
     () =>
@@ -229,15 +226,19 @@ export function FilesClient({ projectId }: FilesClientProps) {
       }
 
       if (input.previewUrl) {
-        setFiles((currentFiles) =>
-          currentFiles.map((file) =>
-            file.id === createdFile.id ? { ...file, previewUrl: input.previewUrl } : file,
-          ),
-        );
+        setData((currentData) => {
+          if (!currentData) return null;
+          return {
+            ...currentData,
+            files: currentData.files.map((file) =>
+              file.id === createdFile.id ? { ...file, previewUrl: input.previewUrl } : file,
+            ),
+          };
+        });
       }
 
       toast.success(input.assetFile ? 'File created with initial material.' : 'File created.');
-      await loadFolders();
+      await reload();
     } catch {
       toast.error('Failed to create file. Please try again.');
     } finally {
@@ -263,10 +264,18 @@ export function FilesClient({ projectId }: FilesClientProps) {
   };
 
   const handleSelectArc = (arcId: number) => {
-    setSelectedArcId(arcId);
-    setSelectedChapterId(null);
-    setSearchQuery('');
-    updateUrlParams(arcId, null);
+    const hasChapters = folders.some((folder) => folder.parentId === arcId);
+    if (!hasChapters) {
+      setSelectedArcId(arcId);
+      setSelectedChapterId(arcId);
+      setSearchQuery('');
+      updateUrlParams(arcId, arcId);
+    } else {
+      setSelectedArcId(arcId);
+      setSelectedChapterId(null);
+      setSearchQuery('');
+      updateUrlParams(arcId, null);
+    }
   };
 
   const handleSelectChapter = (chapterId: number) => {
@@ -283,16 +292,24 @@ export function FilesClient({ projectId }: FilesClientProps) {
   };
 
   const handleBackToChapters = () => {
-    setSelectedChapterId(null);
-    setSearchQuery('');
-    updateUrlParams(selectedArcId, null);
+    const hasChapters = folders.some((folder) => folder.parentId === selectedArcId);
+    if (!hasChapters) {
+      handleBackToArcs();
+    } else {
+      setSelectedChapterId(null);
+      setSearchQuery('');
+      updateUrlParams(selectedArcId, null);
+    }
   };
 
   return (
     <section className="flex min-h-0 flex-1 flex-col px-5 py-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-[24px] font-black leading-8 text-white">Files</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-[24px] font-black leading-8 text-white">Files</h1>
+            <RefreshingIndicator isRefreshing={isRefreshing} />
+          </div>
           <p className="mt-1 text-sm font-medium text-[#aeb7c2]">
             Navigate production work by arc, chapter, then the files inside each chapter.
           </p>
@@ -335,80 +352,84 @@ export function FilesClient({ projectId }: FilesClientProps) {
 
 
       <div className="mt-4 min-h-[560px] flex-1 overflow-hidden rounded-[5px] border border-[#26303b] bg-[#101820]">
-        {isLoading ? (
-          <LoadingState message="Loading file workspace..." />
-        ) : folders.length ? (
-          selectedChapter ? (
-            <div className="min-h-[560px] overflow-hidden">
-              <div className="min-w-0">
-                <div className="flex h-12 items-center gap-3 border-b border-[#26303b] bg-[#0d151e] px-4">
-                  <button
-                    className="flex h-8 items-center gap-2 rounded-[4px] px-2 text-xs font-black text-[#aeb7c2] hover:bg-[#17202b] hover:text-white"
-                    onClick={handleBackToChapters}
-                    type="button"
-                  >
-                    <ChevronLeft className="size-4" />
-                    Chapters
-                  </button>
-                  <span className="h-4 w-px bg-[#303842]" />
-                  <p className="truncate text-sm font-black text-white">{selectedChapter.title}</p>
-                </div>
-                <ChapterWorkspaceHeader
-                  fileCount={chapterFileCounts[selectedChapter.id] ?? 0}
-                  folderCovers={folderCovers}
-                  selectedChapter={selectedChapter}
-                />
-                <FileCollection
-                  files={visibleFiles}
-                  onSearchChange={setSearchQuery}
-                  onSelectFile={(file) =>
-                    router.push(
-                      `/studio/projects/${projectId}/files/${file.id}?arcId=${selectedArcId ?? ''}&chapterId=${selectedChapterId ?? ''}`
-                    )
-                  }
-                  onViewModeChange={setViewMode}
-                  searchQuery={searchQuery}
-                  selectedFileId={null}
-                  viewMode={viewMode}
-                />
-              </div>
-            </div>
-          ) : selectedArc ? (
-            <ChapterGrid
-              chapters={chapters}
-              fileCounts={chapterFileCounts}
-              folderCovers={folderCovers}
-              onBack={handleBackToArcs}
-              onSelectChapter={handleSelectChapter}
-              selectedArc={selectedArc}
-              selectedArcIndex={arcs.findIndex((arc) => arc.id === selectedArc.id)}
-            />
-          ) : (
-            <ArcGrid
-              arcs={arcs}
-              assetRoots={assetRoots}
-              chapterCounts={Object.fromEntries(
-                arcs.map((arc) => [
-                  arc.id,
-                  folders.filter((folder) => folder.parentId === arc.id).length || 1,
-                ]),
-              )}
-              fileCounts={chapterFileCounts}
-              folderCovers={folderCovers}
-              folders={folders}
-              onSelectAssetLibrary={handleSelectChapter}
-              onSelectArc={handleSelectArc}
-            />
-          )
+        {isInitialLoading ? (
+          <LoadingState message="Loading file workspace..." minHeight="560px" />
         ) : (
-          <div className="grid min-h-[560px] place-items-center px-6 text-center">
-            <div>
-              <FolderOpen className="mx-auto size-9 text-[#5b626d]" />
-              <p className="mt-3 text-sm font-black text-white">No project folders yet</p>
-              <p className="mt-1 text-xs font-bold text-[#8b94a1]">
-                Create the first folder to start organizing production records.
-              </p>
-            </div>
+          <div className={`transition-opacity duration-200 ${isRefreshing ? 'opacity-50 pointer-events-none' : ''}`}>
+            {folders.length ? (
+              selectedChapter ? (
+                <div className="min-h-[560px] overflow-hidden">
+                  <div className="min-w-0">
+                    <div className="flex h-12 items-center gap-3 border-b border-[#26303b] bg-[#0d151e] px-4">
+                      <button
+                        className="flex h-8 items-center gap-2 rounded-[4px] px-2 text-xs font-black text-[#aeb7c2] hover:bg-[#17202b] hover:text-white"
+                        onClick={handleBackToChapters}
+                        type="button"
+                      >
+                        <ChevronLeft className="size-4" />
+                        Chapters
+                      </button>
+                      <span className="h-4 w-px bg-[#303842]" />
+                      <p className="truncate text-sm font-black text-white">{selectedChapter.title}</p>
+                    </div>
+                    <ChapterWorkspaceHeader
+                      fileCount={chapterFileCounts[selectedChapter.id] ?? 0}
+                      folderCovers={folderCovers}
+                      selectedChapter={selectedChapter}
+                    />
+                    <FileCollection
+                      files={visibleFiles}
+                      onSearchChange={setSearchQuery}
+                      onSelectFile={(file) =>
+                        router.push(
+                          `/studio/projects/${projectId}/files/${file.id}?arcId=${selectedArcId ?? ''}&chapterId=${selectedChapterId ?? ''}`
+                        )
+                      }
+                      onViewModeChange={setViewMode}
+                      searchQuery={searchQuery}
+                      selectedFileId={null}
+                      viewMode={viewMode}
+                    />
+                  </div>
+                </div>
+              ) : selectedArc ? (
+                <ChapterGrid
+                  chapters={chapters}
+                  fileCounts={chapterFileCounts}
+                  folderCovers={folderCovers}
+                  onBack={handleBackToArcs}
+                  onSelectChapter={handleSelectChapter}
+                  selectedArc={selectedArc}
+                  selectedArcIndex={arcs.findIndex((arc) => arc.id === selectedArc.id)}
+                />
+              ) : (
+                <ArcGrid
+                  arcs={arcs}
+                  assetRoots={assetRoots}
+                  chapterCounts={Object.fromEntries(
+                    arcs.map((arc) => [
+                      arc.id,
+                      folders.filter((folder) => folder.parentId === arc.id).length,
+                    ]),
+                  )}
+                  fileCounts={chapterFileCounts}
+                  folderCovers={folderCovers}
+                  folders={folders}
+                  onSelectAssetLibrary={handleSelectChapter}
+                  onSelectArc={handleSelectArc}
+                />
+              )
+            ) : (
+              <div className="grid min-h-[560px] place-items-center px-6 text-center">
+                <div>
+                  <FolderOpen className="mx-auto size-9 text-[#5b626d]" />
+                  <p className="mt-3 text-sm font-black text-white">No project folders yet</p>
+                  <p className="mt-1 text-xs font-bold text-[#8b94a1]">
+                    Create the first folder to start organizing production records.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

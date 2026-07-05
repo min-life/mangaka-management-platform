@@ -21,6 +21,7 @@ export type TaskSubmission = {
 
 export type TaskWorkspaceItem = {
   assignee: string;
+  assigneeId?: number;
   description: string;
   dueDate: string;
   fileId: number;

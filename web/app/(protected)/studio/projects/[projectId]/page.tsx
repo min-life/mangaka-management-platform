@@ -123,7 +123,7 @@ export default function ProjectDashboardPage() {
   }, [projectId]);
 
   if (isLoading) {
-    return <LoadingState message="Loading project workspace..." minHeight="75vh" />;
+    return <LoadingState message="Loading project workspace..." minHeight="70vh" />;
   }
 
   if (!project) {

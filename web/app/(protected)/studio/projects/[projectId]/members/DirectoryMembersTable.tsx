@@ -169,20 +169,24 @@ export function DirectoryMembersTable({
                         <Eye className="size-4" />
                         View Details
                       </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="gap-2 rounded-[3px] text-xs font-bold focus:bg-[#303842] focus:text-white"
-                        onClick={() => onChangeRole(member)}
-                      >
-                        <UserCog className="size-4" />
-                        Change Role
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="gap-2 rounded-[3px] text-xs font-bold text-red-300 focus:bg-red-950/30 focus:text-red-200"
-                        onClick={() => onRemoveMember(member)}
-                      >
-                        <Trash2 className="size-4" />
-                        Remove Member
-                      </DropdownMenuItem>
+                      {member.role.name !== 'Owner' && (
+                        <>
+                          <DropdownMenuItem
+                            className="gap-2 rounded-[3px] text-xs font-bold focus:bg-[#303842] focus:text-white"
+                            onClick={() => onChangeRole(member)}
+                          >
+                            <UserCog className="size-4" />
+                            Change Role
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="gap-2 rounded-[3px] text-xs font-bold text-red-300 focus:bg-red-950/30 focus:text-red-200"
+                            onClick={() => onRemoveMember(member)}
+                          >
+                            <Trash2 className="size-4" />
+                            Remove Member
+                          </DropdownMenuItem>
+                        </>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>

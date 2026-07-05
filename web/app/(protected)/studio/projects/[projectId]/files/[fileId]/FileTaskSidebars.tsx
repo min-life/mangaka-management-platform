@@ -41,6 +41,8 @@ type FileTaskSidebarProps = {
   selectedVersion: FileVersionItem | null;
   tasks: FileTaskItem[];
   versions: FileVersionItem[];
+  members?: Array<{ id: number; name: string }>;
+  onRefresh?: () => void | Promise<void>;
 };
 
 type DesktopTaskSidebarProps = FileTaskSidebarProps & {
@@ -95,6 +97,8 @@ function TaskDetailPanel({
   onTaskChange,
   selectedSubmissionId,
   versions,
+  members,
+  onRefresh,
 }: Pick<
   FileTaskSidebarProps,
   | 'canReviewTask'
@@ -106,6 +110,8 @@ function TaskDetailPanel({
   | 'onTaskChange'
   | 'selectedSubmissionId'
   | 'versions'
+  | 'members'
+  | 'onRefresh'
 >) {
   if (!focusedTask) {
     return <EmptyTaskDetail />;
@@ -122,6 +128,8 @@ function TaskDetailPanel({
       selectedSubmissionId={selectedSubmissionId}
       task={focusedTask}
       targetVersion={getTargetVersion(focusedTask, versions)}
+      members={members}
+      onRefresh={onRefresh}
     />
   );
 }
@@ -146,6 +154,8 @@ export function DesktopTaskSidebar({
   selectedVersion,
   tasks,
   versions,
+  members,
+  onRefresh,
 }: DesktopTaskSidebarProps) {
   if (!isOpen) {
     return null;
@@ -196,6 +206,8 @@ export function DesktopTaskSidebar({
             onTaskChange={onTaskChange}
             selectedSubmissionId={selectedSubmissionId}
             versions={versions}
+            members={members}
+            onRefresh={onRefresh}
           />
         </section>
       </div>
@@ -227,6 +239,8 @@ export function MobileTaskDrawer({
   selectedTaskId,
   tasks,
   versions,
+  members,
+  onRefresh,
 }: MobileTaskDrawerProps) {
   if (!open) {
     return null;
@@ -263,6 +277,8 @@ export function MobileTaskDrawer({
               onTaskChange={onTaskChange}
               selectedSubmissionId={selectedSubmissionId}
               versions={versions}
+              members={members}
+              onRefresh={onRefresh}
             />
           </div>
         </div>

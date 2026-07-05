@@ -24,6 +24,8 @@ import {
   getFileMaterialVersions,
 } from '@/services/file.service';
 import { LoadingState } from '@/components/ui/loading-state';
+import { RefreshingIndicator } from '@/components/ui/refreshing-indicator';
+import { useAsyncResource } from '@/hooks/useAsyncResource';
 import { useAuth } from '@/hooks/useAuth';
 
 import { CreateTaskDialog } from './CreateTaskDialog';
@@ -51,147 +53,130 @@ const scopeLabels: Record<TaskScope, string> = {
 export function TasksClient({ projectId }: TasksClientProps) {
   const router = useRouter();
   const { user } = useAuth();
-  const [tasks, setTasks] = useState<TaskWorkspaceItem[]>([]);
-  const [projectFiles, setProjectFiles] = useState<{ id: number; title: string }[]>([]);
-  const [members, setMembers] = useState<{ id: number; name: string }[]>([]);
   const [query, setQuery] = useState('');
   const [scope, setScope] = useState<TaskScope>('ALL');
   const [view, setView] = useState<TaskView>('TABLE');
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  const { data, error, isInitialLoading, isRefreshing, reload } = useAsyncResource(async () => {
+    const foldersRes = await getProjectFolders(projectId);
+    const foldersList = foldersRes.folders || [];
+
+    let apiMembers: { id: number; name: string }[] = [];
     try {
-      // 1. Fetch folders
-      const foldersRes = await getProjectFolders(projectId);
-      const foldersList = foldersRes.folders || [];
+      const membersRes = await getProjectMembers(projectId);
+      apiMembers = (membersRes.members || []).map((m) => ({
+        id: m.id,
+        name: m.displayName || m.email,
+      }));
+    } catch (err) {
+      console.error('Failed to load project members:', err);
+    }
 
-      // 2. Fetch members
+    const filesPromises = foldersList.map(async (folder) => {
       try {
-        const membersRes = await getProjectMembers(projectId);
-        setMembers(
-          (membersRes.members || []).map((m) => ({
-            id: m.id,
-            name: m.displayName || m.email,
-          })),
-        );
-      } catch (err) {
-        console.error('Failed to load project members:', err);
+        const filesResult = await getFolderFiles(folder.id);
+        return filesResult.files || [];
+      } catch {
+        return [];
       }
+    });
+    const filesArrays = await Promise.all(filesPromises);
+    const allFiles = filesArrays.flat();
+    const apiProjectFiles = allFiles.map((f) => ({ id: f.id, title: f.title }));
 
-      // 3. Fetch files for each folder
-      const filesPromises = foldersList.map(async (folder) => {
+    const tasksPromises = allFiles.map(async (file) => {
+      try {
+        const dbTasks = await getFileTasks(file.id);
+
+        let previewUrl = '';
+        let fileVersions: any[] = [];
         try {
-          const filesResult = await getFolderFiles(folder.id);
-          return filesResult.files || [];
+          const versionsRes = await getFileMaterialVersions(file.id);
+          const rawArray = (versionsRes as any).data || versionsRes.versions || [];
+          fileVersions = rawArray.map((v: any, index: number, arr: any[]) => ({
+            createdAt: v.createdAt,
+            version: arr.length - index,
+          }));
+          const latestVersion = rawArray[0];
+          if (latestVersion) {
+            const thumbnailMaterial =
+              latestVersion.materials.find((m: any) => m.isThumbnail) || latestVersion.materials[0];
+            previewUrl = thumbnailMaterial?.downloadUrl || thumbnailMaterial?.url || '';
+          }
         } catch {
-          return [];
+          // ignore previewUrl errors
         }
-      });
-      const filesArrays = await Promise.all(filesPromises);
-      const allFiles = filesArrays.flat();
-      setProjectFiles(allFiles.map((f) => ({ id: f.id, title: f.title })));
 
-      // 4. Fetch tasks for each file
-      const tasksPromises = allFiles.map(async (file) => {
-        try {
-          const dbTasks = await getFileTasks(file.id);
-
-          // Get previewUrl for the file
-          let previewUrl = '';
-          let fileVersions: any[] = [];
-          try {
-            const versionsRes = await getFileMaterialVersions(file.id);
-            const rawArray = (versionsRes as any).data || versionsRes.versions || [];
-            fileVersions = rawArray.map((v: any, index: number, arr: any[]) => ({
-              createdAt: v.createdAt,
-              version: arr.length - index,
-            }));
-            const latestVersion = rawArray[0];
-            if (latestVersion) {
-              const thumbnailMaterial =
-                latestVersion.materials.find((m: any) => m.isThumbnail) || latestVersion.materials[0];
-              previewUrl = thumbnailMaterial?.downloadUrl || thumbnailMaterial?.url || '';
+        return dbTasks.map((t: any) => {
+          const frame = t.commentFrames?.[0];
+          const region = frame
+            ? {
+              startX: Number(frame.startX),
+              startY: Number(frame.startY),
+              endX: Number(frame.endX),
+              endY: Number(frame.endY),
             }
-          } catch {
-            // ignore previewUrl errors
+            : undefined;
+
+          const assigneeName = t.assignedByUser?.displayName || t.assignedByUser?.email || 'Unassigned';
+
+          const versionMatch = t.description?.match(/\[version:(v\d+)\]/);
+          let taskVersion = versionMatch ? versionMatch[1] : undefined;
+
+          if (!taskVersion && fileVersions.length > 0 && t.createdAt) {
+            const sorted = [...fileVersions].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+            const taskTime = new Date(t.createdAt).getTime();
+            let matchedVer = sorted[0];
+            for (const v of sorted) {
+              if (new Date(v.createdAt).getTime() <= taskTime) {
+                matchedVer = v;
+              } else {
+                break;
+              }
+            }
+            if (matchedVer) {
+              taskVersion = `v${matchedVer.version}`;
+            }
           }
 
-          return dbTasks.map((t: any) => {
-            const frame = t.commentFrames?.[0];
-            const region = frame
-              ? {
-                startX: Number(frame.startX),
-                startY: Number(frame.startY),
-                endX: Number(frame.endX),
-                endY: Number(frame.endY),
-              }
-              : undefined;
+          const cleanDesc = t.description ? t.description.replace(/\s*\[version:v\d+\]/g, '') : '';
 
-            const assigneeName = t.assignedByUser?.displayName || t.assignedByUser?.email || 'Unassigned';
+          return {
+            assignee: assigneeName,
+            description: cleanDesc,
+            dueDate: t.deadline ? new Date(t.deadline).toLocaleDateString() : 'No due date',
+            fileId: file.id,
+            fileTitle: file.title,
+            id: String(t.id),
+            isMine: user?.id != null && t.assignedByUser?.id === user.id,
+            previewUrl,
+            priority: 'MEDIUM',
+            region,
+            status: t.status,
+            submissions: [],
+            title: t.title,
+            updatedAt: new Date(t.updatedAt).toLocaleDateString(),
+            targetVersion: taskVersion,
+          } as TaskWorkspaceItem;
+        });
+      } catch {
+        return [];
+      }
+    });
 
-            const versionMatch = t.description?.match(/\[version:(v\d+)\]/);
-            let taskVersion = versionMatch ? versionMatch[1] : undefined;
+    const tasksArrays = await Promise.all(tasksPromises);
+    const allTasks = tasksArrays.flat();
 
-            if (!taskVersion && fileVersions.length > 0 && t.createdAt) {
-              const sorted = [...fileVersions].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-              const taskTime = new Date(t.createdAt).getTime();
-              let matchedVer = sorted[0];
-              for (const v of sorted) {
-                if (new Date(v.createdAt).getTime() <= taskTime) {
-                  matchedVer = v;
-                } else {
-                  break;
-                }
-              }
-              if (matchedVer) {
-                taskVersion = `v${matchedVer.version}`;
-              }
-            }
-
-            const cleanDesc = t.description ? t.description.replace(/\s*\[version:v\d+\]/g, '') : '';
-
-            return {
-              assignee: assigneeName,
-              description: cleanDesc,
-              dueDate: t.deadline ? new Date(t.deadline).toLocaleDateString() : 'No due date',
-              fileId: file.id,
-              fileTitle: file.title,
-              id: String(t.id),
-              isMine: user?.id != null && t.assignedByUser?.id === user.id,
-              previewUrl,
-              priority: 'MEDIUM',
-              region,
-              status: t.status,
-              submissions: [],
-              title: t.title,
-              updatedAt: new Date(t.updatedAt).toLocaleDateString(),
-              targetVersion: taskVersion,
-            } as TaskWorkspaceItem;
-          });
-        } catch {
-          return [];
-        }
-      });
-
-      const tasksArrays = await Promise.all(tasksPromises);
-      const allTasks = tasksArrays.flat();
-
-      setTasks(allTasks);
-    } catch {
-      setError('Unable to load tasks.');
-    } finally {
-      setIsLoading(false);
-    }
+    return {
+      members: apiMembers,
+      projectFiles: apiProjectFiles,
+      tasks: allTasks
+    };
   }, [projectId]);
 
-  useEffect(() => {
-    queueMicrotask(() => {
-      void loadData();
-    });
-  }, [loadData]);
+  const members = data?.members ?? [];
+  const projectFiles = data?.projectFiles ?? [];
+  const tasks = data?.tasks ?? [];
 
   const visibleTasks = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -237,7 +222,7 @@ export function TasksClient({ projectId }: TasksClientProps) {
         assignedBy: input.assignedToId,
       });
 
-      await loadData();
+      await reload();
       toast.success('Task created.');
     } catch (err) {
       console.error('Failed to create task:', err);
@@ -273,7 +258,7 @@ export function TasksClient({ projectId }: TasksClientProps) {
     },
   ];
 
-  if (isLoading) {
+  if (isInitialLoading) {
     return (
       <LoadingState message="Loading production tasks..." minHeight="70vh" />
     );
@@ -283,7 +268,10 @@ export function TasksClient({ projectId }: TasksClientProps) {
     <section className="min-h-full bg-[#101820] px-5 py-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-white">Production Tasks</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-black text-white">Production Tasks</h1>
+            <RefreshingIndicator isRefreshing={isRefreshing} />
+          </div>
           <p className="mt-1 text-sm font-medium text-[#aeb7c2]">
             Assign, produce, submit, and review work linked to manga files.
           </p>
@@ -309,7 +297,7 @@ export function TasksClient({ projectId }: TasksClientProps) {
         ))}
       </div>
 
-      <div className="mt-5 border border-[#303842] bg-[#0d151e]">
+      <div className={`mt-5 border border-[#303842] bg-[#0d151e] transition-opacity duration-200 ${isRefreshing ? 'opacity-50 pointer-events-none' : ''}`}>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#303842] px-4 py-3">
           <div className="flex min-w-[240px] flex-1 items-center gap-2 border border-[#39424f] bg-[#151c25] px-3">
             <Search className="size-4 text-[#8b94a1]" />

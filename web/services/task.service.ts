@@ -39,6 +39,7 @@ export type UpdateTaskPayload = {
   parentId?: number;
   status?: TaskStatus;
   title?: string;
+  deadline?: string;
 };
 
 type TaskItemResponse = {
@@ -74,9 +75,7 @@ export type TaskFrameResponse = TaskFramePayload & {
 };
 
 export async function createTaskFrame(taskId: number | string, payload: TaskFramePayload) {
-  // Backend TaskCommentFrame API is not implemented yet, mock return to prevent 404 AxiosErrors
-  console.info(`[Mock] createTaskFrame for taskId: ${taskId}`, payload);
-  return {
+  const frame = {
     id: Date.now(),
     taskId: Number(taskId),
     startX: payload.startX,
@@ -87,19 +86,87 @@ export async function createTaskFrame(taskId: number | string, payload: TaskFram
     updatedAt: new Date().toISOString(),
     createdBy: null,
     updatedBy: null,
-  } as any;
+  };
+
+  if (typeof window !== 'undefined') {
+    const key = `inkly-task-frames:${taskId}`;
+    const existing = getStoredTaskFrames(taskId);
+    window.localStorage.setItem(key, JSON.stringify([...existing, frame]));
+  }
+
+  return frame as any;
 }
 
 export async function getTaskFrames(taskId: number | string): Promise<TaskFrameResponse[]> {
-  // Backend TaskCommentFrame API is not implemented yet, return empty array to prevent 404 AxiosErrors
-  return [];
+  return getStoredTaskFrames(taskId);
+}
+
+function getStoredTaskFrames(taskId: number | string): TaskFrameResponse[] {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+  const key = `inkly-task-frames:${taskId}`;
+  const stored = window.localStorage.getItem(key);
+  if (!stored) {
+    return [];
+  }
+  try {
+    return JSON.parse(stored) as TaskFrameResponse[];
+  } catch {
+    return [];
+  }
 }
 
 export async function getMyTasks(query: { me: boolean; limit?: number; page?: number }) {
-  const response = await api.get<{ data: TaskResponse[] }, { data: TaskResponse[] }>('/tasks', {
+  const response = await api.get<{ data: TaskResponse[]; pagination?: any }, { data: TaskResponse[]; pagination?: any }>('/tasks', {
     params: query,
   });
+  return {
+    tasks: response.data ?? [],
+    pagination: response.pagination,
+  };
+}
+
+export async function getProjectTasks(
+  projectId: number | string,
+  query?: {
+    me?: boolean;
+    search?: string;
+    status?: string;
+    field?: string;
+    order?: string;
+    page?: number;
+    limit?: number;
+  },
+) {
+  const response = await api.get<{ data: TaskResponse[] }, { data: TaskResponse[] }>(
+    `/projects/${projectId}/tasks`,
+    { params: query },
+  );
   return response.data ?? [];
+}
+
+export async function getTaskChildren(
+  taskId: number | string,
+  query?: {
+    search?: string;
+    status?: string;
+    field?: string;
+    order?: string;
+    page?: number;
+    limit?: number;
+  },
+) {
+  const response = await api.get<{ data: TaskResponse[] }, { data: TaskResponse[] }>(
+    `/tasks/${taskId}/children`,
+    { params: query },
+  );
+  return response.data ?? [];
+}
+
+export async function getTaskMaterials(taskId: number | string) {
+  const response = await api.get<any, any>(`/tasks/${taskId}/materials`);
+  return response.data ?? response;
 }
 
 export async function getTaskComments(taskId: number | string) {
@@ -111,3 +178,4 @@ export async function createTaskComment(taskId: number | string, content: string
   const response = await api.post<{ data: any }, { data: any }>(`/tasks/${taskId}/comments`, { content });
   return response.data ?? response;
 }
+
