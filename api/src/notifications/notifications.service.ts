@@ -61,4 +61,15 @@ export class NotificationsService {
       throw new InternalServerErrorException('Mark all notifications as read fail');
     }
   }
+  async getUnreadCount(userId: number) {
+    try {
+      const count = await this.prisma.notification.count({
+        where: { userId, isRead: false },
+      });
+      return { count };
+    } catch (error) {
+      this.logger.error('Get unread notifications count fail', error);
+      throw new InternalServerErrorException('Get unread notifications count fail');
+    }
+  }
 }

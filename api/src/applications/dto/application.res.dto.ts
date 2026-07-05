@@ -47,7 +47,7 @@ export class ApplicationResDto {
   })
   materials?: unknown | null;
 
-  @ApiProperty({ enum: APPLICATION_TYPE, example: APPLICATION_TYPE.PUBLISH_REQUEST })
+  @ApiProperty({ enum: APPLICATION_TYPE, example: APPLICATION_TYPE.CREATE_CHAPTER })
   type!: APPLICATION_TYPE;
 
   @ApiProperty({ enum: APPLICATION_STATUS, example: APPLICATION_STATUS.PENDING })

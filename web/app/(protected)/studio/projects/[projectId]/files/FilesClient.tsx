@@ -1,34 +1,35 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { toast } from '@/lib/toast';
 import {
   ChevronLeft,
   ChevronRight,
-  Database,
   FolderOpen,
 } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
 import {
-  createProjectFolder,
+  createFolderFile,
+  getFolderChildren,
+  getFolderFiles,
   getProjectFolders,
+  getProjectById,
   type ProjectFolderResponse,
+  type ProjectFileResponse,
 } from '@/services/project.service';
+import { createMaterial } from '@/services/file.service';
 
 import { CreateProductionItemDialog } from './CreateProductionItemDialog';
 import { FileCollection, type FileViewMode } from './FileCollection';
+import { LoadingState } from '@/components/ui/loading-state';
 import { ArcGrid, ChapterGrid, ChapterWorkspaceHeader } from './FileFolderViews';
 import {
   getFolderBranchIds,
   isProductionAssetRoot,
   readStoredFolderCovers,
-  writeStoredFolderCover,
 } from './file-folder-utils';
 import {
-  buildDemoProductionFolders,
-  buildFallbackFiles,
-  FILES_LOCAL_STORAGE_KEY,
   type FileExplorerItem,
 } from './file-ui';
 
@@ -36,39 +37,97 @@ type FilesClientProps = {
   projectId: number;
 };
 
+function normalizeFolder(folder: ProjectFolderResponse, projectId: number): ProjectFolderResponse {
+  return {
+    ...folder,
+    parentId: folder.parentId ?? folder.parent?.id ?? null,
+    projectId: folder.projectId ?? projectId,
+  };
+}
+
+function mapApiFileToExplorerItem(file: ProjectFileResponse, folderId: number): FileExplorerItem {
+  return {
+    category: 'Production File',
+    createdAt: file.createdAt,
+    createdByLabel:
+      file.createdByUser?.displayName ?? file.createdByUser?.email ?? 'Project member',
+    description: file.description,
+    folderId: file.folderId ?? file.folder?.id ?? folderId,
+    id: file.id,
+    status: 'PENDING',
+    taskCount: 0,
+    title: file.title,
+    updatedAt: file.updatedAt,
+  };
+}
+
 export function FilesClient({ projectId }: FilesClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const [selectedArcId, setSelectedArcId] = useState<number | null>(() => {
+    const val = searchParams.get('arcId');
+    return val ? Number(val) : null;
+  });
+  const [selectedChapterId, setSelectedChapterId] = useState<number | null>(() => {
+    const val = searchParams.get('chapterId');
+    return val ? Number(val) : null;
+  });
+  const [projectName, setProjectName] = useState<string>('');
   const [folders, setFolders] = useState<ProjectFolderResponse[]>([]);
   const [files, setFiles] = useState<FileExplorerItem[]>([]);
-  const [selectedArcId, setSelectedArcId] = useState<number | null>(null);
-  const [selectedChapterId, setSelectedChapterId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<FileViewMode>('table');
   const [folderCovers, setFolderCovers] = useState<Record<number, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const loadFolders = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const result = await getProjectFolders(projectId);
-      const productionFolders = buildDemoProductionFolders(projectId, result.folders);
+      // Fetch project name for breadcrumb
+      void getProjectById(projectId)
+        .then((proj) => setProjectName(proj.name))
+        .catch(() => {});
+
+      const result = await getProjectFolders(projectId, { type: 'ARC' });
+      const rootFolders = result.folders.map((folder) => ({
+        ...normalizeFolder(folder, projectId),
+        parentId: null,
+      }));
+      const childFolderGroups = await Promise.all(
+        rootFolders.map(async (folder) => {
+          try {
+            const childResult = await getFolderChildren(folder.id);
+            return childResult.folders.map((child) => ({
+              ...normalizeFolder(child, projectId),
+              parentId: folder.id,
+            }));
+          } catch {
+            return [];
+          }
+        }),
+      );
+      const apiFolders = [...rootFolders, ...childFolderGroups.flat()];
+      const productionFolders = apiFolders;
+      const apiFilesByFolder = await Promise.all(
+        apiFolders.map(async (folder) => {
+          try {
+            const folderFiles = await getFolderFiles(folder.id);
+            return folderFiles.files.map((file) => mapApiFileToExplorerItem(file, folder.id));
+          } catch {
+            return [];
+          }
+        }),
+      );
+      const apiFiles = apiFilesByFolder.flat();
+
       setFolders(productionFolders);
       setFolderCovers(readStoredFolderCovers(projectId));
-      setFiles((currentFiles) => {
-        const storedFiles = window.sessionStorage.getItem(FILES_LOCAL_STORAGE_KEY);
-        const localFiles = storedFiles
-          ? (JSON.parse(storedFiles) as FileExplorerItem[]).filter(
-              (file) =>
-                file.folderId && productionFolders.some((folder) => folder.id === file.folderId),
-            )
-          : currentFiles.filter((file) => file.id <= -1000);
-        return [...buildFallbackFiles(productionFolders), ...localFiles];
-      });
+      setFiles(apiFiles);
     } catch {
       setFolders([]);
       setFiles([]);
@@ -135,83 +194,98 @@ export function FilesClient({ projectId }: FilesClientProps) {
     [files, folders],
   );
 
-  const handleCreateFolder = async (input: {
-    coverPreviewUrl?: string;
-    description?: string;
-    parentId?: number;
-    title: string;
-  }) => {
-    setIsSubmitting(true);
-    setError(null);
-
-    try {
-      const createdFolder = await createProjectFolder(projectId, input);
-      if (input.coverPreviewUrl) {
-        writeStoredFolderCover(projectId, createdFolder.id, input.coverPreviewUrl);
-        setFolderCovers((current) => ({
-          ...current,
-          [createdFolder.id]: input.coverPreviewUrl ?? '',
-        }));
-      }
-      setSuccessMessage('Folder created successfully.');
-      await loadFolders();
-    } catch {
-      setError('Unable to create folder.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleCreateFallbackFile = (input: {
+  const handleCreateFile = async (input: {
+    assetFile?: File;
     description?: string;
     folderId: number;
     previewUrl?: string;
     title: string;
   }) => {
-    const now = new Date().toISOString();
-    const nextLocalId = Math.min(-1000, ...files.map((file) => file.id)) - 1;
-    const nextFile: FileExplorerItem = {
-      category: 'Production File *',
-      createdAt: now,
-      createdByLabel: 'Current user *',
-      description: input.description ?? null,
-      folderId: input.folderId,
-      id: nextLocalId,
-      isFallback: true,
-      previewUrl: input.previewUrl,
-      status: 'PENDING',
-      taskCount: 0,
-      title: `${input.title} *`,
-      updatedAt: now,
-    };
+    setIsSubmitting(true);
 
-    setFiles((currentFiles) => [...currentFiles, nextFile]);
-    const storedFiles = window.sessionStorage.getItem(FILES_LOCAL_STORAGE_KEY);
-    const localFiles = storedFiles ? (JSON.parse(storedFiles) as FileExplorerItem[]) : [];
-    window.sessionStorage.setItem(FILES_LOCAL_STORAGE_KEY, JSON.stringify([...localFiles, nextFile]));
-    setSuccessMessage('File record created in UI fallback mode. *');
+    try {
+      const createdFile = await createFolderFile(input.folderId, {
+        description: input.description,
+        title: input.title,
+      });
+
+      if (input.assetFile) {
+        const formData = new FormData();
+        formData.append('name', input.assetFile.name.replace(/\.[^/.]+$/, ''));
+
+        if (input.assetFile.type.startsWith('image/')) {
+          formData.append('image', input.assetFile);
+        } else if (
+          input.assetFile.type.startsWith('text/') ||
+          input.assetFile.type === 'application/pdf' ||
+          /\.(txt|doc|docx)$/i.test(input.assetFile.name)
+        ) {
+          formData.append('text', input.assetFile);
+        } else {
+          formData.append('source', input.assetFile);
+        }
+
+        await createMaterial(createdFile.id, formData);
+      }
+
+      if (input.previewUrl) {
+        setFiles((currentFiles) =>
+          currentFiles.map((file) =>
+            file.id === createdFile.id ? { ...file, previewUrl: input.previewUrl } : file,
+          ),
+        );
+      }
+
+      toast.success(input.assetFile ? 'File created with initial material.' : 'File created.');
+      await loadFolders();
+    } catch {
+      toast.error('Failed to create file. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const updateUrlParams = (arc: number | null, chap: number | null) => {
+    const params = new URLSearchParams(window.location.search);
+    if (arc !== null) {
+      params.set('arcId', String(arc));
+    } else {
+      params.delete('arcId');
+    }
+    if (chap !== null) {
+      params.set('chapterId', String(chap));
+    } else {
+      params.delete('chapterId');
+    }
+    const newSearch = params.toString();
+    const newUrl = `${window.location.pathname}${newSearch ? `?${newSearch}` : ''}`;
+    window.history.replaceState(null, '', newUrl);
   };
 
   const handleSelectArc = (arcId: number) => {
     setSelectedArcId(arcId);
     setSelectedChapterId(null);
     setSearchQuery('');
+    updateUrlParams(arcId, null);
   };
 
   const handleSelectChapter = (chapterId: number) => {
     setSelectedChapterId(chapterId);
     setSearchQuery('');
+    updateUrlParams(selectedArcId, chapterId);
   };
 
   const handleBackToArcs = () => {
     setSelectedArcId(null);
     setSelectedChapterId(null);
     setSearchQuery('');
+    updateUrlParams(null, null);
   };
 
   const handleBackToChapters = () => {
     setSelectedChapterId(null);
     setSearchQuery('');
+    updateUrlParams(selectedArcId, null);
   };
 
   return (
@@ -227,15 +301,14 @@ export function FilesClient({ projectId }: FilesClientProps) {
           <CreateProductionItemDialog
             folders={folders}
             isSubmitting={isSubmitting}
-            onCreateFile={handleCreateFallbackFile}
-            onCreateFolder={handleCreateFolder}
+            onCreateFile={handleCreateFile}
             selectedFolderId={selectedChapterId}
           />
         </div>
       </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-2 text-xs font-bold text-[#8b94a1]">
-        <span>Project #{projectId}</span>
+        <span>{projectName || `Project #${projectId}`}</span>
         <ChevronRight className="size-3.5" />
         <span className="text-white">Files</span>
         {selectedArc ? (
@@ -259,31 +332,11 @@ export function FilesClient({ projectId }: FilesClientProps) {
           {error}
         </p>
       ) : null}
-      {successMessage ? (
-        <button
-          className="mt-4 rounded-[4px] border border-[#315846] bg-[#14291f] px-4 py-3 text-left text-xs font-bold text-[#9df2c7]"
-          onClick={() => setSuccessMessage(null)}
-          type="button"
-        >
-          {successMessage}
-        </button>
-      ) : null}
 
-      <div className="mt-4 flex items-center justify-between border-y border-[#26303b] bg-[#151c25] px-4 py-2">
-        <div className="flex items-center gap-2 text-xs font-bold text-[#aeb7c2]">
-          <Database className="size-4 text-[#FFD369]" />
-          Folders use live API data. File records, materials, and tasks marked * use UI fallback.
-        </div>
-        <Badge className="rounded-[3px] border border-[#6c5516] bg-[#30270d] text-[#ffd35b]">
-          API-aware MVP
-        </Badge>
-      </div>
 
       <div className="mt-4 min-h-[560px] flex-1 overflow-hidden rounded-[5px] border border-[#26303b] bg-[#101820]">
         {isLoading ? (
-          <div className="grid h-full min-h-[560px] place-items-center text-sm font-bold text-[#aeb7c2]">
-            Loading file workspace...
-          </div>
+          <LoadingState message="Loading file workspace..." />
         ) : folders.length ? (
           selectedChapter ? (
             <div className="min-h-[560px] overflow-hidden">
@@ -309,7 +362,9 @@ export function FilesClient({ projectId }: FilesClientProps) {
                   files={visibleFiles}
                   onSearchChange={setSearchQuery}
                   onSelectFile={(file) =>
-                    router.push(`/studio/projects/${projectId}/files/${file.id}`)
+                    router.push(
+                      `/studio/projects/${projectId}/files/${file.id}?arcId=${selectedArcId ?? ''}&chapterId=${selectedChapterId ?? ''}`
+                    )
                   }
                   onViewModeChange={setViewMode}
                   searchQuery={searchQuery}

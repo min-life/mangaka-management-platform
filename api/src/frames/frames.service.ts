@@ -12,6 +12,8 @@ import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
 import { ACTIVITY_EVENT_NAME, ActivityEventPayload } from '../share/events/activity.event';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { CacheService } from '../redis/cache.service';
+import { UseCache, InvalidateCache } from '../share/decorators/cache.decorator';
 
 const USER_SELECT = {
   select: {
@@ -65,8 +67,10 @@ export class FramesService {
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
     private readonly realtimeGateway: RealtimeGateway,
+    private readonly cacheService: CacheService,
   ) {}
 
+  @UseCache((args) => `frame:${args[0]}`)
   async getFrameById(id: number) {
     try {
       return await this.ensureFrame(id);
@@ -75,6 +79,7 @@ export class FramesService {
     }
   }
 
+  @UseCache((args) => `material:${args[0]}:frames`)
   async getMaterialFrames(
     materialId: number,
     sort?: { field: 'createdAt'; order: 'asc' | 'desc' },
@@ -114,6 +119,7 @@ export class FramesService {
     }
   }
 
+  @InvalidateCache((args) => [`material:${args[0]}:frames:*`, `task:*:frames:*`])
   async createFrame(
     materialId: number,
     data: {
@@ -151,6 +157,7 @@ export class FramesService {
     }
   }
 
+  @InvalidateCache((args) => [`frame:${args[0]}`, `material:*:frames:*`, `task:*:frames:*`])
   async updateFrame(
     id: number,
     data: {
@@ -182,6 +189,7 @@ export class FramesService {
     }
   }
 
+  @InvalidateCache((args) => [`frame:${args[0]}`, `material:*:frames:*`, `task:*:frames:*`])
   async deleteFrame(id: number) {
     try {
       await this.ensureFrame(id);
@@ -191,6 +199,7 @@ export class FramesService {
     }
   }
 
+  @UseCache((args) => `frame:${args[0]}:comments`)
   async getFrameComments(
     frameId: number,
     sort?: { field: 'createdAt'; order: 'asc' | 'desc' },
@@ -235,6 +244,7 @@ export class FramesService {
     }
   }
 
+  @InvalidateCache((args) => [`frame:${args[0]}:comments:*`, `task:*:comments:*`])
   async createComment(
     frameId: number,
     data: {

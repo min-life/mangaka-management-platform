@@ -19,6 +19,12 @@ export class NotificationsController {
     return this.notificationsService.getNotifications(currentUser.userId);
   }
 
+  @ApiOperation({ summary: 'Get unread notification count' })
+  @Get('unread-count')
+  async getUnreadCount(@CurrentUser() currentUser: JwtPayload) {
+    return this.notificationsService.getUnreadCount(currentUser.userId);
+  }
+
   @ApiOperation({ summary: 'Mark a notification as read' })
   @ApiOkResponse({ description: 'Return updated notification', type: NotificationResponseDto })
   @Patch(':id/read')

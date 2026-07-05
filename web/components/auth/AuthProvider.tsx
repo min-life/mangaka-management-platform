@@ -4,7 +4,8 @@ import axios from 'axios';
 import { createContext, useCallback, useEffect, useMemo, useState } from 'react';
 
 import api from '@/lib/api';
-import { clearAccessToken } from '@/lib/auth-storage';
+import { clearAccessToken, getAccessToken } from '@/lib/auth-storage';
+import { logout as logoutRequest } from '@/services/auth.service';
 import { AUTH_LOGOUT_EVENT, type AuthContextType, type AuthStatus, type AuthUser } from '@/types/auth';
 
 type UserMeResponse = {
@@ -31,6 +32,10 @@ function normalizeUser(response: UserMeResponse): AuthUser {
 }
 
 async function checkCurrentUser(): Promise<AuthCheckResult> {
+  if (!getAccessToken()) {
+    return { status: 'unauthenticated' };
+  }
+
   try {
     const response = await api.get<UserMeResponse, UserMeResponse>('/users/me');
 
@@ -76,12 +81,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setStatus('error');
   }, []);
 
-  const logout = useCallback(() => {
+  const applyLoggedOutState = useCallback(() => {
     clearAccessToken();
     setUser(null);
     setError(null);
     setStatus('unauthenticated');
   }, []);
+
+  const logout = useCallback(async () => {
+    try {
+      await logoutRequest();
+    } catch (logoutError) {
+      console.error('Logout request failed:', logoutError);
+    } finally {
+      applyLoggedOutState();
+    }
+  }, [applyLoggedOutState]);
 
   const fetchCurrentUser = useCallback(async () => {
     applyAuthResult(await checkCurrentUser());
@@ -107,10 +122,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [applyAuthResult]);
 
   useEffect(() => {
-    window.addEventListener(AUTH_LOGOUT_EVENT, logout);
+    const handleLogoutEvent = () => {
+      void logout();
+    };
+
+    window.addEventListener(AUTH_LOGOUT_EVENT, handleLogoutEvent);
 
     return () => {
-      window.removeEventListener(AUTH_LOGOUT_EVENT, logout);
+      window.removeEventListener(AUTH_LOGOUT_EVENT, handleLogoutEvent);
     };
   }, [logout]);
 

@@ -1,5 +1,8 @@
 import api from '@/lib/api';
 import { compressImageFile } from '@/lib/image-upload';
+import { getActivityLogs, type ActivityLogResponse } from '@/services/activity-log.service';
+import { getNotifications } from '@/services/notification.service';
+import { getUsers, type UserResponse } from '@/services/user.service';
 
 export type Scope = 'SYS' | 'PRJ' | string;
 export type ProgressStatus = 'PENDING' | 'INPROGRESS' | 'REVIEW' | 'DONE';
@@ -41,7 +44,6 @@ export type UserProject = {
     projectId: number;
     metrics: {
       progress: number;
-      statusLabel: 'On Track' | 'Revision' | 'Blocked';
     };
     updatedAt: string;
   }>;
@@ -113,14 +115,8 @@ function normalizeProfile(user: ApiUserProfile): UserProfile {
 }
 
 function normalizeProject(project: ApiUserProject): UserProject {
-  const apiMetrics = project.projectStats?.[0]?.metrics as
-    | { progress?: unknown; statusLabel?: unknown }
-    | undefined;
+  const apiMetrics = project.projectStats?.[0]?.metrics as { progress?: unknown } | undefined;
   const progress = typeof apiMetrics?.progress === 'number' ? apiMetrics.progress : 0;
-  const statusLabel =
-    apiMetrics?.statusLabel === 'Revision' || apiMetrics?.statusLabel === 'Blocked'
-      ? apiMetrics.statusLabel
-      : 'On Track';
 
   return {
     ...project,
@@ -129,7 +125,6 @@ function normalizeProject(project: ApiUserProject): UserProject {
         id: project.projectStats?.[0]?.id ?? project.id,
         metrics: {
           progress,
-          statusLabel,
         },
         projectId: project.id,
         updatedAt: project.projectStats?.[0]?.updatedAt ?? project.updatedAt,
@@ -164,8 +159,174 @@ export async function getCurrentUserEditorBoards(userId?: number) {
   return unwrapData<UserEditorBoard[]>(response);
 }
 
-export async function getCurrentUserActivities(): Promise<UserActivity[]> {
-  return [];
+function formatActionTitle(action: string) {
+  return action
+    .toLowerCase()
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function formatTimeLabel(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat('en', {
+    hour: '2-digit',
+    minute: '2-digit',
+    month: 'short',
+    day: '2-digit',
+  }).format(date);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function getMetadataLabel(metadata: unknown, keys: string[]) {
+  if (!isRecord(metadata)) {
+    return null;
+  }
+
+  for (const key of keys) {
+    const value = metadata[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+// Resolves a participant's display label from a raw numeric id, looking it up
+// in the directory of users passed by the caller (see getCurrentUserContextActivities).
+function getParticipantName(id: unknown, usersById?: Map<number, UserResponse>): string | null {
+  if (typeof id !== 'number' || !Number.isFinite(id)) {
+    return null;
+  }
+
+  const user = usersById?.get(id);
+  return user?.displayName || user?.email || `User #${id}`;
+}
+
+function formatUserNameList(names: string[]): string | null {
+  if (names.length === 0) {
+    return null;
+  }
+
+  if (names.length === 1) {
+    return names[0];
+  }
+
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+export function mapActivityLogToUserActivity(
+  activity: ActivityLogResponse,
+  options?: {
+    editorBoards?: UserEditorBoard[];
+    users?: UserResponse[];
+  },
+): UserActivity {
+  const title = formatActionTitle(activity.action);
+  const metadata = isRecord(activity.metadata) ? activity.metadata : {};
+  const usersById = options?.users
+    ? new Map(options.users.map((user) => [user.id, user] as const))
+    : undefined;
+  const boardId =
+    activity.editorBoardId ?? (activity.entityType === 'EDITOR_BOARD' ? activity.entityId : null);
+  const editorBoardName =
+    options?.editorBoards?.find((board) => board.id === boardId)?.name ?? null;
+  const projectName =
+    getMetadataLabel(activity.metadata, ['projectName', 'fileName', 'folderName']) ??
+    editorBoardName ??
+    (activity.projectId
+      ? `Project #${activity.projectId}`
+      : boardId
+        ? `Editor Board #${boardId}`
+        : activity.entityType);
+  const actorName =
+    activity.actor?.displayName ?? activity.actor?.email ?? `User #${activity.actorId}`;
+  const resolvedEntityName = getMetadataLabel(activity.metadata, ['entityName']);
+  const entityLabel = activity.entityType.toLowerCase().replaceAll('_', ' ');
+  const entityName =
+    activity.entityType === 'EDITOR_BOARD' && editorBoardName
+      ? `editor board "${editorBoardName}"`
+      : resolvedEntityName
+        ? `${entityLabel} "${resolvedEntityName}"`
+        : `${entityLabel} #${activity.entityId}`;
+  const scopeLabel = editorBoardName ? `editor board "${editorBoardName}"` : entityName;
+
+  let description = `${actorName} performed ${title.toLowerCase()} on ${entityName}.`;
+
+  if (activity.action === 'MEMBER_INVITED') {
+    const invitedIds = Array.isArray(metadata.invitedUserIds)
+      ? metadata.invitedUserIds.filter(
+          (id): id is number => typeof id === 'number' && Number.isFinite(id),
+        )
+      : [];
+    const invitedNames = invitedIds.map((id) => getParticipantName(id, usersById));
+    const invitedList = formatUserNameList(
+      invitedNames.filter((name): name is string => Boolean(name)),
+    );
+
+    if (invitedList) {
+      description = `${actorName} added ${invitedList} to ${scopeLabel}.`;
+    }
+  } else if (activity.action === 'MEMBER_REMOVED') {
+    const removedName = getParticipantName(metadata.removedUserId, usersById);
+
+    if (removedName) {
+      description = `${actorName} removed ${removedName} from ${scopeLabel}.`;
+    }
+  }
+
+  return {
+    id: activity.id,
+    title,
+    description,
+    status: 'DONE',
+    projectName,
+    createdAt: activity.createdAt,
+    updatedAt: activity.createdAt,
+    timeLabel: formatTimeLabel(activity.createdAt),
+  };
+}
+
+// GET /activity-logs only returns logs where the current user is the actor, and
+// GET /notifications (no pagination on that endpoint) is the only source for logs
+// where the user is a participant (assigned, mentioned, project owner, etc). There
+// is no backend endpoint that unions the two, so we merge them here: fetch a
+// generous page of the user's own activity plus their full notification list, dedupe
+// by activity log id (a user can be both actor and recipient), and sort by recency.
+// Callers page through the result on the client (see ActivityTimeline in
+// user-profile-page.tsx) instead of requesting further pages from the server.
+const CONTEXT_ACTOR_ACTIVITY_LIMIT = 200;
+
+export async function getCurrentUserContextActivities(userId?: number): Promise<UserActivity[]> {
+  const [actorResult, notifications, editorBoards, users] = await Promise.all([
+    getActivityLogs({ limit: CONTEXT_ACTOR_ACTIVITY_LIMIT, page: 1 }),
+    getNotifications(),
+    getCurrentUserEditorBoards(userId).catch(() => []),
+    getUsers({ limit: 200 }).catch(() => []),
+  ]);
+
+  const activityById = new Map<number, ActivityLogResponse>();
+  for (const activity of actorResult.activities) {
+    activityById.set(activity.id, activity);
+  }
+  for (const notification of notifications) {
+    if (notification.activityLog) {
+      activityById.set(notification.activityLog.id, notification.activityLog);
+    }
+  }
+
+  return [...activityById.values()]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .map((activity) => mapActivityLogToUserActivity(activity, { editorBoards, users }));
 }
 
 export async function updateCurrentUserProfile(payload: UpdateProfilePayload) {
@@ -178,10 +339,10 @@ export async function updateCurrentUserProfile(payload: UpdateProfilePayload) {
 }
 
 export async function updateCurrentUserPassword(payload: UpdatePasswordPayload) {
-  const response = await api.patch<ApiResponse<{ success: boolean }>, ApiResponse<{ success: boolean }>>(
-    '/users/me/password',
-    payload,
-  );
+  const response = await api.patch<
+    ApiResponse<{ success: boolean }>,
+    ApiResponse<{ success: boolean }>
+  >('/users/me/password', payload);
 
   return unwrapData<{ success: boolean }>(response);
 }

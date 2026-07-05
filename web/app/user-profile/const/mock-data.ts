@@ -49,7 +49,7 @@ export const mockProjects: UserProject[] = [
       {
         id: 88,
         projectId: 45,
-        metrics: { progress: 72, statusLabel: 'On Track' },
+        metrics: { progress: 72 },
         updatedAt: '2026-06-24T14:20:00.000Z',
       },
     ],
@@ -76,7 +76,7 @@ export const mockProjects: UserProject[] = [
       {
         id: 89,
         projectId: 46,
-        metrics: { progress: 94, statusLabel: 'Revision' },
+        metrics: { progress: 94 },
         updatedAt: '2026-06-25T09:35:00.000Z',
       },
     ],

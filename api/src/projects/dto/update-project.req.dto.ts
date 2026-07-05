@@ -8,6 +8,16 @@ export class UpdateProjectReqDto {
   @IsString()
   name?: string;
 
+  @ApiPropertyOptional({ example: 'This is a description', nullable: true })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({ example: 'https://example.com/project.png', nullable: true })
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+
   @ApiPropertyOptional({ example: 1, nullable: true, minimum: 1, type: Number })
   @IsOptional()
   @ValidateIf((_, value) => value !== null)

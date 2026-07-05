@@ -42,3 +42,44 @@ export async function updateFrame(frameId: number | string, payload: UpdateFrame
 export async function deleteFrame(frameId: number | string) {
   await api.delete(`/frames/${frameId}`);
 }
+
+export type FrameCommentResponse = {
+  content: unknown;
+  createdAt: string;
+  createdByUser?: {
+    avatarUrl?: string | null;
+    displayName?: string | null;
+    email: string;
+    id: number;
+  } | null;
+  frame?: {
+    id: number;
+    name?: string | null;
+  } | null;
+  frameId?: number | null;
+  id: number;
+  material?: {
+    id: number;
+    name?: string | null;
+  } | null;
+  taskId?: number | null;
+  updatedAt: string;
+};
+
+export async function getFrameComments(frameId: number | string) {
+  const response = await api.get<
+    { data: FrameCommentResponse[] },
+    { data: FrameCommentResponse[] }
+  >(`/frames/${frameId}/comments`, { params: { page: 1, limit: 100 } });
+
+  return response.data ?? [];
+}
+
+export async function createFrameComment(frameId: number | string, content: unknown) {
+  const response = await api.post<
+    { data: FrameCommentResponse },
+    { data: FrameCommentResponse }
+  >(`/frames/${frameId}/comments`, { content });
+
+  return response.data;
+}

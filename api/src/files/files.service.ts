@@ -15,6 +15,8 @@ import type { Pagination } from '../share/interfaces';
 import { AwsS3Service } from '../share/services/aws-s3.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import sizeOf from 'image-size';
+import { CacheService } from '../redis/cache.service';
+import { UseCache, InvalidateCache } from '../share/decorators/cache.decorator';
 
 const USER_SELECT = {
   select: {
@@ -105,8 +107,10 @@ export class FilesService {
     private readonly eventEmitter: EventEmitter2,
     private readonly awsS3Service: AwsS3Service,
     private readonly realtimeGateway: RealtimeGateway,
+    private readonly cacheService: CacheService,
   ) {}
 
+  @UseCache((args) => `file:${args[0]}`)
   async getFileById(id: number) {
     try {
       const file = await this.prisma.file.findUnique({
@@ -122,6 +126,7 @@ export class FilesService {
     }
   }
 
+  @InvalidateCache((args) => [`file:${args[0]}`, `project:*:folders:*`])
   async updateFile(
     id: number,
     data: {
@@ -147,6 +152,7 @@ export class FilesService {
     }
   }
 
+  @InvalidateCache((args) => [`file:${args[0]}`, `project:*:folders:*`])
   async deleteFile(id: number) {
     try {
       await this.ensureFile(id);
@@ -156,6 +162,7 @@ export class FilesService {
     }
   }
 
+  @UseCache((args) => `file:${args[0]}:versions`)
   async getFileMaterialVersions(fileId: number, pagination?: Pagination) {
     try {
       await this.ensureFile(fileId);
@@ -204,6 +211,7 @@ export class FilesService {
     }
   }
 
+  @UseCache((args) => `file:${args[0]}:materials`)
   async getFileMaterials(fileId: number, pagination?: Pagination) {
     try {
       await this.ensureFile(fileId);
@@ -252,6 +260,7 @@ export class FilesService {
     }
   }
 
+  @InvalidateCache((args) => [`file:${args[0]}:versions:*`, `file:${args[0]}:materials:*`])
   async createMaterial(
     fileId: number,
     data: {
@@ -340,6 +349,7 @@ export class FilesService {
     }
   }
 
+  @UseCache((args) => `file:${args[0]}:tasks`)
   async getFileTasks(
     fileId: number,
     filter?: {
@@ -382,6 +392,7 @@ export class FilesService {
     }
   }
 
+  @InvalidateCache((args) => [`file:${args[0]}:tasks:*`, `project:*:tasks:*`])
   async createTask(
     fileId: number,
     data: {
@@ -433,6 +444,7 @@ export class FilesService {
     }
   }
 
+  @UseCache((args) => `file:${args[0]}:comments`)
   async getFileComments(
     fileId: number,
     sort?: { field: 'createdAt'; order: 'asc' | 'desc' },
@@ -476,6 +488,7 @@ export class FilesService {
     }
   }
 
+  @InvalidateCache((args) => [`file:${args[0]}:comments:*`])
   async createComment(
     fileId: number,
     data: {

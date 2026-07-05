@@ -1,31 +1,20 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
-  BarChart3,
-  Bell,
-  BookOpen,
-  ChevronDown,
   CircleGauge,
-  FolderOpen,
-  LayoutDashboard,
-  LogOut,
   MoreVertical,
   Plus,
   Search,
-  Settings,
   ShieldCheck,
   Trash2,
   User,
-  UserCheck,
   UserPlus,
   Users,
   X,
 } from 'lucide-react';
 
-import { StudioSidebar, type StudioSidebarItem } from '@/app/(protected)/studio/components/StudioSidebar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -42,20 +31,10 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Sheet,
   SheetContent,
@@ -72,48 +51,18 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useAuth } from '@/hooks/useAuth';
 import type { UserResponse } from '@/services/user.service';
 
 import {
   addEditorialMembers,
   getAvailableEditorialUsers,
-  getEditorialMemberActivities,
   getEditorialMembers,
   getEditorialMembersSummary,
   removeEditorialMember,
   setEditorialMemberAsLead,
   type EditorialMember,
   type EditorialMembersSummary,
-  type MemberActivity,
-  type MemberStatus,
 } from '../services/editorial-members-service';
-
-function getSidebarItems(editorBoardId: string): StudioSidebarItem[] {
-  const baseHref = `/studio/editor-boards/${editorBoardId}`;
-
-  return [
-    { href: '/studio', icon: LayoutDashboard, label: 'Dashboard', exact: true },
-    { href: `${baseHref}/projects`, icon: FolderOpen, label: 'Projects' },
-    { href: `${baseHref}/members`, icon: Users, label: 'Members' },
-    { href: `${baseHref}/applications`, icon: CircleGauge, label: 'Applications' },
-    { href: `${baseHref}/publishing`, icon: BookOpen, label: 'Publishing' },
-    { href: `${baseHref}/reports`, icon: BarChart3, label: 'Reports' },
-    { href: `${baseHref}/settings`, icon: Settings, label: 'Settings' },
-  ];
-}
-
-const statusLabels: Record<MemberStatus, string> = {
-  AVAILABLE: 'Available',
-  BUSY: 'Busy',
-  OFFLINE: 'Offline',
-};
-
-const statusClassNames: Record<MemberStatus, string> = {
-  AVAILABLE: 'border-emerald-400/20 bg-emerald-500/10 text-emerald-300',
-  BUSY: 'border-amber-400/20 bg-amber-500/10 text-[#FFD369]',
-  OFFLINE: 'border-[#50555D] bg-[#2f353e] text-[#C8C8C8]',
-};
 
 function getInitials(name?: string | null, email?: string) {
   const label = name || email || 'Member';
@@ -428,7 +377,7 @@ function MemberDetailDrawer({
                       {member.displayName ?? member.email}
                     </SheetTitle>
                     <SheetDescription className="text-sm text-[#C8C8C8]">
-                      {member.roleTitle}*
+                      {member.roleTitle}
                     </SheetDescription>
                   </div>
                 </div>
@@ -455,7 +404,7 @@ function MemberDetailDrawer({
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-[8px] border border-[#50555D] bg-[#0e141c] p-4">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                    Projects*
+                    Projects
                   </p>
                   <p className="mt-2 text-[28px] font-bold leading-8 text-white">
                     {member.activeProjects}
@@ -463,7 +412,7 @@ function MemberDetailDrawer({
                 </div>
                 <div className="rounded-[8px] border border-[#50555D] bg-[#0e141c] p-4">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                    Reviews*
+                    Reviews
                   </p>
                   <p className="mt-2 text-[28px] font-bold leading-8 text-[#FFD369]">
                     {member.reviewLoad}
@@ -477,12 +426,14 @@ function MemberDetailDrawer({
                 </p>
                 <div className="mt-3 flex items-center justify-between text-sm">
                   <span className="text-[#C8C8C8]">Lead privileges</span>
-                  <span className={member.isLead ? 'font-semibold text-emerald-300' : 'text-[#C8C8C8]'}>
+                  <span
+                    className={member.isLead ? 'font-semibold text-emerald-300' : 'text-[#C8C8C8]'}
+                  >
                     {member.isLead ? 'Enabled' : 'Disabled'}
                   </span>
                 </div>
                 <div className="mt-3 flex items-center justify-between text-sm">
-                  <span className="text-[#C8C8C8]">Joined*</span>
+                  <span className="text-[#C8C8C8]">Joined</span>
                   <span className="text-white">{formatDate(member.joinedAt)}</span>
                 </div>
               </div>
@@ -496,31 +447,26 @@ function MemberDetailDrawer({
 
 export function EditorialMembersManagementPage() {
   const params = useParams<{ editorBoardId?: string }>();
-  const { logout, user } = useAuth();
   const editorBoardId = params.editorBoardId ?? '1';
   const [members, setMembers] = useState<EditorialMember[]>([]);
-  const [activities, setActivities] = useState<MemberActivity[]>([]);
   const [summary, setSummary] = useState<EditorialMembersSummary | null>(null);
   const [selectedMember, setSelectedMember] = useState<EditorialMember | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | MemberStatus>('ALL');
 
   const loadMembers = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const [nextMembers, nextSummary, nextActivities] = await Promise.all([
+      const [nextMembers, nextSummary] = await Promise.all([
         getEditorialMembers(editorBoardId),
         getEditorialMembersSummary(editorBoardId),
-        getEditorialMemberActivities(),
       ]);
       setMembers(nextMembers);
       setSummary(nextSummary);
-      setActivities(nextActivities);
     } catch {
       setError('Unable to load editorial members.');
     } finally {
@@ -541,17 +487,10 @@ export function EditorialMembersManagementPage() {
         [member.displayName ?? '', member.email, member.roleTitle, member.region].some((value) =>
           value.toLowerCase().includes(normalizedSearch),
         );
-      const matchesStatus = statusFilter === 'ALL' || member.status === statusFilter;
 
-      return matchesSearch && matchesStatus;
+      return matchesSearch;
     });
-  }, [members, searchTerm, statusFilter]);
-
-  const sidebarItems = useMemo(() => getSidebarItems(editorBoardId), [editorBoardId]);
-  const displayName = user?.displayName || user?.email || 'Current user';
-  const email = user?.email ?? 'No email';
-  const roleLabel = user?.role ?? 'Workspace Member';
-  const initials = getInitials(displayName, email);
+  }, [members, searchTerm]);
 
   const handleAddMembers = async (users: UserResponse[]) => {
     setIsSubmitting(true);
@@ -612,91 +551,8 @@ export function EditorialMembersManagementPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#0e141c] text-[#dde3ef]">
-      <StudioSidebar items={sidebarItems} subtitle="Manga Production" />
-
-      <div className="min-w-0 flex-1">
-        <header className="flex h-16 items-center justify-between border-b border-[#393E46] bg-[#222831] px-6">
-          <div className="flex min-w-[360px] items-center gap-4">
-            <img alt="Inkly" className="h-[50px] w-auto object-contain" src="/brand/1.png" />
-            <div className="h-7 w-px bg-[#434A55]" />
-            <div className="leading-tight">
-              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8B93A5]">
-                Editor Board
-              </p>
-              <h1 className="text-[15px] font-semibold text-white">Members Management</h1>
-            </div>
-          </div>
-
-          <div className="relative mx-8 hidden w-full max-w-xl lg:block">
-            <Search className="absolute left-3 top-1/2 size-[18px] -translate-y-1/2 text-[#C8C8C8]" />
-            <Input
-              className="h-9 rounded-lg border-[#4b535f] bg-[#393E46] pl-10 text-sm font-medium text-white placeholder:text-[#8B93A5] focus-visible:border-[#FFD369] focus-visible:ring-[#FFD369]/20"
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Search members, regions, or roles..."
-              value={searchTerm}
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button className="relative rounded-lg p-2 text-[#B8BEC8] transition hover:bg-[#2F3742] hover:text-white" type="button">
-              <Bell className="size-5" />
-              <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full border border-[#222831] bg-[#FFD369]" />
-            </button>
-            <button className="rounded-lg p-2 text-[#B8BEC8] transition hover:bg-[#2F3742] hover:text-white" type="button">
-              <Settings className="size-5" />
-            </button>
-            <div className="mx-2 h-8 w-px bg-[#434A55]" />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-4 rounded-xl px-2 py-1.5 transition hover:bg-[#2F3742]" type="button">
-                  {user?.avatarUrl ? (
-                    <img alt={displayName} className="h-9 w-9 rounded-full border border-[#FFD369] object-cover" src={user.avatarUrl} />
-                  ) : (
-                    <span className="grid h-9 w-9 place-items-center rounded-full border border-[#FFD369] bg-[#101820] text-xs font-black text-white">
-                      {initials}
-                    </span>
-                  )}
-                  <div className="hidden text-left md:block">
-                    <p className="text-sm font-semibold leading-none text-white">{displayName}</p>
-                    <p className="mt-1 text-[11px] font-medium text-[#8B93A5]">{roleLabel}</p>
-                  </div>
-                  <ChevronDown className="size-4 text-[#8B93A5]" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-72 border-[#393E46] bg-[#222831] text-white">
-                <DropdownMenuLabel className="py-3">
-                  <div className="flex items-center gap-4">
-                    <span className="grid h-10 w-10 place-items-center rounded-full border border-[#FFD369] bg-[#101820] text-xs font-black text-white">
-                      {initials}
-                    </span>
-                    <div>
-                      <p className="font-semibold">{displayName}</p>
-                      <p className="text-xs text-[#8B93A5]">{email}</p>
-                      <p className="text-[11px] font-bold text-[#FFD369]">{roleLabel}</p>
-                    </div>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-[#393E46]" />
-                <DropdownMenuGroup>
-                  <DropdownMenuItem asChild className="cursor-pointer focus:bg-[#2F3742]">
-                    <Link href="/user-profile">
-                      <User className="mr-2 size-4" />
-                      My Profile
-                    </Link>
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator className="bg-[#393E46]" />
-                <DropdownMenuItem className="cursor-pointer text-red-400 focus:bg-[#2F3742] focus:text-red-400" onClick={logout}>
-                  <LogOut className="mr-2 size-4" />
-                  Logout
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </header>
-
-        <main className="h-[calc(100vh-64px)] overflow-y-auto p-6">
+    <>
+      <main className="p-6">
           <section className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
             <div>
               <h1 className="text-[32px] font-bold leading-10 text-white">
@@ -706,22 +562,15 @@ export function EditorialMembersManagementPage() {
                 Manage board access, lead ownership, and editorial workload across this team.
               </p>
             </div>
-            <div className="flex items-end gap-2">
-              <div className="flex flex-col gap-1">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                  Status
-                </span>
-                <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}>
-                  <SelectTrigger className="h-10 w-[160px] rounded-[4px] border-[#50555D] bg-[#161c25] text-xs text-[#dde3ef]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="border-[#50555D] bg-[#1a2029] text-white">
-                    <SelectItem value="ALL">All Members</SelectItem>
-                    <SelectItem value="AVAILABLE">Available</SelectItem>
-                    <SelectItem value="BUSY">Busy</SelectItem>
-                    <SelectItem value="OFFLINE">Offline</SelectItem>
-                  </SelectContent>
-                </Select>
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="relative w-[320px] max-w-full">
+                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#8b94a1]" />
+                <Input
+                  className="h-10 rounded-[4px] border-[#50555D] bg-[#161c25] pl-10 text-sm text-white placeholder:text-[#8b94a1] focus-visible:border-[#FFD369] focus-visible:ring-[#FFD369]/20"
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Search members..."
+                  value={searchTerm}
+                />
               </div>
               <AddBoardMemberDialog
                 existingMemberIds={members.map((member) => member.id)}
@@ -736,14 +585,16 @@ export function EditorialMembersManagementPage() {
             </p>
           ) : null}
 
-          <section className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4">
+          <section className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
             {[
               { icon: Users, label: 'Total Members', value: summary?.totalMembers ?? 0 },
-              { icon: UserCheck, label: 'Active Members*', value: summary?.activeMembers ?? 0 },
               { icon: ShieldCheck, label: 'Board Leads', value: summary?.leadMembers ?? 0 },
-              { icon: CircleGauge, label: 'Review Load*', value: summary?.reviewLoad ?? 0 },
+              { icon: CircleGauge, label: 'Review Load', value: summary?.reviewLoad ?? 0 },
             ].map((item) => (
-              <article className="rounded-[8px] border border-[#50555D] bg-[#1a2029] p-5" key={item.label}>
+              <article
+                className="rounded-[8px] border border-[#50555D] bg-[#1a2029] p-5"
+                key={item.label}
+              >
                 <div className="flex items-center justify-between">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
                     {item.label}
@@ -755,7 +606,7 @@ export function EditorialMembersManagementPage() {
             ))}
           </section>
 
-          <section className="grid gap-6 xl:grid-cols-[1fr_360px]">
+          <section>
             <div className="overflow-hidden rounded-[8px] border border-[#50555D] bg-[#1a2029]">
               <Table>
                 <TableHeader className="bg-[#242a33]">
@@ -764,16 +615,13 @@ export function EditorialMembersManagementPage() {
                       Member
                     </TableHead>
                     <TableHead className="h-12 px-4 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                      Board Role*
-                    </TableHead>
-                    <TableHead className="h-12 px-4 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                      Status*
+                      Board Role
                     </TableHead>
                     <TableHead className="h-12 px-4 text-right text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                      Projects*
+                      Projects
                     </TableHead>
                     <TableHead className="h-12 px-4 text-right text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                      Reviews*
+                      Reviews
                     </TableHead>
                     <TableHead className="h-12 px-4 text-right text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
                       Actions
@@ -784,7 +632,7 @@ export function EditorialMembersManagementPage() {
                   {isLoading ? (
                     Array.from({ length: 4 }).map((_, index) => (
                       <TableRow className="border-[#50555D]" key={index}>
-                        {Array.from({ length: 6 }).map((__, cellIndex) => (
+                        {Array.from({ length: 5 }).map((__, cellIndex) => (
                           <TableCell className="px-4 py-4" key={cellIndex}>
                             <Skeleton className="h-8 rounded-[4px] bg-[#2f353e]" />
                           </TableCell>
@@ -812,15 +660,12 @@ export function EditorialMembersManagementPage() {
                         <TableCell className="px-4 py-4">
                           <div className="flex items-center gap-2">
                             <Badge className="rounded-[4px] border-[#50555D] bg-[#202832] px-2 py-1 text-[11px] font-semibold text-white">
-                              {member.roleTitle}*
+                              {member.roleTitle}
                             </Badge>
-                            {member.isLead ? <ShieldCheck className="size-4 text-[#FFD369]" /> : null}
+                            {member.isLead ? (
+                              <ShieldCheck className="size-4 text-[#FFD369]" />
+                            ) : null}
                           </div>
-                        </TableCell>
-                        <TableCell className="px-4 py-4">
-                          <Badge className={`rounded-[4px] px-2 py-1 text-[11px] font-semibold ${statusClassNames[member.status]}`}>
-                            {statusLabels[member.status]}*
-                          </Badge>
                         </TableCell>
                         <TableCell className="px-4 py-4 text-right font-mono text-sm text-[#dde3ef]">
                           {member.activeProjects}
@@ -840,8 +685,14 @@ export function EditorialMembersManagementPage() {
                                 <MoreVertical className="size-5" />
                               </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="min-w-44 border-[#39424f] bg-[#151c25] text-white">
-                              <DropdownMenuItem className="gap-2 focus:bg-[#303842] focus:text-white" onClick={() => setSelectedMember(member)}>
+                            <DropdownMenuContent
+                              align="end"
+                              className="min-w-44 border-[#39424f] bg-[#151c25] text-white"
+                            >
+                              <DropdownMenuItem
+                                className="gap-2 focus:bg-[#303842] focus:text-white"
+                                onClick={() => setSelectedMember(member)}
+                              >
                                 <User className="size-4" />
                                 View Details
                               </DropdownMenuItem>
@@ -868,7 +719,10 @@ export function EditorialMembersManagementPage() {
                     ))
                   ) : (
                     <TableRow className="border-[#50555D]">
-                      <TableCell className="px-4 py-10 text-center text-sm text-[#C8C8C8]" colSpan={6}>
+                      <TableCell
+                        className="px-4 py-10 text-center text-sm text-[#C8C8C8]"
+                        colSpan={5}
+                      >
                         No editorial members found.
                       </TableCell>
                     </TableRow>
@@ -877,34 +731,9 @@ export function EditorialMembersManagementPage() {
               </Table>
             </div>
 
-            <aside className="rounded-[8px] border border-[#50555D] bg-[#1a2029] p-5">
-              <div className="flex items-center justify-between">
-                <h2 className="text-[20px] font-semibold leading-7 text-white">Recent Activity*</h2>
-              </div>
-              <div className="mt-5 grid gap-4">
-                {activities.map((activity) => (
-                  <article className="rounded-[6px] border border-[#39424f] bg-[#101820] p-4" key={activity.id}>
-                    <div className="flex items-start gap-3">
-                      <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-[4px] bg-[#303842] text-[#FFD369]">
-                        <CircleGauge className="size-4" />
-                      </span>
-                      <div>
-                        <p className="text-sm font-semibold text-white">{activity.title}</p>
-                        <p className="mt-1 text-xs leading-5 text-[#C8C8C8]">{activity.description}</p>
-                        <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#8b94a1]">
-                          {activity.memberName} / {formatDate(activity.timestamp)}
-                        </p>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </aside>
           </section>
-        </main>
-      </div>
-
+      </main>
       <MemberDetailDrawer member={selectedMember} onClose={() => setSelectedMember(null)} />
-    </div>
+    </>
   );
 }

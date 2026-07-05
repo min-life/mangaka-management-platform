@@ -4,6 +4,8 @@ import { Prisma, ACTIVITY_ACTION } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ACTIVITY_EVENT_NAME, ActivityEventPayload } from '../share/events/activity.event';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { CacheService } from '../redis/cache.service';
+import { UseCache, InvalidateCache } from '../share/decorators/cache.decorator';
 
 const ACTIVITY_INCLUDE = {
   actor: {
@@ -23,9 +25,11 @@ export class ActivityLogsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly realtimeGateway: RealtimeGateway,
+    private readonly cacheService: CacheService,
   ) {}
 
   @OnEvent(ACTIVITY_EVENT_NAME)
+  @InvalidateCache((args) => [`activity-log:*`])
   async handleActivityEvent(payload: ActivityEventPayload) {
     try {
       const log = await this.prisma.activityLog.create({
@@ -180,6 +184,7 @@ export class ActivityLogsService {
     }
   }
 
+  @UseCache((args) => `activity-log:list`)
   async getActivityLogs(query: {
     page?: number;
     limit?: number;

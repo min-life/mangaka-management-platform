@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   HttpException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -23,6 +24,8 @@ import type { Pagination } from '../share/interfaces';
 import { AwsS3Service } from '../share/services/aws-s3.service';
 import { randomUUID } from 'crypto';
 import sizeOf from 'image-size';
+import { CacheService } from '../redis/cache.service';
+import { UseCache, InvalidateCache } from '../share/decorators/cache.decorator';
 const PROJECT_MEMBER_SELECT = {
   user: {
     select: {
@@ -218,8 +221,10 @@ export class ProjectsService {
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
     private readonly awsS3Service: AwsS3Service,
+    private readonly cacheService: CacheService,
   ) { }
 
+  @InvalidateCache((args) => [`project:list:${args[0].userId}:*`])
   async createProject(data: {
     name: string;
     editorBoardId?: number | null;
@@ -230,7 +235,10 @@ export class ProjectsService {
     try {
       const project = await this.prisma.$transaction(async (prisma) => {
         if (data.editorBoardId) {
-          await this.ensureBoard(data.editorBoardId, prisma);
+          const board = await this.ensureBoard(data.editorBoardId, prisma);
+          if (board.createdBy !== data.userId) {
+            throw new ForbiddenException('Project must be created by the same creator as the editor board');
+          }
         }
 
         const defaultRole = await this.ensureDefaultProjectRole(prisma);
@@ -243,7 +251,7 @@ export class ProjectsService {
             description: data.description,
             imageUrl: data.imageUrl,
           },
-          select: PROJECT_WITH_MEMBERS_SELECT,
+          select: PROJECT_SELECT,
         });
 
         await prisma.userProject.create({
@@ -264,6 +272,7 @@ export class ProjectsService {
     }
   }
 
+  @UseCache((args) => `project:list:${args[0]}`)
   async getProjects(
     userId: number,
     filter?: { name?: string; me?: boolean },
@@ -271,6 +280,7 @@ export class ProjectsService {
     pagination?: Pagination,
   ) {
     try {
+
       const where: Prisma.ProjectWhereInput = {
         ...(filter?.name && { name: { contains: filter.name, mode: 'insensitive' } }),
         ...(filter?.me
@@ -288,7 +298,7 @@ export class ProjectsService {
           orderBy: { [field]: order },
           skip,
           take: limit,
-          select: PROJECT_WITH_MEMBERS_SELECT,
+          select: PROJECT_SELECT,
         }),
       ]);
 
@@ -301,11 +311,12 @@ export class ProjectsService {
     }
   }
 
+  @UseCache((args) => `project:${args[0]}`)
   async getProjectById(id: number) {
     try {
       const project = await this.prisma.project.findUnique({
         where: { id },
-        select: PROJECT_WITH_MEMBERS_SELECT,
+        select: PROJECT_SELECT,
       });
       if (!project) {
         throw new NotFoundException(ERROR.NFPROJECT);
@@ -316,20 +327,26 @@ export class ProjectsService {
     }
   }
 
+  @InvalidateCache((args) => [`project:${args[0]}`, `project:list:${args[1].userId}:*`])
   async updateProject(
     id: number,
-    data: { name?: string; editorBoardId?: number | null; userId: number },
+    data: { name?: string; description?: string; imageUrl?: string; editorBoardId?: number | null; userId: number },
   ) {
     try {
-      await this.ensureProject(id);
+      const project = await this.ensureProject(id);
       if (data.editorBoardId) {
-        await this.ensureBoard(data.editorBoardId);
+        const board = await this.ensureBoard(data.editorBoardId);
+        if (board.createdBy !== project.createdBy) {
+          throw new ForbiddenException('Project must be created by the same creator as the editor board');
+        }
       }
 
       return await this.prisma.project.update({
         where: { id },
         data: {
           name: data.name,
+          description: data.description,
+          imageUrl: data.imageUrl,
           editorBoardId: data.editorBoardId,
           updatedBy: data.userId,
         },
@@ -340,6 +357,7 @@ export class ProjectsService {
     }
   }
 
+  @InvalidateCache((args) => [`project:${args[0]}`, `project:list:*`])
   async deleteProject(id: number) {
     try {
       await this.ensureProject(id);
@@ -349,6 +367,7 @@ export class ProjectsService {
     }
   }
 
+  @InvalidateCache((args) => [`project:${args[0]}:members:*`])
   async addMembersToProject(projectId: number, userIds: number[], roleId: number, actorId: number) {
     try {
       await this.ensureProject(projectId);
@@ -395,6 +414,7 @@ export class ProjectsService {
     }
   }
 
+  @UseCache((args) => `project:${args[0]}:members`)
   async getProjectMembers(
     projectId: number,
     filter?: { search?: string },
@@ -448,6 +468,7 @@ export class ProjectsService {
     }
   }
 
+  @UseCache((args) => `project:${args[0]}:members:${args[1]}`)
   async getProjectMember(projectId: number, userId: number) {
     try {
       const member = await this.findProjectMember(projectId, userId);
@@ -484,6 +505,7 @@ export class ProjectsService {
     }
   }
 
+  @InvalidateCache((args) => [`project:${args[0]}:members:*`])
   async updateProjectMember(projectId: number, userId: number, roleId: number, actorId: number) {
     try {
       await this.findProjectMember(projectId, userId);
@@ -519,6 +541,7 @@ export class ProjectsService {
     }
   }
 
+  @InvalidateCache((args) => [`project:${args[0]}:members:*`])
   async removeProjectMember(projectId: number, userId: number, actorId: number) {
     try {
       const project = await this.ensureProject(projectId);
@@ -558,6 +581,7 @@ export class ProjectsService {
     }
   }
 
+  @UseCache((args) => `project:${args[0]}:editor-board`)
   async getProjectEditorBoard(projectId: number) {
     try {
       await this.ensureProject(projectId);
@@ -587,6 +611,7 @@ export class ProjectsService {
     }
   }
 
+  @InvalidateCache((args) => [`project:${args[0]}`])
   async removeProjectEditorBoard(projectId: number, actorId: number) {
     try {
       await this.ensureProject(projectId);
@@ -603,6 +628,7 @@ export class ProjectsService {
     }
   }
 
+  @UseCache((args) => `project:${args[0]}:applications`)
   async getProjectApplications(
     projectId: number,
     filter?: { search?: string; type?: APPLICATION_TYPE; status?: APPLICATION_STATUS },
@@ -643,6 +669,7 @@ export class ProjectsService {
     }
   }
 
+  @InvalidateCache((args) => [`project:${args[0]}:applications:*`])
   async createProjectApplication(
     projectId: number,
     data: {
@@ -757,6 +784,7 @@ export class ProjectsService {
     }
   }
 
+  @UseCache((args) => `project:${args[0]}:folders`)
   async getProjectFolders(
     projectId: number,
     filter?: { search?: string; parentId?: number; type?: 'ARC' | 'CHAPTER' },
@@ -798,6 +826,7 @@ export class ProjectsService {
     }
   }
 
+  @InvalidateCache((args) => [`project:${args[0]}:folders:*`])
   async createProjectFolder(
     projectId: number,
     data: {
@@ -834,6 +863,7 @@ export class ProjectsService {
     }
   }
 
+  @UseCache((args) => `project:${args[0]}:tasks:${args[1]}`)
   async getMyProjectTasks(
     projectId: number,
     userId: number,
@@ -1022,6 +1052,7 @@ export class ProjectsService {
     throw new InternalServerErrorException(clientMessage);
   }
 
+  @UseCache((args) => `project:${args[0]}:stats`)
   async getProjectStats(projectId: number) {
     try {
       await this.ensureProject(projectId);

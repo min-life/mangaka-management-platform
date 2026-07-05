@@ -10,6 +10,7 @@ import {
   type ProjectMemberResponse,
 } from '@/services/project.service';
 import { getRoles, type RoleResponse } from '@/services/role.service';
+import { toast } from '@/lib/toast';
 
 import { AddMemberDialog } from './AddMemberDialog';
 import { ChangeMemberRoleDialog } from './ChangeMemberRoleDialog';
@@ -80,7 +81,7 @@ export function ProjectMembersClient({ projectId }: ProjectMembersClientProps) {
     );
   }, [members, searchQuery]);
 
-  const subtitle = 'Manage who belongs to this project, their role, and their task load.';
+  const subtitle = 'Manage project access and roles for this production workspace.';
 
   const handleOpenRoleDialog = (member: ProjectMemberResponse) => {
     setSelectedMember(null);
@@ -98,14 +99,14 @@ export function ProjectMembersClient({ projectId }: ProjectMembersClientProps) {
     }
 
     setIsSubmittingMemberAction(true);
-    setError(null);
 
     try {
       await updateProjectMember(projectId, roleDialogMember.id, { roleId });
       setRoleDialogMember(null);
       await loadMembers();
+      toast.success('Role updated.');
     } catch {
-      setError('Unable to update member role.');
+      toast.error('Failed to update role. Please try again.');
     } finally {
       setIsSubmittingMemberAction(false);
     }
@@ -117,14 +118,14 @@ export function ProjectMembersClient({ projectId }: ProjectMembersClientProps) {
     }
 
     setIsSubmittingMemberAction(true);
-    setError(null);
 
     try {
       await removeProjectMember(projectId, removeDialogMember.id);
       setRemoveDialogMember(null);
       await loadMembers();
+      toast.success('Member removed.');
     } catch {
-      setError('Unable to remove project member.');
+      toast.error('Failed to remove member. Please try again.');
     } finally {
       setIsSubmittingMemberAction(false);
     }
@@ -152,10 +153,6 @@ export function ProjectMembersClient({ projectId }: ProjectMembersClientProps) {
           {error}
         </p>
       ) : null}
-
-      <p className="mt-4 text-[11px] font-bold text-[#8b94a1]">
-        * Assigned task counts use UI fallback until the member API returns task summary data.
-      </p>
 
       <div className="mt-5 flex h-10 items-center gap-3 rounded-[4px] border border-[#39424f] bg-[#151c25] px-4 text-[#8b94a1]">
         <Search className="size-4 text-[#dce7f3]" />

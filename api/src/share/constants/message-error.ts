@@ -6,6 +6,8 @@ export const ERROR = {
   EVLVERIFYEMAIL: 'Invalid, expired, or already used verify email token.',
   EVLSAMEPASSWORD: 'New password cannot be the same as the old password.',
   EVLRESETPASSWORD: 'Invalid or expired reset password token.',
+  EVLREFRESHTOKEN_INVALID: 'Refresh token is invalid or missing.',
+  EVLREFRESHTOKEN_EXPIRED: 'Refresh token is expired.',
   SVLOGIN: 'Server is not available to login.',
   SVLOGOUT: 'Server is not available to logout.',
   SVREGISTER: 'Server is not available to register.',

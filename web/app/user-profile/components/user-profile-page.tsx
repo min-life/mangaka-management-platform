@@ -1,26 +1,23 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
-  Bell,
-  BookOpen,
   CheckCheck,
   ChevronRight,
   FilePenLine,
   Languages,
-  LayoutDashboard,
   Palette,
-  PenLine,
   Search,
   Settings,
   ShieldCheck,
   Upload,
   UserPlus,
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
@@ -33,32 +30,106 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Toaster } from '@/components/ui/sonner';
+import { usePlatformLanguage, type PlatformLanguage } from '@/contexts/language-context';
+import { useRealtimeNotifications } from '@/hooks/use-realtime-notifications';
+import { clearAccessToken, getAccessToken } from '@/lib/auth-storage';
 import { cn } from '@/lib/utils';
+import { AUTH_LOGOUT_EVENT } from '@/types/auth';
 import {
-  getCurrentUserActivities,
-  getCurrentUserEditorBoards,
+  getCurrentUserContextActivities,
   getCurrentUserProfile,
-  getCurrentUserProjects,
   getApiErrorMessage,
+  mapActivityLogToUserActivity,
   updateCurrentUserPassword,
   updateCurrentUserProfile,
   uploadAvatarToDataUrl,
   type UpdatePasswordPayload,
   type UserActivity,
-  type UserEditorBoard,
   type UserProfile,
-  type UserProject,
 } from '../services/user-profile-service';
 
 type ProfileTheme = 'dark' | 'light';
 
 const USER_PROFILE_THEME_KEY = 'mangaka:user-profile-theme';
-const PROJECT_IMAGE_FALLBACK =
-  'https://images.unsplash.com/photo-1612036782180-6f0b6cd846fe?w=512&h=720&fit=crop';
+
+const ACTIVITY_PAGE_SIZE = 7;
+
+function isSessionExpiredError(error: unknown) {
+  if (typeof error !== 'object' || !error) {
+    return false;
+  }
+
+  const response = (
+    error as { response?: { status?: number; data?: { message?: string | string[] } } }
+  ).response;
+  const status = response?.status;
+  const rawMessage = response?.data?.message;
+  const message = Array.isArray(rawMessage) ? rawMessage.join(' ') : rawMessage;
+
+  return (
+    status === 401 ||
+    status === 403 ||
+    message?.toLowerCase().includes('invalid email or password') ||
+    message?.toLowerCase().includes('unauthorized')
+  );
+}
+
+const copy: Record<
+  PlatformLanguage,
+  {
+    accountSettings: string;
+    activityLoading: string;
+    activitySummary: string;
+    appearance: (isDark: boolean) => string;
+    assignedEditorBoards: string;
+    assignedProjects: string;
+    editProfile: string;
+    language: string;
+    noActivities: string;
+    noBoards: string;
+    noProjects: string;
+    retry: string;
+    securityPassword: string;
+    shareProfile: string;
+    viewAll: string;
+  }
+> = {
+  en: {
+    accountSettings: 'Account Settings',
+    activityLoading: 'Loading activity...',
+    activitySummary: 'Activity Summary',
+    appearance: (isDark) => `Appearance (State ${isDark ? 'Dark' : 'Light'})`,
+    assignedEditorBoards: 'Assigned Editor Boards',
+    assignedProjects: 'Assigned Projects',
+    editProfile: 'Edit Profile',
+    language: 'Language (English/VI)',
+    noActivities: 'No recent activity found.',
+    noBoards: 'No assigned editor boards found.',
+    noProjects: 'No assigned projects found.',
+    retry: 'Retry',
+    securityPassword: 'Security & Password',
+    shareProfile: 'Share Profile',
+    viewAll: 'View All',
+  },
+  vi: {
+    accountSettings: 'Cài đặt tài khoản',
+    activityLoading: 'Đang tải hoạt động...',
+    activitySummary: 'Tóm tắt hoạt động',
+    appearance: (isDark) => `Giao diện (${isDark ? 'Tối' : 'Sáng'})`,
+    assignedEditorBoards: 'Bảng biên tập được giao',
+    assignedProjects: 'Dự án được giao',
+    editProfile: 'Chỉnh sửa hồ sơ',
+    language: 'Ngôn ngữ (Tiếng Việt/EN)',
+    noActivities: 'Chưa có hoạt động gần đây.',
+    noBoards: 'Chưa có bảng biên tập được giao.',
+    noProjects: 'Chưa có dự án được giao.',
+    retry: 'Thử lại',
+    securityPassword: 'Bảo mật & mật khẩu',
+    shareProfile: 'Chia sẻ hồ sơ',
+    viewAll: 'Xem tất cả',
+  },
+};
 
 const themeTokens: Record<ProfileTheme, React.CSSProperties> = {
   dark: {
@@ -107,73 +178,12 @@ function getPrimaryRole(user: UserProfile | null) {
   return user?.roles[0]?.name ?? 'Team Member';
 }
 
-function ProjectCard({ project }: { project: UserProject }) {
-  const metrics = project.projectStats[0]?.metrics ?? { progress: 0, statusLabel: 'On Track' };
-  const isRevision = metrics.statusLabel === 'Revision';
-
-  return (
-    <Card className="gap-0 rounded-xl border border-[var(--profile-border)] bg-[var(--profile-surface)] p-4 text-[var(--profile-text)] ring-0">
-      <div className="mb-6 flex items-start justify-between">
-        <div className="h-16 w-12 overflow-hidden rounded border border-[var(--profile-border)] bg-[var(--profile-surface-highest)]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            alt={`${project.name} cover`}
-            className="h-full w-full object-cover"
-            src={project.imageUrl ?? PROJECT_IMAGE_FALLBACK}
-          />
-        </div>
-        <Badge
-          className={cn(
-            'h-6 rounded border px-2 py-1 font-medium',
-            isRevision
-              ? 'border-[#FFB703]/20 bg-[#FFB703]/10 text-[#FFB703]'
-              : 'border-[#4CAF50]/20 bg-[#4CAF50]/10 text-[#4CAF50]',
-          )}
-        >
-          {metrics.statusLabel}*
-        </Badge>
-      </div>
-      <h4 className="mb-1 text-[18px] font-semibold leading-6 text-[var(--profile-title)]">
-        {project.name}
-      </h4>
-      <p className="mb-4 text-[12px] leading-[18px] text-[var(--profile-muted)]">
-        {project.description ?? project.role.name}
-      </p>
-      <Progress
-        className="bg-[var(--profile-surface-highest)] [&>div]:bg-[var(--profile-accent)]"
-        value={metrics.progress}
-      />
-    </Card>
-  );
-}
-
-function EditorBoardRow({ board, index }: { board: UserEditorBoard; index: number }) {
-  const icons = [LayoutDashboard, PenLine, BookOpen];
-  const Icon = icons[index] ?? LayoutDashboard;
-
-  return (
-    <button className="flex w-full items-center gap-4 p-4 text-left transition-colors hover:bg-[var(--profile-surface-high)]">
-      <div className="flex h-10 w-10 items-center justify-center rounded bg-[var(--profile-accent)]/20 text-[var(--profile-accent)]">
-        <Icon className="size-5" />
-      </div>
-      <div className="min-w-0">
-        <p className="truncate text-[13px] font-medium leading-4 tracking-[0.02em] text-[var(--profile-title)]">
-          {board.name}
-        </p>
-        <p className="truncate text-[12px] leading-[18px] text-[var(--profile-muted)]">
-          {board.description ?? (board.isLead ? 'Lead editor board' : 'Assigned editor board')}
-        </p>
-      </div>
-    </button>
-  );
-}
-
 function ActivityTimeline({ activities }: { activities: UserActivity[] }) {
   const icons = [CheckCheck, FilePenLine, UserPlus];
 
   return (
-    <Card className="gap-0 rounded-xl border border-[var(--profile-border)] bg-[var(--profile-surface)] p-6 text-[var(--profile-text)] ring-0">
-      <div className="space-y-6">
+    <Card className="gap-0 rounded-xl border border-[var(--profile-border)] bg-[var(--profile-surface)] p-4 text-[var(--profile-text)] ring-0">
+      <div className="space-y-4">
         {activities.map((activity, index) => {
           const Icon = icons[index] ?? FilePenLine;
           const isFirst = index === 0;
@@ -228,14 +238,10 @@ function ActivityTimeline({ activities }: { activities: UserActivity[] }) {
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <Card className="flex min-h-[132px] items-center justify-center rounded-xl border border-[var(--profile-border)] bg-[var(--profile-surface)] p-6 text-center text-[13px] text-[var(--profile-muted)] ring-0">
+    <Card className="flex min-h-[112px] items-center justify-center rounded-xl border border-[var(--profile-border)] bg-[var(--profile-surface)] p-5 text-center text-[13px] text-[var(--profile-muted)] ring-0">
       {message}
     </Card>
   );
-}
-
-function LoadingCard() {
-  return <Skeleton className="h-[190px] rounded-xl bg-[var(--profile-surface-highest)]" />;
 }
 
 function SettingsButton({
@@ -249,7 +255,7 @@ function SettingsButton({
 }) {
   return (
     <button
-      className="flex w-full items-center justify-between rounded-lg bg-[var(--profile-surface-highest)]/30 p-4 text-left text-[var(--profile-title)] transition-colors hover:bg-[var(--profile-surface-highest)]"
+      className="flex w-full items-center justify-between rounded-lg bg-[var(--profile-surface-highest)]/30 p-3 text-left text-[var(--profile-title)] transition-colors hover:bg-[var(--profile-surface-highest)]"
       onClick={onClick}
       type="button"
     >
@@ -313,16 +319,16 @@ function EditProfileDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[460px] max-w-[calc(100vw-32px)] border-white/[0.12] bg-[#151b24] p-6 text-[#eef3fb] shadow-2xl">
+      <DialogContent className="w-[480px] max-w-[calc(100vw-32px)] overflow-hidden rounded-2xl border border-white/[0.12] bg-[#151b24] p-0 text-[#eef3fb] shadow-[0_24px_80px_rgba(0,0,0,0.55)]">
         <form onSubmit={handleSubmit}>
-          <DialogHeader className="mb-6">
+          <DialogHeader className="border-b border-white/[0.08] bg-[#18202c] px-6 py-5">
             <DialogTitle className="text-[22px] text-white">Edit Profile</DialogTitle>
             <DialogDescription className="text-[#b8c3d2]">
               Update your display name and avatar.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6">
+          <div className="space-y-6 p-6">
             <div className="space-y-3">
               <Label className="text-[#e5ecf7]">Avatar</Label>
               <div className="flex items-center gap-4 rounded-xl border border-white/[0.08] bg-[#0f1620] p-4">
@@ -367,7 +373,7 @@ function EditProfileDialog({
             </div>
           </div>
 
-          <DialogFooter className="-mx-6 -mb-6 mt-8 border-white/[0.08] bg-[#101722] px-6">
+          <DialogFooter className="border-t border-white/[0.08] bg-[#101722] px-6 py-4">
             <Button
               className="border-black bg-black text-white hover:border-black hover:bg-black/85 hover:text-white"
               disabled={isSubmitting}
@@ -433,15 +439,15 @@ function ChangePasswordDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[460px] max-w-[calc(100vw-32px)] border-white/[0.12] bg-[#151b24] p-6 text-[#eef3fb] shadow-2xl">
+      <DialogContent className="w-[480px] max-w-[calc(100vw-32px)] overflow-hidden rounded-2xl border border-white/[0.12] bg-[#151b24] p-0 text-[#eef3fb] shadow-[0_24px_80px_rgba(0,0,0,0.55)]">
         <form onSubmit={handleSubmit}>
-          <DialogHeader className="mb-6">
+          <DialogHeader className="border-b border-white/[0.08] bg-[#18202c] px-6 py-5">
             <DialogTitle className="text-[22px] text-white">Security & Password</DialogTitle>
             <DialogDescription className="text-[#b8c3d2]">
               Change your password to keep your workspace secure.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 p-6">
             <Input
               autoFocus
               className="h-10 border-white/[0.14] bg-[#0f1620] text-[#eef3fb]"
@@ -468,7 +474,7 @@ function ChangePasswordDialog({
               onChange={(event) => setConfirmPassword(event.target.value)}
             />
           </div>
-          <DialogFooter className="-mx-6 -mb-6 mt-8 border-white/[0.08] bg-[#101722] px-6">
+          <DialogFooter className="border-t border-white/[0.08] bg-[#101722] px-6 py-4">
             <Button
               className="border-black bg-black text-white hover:border-black hover:bg-black/85 hover:text-white"
               disabled={isSubmitting}
@@ -494,62 +500,152 @@ function ChangePasswordDialog({
 }
 
 export function UserProfilePage() {
+  const router = useRouter();
+  const { language, toggleLanguage } = usePlatformLanguage();
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const [projects, setProjects] = useState<UserProject[]>([]);
-  const [editorBoards, setEditorBoards] = useState<UserEditorBoard[]>([]);
-  const [activities, setActivities] = useState<UserActivity[]>([]);
+  const { notifications } = useRealtimeNotifications(Boolean(currentUser));
+  const [allActivities, setAllActivities] = useState<UserActivity[]>([]);
+  const [visibleActivityCount, setVisibleActivityCount] = useState(ACTIVITY_PAGE_SIZE);
+  const activityScrollRef = useRef<HTMLDivElement | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isPasswordOpen, setIsPasswordOpen] = useState(false);
   const [isProfileSubmitting, setIsProfileSubmitting] = useState(false);
   const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
-  const [theme, setTheme] = useState<ProfileTheme>(() => {
-    if (typeof window === 'undefined') {
-      return 'dark';
-    }
+  // Always start with the server-rendered default ('dark') so the client's first
+  // render matches SSR output; the stored preference is applied after mount below.
+  const [theme, setTheme] = useState<ProfileTheme>('dark');
 
+  useEffect(() => {
     const storedTheme = window.localStorage.getItem(USER_PROFILE_THEME_KEY);
-    return storedTheme === 'light' ? 'light' : 'dark';
-  });
+    if (storedTheme === 'light') {
+      setTheme('light');
+    }
+  }, []);
 
   useEffect(() => {
     void loadProfileData();
   }, []);
 
   useEffect(() => {
+    const handleLogout = () => {
+      router.replace('/login');
+    };
+
+    window.addEventListener(AUTH_LOGOUT_EVENT, handleLogout);
+
+    return () => {
+      window.removeEventListener(AUTH_LOGOUT_EVENT, handleLogout);
+    };
+  }, [router]);
+
+  useEffect(() => {
     window.localStorage.setItem(USER_PROFILE_THEME_KEY, theme);
   }, [theme]);
 
+  useEffect(() => {
+    const activityLog = notifications[0]?.activityLog;
+
+    if (!activityLog) {
+      return;
+    }
+
+    const nextActivity = mapActivityLogToUserActivity(activityLog);
+    setAllActivities((currentActivities) => {
+      if (currentActivities.some((activity) => activity.id === nextActivity.id)) {
+        return currentActivities;
+      }
+
+      return [nextActivity, ...currentActivities];
+    });
+    // Bump the visible window by one so the new item is shown immediately
+    // instead of silently pushing an already-visible item out of view.
+    setVisibleActivityCount((current) => current + 1);
+  }, [notifications]);
+
   const themeStyle = useMemo(() => themeTokens[theme], [theme]);
+  const text = copy[language];
   const displayName = currentUser?.displayName ?? 'Unnamed User';
   const avatarUrl = currentUser?.avatarUrl ?? '';
   const roleName = getPrimaryRole(currentUser);
   const initials = getInitials(displayName);
   const isDarkTheme = theme === 'dark';
+  const activities = useMemo(
+    () => allActivities.slice(0, visibleActivityCount),
+    [allActivities, visibleActivityCount],
+  );
+  const hasMoreActivities = visibleActivityCount < allActivities.length;
 
   async function loadProfileData() {
     setIsLoading(true);
     setError('');
 
+    if (!getAccessToken()) {
+      clearAccessToken();
+      router.replace('/login');
+      return;
+    }
+
     try {
       const profileData = await getCurrentUserProfile();
-      const [projectData, boardData, activityData] = await Promise.all([
-        getCurrentUserProjects(profileData.id),
-        getCurrentUserEditorBoards(profileData.id),
-        getCurrentUserActivities(),
-      ]);
+      const activityData = await getCurrentUserContextActivities(profileData.id);
 
       setCurrentUser(profileData);
-      setProjects(projectData);
-      setEditorBoards(boardData);
-      setActivities(activityData);
+      setAllActivities(activityData);
+      setVisibleActivityCount(ACTIVITY_PAGE_SIZE);
     } catch (loadError) {
+      if (isSessionExpiredError(loadError)) {
+        clearAccessToken();
+        router.replace('/login');
+        return;
+      }
+
       setError(getApiErrorMessage(loadError, 'Unable to load profile data.'));
     } finally {
       setIsLoading(false);
     }
   }
+
+  // Pagination happens entirely client-side (see getCurrentUserContextActivities):
+  // the full list is already in memory, so "loading more" is just widening the
+  // visible window, no network round trip.
+  const loadMoreActivities = useCallback(() => {
+    setVisibleActivityCount((current) =>
+      Math.min(current + ACTIVITY_PAGE_SIZE, allActivities.length),
+    );
+  }, [allActivities.length]);
+
+  // Auto-fill: if container isn't overflowing but we have more data, load more.
+  useEffect(() => {
+    const container = activityScrollRef.current;
+    if (!container || !hasMoreActivities) {
+      return;
+    }
+
+    if (container.scrollHeight <= container.clientHeight) {
+      loadMoreActivities();
+    }
+  }, [activities, hasMoreActivities, loadMoreActivities]);
+
+  // Scroll-based load: trigger load-more when user scrolls near the bottom.
+  useEffect(() => {
+    const container = activityScrollRef.current;
+    if (!container || !hasMoreActivities) {
+      return;
+    }
+
+    const handleScroll = () => {
+      const nearBottom =
+        container.scrollTop + container.clientHeight >= container.scrollHeight - 80;
+      if (nearBottom) {
+        loadMoreActivities();
+      }
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [hasMoreActivities, loadMoreActivities]);
 
   async function handleShareProfile() {
     try {
@@ -608,7 +704,6 @@ export function UserProfilePage() {
       )}
       style={themeStyle}
     >
-      <Toaster position="top-right" />
       <EditProfileDialog
         isSubmitting={isProfileSubmitting}
         open={isEditProfileOpen}
@@ -626,11 +721,7 @@ export function UserProfilePage() {
       <header className="sticky top-0 z-40 border-b border-[var(--profile-border)] bg-[var(--profile-header)] px-8 py-4">
         <div className="flex items-center justify-between gap-8">
           <div className="flex items-center gap-8">
-            <img
-              alt="Inkly"
-              className="h-[50px] w-auto object-contain"
-              src="/brand/1.png"
-            />
+            <img alt="Inkly" className="h-[50px] w-auto object-contain" src="/brand/1.png" />
             <Separator
               className="hidden h-6 bg-[var(--profile-border)] md:block"
               orientation="vertical"
@@ -653,7 +744,10 @@ export function UserProfilePage() {
           </div>
 
           <div className="flex items-center gap-6">
-            <Bell className="size-6 text-[var(--profile-muted)]" />
+            <NotificationBell
+              triggerClassName="text-[var(--profile-muted)] hover:bg-[var(--profile-surface-high)] hover:text-[var(--profile-title)]"
+              dotClassName="border-[var(--profile-header)]"
+            />
             <Settings className="size-6 text-[var(--profile-muted)]" />
             <Separator className="h-8 bg-[var(--profile-border)]" orientation="vertical" />
             <div className="flex items-center gap-4">
@@ -672,8 +766,8 @@ export function UserProfilePage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl p-8">
-        <section className="relative mb-8 flex flex-col gap-6 overflow-hidden rounded-xl border border-[var(--profile-border)] bg-[var(--profile-surface)] p-6 md:flex-row md:items-end">
+      <main className="mx-auto max-w-7xl p-6 lg:p-8">
+        <section className="relative mb-6 flex flex-col gap-6 overflow-hidden rounded-xl border border-[var(--profile-border)] bg-[var(--profile-surface)] p-6 md:flex-row md:items-end">
           <div className="pointer-events-none absolute -right-10 -top-10 rotate-12 opacity-5">
             <h2 className="text-[120px] font-bold leading-none text-[var(--profile-title)]">
               MONOLITH
@@ -712,14 +806,14 @@ export function UserProfilePage() {
               variant="outline"
               onClick={handleShareProfile}
             >
-              Share Profile
+              {text.shareProfile}
             </Button>
             <Button
               className="h-9 rounded-lg bg-[var(--profile-button)] px-6 text-[13px] text-[var(--profile-button-text)]"
               disabled={!currentUser}
               onClick={() => setIsEditProfileOpen(true)}
             >
-              Edit Profile
+              {text.editProfile}
             </Button>
           </div>
         </section>
@@ -729,98 +823,43 @@ export function UserProfilePage() {
             <div className="flex items-center justify-between gap-4">
               <p>{error}</p>
               <Button variant="outline" onClick={() => void loadProfileData()}>
-                Retry
+                {text.retry}
               </Button>
             </div>
           </Card>
         ) : null}
 
-        <div className="grid grid-cols-12 gap-6">
-          <section className="col-span-12 lg:col-span-8">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-[24px] font-semibold text-[var(--profile-title)]">
-                Assigned Projects
-              </h3>
-              <button
-                className="text-[13px] font-medium text-[var(--profile-accent)]"
-                type="button"
-              >
-                View All
-              </button>
-            </div>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {isLoading ? (
-                <>
-                  <LoadingCard />
-                  <LoadingCard />
-                </>
-              ) : projects.length > 0 ? (
-                projects.map((project) => <ProjectCard key={project.id} project={project} />)
-              ) : (
-                <div className="md:col-span-2">
-                  <EmptyState message="No assigned projects found." />
-                </div>
-              )}
-            </div>
-          </section>
-
-          <section className="col-span-12 lg:col-span-4">
-            <h3 className="mb-4 text-[24px] font-semibold text-[var(--profile-title)]">
-              Assigned Editor Boards
-            </h3>
-            <div className="overflow-hidden rounded-xl border border-[var(--profile-border)] bg-[var(--profile-surface)]">
-              {isLoading ? (
-                <div className="space-y-2 p-4">
-                  <Skeleton className="h-12 bg-[var(--profile-surface-highest)]" />
-                  <Skeleton className="h-12 bg-[var(--profile-surface-highest)]" />
-                  <Skeleton className="h-12 bg-[var(--profile-surface-highest)]" />
-                </div>
-              ) : editorBoards.length > 0 ? (
-                editorBoards.map((board, index) => (
-                  <div
-                    className="border-b border-[var(--profile-border)] last:border-b-0"
-                    key={board.id}
-                  >
-                    <EditorBoardRow board={board} index={index} />
-                  </div>
-                ))
-              ) : (
-                <div className="p-4">
-                  <EmptyState message="No assigned editor boards found." />
-                </div>
-              )}
-            </div>
-          </section>
-
-          <section className="col-span-12 lg:col-span-7">
-            <h3 className="mb-4 text-[24px] font-semibold text-[var(--profile-title)]">
-              Activity Summary
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
+          <section>
+            <h3 className="mb-4 text-[22px] font-semibold text-[var(--profile-title)]">
+              {text.activitySummary}
             </h3>
             {isLoading ? (
-              <EmptyState message="Loading activity..." />
+              <EmptyState message={text.activityLoading} />
             ) : activities.length > 0 ? (
-              <ActivityTimeline activities={activities} />
+              <div className="max-h-[600px] overflow-y-auto pr-1" ref={activityScrollRef}>
+                <ActivityTimeline activities={activities} />
+              </div>
             ) : (
-              <EmptyState message="No recent activity found." />
+              <EmptyState message={text.noActivities} />
             )}
           </section>
 
-          <section className="col-span-12 lg:col-span-5">
-            <h3 className="mb-4 text-[24px] font-semibold text-[var(--profile-title)]">
-              Account Settings
+          <section>
+            <h3 className="mb-4 text-[22px] font-semibold text-[var(--profile-title)]">
+              {text.accountSettings}
             </h3>
             <Card className="gap-0 rounded-xl border border-[var(--profile-border)] bg-[var(--profile-surface)] p-4 text-[var(--profile-text)] ring-0">
               <div className="space-y-2">
                 <SettingsButton
                   icon={ShieldCheck}
-                  label="Security & Password"
+                  label={text.securityPassword}
                   onClick={() => setIsPasswordOpen(true)}
                 />
-                <SettingsButton icon={Bell} label="Notification Preferences" />
-                <SettingsButton icon={Languages} label="Language (English/JP)" />
+                <SettingsButton icon={Languages} label={text.language} onClick={toggleLanguage} />
                 <SettingsButton
                   icon={Palette}
-                  label={`Appearance (State ${isDarkTheme ? 'Dark' : 'Light'})`}
+                  label={text.appearance(isDarkTheme)}
                   onClick={() =>
                     setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))
                   }

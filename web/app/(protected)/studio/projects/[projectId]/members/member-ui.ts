@@ -1,12 +1,5 @@
 import type { ProjectMemberResponse } from '@/services/project.service';
 
-export type MemberTaskSummary = {
-  assigned: number;
-  done: number;
-  inProgress: number;
-  review: number;
-};
-
 export function getRoleClassName(roleName: string) {
   const normalizedRole = roleName.toLowerCase();
 
@@ -33,17 +26,6 @@ export function getInitials(member: ProjectMemberResponse) {
     .slice(0, 2)
     .map((word) => word.charAt(0).toUpperCase())
     .join('');
-}
-
-export function getMemberTaskSummary(member: ProjectMemberResponse): MemberTaskSummary {
-  const seed = member.id % 5;
-
-  return {
-    assigned: 4 + seed * 2,
-    done: 8 + seed * 3,
-    inProgress: 1 + (seed % 3),
-    review: seed % 2,
-  };
 }
 
 export function formatOptionalDate(dateValue?: string) {

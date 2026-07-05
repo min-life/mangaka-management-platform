@@ -24,6 +24,7 @@ import { ProjectStatsModule } from './project-stats/project-stats.module';
 import { ActivityLogsModule } from './activity-logs/activity-logs.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { RealtimeModule } from './realtime/realtime.module';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { RealtimeModule } from './realtime/realtime.module';
     ActivityLogsModule,
     NotificationsModule,
     RealtimeModule,
+    RedisModule,
   ],
   controllers: [AppController],
   providers: [

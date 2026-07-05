@@ -291,6 +291,28 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 
 ---
 
+### Check if current user has password
+**GET** `/api/users/me/has-password`
+
+#### Responses
+- **200**: Returns boolean indicating if user has password
+
+---
+
+### Create new password for current user
+**POST** `/api/users/me/password`
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `newPassword` | `string` | `Yes` | New password to set (minLength: 6) |
+
+#### Responses
+- **200**: Password created successfully
+- **400**: User already has a password
+
+---
+
 ### Update current user password 
 **PATCH** `/api/users/me/password`
 
@@ -325,7 +347,7 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 **GET** `/api/users/stats`
 
 #### Responses
-- **200**: Statistics retrieved successfully
+- **200**: Statistics retrieved successfully (Returns total, active, inactive, growthByMonth, and growthByYear)
 
 ---
 
@@ -600,6 +622,14 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 
 ---
 
+### Get unread notification count 
+**GET** `/api/notifications/unread-count`
+
+#### Responses
+- **200**: Return unread notifications count for the current user
+
+---
+
 ### Mark a notification as read 
 **PATCH** `/api/notifications/{id}/read`
 
@@ -741,7 +771,7 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
   **Response Schema:**
   | Field | Type | Description |
   |-------|------|-------------|
-  | `data` | `array` |  |
+  | `data` | `array` |  (Note: Does not return members, use GET /api/projects/:id/members) |
   | `pagination` | `string` |  |
 
 
@@ -760,6 +790,7 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 
 #### Responses
 - **201**: Project created successfully
+- **403**: Forbidden if editorBoardId is provided and creator of board does not match creator of project
   
   **Response Schema:**
   | Field | Type | Description |
@@ -827,10 +858,13 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | `string` | `No` |  |
+| `description` | `string` | `No` |  |
+| `imageUrl` | `string` | `No` |  |
 | `editorBoardId` | `number` | `No` |  |
 
 #### Responses
 - **200**: Project updated successfully
+- **403**: Forbidden if editorBoardId is provided and creator of board does not match creator of project
   
   **Response Schema:**
   | Field | Type | Description |
@@ -1637,9 +1671,11 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `status` | `string` | `Yes` |  |
+| `voteDeadline` | `string` | `No` | Applicable only when status is SUBMITTED |
+| `comment` | `string` | `No` | Comment to attach when updating status |
 
 #### Responses
-- **200**: Application status updated successfully
+- **200**: Application status updated successfully (and auto-creates folder/file if Arc/Chapter is APPROVED, and creates comment if provided)
   
   **Response Schema:**
   | Field | Type | Description |
