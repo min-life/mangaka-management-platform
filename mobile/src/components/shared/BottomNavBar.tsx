@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
 import { RootStackNavProp, RootStackParamList } from '@/src/navigation/types';
+import { fetchNotifications } from '@/src/services/notificationApi';
 
 export type BottomTab = 'inbox' | 'home' | 'profile';
 
@@ -28,9 +29,31 @@ const TABS: Array<{
 export default function BottomNavBar({
   activeTab = 'home',
   avatarUri,
-  unreadInboxCount = 0,
+  unreadInboxCount,
 }: BottomNavBarProps) {
   const navigation = useNavigation<RootStackNavProp>();
+  const [fetchedUnreadCount, setFetchedUnreadCount] = useState(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (unreadInboxCount !== undefined) return undefined;
+
+      let isActive = true;
+
+      void fetchNotifications()
+        .then((result) => {
+          if (!isActive) return;
+          setFetchedUnreadCount(result.items.filter((item) => item.isUnread).length);
+        })
+        .catch(() => {
+          if (isActive) setFetchedUnreadCount(0);
+        });
+
+      return () => {
+        isActive = false;
+      };
+    }, [unreadInboxCount]),
+  );
 
   const handlePress = (tab: BottomTab) => {
     const target = TABS.find((item) => item.key === tab);
@@ -41,6 +64,7 @@ export default function BottomNavBar({
 
   const activeColor = '#1F2329';
   const inactiveColor = Colors.textPlaceholder;
+  const resolvedUnreadCount = unreadInboxCount ?? fetchedUnreadCount;
 
   return (
     <SafeAreaView
@@ -69,16 +93,16 @@ export default function BottomNavBar({
             const isActive = activeTab === tab.key;
             const iconColor = isActive ? activeColor : inactiveColor;
             const textColor = isActive ? activeColor : Colors.textMuted;
-            const showUnreadBadge = tab.key === 'inbox' && unreadInboxCount > 0;
-            const unreadBadgeLabel = unreadInboxCount > 99 ? '99+' : String(unreadInboxCount);
+            const showUnreadBadge = tab.key === 'inbox' && resolvedUnreadCount > 0;
+            const unreadBadgeLabel = resolvedUnreadCount > 99 ? '99+' : String(resolvedUnreadCount);
 
             return (
               <TouchableOpacity
                 key={tab.key}
                 activeOpacity={0.78}
                 accessibilityLabel={
-                  tab.key === 'inbox' && unreadInboxCount > 0
-                    ? `Inbox, ${unreadInboxCount} unread notifications`
+                  tab.key === 'inbox' && resolvedUnreadCount > 0
+                    ? `Inbox, ${resolvedUnreadCount} unread notifications`
                     : tab.label
                 }
                 onPress={() => handlePress(tab.key)}

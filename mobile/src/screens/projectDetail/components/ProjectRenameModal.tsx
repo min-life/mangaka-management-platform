@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -15,20 +16,24 @@ import { Colors } from '@/src/constants/colors';
 
 interface ProjectRenameModalProps {
   errorMessage?: string;
+  imagePreviewUri?: string;
   isSubmitting?: boolean;
   name: string;
   onChangeName: (name: string) => void;
   onClose: () => void;
+  onPickImage: () => void;
   onSubmit: () => void;
   visible: boolean;
 }
 
 export default function ProjectRenameModal({
   errorMessage,
+  imagePreviewUri,
   isSubmitting,
   name,
   onChangeName,
   onClose,
+  onPickImage,
   onSubmit,
   visible,
 }: ProjectRenameModalProps) {
@@ -56,10 +61,10 @@ export default function ProjectRenameModal({
           <View className="flex-row items-start justify-between gap-4">
             <View className="flex-1">
               <Text className="text-[22px] font-black" style={{ color: Colors.text }}>
-                Rename project
+                Edit project
               </Text>
               <Text className="mt-1 text-[13px] leading-5" style={{ color: Colors.textMuted }}>
-                Update the project name shown across the workspace.
+                Update the project name and optionally upload a new cover image.
               </Text>
             </View>
 
@@ -75,6 +80,42 @@ export default function ProjectRenameModal({
           </View>
 
           <View className="mt-5 gap-2">
+            <Text className="text-[12px] font-bold uppercase" style={{ color: Colors.textMuted }}>
+              Project image
+            </Text>
+            <View
+              className="overflow-hidden rounded-2xl"
+              style={{
+                backgroundColor: Colors.surface,
+                borderColor: Colors.borderFaint,
+                borderWidth: 1,
+              }}
+            >
+              <View className="h-36 w-full" style={{ backgroundColor: Colors.iconBg }}>
+                {imagePreviewUri ? (
+                  <Image source={{ uri: imagePreviewUri }} className="h-full w-full" resizeMode="cover" />
+                ) : (
+                  <View className="h-full w-full items-center justify-center">
+                    <MaterialIcon name="image" color={Colors.textMuted} size={34} />
+                  </View>
+                )}
+              </View>
+              <TouchableOpacity
+                activeOpacity={0.75}
+                className="h-11 flex-row items-center justify-center gap-2"
+                disabled={isSubmitting}
+                onPress={onPickImage}
+              >
+                <MaterialIcon name="cloud_upload" color={Colors.accent} size={18} />
+                <Text className="text-[13px] font-bold" style={{ color: Colors.accent }}>
+                  Choose image
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <Text className="text-[12px]" style={{ color: Colors.textMuted }}>
+              Leave unchanged if you do not choose a new image.
+            </Text>
+
             <Text className="text-[12px] font-bold uppercase" style={{ color: Colors.textMuted }}>
               Project name
             </Text>

@@ -34,10 +34,6 @@ projects
 chỉ cho filter theo mình có là owner project hay không
 lỗi search
 icon đổi chế độ xem bỏ lên header
----
-
-sửa câu thông báo - notification -> theo đông
-
 
 Project detail
 check createdByUse trong /api/projects/{id} xem có trùng với danh sách member không nếu có thì gắn lable project owner
@@ -49,6 +45,10 @@ Dấu 3 chấm cho sửa ảnh và tên của project
 Task - project
 gom thành combo box
 xóa nút header
+
+---
+
+sửa câu thông báo - notification -> theo đông
 
 Contributor
 bỏ thống kê

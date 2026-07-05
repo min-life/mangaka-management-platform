@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import * as ImagePicker from 'expo-image-picker';
 
 import ApiStateView from '@/src/components/shared/ApiStateView';
 import BottomNavBar from '@/src/components/shared/BottomNavBar';
@@ -10,6 +11,7 @@ import { navigateToNotificationTarget } from '@/src/navigation/notificationTarge
 import { RootStackParamList } from '@/src/navigation/types';
 import { fetchProjectActivityLogs } from '@/src/services/activityLogApi';
 import { ApiEditorBoard } from '@/src/services/apiTypes';
+import { uploadProjectImageToCloudinary } from '@/src/services/cloudinaryUpload';
 import { fetchProjectBundle, updateProject } from '@/src/services/projectApi';
 import { ActivityItem } from '@/src/types/home';
 import { ProjectItem } from '@/src/types/projects';
@@ -38,6 +40,8 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameErrorMessage, setRenameErrorMessage] = useState('');
   const [renameForm, setRenameForm] = useState('');
+  const [projectImageAsset, setProjectImageAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [projectImagePreviewUri, setProjectImagePreviewUri] = useState<string | undefined>();
 
   const loadProject = useCallback(async () => {
     setIsLoading(true);
@@ -93,6 +97,8 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
   const openRenameModal = useCallback(() => {
     if (!project) return;
     setRenameForm(project.name);
+    setProjectImageAsset(null);
+    setProjectImagePreviewUri(project.coverUri);
     setRenameErrorMessage('');
     setIsRenameVisible(true);
   }, [project]);
@@ -100,6 +106,30 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
   const closeRenameModal = useCallback(() => {
     if (isRenaming) return;
     setIsRenameVisible(false);
+    setRenameErrorMessage('');
+    setProjectImageAsset(null);
+  }, [isRenaming]);
+
+  const handlePickProjectImage = useCallback(async () => {
+    if (isRenaming) return;
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setRenameErrorMessage('Please allow access to your photo library.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: true,
+      aspect: [16, 9],
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.88,
+    });
+
+    if (result.canceled || !result.assets[0]) return;
+
+    setProjectImageAsset(result.assets[0]);
+    setProjectImagePreviewUri(result.assets[0].uri);
     setRenameErrorMessage('');
   }, [isRenaming]);
 
@@ -112,7 +142,7 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
       return;
     }
 
-    if (nextName === project.name) {
+    if (nextName === project.name && !projectImageAsset) {
       setIsRenameVisible(false);
       return;
     }
@@ -121,25 +151,34 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
     setRenameErrorMessage('');
 
     try {
-      const updatedProject = await updateProject(project.id, { name: nextName });
+      const nextImageUrl = projectImageAsset
+        ? await uploadProjectImageToCloudinary(projectImageAsset)
+        : undefined;
+      const updatedProject = await updateProject(project.id, {
+        ...(nextImageUrl ? { imageUrl: nextImageUrl } : {}),
+        name: nextName,
+      });
       setProject((currentProject) =>
         currentProject
           ? {
               ...currentProject,
+              coverUri: updatedProject.imageUrl ?? currentProject.coverUri,
               name: updatedProject.name,
               updatedAt: updatedProject.updatedAt,
             }
           : currentProject,
       );
       setIsRenameVisible(false);
+      setProjectImageAsset(null);
+      setProjectImagePreviewUri(undefined);
     } catch (error) {
       setRenameErrorMessage(
-        error instanceof Error ? error.message : 'Unable to rename project.',
+        error instanceof Error ? error.message : 'Unable to update project.',
       );
     } finally {
       setIsRenaming(false);
     }
-  }, [isRenaming, project, renameForm]);
+  }, [isRenaming, project, projectImageAsset, renameForm]);
 
   if (isLoading) {
     return (
@@ -255,10 +294,12 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
 
       <ProjectRenameModal
         errorMessage={renameErrorMessage}
+        imagePreviewUri={projectImagePreviewUri}
         isSubmitting={isRenaming}
         name={renameForm}
         onChangeName={setRenameForm}
         onClose={closeRenameModal}
+        onPickImage={handlePickProjectImage}
         onSubmit={handleSubmitRename}
         visible={isRenameVisible}
       />

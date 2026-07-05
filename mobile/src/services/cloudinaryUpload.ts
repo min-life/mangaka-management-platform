@@ -21,8 +21,8 @@ function getCloudinaryUploadUrl() {
   return `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 }
 
-function getUploadFile(asset: ImagePickerAsset) {
-  const fileName = asset.fileName || `avatar-${Date.now()}.jpg`;
+function getUploadFile(asset: ImagePickerAsset, prefix: string) {
+  const fileName = asset.fileName || `${prefix}-${Date.now()}.jpg`;
   const mimeType = asset.mimeType || 'image/jpeg';
 
   return {
@@ -32,11 +32,11 @@ function getUploadFile(asset: ImagePickerAsset) {
   };
 }
 
-export async function uploadAvatarToCloudinary(asset: ImagePickerAsset) {
+async function uploadImageToCloudinary(asset: ImagePickerAsset, folder: string, prefix: string) {
   const formData = new FormData();
   formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET ?? '');
-  formData.append('folder', 'mangaka/avatars');
-  formData.append('file', getUploadFile(asset) as unknown as Blob);
+  formData.append('folder', folder);
+  formData.append('file', getUploadFile(asset, prefix) as unknown as Blob);
 
   let response: Response;
   try {
@@ -64,4 +64,12 @@ export async function uploadAvatarToCloudinary(asset: ImagePickerAsset) {
   }
 
   return body.secure_url || body.url;
+}
+
+export async function uploadAvatarToCloudinary(asset: ImagePickerAsset) {
+  return uploadImageToCloudinary(asset, 'mangaka/avatars', 'avatar');
+}
+
+export async function uploadProjectImageToCloudinary(asset: ImagePickerAsset) {
+  return uploadImageToCloudinary(asset, 'mangaka/projects', 'project');
 }

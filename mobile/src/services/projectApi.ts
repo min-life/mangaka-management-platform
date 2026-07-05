@@ -37,7 +37,7 @@ export async function fetchProjects(params: { me?: boolean; name?: string } = {}
 
 export async function updateProject(
   projectId: string,
-  data: { name?: string },
+  data: { imageUrl?: string; name?: string },
 ) {
   const response = await apiRequest<ApiDataResponse<ApiProject>>(`/projects/${projectId}`, {
     body: data,
