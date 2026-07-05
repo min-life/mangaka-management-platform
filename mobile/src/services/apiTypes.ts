@@ -243,3 +243,17 @@ export interface ApiNotification {
   updatedAt?: string;
 }
 
+export interface ApiActivityLog {
+  action?: string;
+  actor?: ApiUserSummary | null;
+  actorId?: number;
+  createdAt?: string;
+  editorBoardId?: number | null;
+  entityId?: number;
+  entityType?: string;
+  fileId?: number | null;
+  id: number;
+  metadata?: Record<string, unknown> | null;
+  projectId?: number | null;
+}
+

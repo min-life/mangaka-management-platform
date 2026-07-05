@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Image, ScrollView, Text, TextInput, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -38,7 +38,11 @@ function TaskMetric({
   );
 }
 
-function ContributorRow({ member }: { member: ProjectMemberItem }) {
+function ContributorRow({ isOwner, member }: { isOwner?: boolean; member: ProjectMemberItem }) {
+  const roleLabel = isOwner ? 'Owner' : member.roleName;
+  const roleColor = isOwner ? Colors.accent : Colors.statusProgress;
+  const roleBackground = isOwner ? 'rgba(255,211,105,0.16)' : 'rgba(77,166,255,0.16)';
+
   return (
     <View
       className="rounded-xl p-4"
@@ -73,10 +77,10 @@ function ContributorRow({ member }: { member: ProjectMemberItem }) {
 
         <View
           className="rounded-full px-3 py-1"
-          style={{ backgroundColor: 'rgba(77,166,255,0.16)' }}
+          style={{ backgroundColor: roleBackground }}
         >
-          <Text className="text-[11px] font-bold" style={{ color: Colors.statusProgress }}>
-            {member.roleName}
+          <Text className="text-[11px] font-bold" style={{ color: roleColor }}>
+            {roleLabel}
           </Text>
         </View>
       </View>
@@ -100,6 +104,7 @@ export default function ProjectContributorsScreen({
   route,
 }: ProjectContributorsScreenProps) {
   const [members, setMembers] = useState<ProjectMemberItem[]>([]);
+  const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState('Project');
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -115,6 +120,7 @@ export default function ProjectContributorsScreen({
         fetchProjectBundle(route.params.projectId).catch(() => null),
       ]);
       setMembers(memberResult.members);
+      setOwnerUserId(projectBundle?.project.createdBy || null);
       setProjectName(projectBundle?.project.name ?? 'Project');
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Không thể tải thành viên.');
@@ -130,11 +136,6 @@ export default function ProjectContributorsScreen({
 
     return () => clearTimeout(timeout);
   }, [loadMembers]);
-
-  const totalTasks = useMemo(
-    () => members.reduce((sum, member) => sum + member.numberOfTasks, 0),
-    [members],
-  );
 
   return (
     <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
@@ -163,11 +164,6 @@ export default function ProjectContributorsScreen({
           />
         </View>
 
-        <View className="mt-4 flex-row gap-2">
-          <TaskMetric label="Members" value={members.length} />
-          <TaskMetric label="Tasks" value={totalTasks} />
-        </View>
-
         {isLoading ? (
           <ApiStateView type="loading" />
         ) : errorMessage ? (
@@ -175,7 +171,11 @@ export default function ProjectContributorsScreen({
         ) : members.length > 0 ? (
           <View className="mt-4 gap-3">
             {members.map((member) => (
-              <ContributorRow key={member.id} member={member} />
+              <ContributorRow
+                key={member.id}
+                isOwner={member.id === ownerUserId}
+                member={member}
+              />
             ))}
           </View>
         ) : (

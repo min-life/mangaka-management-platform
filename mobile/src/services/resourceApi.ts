@@ -198,7 +198,7 @@ export async function fetchResourceFileBundle(fileId: string) {
 
 export async function createFileDiscussionComment(params: { fileId: string; text: string }) {
   const text = params.text.trim();
-  if (!text) throw new Error('Vui lòng nhập nội dung bình luận.');
+  if (!text) throw new Error('Please enter a comment.');
 
   const response = await apiRequest<ApiDataResponse<ApiComment>>(
     `/files/${params.fileId}/comments`,
@@ -208,13 +208,13 @@ export async function createFileDiscussionComment(params: { fileId: string; text
     },
   );
 
-  if (!response.data) throw new Error('Không thể tạo bình luận.');
+  if (!response.data) throw new Error('Unable to create the comment.');
   return mapComment(response.data);
 }
 
 export async function fetchFileDiscussionComments(fileId: string) {
   const response = await apiRequest<ApiListResponse<ApiComment>>(`/files/${fileId}/comments`, {
-    params: { field: 'createdAt', limit: 100, order: 'desc', page: 1 },
+    params: { field: 'createdAt', limit: 100, order: 'asc', page: 1 },
   });
 
   return uniqueById((response.data ?? []).map(mapComment));
@@ -230,7 +230,7 @@ export async function fetchFileDiscussionTasks(fileId: string) {
 
 export async function fetchTaskDiscussionComments(taskId: string) {
   const response = await apiRequest<ApiListResponse<ApiComment>>(`/tasks/${taskId}/comments`, {
-    params: { field: 'createdAt', limit: 100, order: 'desc', page: 1 },
+    params: { field: 'createdAt', limit: 100, order: 'asc', page: 1 },
   });
 
   return uniqueById((response.data ?? []).map(mapComment));
@@ -253,7 +253,7 @@ export async function fetchFrameDetail(frameId: string) {
 
 export async function fetchFrameDiscussionComments(frameId: string) {
   const response = await apiRequest<ApiListResponse<ApiComment>>(`/frames/${frameId}/comments`, {
-    params: { field: 'createdAt', limit: 100, order: 'desc', page: 1 },
+    params: { field: 'createdAt', limit: 100, order: 'asc', page: 1 },
   });
 
   return uniqueById((response.data ?? []).map(mapComment));
@@ -265,7 +265,7 @@ export async function createDiscussionComment(params: {
   text: string;
 }) {
   const text = params.text.trim();
-  if (!text) throw new Error('Vui lòng nhập nội dung bình luận.');
+  if (!text) throw new Error('Please enter a comment.');
 
   const path = params.frameId
     ? `/frames/${params.frameId}/comments`
@@ -275,7 +275,7 @@ export async function createDiscussionComment(params: {
     method: 'POST',
   });
 
-  if (!response.data) throw new Error('Không thể tạo bình luận.');
+  if (!response.data) throw new Error('Unable to create the comment.');
   return mapComment(response.data);
 }
 

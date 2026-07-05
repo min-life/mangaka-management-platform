@@ -16,13 +16,13 @@ function emptyListResponse<T>(): ApiListResponse<T> {
   return { data: [], pagination: undefined };
 }
 
-export async function fetchProjects(params: { name?: string } = {}) {
+export async function fetchProjects(params: { me?: boolean; name?: string } = {}) {
   const response = await apiRequest<ApiListResponse<ApiProject>>('/projects', {
     params: {
       // field: '',
       limit: 10,
-      me: false,
-      // name: params.name,
+      me: params.me ?? false,
+      name: params.name,
       order: 'desc',
       page: 1,
     },
@@ -33,6 +33,22 @@ export async function fetchProjects(params: { name?: string } = {}) {
     projects: uniqueById((response.data ?? []).map((project) => mapProject(project))),
     rawProjects: response.data ?? [],
   };
+}
+
+export async function updateProject(
+  projectId: string,
+  data: { name?: string },
+) {
+  const response = await apiRequest<ApiDataResponse<ApiProject>>(`/projects/${projectId}`, {
+    body: data,
+    method: 'PATCH',
+  });
+
+  if (!response.data) {
+    throw new Error('Project update response is missing.');
+  }
+
+  return response.data;
 }
 
 export async function fetchProjectBundle(

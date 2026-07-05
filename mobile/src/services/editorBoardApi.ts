@@ -13,7 +13,7 @@ export async function fetchEditorBoards(params: { name?: string } = {}) {
   const response = await apiRequest<ApiListResponse<ApiEditorBoard>>('/editor-boards', {
     params: {
       limit: 50,
-      me: true,
+      me: false,
       name: params.name,
       page: 1,
     },

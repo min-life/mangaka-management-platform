@@ -1,6 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   ScrollView,
   Text,
   TextInput,
@@ -37,12 +39,20 @@ import {
   ResourceFileTabBar,
 } from '@/src/screens/resourceFile/components/ResourceFilePanels';
 
-type ApplicationDetailScreenProps = NativeStackScreenProps<
-  RootStackParamList,
-  'ApplicationDetail'
->;
+type ApplicationDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'ApplicationDetail'>;
 
 const APPLICATION_DETAIL_TABS: ResourceFileTab[] = ['Overview', 'Discussion', 'Materials'];
+const INITIAL_COMMENT_COUNT = 5;
+const COMMENT_BATCH_COUNT = 5;
+
+function visibleCountForHighlight(comments: ResourceTaskComment[], highlightedCommentId?: string) {
+  if (!highlightedCommentId) return INITIAL_COMMENT_COUNT;
+
+  const highlightedIndex = comments.findIndex((comment) => comment.id === highlightedCommentId);
+  if (highlightedIndex < 0) return INITIAL_COMMENT_COUNT;
+
+  return Math.max(INITIAL_COMMENT_COUNT, comments.length - highlightedIndex);
+}
 
 function ApplicationOverview({ application }: { application: ApplicationItem }) {
   return (
@@ -121,14 +131,55 @@ function ApplicationMaterials({ application }: { application: ApplicationItem })
 function ApplicationDiscussion({
   comments,
   errorMessage,
+  highlightedCommentId,
   isLoading,
+  onCommentLayout,
   onRetry,
 }: {
   comments: ResourceTaskComment[];
   errorMessage: string;
+  highlightedCommentId?: string;
   isLoading: boolean;
+  onCommentLayout?: (commentId: string, y: number) => void;
   onRetry: () => void;
 }) {
+  const panelTopRef = useRef(0);
+  const commentListTopRef = useRef(0);
+  const commentThreadScrollRef = useRef<ScrollView | null>(null);
+  const isLoadingOlderCommentsRef = useRef(false);
+  const lastOlderLoadAtRef = useRef(0);
+  const minimumVisibleCommentCount = visibleCountForHighlight(comments, highlightedCommentId);
+  const [visibleCommentCount, setVisibleCommentCount] = useState(minimumVisibleCommentCount);
+
+  useEffect(() => {
+    setVisibleCommentCount(minimumVisibleCommentCount);
+  }, [highlightedCommentId, minimumVisibleCommentCount]);
+
+  useEffect(() => {
+    setVisibleCommentCount((currentCount) => Math.max(currentCount, minimumVisibleCommentCount));
+  }, [minimumVisibleCommentCount]);
+
+  const visibleComments = useMemo(() => {
+    const count = Math.min(comments.length, visibleCommentCount);
+    return comments.slice(Math.max(0, comments.length - count));
+  }, [comments, visibleCommentCount]);
+  const hiddenCommentCount = Math.max(0, comments.length - visibleComments.length);
+  const handleShowOlderComments = () => {
+    isLoadingOlderCommentsRef.current = true;
+    setVisibleCommentCount((currentCount) =>
+      Math.min(comments.length, currentCount + COMMENT_BATCH_COUNT),
+    );
+  };
+  const handleCommentThreadScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (hiddenCommentCount <= 0) return;
+    if (event.nativeEvent.contentOffset.y > 8) return;
+
+    const now = Date.now();
+    if (now - lastOlderLoadAtRef.current < 300) return;
+    lastOlderLoadAtRef.current = now;
+    handleShowOlderComments();
+  };
+
   if (isLoading) {
     return (
       <View
@@ -170,7 +221,12 @@ function ApplicationDiscussion({
   }
 
   return (
-    <View className="mt-6 gap-3">
+    <View
+      className="mt-6 gap-3"
+      onLayout={(event) => {
+        panelTopRef.current = event.nativeEvent.layout.y;
+      }}
+    >
       <View className="flex-row items-center justify-between">
         <Text
           className="text-[12px] font-bold uppercase"
@@ -183,9 +239,65 @@ function ApplicationDiscussion({
         </Text>
       </View>
       {comments.length > 0 ? (
-        comments.map((comment, index) => (
-          <CommentBubble key={`${comment.id}-${index}`} comment={comment} />
-        ))
+        <ScrollView
+          ref={commentThreadScrollRef}
+          nestedScrollEnabled
+          onContentSizeChange={() => {
+            if (isLoadingOlderCommentsRef.current) {
+              isLoadingOlderCommentsRef.current = false;
+              return;
+            }
+
+            commentThreadScrollRef.current?.scrollToEnd({ animated: false });
+          }}
+          onScroll={handleCommentThreadScroll}
+          scrollEventThrottle={16}
+          showsVerticalScrollIndicator={false}
+          style={{ maxHeight: 420 }}
+        >
+          <View
+            className="gap-2"
+            onLayout={(event) => {
+              commentListTopRef.current = event.nativeEvent.layout.y;
+            }}
+          >
+            {hiddenCommentCount > 0 ? (
+              <TouchableOpacity
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                className="mb-1 self-center rounded-full px-3 py-2"
+                onPress={handleShowOlderComments}
+                style={{
+                  backgroundColor: C.surface,
+                  borderColor: C.borderFaint,
+                  borderWidth: 1,
+                }}
+              >
+                <Text className="text-[12px] font-semibold" style={{ color: C.textMuted }}>
+                  Kéo lên hoặc chạm để xem {Math.min(hiddenCommentCount, COMMENT_BATCH_COUNT)} bình
+                  luận cũ
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+
+            {visibleComments.map((comment, index) => (
+              <View
+                key={`${comment.id}-${index}`}
+                onLayout={(event) => {
+                  onCommentLayout?.(
+                    comment.id,
+                    panelTopRef.current + commentListTopRef.current + event.nativeEvent.layout.y,
+                  );
+                }}
+              >
+                <CommentBubble
+                  comment={comment}
+                  isHighlighted={comment.id === highlightedCommentId}
+                />
+              </View>
+            ))}
+          </View>
+        </ScrollView>
       ) : (
         <View
           className="items-center rounded-xl px-5 py-8"
@@ -282,13 +394,20 @@ export default function ApplicationDetailScreen({
   navigation,
   route,
 }: ApplicationDetailScreenProps) {
-  const [activeTab, setActiveTab] = useState<ResourceFileTab>('Overview');
+  const [activeTab, setActiveTab] = useState<ResourceFileTab>(
+    route.params.initialTab ?? 'Overview',
+  );
   const [application, setApplication] = useState<ApplicationItem | null>(null);
   const [comments, setComments] = useState<ResourceTaskComment[]>([]);
   const [commentsErrorMessage, setCommentsErrorMessage] = useState('');
   const [isCommentsLoading, setIsCommentsLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
+  const scrollViewRef = useRef<ScrollView | null>(null);
+  const didScrollToInitialCommentRef = useRef(false);
+  const didScrollToLatestDiscussionRef = useRef(false);
+  const initialCommentLayoutYRef = useRef<number | null>(null);
+  const initialCommentId = route.params.initialCommentId;
 
   const loadApplication = useCallback(async () => {
     setIsLoading(true);
@@ -316,7 +435,7 @@ export default function ApplicationDetailScreen({
         return currentComments;
       }
 
-      return [nextComment, ...currentComments];
+      return [...currentComments, nextComment];
     });
   }, []);
 
@@ -359,14 +478,55 @@ export default function ApplicationDetailScreen({
         return currentComments;
       }
 
-      return [nextComment, ...currentComments];
+      return [...currentComments, nextComment];
     });
   };
 
-  const contentPaddingBottom = useMemo(
-    () => (activeTab === 'Discussion' ? 148 : 40),
-    [activeTab],
+  const scrollToInitialComment = useCallback(() => {
+    if (didScrollToInitialCommentRef.current || !initialCommentId) return;
+
+    const commentY = initialCommentLayoutYRef.current;
+    if (commentY === null) return;
+
+    didScrollToInitialCommentRef.current = true;
+    requestAnimationFrame(() => {
+      scrollViewRef.current?.scrollTo({ y: Math.max(commentY - 24, 0), animated: true });
+    });
+  }, [initialCommentId]);
+
+  const handleCommentLayout = useCallback(
+    (commentId: string, y: number) => {
+      if (commentId !== initialCommentId) return;
+      initialCommentLayoutYRef.current = y;
+      scrollToInitialComment();
+    },
+    [initialCommentId, scrollToInitialComment],
   );
+
+  useEffect(() => {
+    if (!initialCommentId || isCommentsLoading) return;
+    if (!comments.some((comment) => comment.id === initialCommentId)) return;
+
+    scrollToInitialComment();
+  }, [comments, initialCommentId, isCommentsLoading, scrollToInitialComment]);
+
+  useEffect(() => {
+    didScrollToLatestDiscussionRef.current = false;
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (initialCommentId) return;
+    if (activeTab !== 'Discussion') return;
+    if (isCommentsLoading || comments.length === 0) return;
+    if (didScrollToLatestDiscussionRef.current) return;
+
+    didScrollToLatestDiscussionRef.current = true;
+    requestAnimationFrame(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    });
+  }, [activeTab, comments.length, initialCommentId, isCommentsLoading]);
+
+  const contentPaddingBottom = useMemo(() => (activeTab === 'Discussion' ? 148 : 40), [activeTab]);
 
   return (
     <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
@@ -386,6 +546,7 @@ export default function ApplicationDetailScreen({
         />
       ) : (
         <ScrollView
+          ref={scrollViewRef}
           className="flex-1"
           contentContainerStyle={{ padding: 16, paddingBottom: contentPaddingBottom }}
           showsVerticalScrollIndicator={false}
@@ -402,7 +563,9 @@ export default function ApplicationDetailScreen({
             <ApplicationDiscussion
               comments={comments}
               errorMessage={commentsErrorMessage}
+              highlightedCommentId={initialCommentId}
               isLoading={isCommentsLoading}
+              onCommentLayout={handleCommentLayout}
               onRetry={loadApplicationComments}
             />
           ) : null}
@@ -424,4 +587,3 @@ export default function ApplicationDetailScreen({
     </View>
   );
 }
-

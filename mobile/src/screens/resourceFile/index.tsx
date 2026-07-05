@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -28,11 +28,7 @@ import {
 import { mapComment } from '@/src/services/mappers';
 import { subscribeToComments } from '@/src/services/realtimeClient';
 
-import {
-  C,
-  TaskDetailTopBar,
-  TaskPreviewSection,
-} from '@/src/screens/taskDetail/components';
+import { C, TaskDetailTopBar, TaskPreviewSection } from '@/src/screens/taskDetail/components';
 import {
   MaterialsPanel,
   OverviewPanel,
@@ -62,10 +58,7 @@ function buildFileDescription(content: string, language: string) {
   return `${summary} Review this ${language} resource as part of the manga production workspace. Check the annotated areas, discussion notes, and approval status before moving it forward.`;
 }
 
-export default function ResourceFileScreen({
-  navigation,
-  route,
-}: ResourceFileScreenProps) {
+export default function ResourceFileScreen({ navigation, route }: ResourceFileScreenProps) {
   const [activeTab, setActiveTab] = useState<ResourceFileTab>(
     route.params.initialTab ?? 'Overview',
   );
@@ -88,6 +81,12 @@ export default function ResourceFileScreen({
   const [isDiscussionFramesLoading, setIsDiscussionFramesLoading] = useState(false);
   const [discussionFrameStatusMessage, setDiscussionFrameStatusMessage] = useState('');
   const [selectedDiscussionFrameId, setSelectedDiscussionFrameId] = useState<string | null>(null);
+  const scrollViewRef = useRef<ScrollView | null>(null);
+  const initialDiscussionAppliedRef = useRef(false);
+  const didScrollToInitialCommentRef = useRef(false);
+  const didScrollToLatestDiscussionRef = useRef(false);
+  const initialCommentLayoutYRef = useRef<number | null>(null);
+  const initialCommentId = route.params.initialCommentId;
 
   const loadFile = useCallback(async () => {
     setIsLoading(true);
@@ -144,7 +143,8 @@ export default function ResourceFileScreen({
     [discussionFrames],
   );
 
-  const selectedVersion = versions.find((version) => version.id === selectedVersionId) ?? versions[0];
+  const selectedVersion =
+    versions.find((version) => version.id === selectedVersionId) ?? versions[0];
   const previewImageUri = selectedVersion?.materials.imageUri ?? file?.previewImageUri;
 
   const handleSelectFrame = (frame: ResourceTaskFrame) => {
@@ -181,7 +181,7 @@ export default function ResourceFileScreen({
           setFileDiscussionCommentCount((count) => count + 1);
         }
 
-        return [nextComment, ...currentComments];
+        return [...currentComments, nextComment];
       });
     },
     [],
@@ -287,10 +287,79 @@ export default function ResourceFileScreen({
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'Discussion') {
-      void handleSelectFileComments();
+    if (activeTab !== 'Discussion') return;
+
+    if (!initialDiscussionAppliedRef.current) {
+      initialDiscussionAppliedRef.current = true;
+
+      if (route.params.initialDiscussionScope === 'task' && route.params.initialTaskId) {
+        void loadDiscussionTasks();
+        void loadTaskDiscussion(route.params.initialTaskId);
+        return;
+      }
+
+      if (route.params.initialDiscussionScope === 'frame' && route.params.initialFrameId) {
+        void loadDiscussionTasks();
+        void loadFrameDiscussion(route.params.initialFrameId);
+        return;
+      }
     }
-  }, [activeTab, handleSelectFileComments]);
+
+    void handleSelectFileComments();
+  }, [
+    activeTab,
+    handleSelectFileComments,
+    loadDiscussionTasks,
+    loadFrameDiscussion,
+    loadTaskDiscussion,
+    route.params.initialDiscussionScope,
+    route.params.initialFrameId,
+    route.params.initialTaskId,
+  ]);
+
+  const scrollToInitialComment = useCallback(() => {
+    if (didScrollToInitialCommentRef.current || !initialCommentId) return;
+
+    const commentY = initialCommentLayoutYRef.current;
+    if (commentY === null) return;
+
+    didScrollToInitialCommentRef.current = true;
+    requestAnimationFrame(() => {
+      scrollViewRef.current?.scrollTo({ y: Math.max(commentY - 24, 0), animated: true });
+    });
+  }, [initialCommentId]);
+
+  const handleCommentLayout = useCallback(
+    (commentId: string, y: number) => {
+      if (commentId !== initialCommentId) return;
+      initialCommentLayoutYRef.current = y;
+      scrollToInitialComment();
+    },
+    [initialCommentId, scrollToInitialComment],
+  );
+
+  useEffect(() => {
+    if (!initialCommentId || isDiscussionCommentsLoading) return;
+    if (!discussionComments.some((comment) => comment.id === initialCommentId)) return;
+
+    scrollToInitialComment();
+  }, [discussionComments, initialCommentId, isDiscussionCommentsLoading, scrollToInitialComment]);
+
+  useEffect(() => {
+    didScrollToLatestDiscussionRef.current = false;
+  }, [activeTab, discussionScope, selectedDiscussionFrameId, selectedDiscussionTaskId]);
+
+  useEffect(() => {
+    if (initialCommentId) return;
+    if (activeTab !== 'Discussion') return;
+    if (isDiscussionCommentsLoading || discussionComments.length === 0) return;
+    if (didScrollToLatestDiscussionRef.current) return;
+
+    didScrollToLatestDiscussionRef.current = true;
+    requestAnimationFrame(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    });
+  }, [activeTab, discussionComments.length, initialCommentId, isDiscussionCommentsLoading]);
 
   useEffect(() => {
     if (activeTab !== 'Discussion') return undefined;
@@ -381,11 +450,7 @@ export default function ResourceFileScreen({
   if (errorMessage || !file) {
     return (
       <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
-        <TaskDetailTopBar
-          subtitle="Resource"
-          title="File"
-          onBack={() => navigation.goBack()}
-        />
+        <TaskDetailTopBar subtitle="Resource" title="File" onBack={() => navigation.goBack()} />
         <ApiStateView type="error" message={errorMessage || 'File not found'} onRetry={loadFile} />
       </View>
     );
@@ -400,6 +465,7 @@ export default function ResourceFileScreen({
       />
 
       <ScrollView
+        ref={scrollViewRef}
         className="flex-1"
         contentContainerStyle={{
           paddingHorizontal: 16,
@@ -417,10 +483,7 @@ export default function ResourceFileScreen({
         <ResourceFileTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
         {activeTab === 'Overview' && (
-          <OverviewPanel
-            description={description}
-            fileContent={file.content}
-          />
+          <OverviewPanel description={description} fileContent={file.content} />
         )}
 
         {activeTab === 'Tasks' && (
@@ -447,9 +510,11 @@ export default function ResourceFileScreen({
             }
             frameOptions={discussionFrameOptions}
             frameStatusMessage={discussionFrameStatusMessage}
+            highlightedCommentId={initialCommentId}
             isCommentsLoading={isDiscussionCommentsLoading}
             isFramesLoading={isDiscussionFramesLoading}
             isTasksLoading={isDiscussionTasksLoading}
+            onCommentLayout={handleCommentLayout}
             onRetryComments={handleRetryDiscussionComments}
             onSelectFileComments={handleSelectFileComments}
             onSelectFrameComments={loadFrameDiscussion}

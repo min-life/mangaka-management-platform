@@ -2,6 +2,8 @@
  * Types cho màn hình Home
  */
 
+import type { NotificationItem } from './notifications';
+
 export interface WorkItem {
   id: string;
   icon: string;
@@ -19,4 +21,5 @@ export interface ActivityItem {
   subtitle: string;
   time: string;
   hasLine: boolean;
+  target?: NotificationItem['target'];
 }

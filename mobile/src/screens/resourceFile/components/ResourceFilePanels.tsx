@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 import CommentBubble from '@/src/components/sub-component/CommentBubble';
 import FrameListPanel from '@/src/components/sub-component/FrameListPanel';
@@ -20,6 +29,8 @@ export type ResourceFileTab = 'Overview' | 'Tasks' | 'Discussion' | 'Materials';
 export type DiscussionScope = 'file' | 'task' | 'frame';
 
 const FILE_TABS: ResourceFileTab[] = ['Overview', 'Tasks', 'Discussion', 'Materials'];
+const INITIAL_COMMENT_COUNT = 5;
+const COMMENT_BATCH_COUNT = 5;
 
 const STATUS_META: Record<ResourceTaskStatus, { label: string; color: string }> = {
   PENDING: { label: 'Pending', color: Colors.statusPending },
@@ -36,6 +47,15 @@ function formatDate(value?: string) {
     day: '2-digit',
     year: 'numeric',
   }).format(new Date(value));
+}
+
+function visibleCountForHighlight(comments: ResourceTaskComment[], highlightedCommentId?: string) {
+  if (!highlightedCommentId) return INITIAL_COMMENT_COUNT;
+
+  const highlightedIndex = comments.findIndex((comment) => comment.id === highlightedCommentId);
+  if (highlightedIndex < 0) return INITIAL_COMMENT_COUNT;
+
+  return Math.max(INITIAL_COMMENT_COUNT, comments.length - highlightedIndex);
 }
 
 function StatusBadge({ status }: { status: ResourceTaskStatus }) {
@@ -207,7 +227,10 @@ function CommentComboBox({
   const isDisabled = disabled || isLoading;
 
   return (
-    <View className="flex-1" style={{ minWidth: 152, position: 'relative', zIndex: isOpen ? 40 : 1 }}>
+    <View
+      className="flex-1"
+      style={{ minWidth: 152, position: 'relative', zIndex: isOpen ? 40 : 1 }}
+    >
       <TouchableOpacity
         activeOpacity={0.78}
         accessibilityRole="button"
@@ -289,7 +312,11 @@ function CommentComboBox({
                       {option.label}
                     </Text>
                     {option.description ? (
-                      <Text className="mt-0.5 text-[10px]" numberOfLines={1} style={{ color: C.textMuted }}>
+                      <Text
+                        className="mt-0.5 text-[10px]"
+                        numberOfLines={1}
+                        style={{ color: C.textMuted }}
+                      >
                         {option.description}
                       </Text>
                     ) : null}
@@ -339,7 +366,11 @@ function DiscussionScopeControls({
   return (
     <View className="gap-2">
       <View className="flex-row">
-        <FileCommentLabel count={commentCount} isActive={activeScope === 'file'} onPress={onSelectFile} />
+        <FileCommentLabel
+          count={commentCount}
+          isActive={activeScope === 'file'}
+          onPress={onSelectFile}
+        />
       </View>
       <View className="flex-row gap-2" style={{ zIndex: openMenu ? 40 : 1 }}>
         <CommentComboBox
@@ -382,9 +413,11 @@ export function DiscussionPanel({
   frameCommentCount,
   frameOptions,
   frameStatusMessage,
+  highlightedCommentId,
   isCommentsLoading,
   isFramesLoading,
   isTasksLoading,
+  onCommentLayout,
   onRetryComments,
   onSelectFileComments,
   onSelectFrameComments,
@@ -401,9 +434,11 @@ export function DiscussionPanel({
   frameCommentCount?: number;
   frameOptions: CommentSelectOption[];
   frameStatusMessage?: string;
+  highlightedCommentId?: string;
   isCommentsLoading: boolean;
   isFramesLoading: boolean;
   isTasksLoading: boolean;
+  onCommentLayout?: (commentId: string, y: number) => void;
   onRetryComments: () => void;
   onSelectFileComments: () => void;
   onSelectFrameComments: (frameId: string) => void;
@@ -413,8 +448,53 @@ export function DiscussionPanel({
   taskCommentCount?: number;
   taskOptions: CommentSelectOption[];
 }) {
+  const panelTopRef = React.useRef(0);
+  const commentListTopRef = React.useRef(0);
+  const commentThreadScrollRef = React.useRef<ScrollView | null>(null);
+  const isLoadingOlderCommentsRef = React.useRef(false);
+  const lastOlderLoadAtRef = React.useRef(0);
+  const resetKey = `${activeScope}:${selectedTaskId ?? ''}:${selectedFrameId ?? ''}:${
+    highlightedCommentId ?? ''
+  }`;
+  const minimumVisibleCommentCount = visibleCountForHighlight(comments, highlightedCommentId);
+  const [visibleCommentCount, setVisibleCommentCount] = React.useState(minimumVisibleCommentCount);
+
+  React.useEffect(() => {
+    setVisibleCommentCount(minimumVisibleCommentCount);
+  }, [minimumVisibleCommentCount, resetKey]);
+
+  React.useEffect(() => {
+    setVisibleCommentCount((currentCount) => Math.max(currentCount, minimumVisibleCommentCount));
+  }, [minimumVisibleCommentCount]);
+
+  const visibleComments = React.useMemo(() => {
+    const count = Math.min(comments.length, visibleCommentCount);
+    return comments.slice(Math.max(0, comments.length - count));
+  }, [comments, visibleCommentCount]);
+  const hiddenCommentCount = Math.max(0, comments.length - visibleComments.length);
+  const handleShowOlderComments = () => {
+    isLoadingOlderCommentsRef.current = true;
+    setVisibleCommentCount((currentCount) =>
+      Math.min(comments.length, currentCount + COMMENT_BATCH_COUNT),
+    );
+  };
+  const handleCommentThreadScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (hiddenCommentCount <= 0) return;
+    if (event.nativeEvent.contentOffset.y > 8) return;
+
+    const now = Date.now();
+    if (now - lastOlderLoadAtRef.current < 300) return;
+    lastOlderLoadAtRef.current = now;
+    handleShowOlderComments();
+  };
+
   return (
-    <View className="mt-6 gap-4">
+    <View
+      className="mt-6 gap-4"
+      onLayout={(event) => {
+        panelTopRef.current = event.nativeEvent.layout.y;
+      }}
+    >
       <DiscussionScopeControls
         activeScope={activeScope}
         commentCount={fileCommentCount}
@@ -434,7 +514,11 @@ export function DiscussionPanel({
       {frameStatusMessage ? (
         <View
           className="flex-row items-center gap-2 rounded-xl px-3 py-2"
-          style={{ backgroundColor: 'rgba(255,184,77,0.1)', borderWidth: 1, borderColor: 'rgba(255,184,77,0.2)' }}
+          style={{
+            backgroundColor: 'rgba(255,184,77,0.1)',
+            borderWidth: 1,
+            borderColor: 'rgba(255,184,77,0.2)',
+          }}
         >
           <MaterialIcon name="warning" color={Colors.statusReview} size={15} />
           <Text className="flex-1 text-[12px]" style={{ color: Colors.statusReview }}>
@@ -476,11 +560,62 @@ export function DiscussionPanel({
           </TouchableOpacity>
         </View>
       ) : comments.length > 0 ? (
-        <View className="gap-3">
-          {comments.map((item, index) => (
-            <CommentBubble key={`${item.id}-${index}`} comment={item} />
-          ))}
-        </View>
+        <ScrollView
+          ref={commentThreadScrollRef}
+          nestedScrollEnabled
+          onContentSizeChange={() => {
+            if (isLoadingOlderCommentsRef.current) {
+              isLoadingOlderCommentsRef.current = false;
+              return;
+            }
+
+            commentThreadScrollRef.current?.scrollToEnd({ animated: false });
+          }}
+          onScroll={handleCommentThreadScroll}
+          scrollEventThrottle={16}
+          showsVerticalScrollIndicator={false}
+          style={{ maxHeight: 420 }}
+        >
+          <View
+            className="gap-2"
+            onLayout={(event) => {
+              commentListTopRef.current = event.nativeEvent.layout.y;
+            }}
+          >
+            {hiddenCommentCount > 0 ? (
+              <TouchableOpacity
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                className="mb-1 self-center rounded-full px-3 py-2"
+                onPress={handleShowOlderComments}
+                style={{
+                  backgroundColor: C.surface,
+                  borderColor: C.borderFaint,
+                  borderWidth: 1,
+                }}
+              >
+                <Text className="text-[12px] font-semibold" style={{ color: C.textMuted }}>
+                  Kéo lên hoặc chạm để xem {Math.min(hiddenCommentCount, COMMENT_BATCH_COUNT)} bình
+                  luận cũ
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+
+            {visibleComments.map((item, index) => (
+              <View
+                key={`${item.id}-${index}`}
+                onLayout={(event) => {
+                  onCommentLayout?.(
+                    item.id,
+                    panelTopRef.current + commentListTopRef.current + event.nativeEvent.layout.y,
+                  );
+                }}
+              >
+                <CommentBubble comment={item} isHighlighted={item.id === highlightedCommentId} />
+              </View>
+            ))}
+          </View>
+        </ScrollView>
       ) : (
         <EmptyState title="No discussion yet" />
       )}
@@ -615,7 +750,11 @@ function TaskRow({
           </View>
 
           {task.description ? (
-            <Text numberOfLines={2} className="text-[13px] leading-5" style={{ color: C.textMuted }}>
+            <Text
+              numberOfLines={2}
+              className="text-[13px] leading-5"
+              style={{ color: C.textMuted }}
+            >
               {task.description}
             </Text>
           ) : null}
@@ -664,9 +803,18 @@ function TaskDiscussion({
   const [comment, setComment] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const visibleComments = selectedFrame
+  const scopedComments = selectedFrame
     ? task.comments.filter((item) => item.frameId === selectedFrame.id)
     : task.comments;
+  const [visibleCommentCount, setVisibleCommentCount] = useState(INITIAL_COMMENT_COUNT);
+  const visibleComments = scopedComments.slice(
+    Math.max(0, scopedComments.length - visibleCommentCount),
+  );
+  const hiddenCommentCount = Math.max(0, scopedComments.length - visibleComments.length);
+
+  React.useEffect(() => {
+    setVisibleCommentCount(INITIAL_COMMENT_COUNT);
+  }, [selectedFrame?.id, task.id]);
 
   const handleSubmit = async () => {
     if (isSubmitting || !comment.trim()) return;
@@ -724,6 +872,27 @@ function TaskDiscussion({
 
         {visibleComments.length > 0 ? (
           <View className="gap-3">
+            {hiddenCommentCount > 0 ? (
+              <TouchableOpacity
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                className="self-center rounded-full px-3 py-2"
+                onPress={() =>
+                  setVisibleCommentCount((currentCount) =>
+                    Math.min(scopedComments.length, currentCount + COMMENT_BATCH_COUNT),
+                  )
+                }
+                style={{
+                  backgroundColor: C.surface,
+                  borderColor: C.borderFaint,
+                  borderWidth: 1,
+                }}
+              >
+                <Text className="text-[12px] font-semibold" style={{ color: C.textMuted }}>
+                  Xem {Math.min(hiddenCommentCount, COMMENT_BATCH_COUNT)} bình luận cũ
+                </Text>
+              </TouchableOpacity>
+            ) : null}
             {visibleComments.map((item, index) => (
               <CommentBubble key={`${item.id}-${index}`} comment={item} />
             ))}
@@ -765,18 +934,13 @@ function TaskDiscussion({
               onPress={handleSubmit}
               className="h-9 w-9 items-center justify-center rounded-full"
               style={{
-                backgroundColor:
-                  isSubmitting || !comment.trim() ? C.surfaceHighest : C.accent,
+                backgroundColor: isSubmitting || !comment.trim() ? C.surfaceHighest : C.accent,
               }}
             >
               {isSubmitting ? (
                 <ActivityIndicator color={C.text} size="small" />
               ) : (
-                <MaterialIcon
-                  name="send"
-                  color={!comment.trim() ? C.textFaint : C.bg}
-                  size={18}
-                />
+                <MaterialIcon name="send" color={!comment.trim() ? C.textFaint : C.bg} size={18} />
               )}
             </TouchableOpacity>
           </View>
@@ -942,7 +1106,11 @@ export function TasksPanel({
           <Text className="text-[14px] font-bold" style={{ color: C.text }}>
             Back to Tasks
           </Text>
-          <Text className="text-[14px] font-medium ml-2 truncate flex-1" numberOfLines={1} style={{ color: C.textMuted }}>
+          <Text
+            className="text-[14px] font-medium ml-2 truncate flex-1"
+            numberOfLines={1}
+            style={{ color: C.textMuted }}
+          >
             ({selectedTask.title})
           </Text>
         </TouchableOpacity>

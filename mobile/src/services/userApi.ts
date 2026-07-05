@@ -27,7 +27,7 @@ export async function updatePassword(params: { currentPassword: string; newPassw
   });
 
   const accessToken = response.data?.accessToken;
-  if (!accessToken) throw new Error('Không thể cập nhật phiên đăng nhập mới.');
+  if (!accessToken) throw new Error('Unable to update the login session.');
 
   await saveAccessToken(accessToken);
 }

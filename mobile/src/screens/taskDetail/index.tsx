@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -28,11 +28,7 @@ import { fetchTask } from '@/src/services/taskApi';
 import { mapComment } from '@/src/services/mappers';
 import { subscribeToComments } from '@/src/services/realtimeClient';
 
-import {
-  C,
-  TaskDetailTopBar,
-  TaskPreviewSection,
-} from '@/src/screens/taskDetail/components';
+import { C, TaskDetailTopBar, TaskPreviewSection } from '@/src/screens/taskDetail/components';
 import {
   DiscussionComposer,
   DiscussionPanel,
@@ -65,7 +61,9 @@ function buildFileDescription(content: string, language: string) {
 type TaskDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'TaskDetail'>;
 
 export default function TaskDetailScreen({ navigation, route }: TaskDetailScreenProps) {
-  const [activeTab, setActiveTab] = useState<ResourceFileTab>('Overview');
+  const [activeTab, setActiveTab] = useState<ResourceFileTab>(
+    route.params?.initialTab ?? 'Overview',
+  );
   const [file, setFile] = useState<ResourceFileNode | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
@@ -84,6 +82,12 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
   const [isDiscussionFramesLoading, setIsDiscussionFramesLoading] = useState(false);
   const [discussionFrameStatusMessage, setDiscussionFrameStatusMessage] = useState('');
   const [selectedDiscussionFrameId, setSelectedDiscussionFrameId] = useState<string | null>(null);
+  const scrollViewRef = useRef<ScrollView | null>(null);
+  const initialDiscussionAppliedRef = useRef(false);
+  const didScrollToInitialCommentRef = useRef(false);
+  const didScrollToLatestDiscussionRef = useRef(false);
+  const initialCommentLayoutYRef = useRef<number | null>(null);
+  const initialCommentId = route.params?.initialCommentId;
 
   const loadTaskDetail = useCallback(async () => {
     const taskId = route.params?.taskId;
@@ -101,19 +105,20 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
       const fileId = String(task.fileId ?? task.file?.id ?? '');
       if (!fileId) throw new Error('Task does not have a file.');
       const nextFile = await fetchResourceFileBundle(fileId);
-      const selectedTask = nextFile.tasks?.find((item) => item.id === taskId) ?? nextFile.tasks?.[0];
+      const selectedTask =
+        nextFile.tasks?.find((item) => item.id === taskId) ?? nextFile.tasks?.[0];
       setFile(nextFile);
       setFileDiscussionCommentCount(nextFile.comments?.length ?? 0);
       setSelectedTaskId(selectedTask?.id ?? taskId);
       setSelectedFrame(selectedTask?.frames[0] ?? null);
       setSelectedVersionId(nextFile.materialVersions?.[0]?.id ?? null);
-      setActiveTab('Tasks');
+      setActiveTab(route.params?.initialTab ?? 'Tasks');
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Không thể tải task.');
     } finally {
       setIsLoading(false);
     }
-  }, [route.params?.taskId]);
+  }, [route.params?.initialTab, route.params?.taskId]);
 
   useEffect(() => {
     void loadTaskDetail();
@@ -186,7 +191,7 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
           setFileDiscussionCommentCount((count) => count + 1);
         }
 
-        return [nextComment, ...currentComments];
+        return [...currentComments, nextComment];
       });
     },
     [],
@@ -297,10 +302,83 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'Discussion') {
-      void handleSelectFileComments();
+    if (activeTab !== 'Discussion') return;
+
+    if (!initialDiscussionAppliedRef.current) {
+      initialDiscussionAppliedRef.current = true;
+
+      if (
+        (route.params?.initialDiscussionScope === 'task' ||
+          !route.params?.initialDiscussionScope) &&
+        route.params?.taskId
+      ) {
+        void loadDiscussionTasks();
+        void loadTaskDiscussion(route.params.taskId);
+        return;
+      }
+
+      if (route.params?.initialDiscussionScope === 'frame' && route.params.initialFrameId) {
+        void loadDiscussionTasks();
+        void loadFrameDiscussion(route.params.initialFrameId);
+        return;
+      }
     }
-  }, [activeTab, handleSelectFileComments]);
+
+    void handleSelectFileComments();
+  }, [
+    activeTab,
+    handleSelectFileComments,
+    loadDiscussionTasks,
+    loadFrameDiscussion,
+    loadTaskDiscussion,
+    route.params?.initialDiscussionScope,
+    route.params?.initialFrameId,
+    route.params?.taskId,
+  ]);
+
+  const scrollToInitialComment = useCallback(() => {
+    if (didScrollToInitialCommentRef.current || !initialCommentId) return;
+
+    const commentY = initialCommentLayoutYRef.current;
+    if (commentY === null) return;
+
+    didScrollToInitialCommentRef.current = true;
+    requestAnimationFrame(() => {
+      scrollViewRef.current?.scrollTo({ y: Math.max(commentY - 24, 0), animated: true });
+    });
+  }, [initialCommentId]);
+
+  const handleCommentLayout = useCallback(
+    (commentId: string, y: number) => {
+      if (commentId !== initialCommentId) return;
+      initialCommentLayoutYRef.current = y;
+      scrollToInitialComment();
+    },
+    [initialCommentId, scrollToInitialComment],
+  );
+
+  useEffect(() => {
+    if (!initialCommentId || isDiscussionCommentsLoading) return;
+    if (!discussionComments.some((comment) => comment.id === initialCommentId)) return;
+
+    scrollToInitialComment();
+  }, [discussionComments, initialCommentId, isDiscussionCommentsLoading, scrollToInitialComment]);
+
+  useEffect(() => {
+    didScrollToLatestDiscussionRef.current = false;
+  }, [activeTab, discussionScope, selectedDiscussionFrameId, selectedDiscussionTaskId]);
+
+  useEffect(() => {
+    if (initialCommentId) return;
+    if (activeTab !== 'Discussion') return;
+    if (isDiscussionCommentsLoading || discussionComments.length === 0) return;
+    if (didScrollToLatestDiscussionRef.current) return;
+
+    didScrollToLatestDiscussionRef.current = true;
+    requestAnimationFrame(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    });
+  }, [activeTab, discussionComments.length, initialCommentId, isDiscussionCommentsLoading]);
 
   useEffect(() => {
     if (activeTab !== 'Discussion') return undefined;
@@ -391,11 +469,7 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
   if (errorMessage || !file) {
     return (
       <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
-        <TaskDetailTopBar
-          subtitle="Task"
-          title="Detail"
-          onBack={() => navigation.goBack()}
-        />
+        <TaskDetailTopBar subtitle="Task" title="Detail" onBack={() => navigation.goBack()} />
         <ApiStateView
           type="error"
           message={errorMessage || 'Task not found'}
@@ -407,13 +481,10 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
 
   return (
     <View className="flex-1" style={{ backgroundColor: C.bg }}>
-      <TaskDetailTopBar
-        subtitle="Task"
-        title={file.name}
-        onBack={() => navigation.goBack()}
-      />
+      <TaskDetailTopBar subtitle="Task" title={file.name} onBack={() => navigation.goBack()} />
 
       <ScrollView
+        ref={scrollViewRef}
         className="flex-1"
         contentContainerStyle={{
           paddingHorizontal: 16,
@@ -435,10 +506,7 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
         />
 
         {activeTab === 'Overview' && (
-          <OverviewPanel
-            description={description}
-            fileContent={file.content}
-          />
+          <OverviewPanel description={description} fileContent={file.content} />
         )}
 
         {activeTab === 'Tasks' && (
@@ -465,9 +533,11 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
             }
             frameOptions={discussionFrameOptions}
             frameStatusMessage={discussionFrameStatusMessage}
+            highlightedCommentId={initialCommentId}
             isCommentsLoading={isDiscussionCommentsLoading}
             isFramesLoading={isDiscussionFramesLoading}
             isTasksLoading={isDiscussionTasksLoading}
+            onCommentLayout={handleCommentLayout}
             onRetryComments={handleRetryDiscussionComments}
             onSelectFileComments={handleSelectFileComments}
             onSelectFrameComments={loadFrameDiscussion}

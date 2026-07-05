@@ -21,7 +21,7 @@ export default function ProjectsEmptyState() {
         No projects found
       </Text>
       <Text className="mt-2 text-center text-[14px]" style={{ color: Colors.textMuted }}>
-        Try another search term or type filter.
+        Try another search term or owner filter.
       </Text>
     </View>
   );
