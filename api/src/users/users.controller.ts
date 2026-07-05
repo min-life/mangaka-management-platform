@@ -25,6 +25,7 @@ import { CurrentUser, Permissions, Public } from '../share/decorators';
 import { AppendUserRolesDto } from './dto/append-user-roles.dto';
 import { CreateStaffUserDto } from './dto/create-staff-user.dto';
 import { ReplaceUserRolesDto } from './dto/replace-user-roles.dto';
+import { CreatePasswordDto } from './dto/create-password.dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -60,6 +61,34 @@ export class UsersController {
     @Res({ passthrough: true }) response: Response,
   ) {
     const result = await this.usersService.updatePassword(currentUser.userId, body);
+    if (!result) return;
+
+    response.cookie('refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      expires: result.refreshTokenExpiresAt,
+    });
+
+    return { data: { accessToken: result.accessToken } };
+  }
+
+  @ApiOperation({ summary: 'Check if current user has password' })
+  @ApiOkResponse({ description: 'Returns boolean indicating if user has password' })
+  @Get('me/has-password')
+  hasPassword(@CurrentUser() currentUser: JwtPayload) {
+    return this.usersService.hasPassword(currentUser.userId);
+  }
+
+  @ApiOperation({ summary: 'Create new password for current user' })
+  @ApiOkResponse({ description: 'Password created successfully' })
+  @Post('me/password')
+  async createPassword(
+    @CurrentUser() currentUser: JwtPayload,
+    @Body() body: CreatePasswordDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.usersService.createPassword(currentUser.userId, body);
     if (!result) return;
 
     response.cookie('refreshToken', result.refreshToken, {

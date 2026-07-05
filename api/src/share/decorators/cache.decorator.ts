@@ -45,7 +45,8 @@ export function InvalidateCache(patterns: string[] | ((args: any[], result: any)
       const cacheService = (this as any).cacheService;
       if (cacheService) {
         const resolvedPatterns = typeof patterns === 'function' ? patterns(args, result) : patterns;
-        await cacheService.delMultiple(resolvedPatterns);
+        const normalizedPatterns = resolvedPatterns.map(p => p.endsWith('*') ? p : `${p}:*`);
+        await cacheService.delMultiple(normalizedPatterns);
       }
       
       return result;

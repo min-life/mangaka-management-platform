@@ -330,7 +330,7 @@ export class ProjectsService {
   @InvalidateCache((args) => [`project:${args[0]}`, `project:list:${args[1].userId}:*`])
   async updateProject(
     id: number,
-    data: { name?: string; editorBoardId?: number | null; userId: number },
+    data: { name?: string; description?: string; imageUrl?: string; editorBoardId?: number | null; userId: number },
   ) {
     try {
       const project = await this.ensureProject(id);
@@ -345,6 +345,8 @@ export class ProjectsService {
         where: { id },
         data: {
           name: data.name,
+          description: data.description,
+          imageUrl: data.imageUrl,
           editorBoardId: data.editorBoardId,
           updatedBy: data.userId,
         },
