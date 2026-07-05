@@ -858,6 +858,8 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | `string` | `No` |  |
+| `description` | `string` | `No` |  |
+| `imageUrl` | `string` | `No` |  |
 | `editorBoardId` | `number` | `No` |  |
 
 #### Responses
