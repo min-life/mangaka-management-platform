@@ -83,6 +83,11 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 4. **Đánh dấu lỗi (Frames)**: Trên giao diện xem trước ảnh (Material), người dùng kéo thả tạo khung (Frame) bằng `POST /api/materials/:id/frames`. Sau đó tạo bình luận ghim trên khung `POST /api/frames/:id/comments`. Có thể xem danh sách khung bằng `GET /api/materials/:id/frames` hoặc `GET /api/tasks/:id/frames`. 
 5. **Chỉnh sửa bình luận**: Người dùng hoặc project owner có thể cập nhật (`PATCH /api/comments/:id`) hoặc xóa bình luận (`DELETE /api/comments/:id`).
 
+### 7.2 Khởi tạo Task & Tạo Nhánh Bản Vẽ (Material Branching)
+1. **Khởi tạo Task**: Khi tạo task mới (`POST /api/files/:id/tasks`), hệ thống hỗ trợ tạo nhánh (branching) bản vẽ để các task song song làm việc độc lập.
+2. **Clone từ Base Material**: Truyền `cloneBaseMaterial: true` để tạo một bản copy của bản vẽ gốc (material không thuộc task nào) và gán cho task mới.
+3. **Clone từ Task khác**: Truyền `cloneMaterialFromTaskId: [ID]` để tạo một bản copy của bản vẽ mới nhất từ một task khác. Phiên bản copy này sẽ hoàn toàn độc lập (sạch), không chứa frame/comment của task cũ, giúp người dùng bắt đầu một phiên làm việc mới trên nền bản vẽ đó.
+
 ## 8. Luồng Thư mục & Tập tin (Folders & Files Flow)
 
 ### 8.1 Cây thư mục (Folder Tree)

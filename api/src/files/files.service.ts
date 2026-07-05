@@ -402,6 +402,8 @@ export class FilesService {
       deadline?: Date;
       parentId?: number;
       assignedBy?: number;
+      cloneMaterialFromTaskId?: number;
+      cloneBaseMaterial?: boolean;
       userId: number;
     },
   ) {
@@ -422,6 +424,33 @@ export class FilesService {
         },
         select: TASK_SELECT,
       });
+
+      // Handle material branching/cloning
+      let sourceMaterial = null;
+      if (data.cloneMaterialFromTaskId) {
+        sourceMaterial = await this.prisma.fileMaterial.findFirst({
+          where: { taskId: data.cloneMaterialFromTaskId, fileId },
+          orderBy: { createdAt: 'desc' },
+        });
+      } else if (data.cloneBaseMaterial) {
+        sourceMaterial = await this.prisma.fileMaterial.findFirst({
+          where: { taskId: null, fileId },
+          orderBy: { createdAt: 'desc' },
+        });
+      }
+
+      if (sourceMaterial) {
+        await this.prisma.fileMaterial.create({
+          data: {
+            fileId,
+            taskId: task.id,
+            name: sourceMaterial.name,
+            materials: sourceMaterial.materials as Prisma.InputJsonValue,
+            createdBy: data.userId,
+            updatedBy: data.userId,
+          },
+        });
+      }
 
       const fileWithFolder = await this.prisma.file.findUnique({
         where: { id: fileId },
