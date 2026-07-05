@@ -30,6 +30,7 @@ import { CreateStaffUserDto } from './dto/create-staff-user.dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { CreatePasswordDto } from './dto/create-password.dto';
 
 const BCRYPT_SALT_ROUNDS = requireNumberEnv('BCRYPT_SALT_ROUNDS');
 const ACCESS_TOKEN_EXPIRES_IN = requireDurationStringEnv('ACCESS_TOKEN_EXPIRES_IN');
@@ -201,6 +202,67 @@ export class UsersService {
       return { data: this.serializeUser(user) };
     } catch (error) {
       this.handleError(error, 'Update profile fail', ERROR.SVUPDATEUSER);
+    }
+  }
+
+  async hasPassword(userId: number) {
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { password: true },
+      });
+
+      if (!user) {
+        throw new NotFoundException(ERROR.NFUSER);
+      }
+
+      return { data: { hasPassword: !!user.password } };
+    } catch (error) {
+      this.handleError(error, 'Check password fail', ERROR.SVGETUSER);
+    }
+  }
+
+  @InvalidateCache((args) => [`user:${args[0]}`, `user:me:${args[0]}`])
+  async createPassword(userId: number, dto: CreatePasswordDto) {
+    try {
+      const user = await this.ensureUser(userId);
+
+      if (user.password) {
+        throw new BadRequestException('User already has a password');
+      }
+
+      await this.prisma.$transaction([
+        this.prisma.user.update({
+          where: { id: userId },
+          data: {
+            password: await bcrypt.hash(dto.newPassword, BCRYPT_SALT_ROUNDS),
+            updatedBy: userId,
+          },
+        }),
+        this.prisma.refreshToken.deleteMany({ where: { userId } }),
+      ]);
+
+      const accessToken = await this.jwtService.signAsync(
+        { userId, email: user.email, jti: randomUUID() },
+        { secret: requireEnv('ACCESS_TOKEN_SECRET'), expiresIn: ACCESS_TOKEN_EXPIRES_IN as any },
+      );
+
+      const refreshTokenExpiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_IN_MS);
+      const refreshToken = await this.jwtService.signAsync(
+        { userId, email: user.email },
+        { secret: requireEnv('REFRESH_TOKEN_SECRET'), expiresIn: REFRESH_TOKEN_EXPIRES_IN as any },
+      );
+
+      await this.prisma.refreshToken.create({
+        data: { token: refreshToken, userId, expiresAt: refreshTokenExpiresAt },
+      });
+
+      return { accessToken, refreshToken, refreshTokenExpiresAt };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      this.handleError(error, 'Create password fail', ERROR.SVUPDATEUSER);
     }
   }
 
