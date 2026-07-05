@@ -291,6 +291,28 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 
 ---
 
+### Check if current user has password
+**GET** `/api/users/me/has-password`
+
+#### Responses
+- **200**: Returns boolean indicating if user has password
+
+---
+
+### Create new password for current user
+**POST** `/api/users/me/password`
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `newPassword` | `string` | `Yes` | New password to set (minLength: 6) |
+
+#### Responses
+- **200**: Password created successfully
+- **400**: User already has a password
+
+---
+
 ### Update current user password 
 **PATCH** `/api/users/me/password`
 
@@ -836,6 +858,8 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | `string` | `No` |  |
+| `description` | `string` | `No` |  |
+| `imageUrl` | `string` | `No` |  |
 | `editorBoardId` | `number` | `No` |  |
 
 #### Responses
