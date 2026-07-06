@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsNotEmpty, IsOptional, IsInt, Min, IsString } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsInt, Min, IsString, IsBoolean, IsNumber } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PROGRESS_STATUS } from '@prisma/client';
 
@@ -62,10 +62,21 @@ export class CreateTaskReqDto {
   @Min(1)
   parentId?: number;
 
-  @ApiPropertyOptional({ example: 2, minimum: 1, type: Number })
+  @ApiPropertyOptional({ example: 9, minimum: 1, type: Number })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(1)
+  @IsNumber()
   assignedBy?: number;
+
+  @ApiPropertyOptional({ example: 1, type: Number, description: 'Clone material from a specific task ID' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  cloneMaterialFromTaskId?: number;
+
+  @ApiPropertyOptional({ example: true, type: Boolean, description: 'Clone the base material of the file' })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  cloneBaseMaterial?: boolean;
 }
