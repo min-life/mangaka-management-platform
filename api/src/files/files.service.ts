@@ -426,18 +426,17 @@ export class FilesService {
       });
 
       // Handle material branching/cloning
-      let sourceMaterial = null;
-      if (data.cloneMaterialFromTaskId) {
-        sourceMaterial = await this.prisma.fileMaterial.findFirst({
-          where: { taskId: data.cloneMaterialFromTaskId, fileId },
-          orderBy: { createdAt: 'desc' },
-        });
-      } else if (data.cloneBaseMaterial) {
-        sourceMaterial = await this.prisma.fileMaterial.findFirst({
-          where: { taskId: null, fileId },
-          orderBy: { createdAt: 'desc' },
-        });
-      }
+      const sourceMaterial = data.cloneMaterialFromTaskId
+        ? await this.prisma.fileMaterial.findFirst({
+            where: { taskId: data.cloneMaterialFromTaskId, fileId },
+            orderBy: { createdAt: 'desc' },
+          })
+        : data.cloneBaseMaterial
+        ? await this.prisma.fileMaterial.findFirst({
+            where: { taskId: null, fileId },
+            orderBy: { createdAt: 'desc' },
+          })
+        : null;
 
       if (sourceMaterial) {
         await this.prisma.fileMaterial.create({
