@@ -216,7 +216,7 @@ export class FilesService {
     try {
       await this.ensureFile(fileId);
 
-      const where: Prisma.FileMaterialWhereInput = { fileId };
+      const where: Prisma.FileMaterialWhereInput = { fileId, taskId: null };
       const { page, limit, skip } = this.buildPagination(pagination);
 
       const [total, materials] = await this.prisma.$transaction([
@@ -481,7 +481,19 @@ export class FilesService {
     try {
       await this.ensureFile(fileId);
 
-      const where: Prisma.CommentWhereInput = { fileId };
+      const where: Prisma.CommentWhereInput = {
+        OR: [
+          { fileId, taskId: null },
+          {
+            frame: {
+              material: {
+                fileId,
+                taskId: null,
+              },
+            },
+          },
+        ],
+      };
       const orderBy: Prisma.CommentOrderByWithRelationInput = sort
         ? { [sort.field]: sort.order }
         : { createdAt: 'desc' };
