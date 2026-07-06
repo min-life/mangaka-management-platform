@@ -383,7 +383,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
   }, [fileId, projectId]);
 
   useEffect(() => {
-    void reload().catch(() => {});
+    void reload().catch(() => { });
   }, [selectedTaskId]);
 
   const file = data?.file ?? null;

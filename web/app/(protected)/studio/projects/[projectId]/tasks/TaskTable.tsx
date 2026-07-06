@@ -5,7 +5,6 @@ import { Crosshair, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 import {
-  taskPriorityClassName,
   taskStatusClassName,
   taskStatusLabels,
   type TaskWorkspaceItem,
@@ -21,7 +20,7 @@ export function TaskTable({ onOpenTask, tasks }: TaskTableProps) {
           <span>Task</span>
           <span>Related File</span>
           <span>Assignee</span>
-          <span>Priority</span>
+          <span>Update Day</span>
           <span>Status</span>
           <span>Due</span>
         </div>
@@ -47,9 +46,9 @@ export function TaskTable({ onOpenTask, tasks }: TaskTableProps) {
               </span>
               <span className="truncate text-xs font-bold text-[#dce7f3]">{task.fileTitle}</span>
               <span className="truncate text-xs font-bold text-white">{task.assignee}</span>
-              <Badge className={`w-fit rounded-[3px] border ${taskPriorityClassName[task.priority]}`}>
-                {task.priority}
-              </Badge>
+              <span className="truncate text-xs font-bold text-[#aeb7c2]">
+                {task.updatedAt}
+              </span>
               <Badge className={`w-fit rounded-[3px] border ${taskStatusClassName[task.status]}`}>
                 {taskStatusLabels[task.status]}
               </Badge>
@@ -82,12 +81,11 @@ export function TaskTable({ onOpenTask, tasks }: TaskTableProps) {
                 </span>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <Badge className={`rounded-[3px] border ${taskPriorityClassName[task.priority]}`}>
-                  {task.priority}
-                </Badge>
                 <Badge className={`rounded-[3px] border ${taskStatusClassName[task.status]}`}>
                   {taskStatusLabels[task.status]}
                 </Badge>
+                <span className="text-[11px] font-bold text-[#8b94a1]">Updated {task.updatedAt}</span>
+                <span className="text-[11px] font-bold text-[#8b94a1]">•</span>
                 <span className="text-[11px] font-bold text-[#8b94a1]">{task.dueDate}</span>
               </div>
             </button>

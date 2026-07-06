@@ -159,8 +159,8 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
                 {(['overview', 'discussion', 'versions', 'activity'] as const).map((tab) => (
                   <button
                     className={`relative h-full px-4 text-xs font-black capitalize ${resourceTab === tab
-                        ? 'text-[#FFD369]'
-                        : 'text-[#aeb7c2] hover:text-white'
+                      ? 'text-[#FFD369]'
+                      : 'text-[#aeb7c2] hover:text-white'
                       }`}
                     key={tab}
                     onClick={() => setResourceTab(tab)}

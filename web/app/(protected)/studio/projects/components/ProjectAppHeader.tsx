@@ -115,13 +115,6 @@ export function ProjectAppHeader({ projectId, projectName }: ProjectAppHeaderPro
           dotClassName="-right-0.5 -top-1 size-2 border-0"
           triggerClassName="rounded-[4px] p-1.5 text-white hover:bg-[#222a34]"
         />
-        <button
-          aria-label="Help"
-          className="grid size-8 place-items-center rounded-[4px] text-white hover:bg-[#222a34]"
-          type="button"
-        >
-          <HelpCircle className="size-5" />
-        </button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button

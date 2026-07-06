@@ -128,13 +128,13 @@ function AddBoardMemberDialog({
     const normalizedQuery = searchQuery.trim().toLowerCase();
     const unavailableIds = new Set([...existingMemberIds, ...selectedUsers.map((user) => user.id)]);
 
+    if (!normalizedQuery) {
+      return [];
+    }
+
     return users
       .filter((user) => !unavailableIds.has(user.id))
       .filter((user) => {
-        if (!normalizedQuery) {
-          return true;
-        }
-
         return [user.email, user.displayName ?? ''].some((value) =>
           value.toLowerCase().includes(normalizedQuery),
         );
@@ -239,6 +239,8 @@ function AddBoardMemberDialog({
               <div className="mt-3 h-[300px] overflow-y-auto rounded-[4px] border border-[#39424f] bg-[#0c1219] p-1">
                 {isLoadingUsers ? (
                   <p className="px-3 py-3 text-xs font-bold text-[#8b94a1]">Loading users...</p>
+                ) : !searchQuery.trim() ? (
+                  <p className="px-3 py-3 text-xs font-bold text-[#8b94a1]">Type name or email to search...</p>
                 ) : filteredUsers.length ? (
                   filteredUsers.map((user) => (
                     <button
