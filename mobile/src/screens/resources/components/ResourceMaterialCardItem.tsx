@@ -16,8 +16,7 @@ export default function ResourceMaterialCardItem({
   material,
   onPress,
 }: ResourceMaterialCardItemProps) {
-  const { file, latestVersion, versionCount } = material;
-  const layerCount = latestVersion.materials.layers?.length ?? 0;
+  const { file, latestVersion } = material;
 
   return (
     <TouchableOpacity
@@ -80,22 +79,7 @@ export default function ResourceMaterialCardItem({
           </Text>
         ) : null}
 
-        <View className="mt-4 flex-row flex-wrap gap-x-4 gap-y-2">
-          <View className="flex-row items-center gap-1.5">
-            <MaterialIcon name="image" color={Colors.statusProgress} size={16} />
-            <Text className="text-[12px] font-semibold" style={{ color: Colors.textMuted }}>
-              {versionCount} version{versionCount === 1 ? '' : 's'}
-            </Text>
-          </View>
-          <View className="flex-row items-center gap-1.5">
-            <MaterialIcon name="description" color={Colors.iconFolder} size={16} />
-            <Text className="text-[12px] font-semibold" style={{ color: Colors.textMuted }}>
-              {layerCount} layer{layerCount === 1 ? '' : 's'}
-            </Text>
-          </View>
-        </View>
-
-        <Text className="mt-3 text-[12px]" style={{ color: Colors.textFaint }} numberOfLines={1}>
+        <Text className="mt-4 text-[12px]" style={{ color: Colors.textFaint }} numberOfLines={1}>
           {latestVersion.createdByName ?? 'Unknown creator'} -{' '}
           {formatResourceDate(latestVersion.createdAt)}
         </Text>

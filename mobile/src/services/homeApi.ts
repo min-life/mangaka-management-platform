@@ -60,6 +60,7 @@ export async function fetchHomeSummary() {
     iconColor: Colors.statusProgress,
     id: item.id,
     subtitle: item.subtitle || item.project,
+    target: item.target,
     time: item.time || relativeDate(new Date().toISOString()),
     title: item.title,
   }));

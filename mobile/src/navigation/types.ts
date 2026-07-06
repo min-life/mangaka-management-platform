@@ -6,6 +6,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
  */
 export type RootStackParamList = {
   Login: undefined;
+  ForgotPassword: { email?: string } | undefined;
   Home: undefined;
   Tasks: { projectId?: string } | undefined;
   Projects: undefined;
@@ -13,7 +14,12 @@ export type RootStackParamList = {
   ProjectContributors: { projectId: string };
   ProjectReport: { projectId: string };
   Applications: { projectId?: string } | undefined;
-  ApplicationDetail: { projectId?: string; applicationId: string };
+  ApplicationDetail: {
+    projectId?: string;
+    applicationId: string;
+    initialTab?: 'Overview' | 'Discussion' | 'Materials';
+    initialCommentId?: string;
+  };
   EditorBoards: undefined;
   EditorBoardDetail: { boardId: string };
   EditorBoardProjects: { boardId: string };
@@ -26,8 +32,21 @@ export type RootStackParamList = {
     fileId: string;
     parentFolderId?: string;
     initialTab?: 'Overview' | 'Tasks' | 'Discussion' | 'Materials';
+    initialMaterialVersionId?: string;
+    initialDiscussionScope?: 'file' | 'task' | 'frame';
+    initialTaskId?: string;
+    initialFrameId?: string;
+    initialCommentId?: string;
   };
-  TaskDetail: { taskId: string } | undefined;
+  TaskDetail:
+    | {
+        taskId: string;
+        initialTab?: 'Overview' | 'Tasks' | 'Discussion' | 'Materials';
+        initialDiscussionScope?: 'file' | 'task' | 'frame';
+        initialFrameId?: string;
+        initialCommentId?: string;
+      }
+    | undefined;
   Profile: undefined;
   Notifications: undefined;
 };

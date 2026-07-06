@@ -13,8 +13,6 @@ interface EditorBoardCardProps {
 }
 
 export default function EditorBoardCard({ board, onPress }: EditorBoardCardProps) {
-  const memberCount = board.memberIds.length;
-
   return (
     <TouchableOpacity
       activeOpacity={0.78}
@@ -38,15 +36,12 @@ export default function EditorBoardCard({ board, onPress }: EditorBoardCardProps
       <View className="px-4 py-4">
         <View className="flex-row items-start gap-3">
           <View className="flex-1">
-            <Text className="text-[18px] font-bold" style={{ color: Colors.text }} numberOfLines={1}>
-              {board.name}
-            </Text>
             <Text
-              className="mt-1 text-[13px] font-semibold"
-              style={{ color: 'rgba(237,241,251,0.72)' }}
+              className="text-[18px] font-bold"
+              style={{ color: Colors.text }}
               numberOfLines={1}
             >
-              {memberCount} members - {board.projectIds.length} projects
+              {board.name}
             </Text>
           </View>
           <BoardRoleBadge role={board.currentUserRole} />

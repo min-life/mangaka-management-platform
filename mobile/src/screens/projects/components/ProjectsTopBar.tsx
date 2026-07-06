@@ -4,12 +4,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
+import ProjectViewModeToggle, { ProjectViewMode } from './ProjectViewModeToggle';
 
 interface ProjectsTopBarProps {
   onBack: () => void;
+  onViewModeChange: (mode: ProjectViewMode) => void;
+  viewMode: ProjectViewMode;
 }
 
-export default function ProjectsTopBar({ onBack }: ProjectsTopBarProps) {
+export default function ProjectsTopBar({
+  onBack,
+  onViewModeChange,
+  viewMode,
+}: ProjectsTopBarProps) {
   return (
     <SafeAreaView edges={['top']} style={{ backgroundColor: Colors.bg }}>
       <View className="h-16 justify-center px-4">
@@ -33,6 +40,10 @@ export default function ProjectsTopBar({ onBack }: ProjectsTopBarProps) {
         >
           Projects
         </Text>
+
+        <View className="absolute right-3 z-10">
+          <ProjectViewModeToggle viewMode={viewMode} onViewModeChange={onViewModeChange} />
+        </View>
       </View>
     </SafeAreaView>
   );

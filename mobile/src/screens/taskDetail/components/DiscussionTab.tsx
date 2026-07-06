@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 
 import CommentBubble from '@/src/components/sub-component/CommentBubble';
 import FrameListPanel from '@/src/components/sub-component/FrameListPanel';
@@ -8,6 +8,9 @@ import { Comment, FrameAnnotation } from '@/src/types/taskDetail';
 import { Colors } from '@/src/constants/colors';
 
 import { C } from './theme';
+
+const INITIAL_COMMENT_COUNT = 5;
+const COMMENT_BATCH_COUNT = 5;
 
 interface DiscussionTabProps {
   comments: Comment[];
@@ -25,6 +28,15 @@ export default function DiscussionTab({
   const visibleComments = selectedFrame
     ? comments.filter((c) => c.frameId === selectedFrame.id)
     : comments;
+  const [visibleCommentCount, setVisibleCommentCount] = React.useState(INITIAL_COMMENT_COUNT);
+  const recentComments = visibleComments.slice(
+    Math.max(0, visibleComments.length - visibleCommentCount),
+  );
+  const hiddenCommentCount = Math.max(0, visibleComments.length - recentComments.length);
+
+  React.useEffect(() => {
+    setVisibleCommentCount(INITIAL_COMMENT_COUNT);
+  }, [selectedFrame?.id]);
 
   return (
     <View className="mt-6 gap-4">
@@ -63,9 +75,30 @@ export default function DiscussionTab({
             </Text>
           </View>
 
-          {visibleComments.length > 0 ? (
+          {recentComments.length > 0 ? (
             <View className="gap-3">
-              {visibleComments.map((commentItem, index) => (
+              {hiddenCommentCount > 0 ? (
+                <TouchableOpacity
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  className="self-center rounded-full px-3 py-2"
+                  onPress={() =>
+                    setVisibleCommentCount((currentCount) =>
+                      Math.min(visibleComments.length, currentCount + COMMENT_BATCH_COUNT),
+                    )
+                  }
+                  style={{
+                    backgroundColor: C.surface,
+                    borderColor: C.borderFaint,
+                    borderWidth: 1,
+                  }}
+                >
+                  <Text className="text-[12px] font-semibold" style={{ color: C.textMuted }}>
+                    Xem {Math.min(hiddenCommentCount, COMMENT_BATCH_COUNT)} bình luận cũ
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+              {recentComments.map((commentItem, index) => (
                 <CommentBubble key={`${commentItem.id}-${index}`} comment={commentItem} />
               ))}
             </View>

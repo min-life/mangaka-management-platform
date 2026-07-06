@@ -24,6 +24,7 @@ import TaskDetailScreen from '@/src/screens/taskDetail';
 import ProfileScreen from '@/src/screens/profile';
 import NotificationsScreen from '@/src/screens/notifications';
 import LoginScreen from '@/src/screens/login';
+import ForgotPasswordScreen from '@/src/screens/forgotPassword';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -50,6 +51,7 @@ export default function RootNavigator() {
         }}
       >
         <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="Tasks" component={TasksScreen} />
         <Stack.Screen name="Projects" component={ProjectsScreen} />

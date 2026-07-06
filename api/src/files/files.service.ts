@@ -216,7 +216,7 @@ export class FilesService {
     try {
       await this.ensureFile(fileId);
 
-      const where: Prisma.FileMaterialWhereInput = { fileId };
+      const where: Prisma.FileMaterialWhereInput = { fileId, taskId: null };
       const { page, limit, skip } = this.buildPagination(pagination);
 
       const [total, materials] = await this.prisma.$transaction([
@@ -402,6 +402,8 @@ export class FilesService {
       deadline?: Date;
       parentId?: number;
       assignedBy?: number;
+      cloneMaterialFromTaskId?: number;
+      cloneBaseMaterial?: boolean;
       userId: number;
     },
   ) {
@@ -422,6 +424,32 @@ export class FilesService {
         },
         select: TASK_SELECT,
       });
+
+      // Handle material branching/cloning
+      const sourceMaterial = data.cloneMaterialFromTaskId
+        ? await this.prisma.fileMaterial.findFirst({
+            where: { taskId: data.cloneMaterialFromTaskId, fileId },
+            orderBy: { createdAt: 'desc' },
+          })
+        : data.cloneBaseMaterial
+        ? await this.prisma.fileMaterial.findFirst({
+            where: { taskId: null, fileId },
+            orderBy: { createdAt: 'desc' },
+          })
+        : null;
+
+      if (sourceMaterial) {
+        await this.prisma.fileMaterial.create({
+          data: {
+            fileId,
+            taskId: task.id,
+            name: sourceMaterial.name,
+            materials: sourceMaterial.materials as Prisma.InputJsonValue,
+            createdBy: data.userId,
+            updatedBy: data.userId,
+          },
+        });
+      }
 
       const fileWithFolder = await this.prisma.file.findUnique({
         where: { id: fileId },
@@ -453,7 +481,19 @@ export class FilesService {
     try {
       await this.ensureFile(fileId);
 
-      const where: Prisma.CommentWhereInput = { fileId };
+      const where: Prisma.CommentWhereInput = {
+        OR: [
+          { fileId, taskId: null },
+          {
+            frame: {
+              material: {
+                fileId,
+                taskId: null,
+              },
+            },
+          },
+        ],
+      };
       const orderBy: Prisma.CommentOrderByWithRelationInput = sort
         ? { [sort.field]: sort.order }
         : { createdAt: 'desc' };

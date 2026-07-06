@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
@@ -12,16 +12,16 @@ interface LoginFormCardProps {
   password: string;
   showPassword: boolean;
   isLoading: boolean;
-  isForgotLoading: boolean;
+  isGoogleLoading: boolean;
   loginSuccess: boolean;
   isFormValid: boolean;
   errorMessage?: string;
-  successMessage?: string;
   onEmailChange: (email: string) => void;
   onPasswordChange: (password: string) => void;
   onTogglePassword: () => void;
   onLogin: () => void;
   onForgotPassword: () => void;
+  onGoogleLogin: () => void;
 }
 
 export default function LoginFormCard({
@@ -29,58 +29,83 @@ export default function LoginFormCard({
   password,
   showPassword,
   isLoading,
-  isForgotLoading,
+  isGoogleLoading,
   loginSuccess,
   isFormValid,
   errorMessage,
-  successMessage,
   onEmailChange,
   onPasswordChange,
   onTogglePassword,
   onLogin,
   onForgotPassword,
+  onGoogleLogin,
 }: LoginFormCardProps) {
-  return (
-    <View
-      className="rounded-[20px] p-5"
-      style={{
-        backgroundColor: Colors.surface,
-        borderColor: Colors.borderFaint,
-        borderWidth: 1,
-      }}
-    >
-      <View className="mb-5">
-        <Text className="text-[22px] font-bold" style={{ color: Colors.text }}>
-          Sign in
-        </Text>
-        <Text className="mt-1 text-[13px] leading-5" style={{ color: Colors.textMuted }}>
-          Use your studio account to continue.
-        </Text>
-      </View>
+  const [rememberMe, setRememberMe] = React.useState(false);
+  const isBusy = isLoading || isGoogleLoading;
 
+  return (
+    <View className="w-full">
       <LoginTextField
         label="Email"
-        iconName="mail"
         value={email}
         onChangeText={onEmailChange}
-        placeholder="artist@mangaka.studio"
+        placeholder="Enter your email"
         keyboardType="email-address"
         autoCapitalize="none"
         autoCorrect={false}
+        showLeadingIcon={false}
       />
 
       <LoginTextField
         label="Password"
-        iconName="lock"
         value={password}
         onChangeText={onPasswordChange}
-        placeholder="Password"
+        placeholder="Enter your password"
         secureTextEntry={!showPassword}
         autoCapitalize="none"
         showSecureTextToggle
         secureTextVisible={showPassword}
         onToggleSecureText={onTogglePassword}
+        showLeadingIcon={false}
       />
+
+      <View className="mb-4 flex-row items-center justify-between px-1">
+        <TouchableOpacity
+          activeOpacity={0.75}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: rememberMe, disabled: isBusy }}
+          className="min-h-8 flex-row items-center gap-2"
+          disabled={isBusy}
+          onPress={() => setRememberMe((current) => !current)}
+        >
+          <View
+            className="h-4 w-4 items-center justify-center rounded"
+            style={{
+              backgroundColor: rememberMe ? Colors.accent : 'transparent',
+              borderColor: rememberMe ? Colors.accent : Colors.borderFaint,
+              borderWidth: 1,
+            }}
+          >
+            {rememberMe ? <MaterialIcon name="check" color={Colors.bg} size={12} /> : null}
+          </View>
+          <Text className="text-[13px] font-semibold" style={{ color: Colors.textMuted }}>
+            Remember me
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={isBusy ? 1 : 0.7}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: isBusy }}
+          className="min-h-8 items-center justify-center"
+          disabled={isBusy}
+          onPress={onForgotPassword}
+        >
+          <Text className="text-[13px] font-semibold" style={{ color: Colors.accent }}>
+            Forgot password?
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       {errorMessage ? (
         <View
@@ -99,42 +124,57 @@ export default function LoginFormCard({
         </View>
       ) : null}
 
-      {successMessage ? (
-        <View
-          accessibilityRole="alert"
-          className="mb-4 flex-row rounded-xl px-4 py-3"
-          style={{
-            backgroundColor: 'rgba(93,211,158,0.12)',
-            borderColor: 'rgba(93,211,158,0.22)',
-            borderWidth: 1,
-          }}
-        >
-          <MaterialIcon name="check_circle" color={Colors.statusDone} size={18} />
-          <Text className="ml-2 flex-1 text-[13px] leading-5" style={{ color: Colors.text }}>
-            {successMessage}
-          </Text>
-        </View>
-      ) : null}
-
       <LoginSubmitButton
-        isFormValid={isFormValid}
+        isFormValid={isFormValid && !isGoogleLoading}
         isLoading={isLoading}
         loginSuccess={loginSuccess}
         onPress={onLogin}
       />
 
+      <View className="my-4 flex-row items-center gap-2">
+        <View className="h-px flex-1" style={{ backgroundColor: Colors.borderFaint }} />
+        <Text className="text-[11px] font-semibold uppercase" style={{ color: Colors.textMuted }}>
+          or
+        </Text>
+        <View className="h-px flex-1" style={{ backgroundColor: Colors.borderFaint }} />
+      </View>
+
       <TouchableOpacity
-        activeOpacity={isLoading || isForgotLoading ? 1 : 0.7}
+        activeOpacity={isBusy ? 1 : 0.85}
         accessibilityRole="button"
-        accessibilityState={{ disabled: isLoading || isForgotLoading }}
-        className="mt-5 h-11 items-center justify-center"
-        disabled={isLoading || isForgotLoading}
-        onPress={onForgotPassword}
+        accessibilityState={{ busy: isGoogleLoading, disabled: isBusy }}
+        className="h-12 flex-row items-center justify-center gap-2 rounded-xl"
+        disabled={isBusy}
+        onPress={onGoogleLogin}
+        style={{
+          backgroundColor: 'rgba(34,40,49,0.58)',
+          borderColor: Colors.borderFaint,
+          borderWidth: 1,
+          opacity: isBusy && !isGoogleLoading ? 0.72 : 1,
+        }}
       >
-        <Text className="text-[13px] font-semibold" style={{ color: Colors.textMuted }}>
-          {isForgotLoading ? 'Sending reset link...' : 'Forgot your password?'}
+        {isGoogleLoading ? (
+          <ActivityIndicator color={Colors.text} size="small" />
+        ) : (
+          <View
+            className="h-5 w-5 items-center justify-center rounded-full"
+            style={{ backgroundColor: Colors.surfaceContainer }}
+          >
+            <Text className="text-[12px] font-bold" style={{ color: Colors.text }}>
+              G
+            </Text>
+          </View>
+        )}
+        <Text className="text-[13px] font-semibold" style={{ color: Colors.text }}>
+          {isGoogleLoading ? 'Signing in with Google...' : 'Continue with Google'}
         </Text>
       </TouchableOpacity>
+
+      <Text className="mt-8 text-center text-[13px] leading-5" style={{ color: Colors.textMuted }}>
+        By signing in you accept our{' '}
+        <Text style={{ color: Colors.accent, fontWeight: '600' }}>Terms of Use</Text> and{' '}
+        <Text style={{ color: Colors.accent, fontWeight: '600' }}>Privacy Policy</Text>.
+      </Text>
     </View>
   );
 }

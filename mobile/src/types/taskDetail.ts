@@ -7,7 +7,8 @@ export type ReviewTab = 'Overview' | 'Discussion' | 'Action';
 /** Tọa độ bounding box trên ảnh, tính theo % so với chiều rộng/cao của ảnh */
 export interface FrameAnnotation {
   id: string;
-  name: string;       // Tên frame, ví dụ: "Tô viền nhân vật"
+  materialId?: string;
+  name: string; // Tên frame, ví dụ: "Tô viền nhân vật"
   description?: string;
   /** Vị trí và kích thước: 0–100 (% của container ảnh) */
   x: number;
@@ -28,7 +29,11 @@ export interface Contributor {
 
 export interface Comment {
   id: string;
-  frameId: string;    // Thuộc frame nào
+  frameId: string; // Thuộc frame nào
+  frameName?: string;
+  materialFileId?: string;
+  materialId?: string;
+  materialName?: string;
   initials: string;
   author: string;
   authorRole: string;

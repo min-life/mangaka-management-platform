@@ -2,18 +2,27 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import * as ImagePicker from 'expo-image-picker';
 
 import ApiStateView from '@/src/components/shared/ApiStateView';
 import BottomNavBar from '@/src/components/shared/BottomNavBar';
 import { Colors } from '@/src/constants/colors';
+import { navigateToNotificationTarget } from '@/src/navigation/notificationTargetNavigation';
 import { RootStackParamList } from '@/src/navigation/types';
-import { fetchProjectBundle } from '@/src/services/projectApi';
+import { fetchProjectActivityLogs } from '@/src/services/activityLogApi';
+import { ApiEditorBoard } from '@/src/services/apiTypes';
+import { uploadProjectImageToCloudinary } from '@/src/services/cloudinaryUpload';
+import { fetchProjectBundle, updateProject } from '@/src/services/projectApi';
+import { ActivityItem } from '@/src/types/home';
 import { ProjectItem } from '@/src/types/projects';
 
 import {
+  ProjectActivitySection,
   ProjectDetailHero,
   ProjectDetailMenuItem,
   ProjectDetailTopBar,
+  ProjectEditorBoardSection,
+  ProjectRenameModal,
 } from './components';
 
 type ProjectDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'ProjectDetail'>;
@@ -21,24 +30,48 @@ type ProjectDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'Proj
 export default function ProjectDetailScreen({ navigation, route }: ProjectDetailScreenProps) {
   const scrollViewRef = useRef<ScrollView>(null);
   const [project, setProject] = useState<ProjectItem | null>(null);
-  const [boardId, setBoardId] = useState<string | null>(null);
+  const [editorBoard, setEditorBoard] = useState<ApiEditorBoard | null>(null);
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [isActivityLoading, setIsActivityLoading] = useState(true);
+  const [activityErrorMessage, setActivityErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
+  const [isRenameVisible, setIsRenameVisible] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameErrorMessage, setRenameErrorMessage] = useState('');
+  const [renameForm, setRenameForm] = useState('');
+  const [projectImageAsset, setProjectImageAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [projectImagePreviewUri, setProjectImagePreviewUri] = useState<string | undefined>();
 
   const loadProject = useCallback(async () => {
     setIsLoading(true);
+    setIsActivityLoading(true);
     setErrorMessage('');
+    setActivityErrorMessage('');
 
     try {
       const bundle = await fetchProjectBundle(route.params.projectId, {
         includeResourceStats: true,
       });
       setProject(bundle.project);
-      setBoardId(bundle.board ? String(bundle.board.id) : null);
+      setEditorBoard(bundle.board);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải project.');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load project.');
     } finally {
       setIsLoading(false);
+    }
+
+    try {
+      const activityResult = await fetchProjectActivityLogs(route.params.projectId, {
+        limit: 12,
+      });
+      setActivities(activityResult.activities);
+    } catch (error) {
+      setActivityErrorMessage(
+        error instanceof Error ? error.message : 'Unable to load project activity.',
+      );
+    } finally {
+      setIsActivityLoading(false);
     }
   }, [route.params.projectId]);
 
@@ -53,6 +86,99 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
       });
     }, []),
   );
+
+  const handleActivityPress = useCallback(
+    (activity: ActivityItem) => {
+      navigateToNotificationTarget(navigation, activity.target);
+    },
+    [navigation],
+  );
+
+  const openRenameModal = useCallback(() => {
+    if (!project) return;
+    setRenameForm(project.name);
+    setProjectImageAsset(null);
+    setProjectImagePreviewUri(project.coverUri);
+    setRenameErrorMessage('');
+    setIsRenameVisible(true);
+  }, [project]);
+
+  const closeRenameModal = useCallback(() => {
+    if (isRenaming) return;
+    setIsRenameVisible(false);
+    setRenameErrorMessage('');
+    setProjectImageAsset(null);
+  }, [isRenaming]);
+
+  const handlePickProjectImage = useCallback(async () => {
+    if (isRenaming) return;
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setRenameErrorMessage('Please allow access to your photo library.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: true,
+      aspect: [16, 9],
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.88,
+    });
+
+    if (result.canceled || !result.assets[0]) return;
+
+    setProjectImageAsset(result.assets[0]);
+    setProjectImagePreviewUri(result.assets[0].uri);
+    setRenameErrorMessage('');
+  }, [isRenaming]);
+
+  const handleSubmitRename = useCallback(async () => {
+    if (!project || isRenaming) return;
+
+    const nextName = renameForm.trim();
+    if (!nextName) {
+      setRenameErrorMessage('Please enter a project name.');
+      return;
+    }
+
+    if (nextName === project.name && !projectImageAsset) {
+      setIsRenameVisible(false);
+      return;
+    }
+
+    setIsRenaming(true);
+    setRenameErrorMessage('');
+
+    try {
+      const nextImageUrl = projectImageAsset
+        ? await uploadProjectImageToCloudinary(projectImageAsset)
+        : undefined;
+      const updatedProject = await updateProject(project.id, {
+        ...(nextImageUrl ? { imageUrl: nextImageUrl } : {}),
+        name: nextName,
+      });
+      setProject((currentProject) =>
+        currentProject
+          ? {
+              ...currentProject,
+              coverUri: updatedProject.imageUrl ?? currentProject.coverUri,
+              name: updatedProject.name,
+              updatedAt: updatedProject.updatedAt,
+            }
+          : currentProject,
+      );
+      setIsRenameVisible(false);
+      setProjectImageAsset(null);
+      setProjectImagePreviewUri(undefined);
+    } catch (error) {
+      setRenameErrorMessage(
+        error instanceof Error ? error.message : 'Unable to update project.',
+      );
+    } finally {
+      setIsRenaming(false);
+    }
+  }, [isRenaming, project, projectImageAsset, renameForm]);
 
   if (isLoading) {
     return (
@@ -103,18 +229,6 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
       onPress: () => navigation.navigate('Tasks', { projectId: project.id }),
     },
     {
-      label: 'Editor Board',
-      subtitle: project.editorBoard,
-      count: boardId ? 1 : 0,
-      icon: 'groups',
-      iconColor: '#FFFFFF',
-      iconBg: '#14B8A6',
-      onPress: () =>
-        boardId
-          ? navigation.navigate('EditorBoardDetail', { boardId })
-          : navigation.navigate('EditorBoards'),
-    },
-    {
       label: 'Contribute',
       count: project.contributors,
       icon: 'group_add',
@@ -130,18 +244,11 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
       iconBg: '#8B5CF6',
       onPress: () => navigation.navigate('ProjectReport', { projectId: project.id }),
     },
-    {
-      label: 'More',
-      icon: 'more_vert',
-      iconColor: Colors.textMuted,
-      iconBg: 'rgba(237,241,251,0.08)',
-      trailingIcon: 'expand_less',
-    },
   ];
 
   return (
     <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
-      <ProjectDetailTopBar onBack={() => navigation.goBack()} />
+      <ProjectDetailTopBar onBack={() => navigation.goBack()} onMorePress={openRenameModal} />
 
       <ScrollView
         ref={scrollViewRef}
@@ -168,14 +275,34 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
               subtitle={item.subtitle}
               count={item.count}
               onPress={item.onPress}
-              trailingIcon={item.trailingIcon}
               isLast={index === menuItems.length - 1}
             />
           ))}
         </View>
+
+        <ProjectActivitySection
+          activities={activities}
+          errorMessage={activityErrorMessage}
+          isLoading={isActivityLoading}
+          onActivityPress={handleActivityPress}
+        />
+
+        <ProjectEditorBoardSection board={editorBoard} />
       </ScrollView>
 
       <BottomNavBar activeTab="home" />
+
+      <ProjectRenameModal
+        errorMessage={renameErrorMessage}
+        imagePreviewUri={projectImagePreviewUri}
+        isSubmitting={isRenaming}
+        name={renameForm}
+        onChangeName={setRenameForm}
+        onClose={closeRenameModal}
+        onPickImage={handlePickProjectImage}
+        onSubmit={handleSubmitRename}
+        visible={isRenameVisible}
+      />
     </View>
   );
 }

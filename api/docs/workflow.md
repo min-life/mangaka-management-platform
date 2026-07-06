@@ -83,6 +83,11 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 4. **Đánh dấu lỗi (Frames)**: Trên giao diện xem trước ảnh (Material), người dùng kéo thả tạo khung (Frame) bằng `POST /api/materials/:id/frames`. Sau đó tạo bình luận ghim trên khung `POST /api/frames/:id/comments`. Có thể xem danh sách khung bằng `GET /api/materials/:id/frames` hoặc `GET /api/tasks/:id/frames`. 
 5. **Chỉnh sửa bình luận**: Người dùng hoặc project owner có thể cập nhật (`PATCH /api/comments/:id`) hoặc xóa bình luận (`DELETE /api/comments/:id`).
 
+### 7.2 Khởi tạo Task & Tạo Nhánh Bản Vẽ (Material Branching)
+1. **Khởi tạo Task**: Khi tạo task mới (`POST /api/files/:id/tasks`), hệ thống hỗ trợ tạo nhánh (branching) bản vẽ để các task song song làm việc độc lập.
+2. **Clone từ Base Material**: Truyền `cloneBaseMaterial: true` để tạo một bản copy của bản vẽ gốc (material không thuộc task nào) và gán cho task mới.
+3. **Clone từ Task khác**: Truyền `cloneMaterialFromTaskId: [ID]` để tạo một bản copy của bản vẽ mới nhất từ một task khác. Phiên bản copy này sẽ hoàn toàn độc lập (sạch), không chứa frame/comment của task cũ, giúp người dùng bắt đầu một phiên làm việc mới trên nền bản vẽ đó.
+
 ## 8. Luồng Thư mục & Tập tin (Folders & Files Flow)
 
 ### 8.1 Cây thư mục (Folder Tree)
@@ -99,6 +104,7 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 1. **Tải lên File/Material (Upload)**: Khi người dùng muốn cập nhật/thêm bản vẽ mới cho File, Frontend cần khởi tạo một đối tượng `FormData`, dùng `formData.append('file', fileObject)` để đính kèm file vật lý, sau đó gọi `POST /api/files/:id/materials` (sử dụng Content-Type `multipart/form-data`).
 2. **Phản hồi Upload**: Backend sẽ tải file lên AWS S3 và tự động lưu URL vào CSDL. Nếu thành công (✅), giao diện sẽ hiển thị Toast thành công và load lại danh sách Materials. Nếu thất bại hoặc file quá 500MB (❌), hiển thị Toast thông báo lỗi từ backend.
 3. **Khôi phục phiên bản**: Xem lịch sử version (Materials) của một File. Bấm Khôi phục -> Gọi `POST /api/materials/:id/restore` để đưa phiên bản cũ làm bản chính thức hiện tại.
+4. **Xem bản vẽ gốc của File**: Gọi `GET /api/files/:id/materials`. API này chỉ trả về danh sách các bản vẽ (materials) gốc của file, hoàn toàn loại trừ các bản vẽ đã được phân nhánh cho các Task.
 
 ## 9. Luồng Đánh dấu Khung hình (Frames Flow)
 
@@ -109,7 +115,9 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 ## 10. Luồng Bình luận Đa năng (Universal Comments Flow)
 
 ### 10.1 Thảo luận (Files, Tasks, Applications, Frames)
-1. **Hiển thị**: Khi mở bất kỳ đối tượng nào hỗ trợ thảo luận, gọi `GET /api/<module>/:id/comments` (VD: `/api/files/:1/comments`).
+1. **Hiển thị**: Khi mở bất kỳ đối tượng nào hỗ trợ thảo luận, gọi API tương ứng:
+   - Với **Task**, gọi `GET /api/tasks/:id/comments`: Trả về toàn bộ bình luận của Task và bình luận ghim trên frame của Task đó.
+   - Với **File**, gọi `GET /api/files/:id/comments`: Chỉ trả về bình luận gốc của File và bình luận ghim trên frame của bản vẽ gốc (hoàn toàn loại trừ bình luận của Task).
 2. **Nhắn tin**: Nhập text và gửi -> Gọi `POST /api/<module>/:id/comments`. Backend tự động gắn đúng `fileId`, `taskId`, v.v. dựa trên endpoint tương ứng.
 
 ## 11. Luồng Thống kê (Stats Flow)
@@ -1938,7 +1946,7 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 | `limit` | `query` | `No` | `number` |  |
 
 #### Responses
-- **200**: File comments retrieved successfully
+- **200**: File comments retrieved successfully (Excludes comments linked to any tasks)
   
   **Response Schema:**
   | Field | Type | Description |
@@ -2061,7 +2069,7 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 | `id` | `path` | `Yes` | `number` | File id |
 
 #### Responses
-- **200**: File materials retrieved successfully
+- **200**: File materials retrieved successfully (Excludes materials linked to any tasks)
   
   **Response Schema:**
   | Field | Type | Description |

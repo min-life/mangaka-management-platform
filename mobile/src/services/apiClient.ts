@@ -5,6 +5,7 @@ import { resetToLogin } from '@/src/navigation/navigationRef';
 import { clearSession, getAccessToken, saveAccessToken } from './tokenStorage';
 
 interface ApiErrorBody {
+  error?: string;
   message?: string | string[];
 }
 
@@ -92,8 +93,6 @@ function shouldAttemptRefresh(path: string, options: RequestOptions, hasRetried:
 }
 
 function getErrorMessage(status: number, body?: ApiErrorBody) {
-  if (status === 401) return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
-
   if (Array.isArray(body?.message) && body.message.length > 0) {
     return body.message[0];
   }
@@ -102,9 +101,15 @@ function getErrorMessage(status: number, body?: ApiErrorBody) {
     return body.message;
   }
 
-  if (status >= 500) return 'Máy chủ đang gặp sự cố. Vui lòng thử lại sau.';
+  if (typeof body?.error === 'string' && body.error.length > 0) {
+    return body.error;
+  }
 
-  return 'Không thể tải dữ liệu. Vui lòng thử lại.';
+  if (status === 401) return 'Your session has expired. Please sign in again.';
+
+  if (status >= 500) return 'The server is unavailable. Please try again later.';
+
+  return 'Unable to load data. Please try again.';
 }
 
 async function performApiFetch(
@@ -136,7 +141,7 @@ async function performApiFetch(
     });
   } catch {
     throw new ApiClientError(
-      'Không thể kết nối tới API. Vui lòng kiểm tra server hoặc cấu hình URL.',
+      'Unable to connect to the API. Please check the server or API URL.',
       0,
     );
   }
@@ -179,7 +184,7 @@ async function requestFreshAccessToken() {
 
   const accessToken = body.accessToken;
   if (typeof accessToken !== 'string' || !accessToken.trim()) {
-    throw new ApiClientError('Phản hồi làm mới phiên đăng nhập không hợp lệ.', 401);
+    throw new ApiClientError('Invalid refresh session response.', 401);
   }
 
   await saveAccessToken(accessToken);
