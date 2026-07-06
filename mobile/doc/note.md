@@ -46,14 +46,9 @@ Task - project
 gom thành combo box
 xóa nút header
 
----
-
-sửa câu thông báo - notification -> theo đông
-
 Contributor
 bỏ thống kê
 Thêm tính năng xóa và thêm member - tìm theo email
-
 Application
 sửa 2 nút combo box
 
@@ -65,13 +60,12 @@ Folder arc với chapter
 thêm ảnh
 Xóa thống kê
 Ảnh không có thì sẽ là ô có nội dung ảnh đang trống
-Card
+chuyển đổi chế độ xem
 xoa thống kê -> ngày tạo
 
 File
 Overview
 Thêm người tạo - ngày sửa
-
 Task
 Thay đổi thành filter theo status
 Detail
@@ -90,6 +84,10 @@ Editor board
 sửa label thành combo box
 đưa chuyển chế độ lên header
 Nút 3 chấm -> Out
+
+---
+
+sửa câu thông báo - notification -> theo đông
 
 Report : Tên project
 

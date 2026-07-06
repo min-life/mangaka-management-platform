@@ -32,6 +32,7 @@ export type RootStackParamList = {
     fileId: string;
     parentFolderId?: string;
     initialTab?: 'Overview' | 'Tasks' | 'Discussion' | 'Materials';
+    initialMaterialVersionId?: string;
     initialDiscussionScope?: 'file' | 'task' | 'frame';
     initialTaskId?: string;
     initialFrameId?: string;

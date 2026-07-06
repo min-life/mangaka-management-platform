@@ -6,6 +6,7 @@ import {
   ApiListResponse,
   ApiProject,
   ApiProjectMember,
+  ApiRoleSummary,
   ApiTask,
 } from './apiTypes';
 import { apiRequest } from './apiClient';
@@ -138,4 +139,36 @@ export async function fetchProjectMembers(projectId: string, params: { search?: 
     pagination: response.pagination,
     rawMembers: response.data ?? [],
   };
+}
+
+export async function addProjectMembers(projectId: string, userIds: number[], roleId: number) {
+  return apiRequest<void>(`/projects/${projectId}/members`, {
+    body: { userIds, roleId },
+    method: 'POST',
+  });
+}
+
+export async function fetchProjectRoles(): Promise<ApiRoleSummary[]> {
+  const response = await apiRequest<ApiListResponse<ApiRoleSummary>>('/roles', {
+    params: {
+      scope: 'PRJ',
+    },
+  });
+
+  return (response.data ?? []).filter((role) => typeof role.id === 'number');
+}
+
+export async function removeProjectMember(projectId: string, userId: string) {
+  return apiRequest<void>(`/projects/${projectId}/members/${userId}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function fetchDefaultProjectRoleId(): Promise<number> {
+  const projectRoles = await fetchProjectRoles();
+  const defaultRole = projectRoles.find((role) => role.isDefault === true) ?? projectRoles[0];
+  if (!defaultRole || defaultRole.id === undefined) {
+    throw new Error('Default project role not found');
+  }
+  return defaultRole.id;
 }

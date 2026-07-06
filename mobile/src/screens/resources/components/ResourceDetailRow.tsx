@@ -1,11 +1,11 @@
 import React from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { Image, Text, TouchableOpacity, View } from 'react-native';
 
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
 import { ResourceNode } from '@/src/types/resources';
 
-import { getMaterialVersionCount, getPageCount } from './resourceFormatters';
+import { formatResourceDate } from './resourceFormatters';
 
 interface ResourceDetailRowProps {
   node: ResourceNode;
@@ -13,20 +13,13 @@ interface ResourceDetailRowProps {
   onPress: () => void;
 }
 
-export default function ResourceDetailRow({
-  node,
-  isLast,
-  onPress,
-}: ResourceDetailRowProps) {
+export default function ResourceDetailRow({ node, isLast, onPress }: ResourceDetailRowProps) {
   const isChapter = node.type === 'folder';
-  const materialCount = isChapter
-    ? getMaterialVersionCount(node)
-    : node.materialVersions?.length ?? 0;
-  const helperText = isChapter
-    ? `${getPageCount(node)} page${
-        getPageCount(node) === 1 ? '' : 's'
-      } - ${materialCount} material versions`
-    : node.description ?? node.language;
+  const thumbnailUri =
+    node.type === 'folder' ? node.coverUri : (node.previewImageUri ?? node.coverUri);
+  const typeLabel = isChapter ? 'Chapter' : 'Page';
+  const statusColor = isChapter ? Colors.statusDone : Colors.statusReview;
+  const dateLabel = formatResourceDate(node.updatedAt || node.createdAt);
 
   return (
     <TouchableOpacity
@@ -37,7 +30,7 @@ export default function ResourceDetailRow({
       className={isLast ? 'mx-4 mb-0' : 'mx-4 mb-3'}
     >
       <View
-        className="flex-row rounded-2xl p-4"
+        className="flex-row items-center rounded-2xl p-3"
         style={{
           backgroundColor: Colors.surface,
           borderWidth: 1,
@@ -45,51 +38,48 @@ export default function ResourceDetailRow({
         }}
       >
         <View
-          className="h-12 w-12 items-center justify-center rounded-2xl"
+          className="h-16 w-16 items-center justify-center overflow-hidden rounded-xl"
           style={{
-            backgroundColor: isChapter
-              ? 'rgba(230,161,75,0.22)'
-              : 'rgba(77,166,255,0.18)',
+            backgroundColor: thumbnailUri
+              ? Colors.surfaceContainer
+              : isChapter
+                ? 'rgba(230,161,75,0.22)'
+                : 'rgba(77,166,255,0.18)',
           }}
         >
-          <MaterialIcon
-            name={isChapter ? 'description' : 'image'}
-            color={isChapter ? Colors.iconFolder : Colors.statusProgress}
-            size={24}
-          />
+          {thumbnailUri ? (
+            <Image source={{ uri: thumbnailUri }} className="h-full w-full" resizeMode="cover" />
+          ) : (
+            <MaterialIcon
+              name={isChapter ? 'description' : 'image'}
+              color={isChapter ? Colors.iconFolder : Colors.statusProgress}
+              size={25}
+            />
+          )}
         </View>
 
-        <View className="ml-4 flex-1">
-          <View className="flex-row items-center">
-            <Text
-              className="flex-1 text-[16px] font-bold"
-              style={{ color: Colors.text }}
-              numberOfLines={1}
+        <View className="ml-4 flex-1 justify-center">
+          <Text className="text-[15px] font-black" style={{ color: Colors.text }} numberOfLines={1}>
+            {node.name}
+          </Text>
+
+          <View className="mt-2 flex-row items-center">
+            <View
+              className="rounded-full px-2 py-0.5"
+              style={{ backgroundColor: `${statusColor}22` }}
             >
-              {node.name}
-            </Text>
-            <MaterialIcon name="chevron_right" color={Colors.textFaint} size={22} />
-          </View>
-
-          <Text className="mt-1 text-[12px] font-semibold" style={{ color: Colors.textFaint }}>
-            {isChapter ? 'Chapter' : 'Manga page'}
-          </Text>
-
-          <Text
-            className="mt-2 text-[13px] leading-5"
-            style={{ color: Colors.textMuted }}
-            numberOfLines={2}
-          >
-            {helperText}
-          </Text>
-          {!isChapter && (
-            <View className="mt-2 flex-row items-center gap-1.5">
-              <MaterialIcon name="file" color={Colors.statusDone} size={15} />
-              <Text className="text-[12px] font-semibold" style={{ color: Colors.textFaint }}>
-                {materialCount} material version{materialCount === 1 ? '' : 's'}
+              <Text className="text-[9px] font-black uppercase" style={{ color: statusColor }}>
+                {typeLabel}
               </Text>
             </View>
-          )}
+            <Text className="ml-2 text-[11px] font-semibold" style={{ color: Colors.textMuted }}>
+              {dateLabel}
+            </Text>
+          </View>
+        </View>
+
+        <View className="pl-3">
+          <MaterialIcon name="chevron_right" color={Colors.textFaint} size={22} />
         </View>
       </View>
     </TouchableOpacity>

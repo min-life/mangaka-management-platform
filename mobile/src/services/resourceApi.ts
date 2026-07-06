@@ -142,7 +142,18 @@ export async function fetchFolderBundle(folderId: string) {
   if (!folder) throw new Error('Resource folder not found');
 
   const childFolders = uniqueById((childrenResponse.data ?? []).map((item) => mapFolder(item)));
-  const files = uniqueById((filesResponse.data ?? []).map((item) => mapFile(item)));
+  const files = uniqueById(
+    await Promise.all(
+      (filesResponse.data ?? []).map(async (item) => {
+        const versionsResponse = await apiRequest<ApiListResponse<ApiMaterial>>(
+          `/files/${item.id}/versions`,
+          { params: { limit: 1, page: 1 } },
+        ).catch(() => emptyListResponse<ApiMaterial>());
+
+        return mapFile(item, versionsResponse.data ?? []);
+      }),
+    ),
+  );
 
   return {
     folder: mapFolder(folder, [...childFolders, ...files]),
@@ -257,6 +268,13 @@ export async function fetchFrameDiscussionComments(frameId: string) {
   });
 
   return uniqueById((response.data ?? []).map(mapComment));
+}
+
+export async function fetchMaterialVersion(materialId: string) {
+  const response = await apiRequest<ApiDataResponse<ApiMaterial>>(`/materials/${materialId}`);
+
+  if (!response.data) throw new Error('Material not found.');
+  return mapMaterialVersion(response.data);
 }
 
 export async function createDiscussionComment(params: {

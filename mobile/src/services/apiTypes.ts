@@ -162,6 +162,14 @@ export interface ApiFrame {
   endX: number | string;
   endY: number | string;
   id: number;
+  material?: {
+    file?: ApiFile | null;
+    fileId?: number;
+    id: number;
+    name?: string | null;
+  } | null;
+  materialId?: number | null;
+  name?: string | null;
   startX: number | string;
   startY: number | string;
   task?: { id: number; title: string };
@@ -170,14 +178,30 @@ export interface ApiFrame {
 }
 
 export interface ApiComment {
+  applicationId?: number | null;
   content?: { text?: string; mentions?: string[]; attachments?: unknown[] } | string;
   createdAt: string;
   createByUser?: ApiUserSummary | null;
   createdByUser?: ApiUserSummary | null;
-  applicationId?: number | null;
   fileId?: number | null;
+  frame?: {
+    id: number;
+    material?: {
+      file?: ApiFile | null;
+      fileId?: number;
+      id: number;
+      name?: string | null;
+    } | null;
+    name?: string | null;
+  } | null;
   frameId?: number | null;
   id: number;
+  material?: {
+    file?: ApiFile | null;
+    fileId?: number;
+    id: number;
+    name?: string | null;
+  } | null;
   taskId?: number | null;
   updatedAt: string;
 }
@@ -190,7 +214,9 @@ export interface ApiMaterial {
   file?: ApiFile | null;
   fileId?: number;
   id: number;
-  materials?: Record<string, unknown>;
+  materials?: Record<string, unknown> | Array<Record<string, unknown>>;
+  name?: string | null;
+  taskId?: number | null;
   updatedAt: string;
   updatedBy?: number | null;
   updatedByUser?: ApiUserSummary | null;
@@ -198,12 +224,7 @@ export interface ApiMaterial {
 
 export type ApiApplicationType = 'MANUSCRIPT_REVIEW' | 'PUBLISH_REQUEST';
 export type ApiApplicationStatus =
-  | 'APPROVE'
-  | 'CANCELLED'
-  | 'INTERNAL_APPROVED'
-  | 'PENDING'
-  | 'REJECT'
-  | 'SUBMITTED';
+  'APPROVE' | 'CANCELLED' | 'INTERNAL_APPROVED' | 'PENDING' | 'REJECT' | 'SUBMITTED';
 
 export interface ApiApplication {
   createdAt: string;
@@ -256,4 +277,3 @@ export interface ApiActivityLog {
   metadata?: Record<string, unknown> | null;
   projectId?: number | null;
 }
-

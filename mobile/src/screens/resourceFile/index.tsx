@@ -21,6 +21,7 @@ import {
   fetchFolderBundle,
   fetchFrameDetail,
   fetchFrameDiscussionComments,
+  fetchMaterialVersion,
   fetchResourceFileBundle,
   fetchTaskDiscussionComments,
   fetchTaskDiscussionFrames,
@@ -101,15 +102,17 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
       setFile(nextFile);
       setFileDiscussionCommentCount(nextFile.comments?.length ?? 0);
       setParentName(parentBundle?.folder.name ?? 'Resource');
-      setSelectedVersionId(nextFile.materialVersions?.[0]?.id ?? null);
+      setSelectedVersionId(
+        route.params.initialMaterialVersionId ?? nextFile.materialVersions?.[0]?.id ?? null,
+      );
       setSelectedTaskId(nextFile.tasks?.[0]?.id ?? null);
-      setSelectedFrame(nextFile.tasks?.[0]?.frames[0] ?? null);
+      setSelectedFrame(null);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Không thể tải file.');
     } finally {
       setIsLoading(false);
     }
-  }, [route.params.fileId, route.params.parentFolderId]);
+  }, [route.params.fileId, route.params.initialMaterialVersionId, route.params.parentFolderId]);
 
   useEffect(() => {
     void loadFile();
@@ -158,7 +161,7 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
       return;
     }
     setSelectedTaskId(task.id);
-    setSelectedFrame(task.frames[0] ?? null);
+    setSelectedFrame(null);
     setActiveTab('Tasks');
   };
 
@@ -167,6 +170,36 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
     setSelectedFrame(null);
     setActiveTab('Materials');
   };
+
+  const handleOpenCommentMaterial = useCallback(
+    async (materialId: string) => {
+      const localVersion = versions.find((version) => version.id === materialId);
+      if (localVersion) {
+        setSelectedVersionId(localVersion.id);
+        setSelectedFrame(null);
+        setActiveTab('Materials');
+        return;
+      }
+
+      try {
+        const material = await fetchMaterialVersion(materialId);
+        if (!material.fileId) throw new Error('Material file not found.');
+
+        navigation.navigate('ResourceFile', {
+          fileId: material.fileId,
+          initialMaterialVersionId: materialId,
+          initialTab: 'Materials',
+          projectId: route.params.projectId,
+        });
+      } catch (error) {
+        console.warn('[ResourceFileScreen] Open comment material failed.', error);
+        setDiscussionErrorMessage(
+          error instanceof Error ? error.message : 'Không thể mở material này.',
+        );
+      }
+    },
+    [navigation, route.params.projectId, versions],
+  );
 
   const addRealtimeDiscussionComment = useCallback(
     (comment: ApiComment, options: { updateFileCount?: boolean } = {}) => {
@@ -483,7 +516,7 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
         <ResourceFileTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
         {activeTab === 'Overview' && (
-          <OverviewPanel description={description} fileContent={file.content} />
+          <OverviewPanel description={description} file={file} fileContent={file.content} />
         )}
 
         {activeTab === 'Tasks' && (
@@ -515,6 +548,7 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
             isFramesLoading={isDiscussionFramesLoading}
             isTasksLoading={isDiscussionTasksLoading}
             onCommentLayout={handleCommentLayout}
+            onOpenMaterialContext={handleOpenCommentMaterial}
             onRetryComments={handleRetryDiscussionComments}
             onSelectFileComments={handleSelectFileComments}
             onSelectFrameComments={loadFrameDiscussion}

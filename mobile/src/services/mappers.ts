@@ -304,11 +304,30 @@ export function mapFolder(
   };
 }
 
-export function materialImage(material?: Record<string, unknown>) {
-  const pages = Array.isArray(material?.pages) ? material.pages : [];
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function stringValue(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+export function materialImage(material?: Record<string, unknown> | Array<Record<string, unknown>>) {
+  if (Array.isArray(material)) {
+    const thumbnail =
+      material.find((item) => item.isThumbnail === true && stringValue(item.url)) ??
+      material.find((item) => item.type === 'IMAGE' && stringValue(item.url)) ??
+      material.find((item) => stringValue(item.url));
+
+    return stringValue(thumbnail?.url);
+  }
+
+  if (!isRecord(material)) return undefined;
+
+  const pages = Array.isArray(material.pages) ? material.pages : [];
   const firstPage = pages[0] as { url?: unknown } | undefined;
-  const imageUri = material?.imageUri ?? material?.thumbnailUrl ?? firstPage?.url;
-  return typeof imageUri === 'string' && imageUri.trim() ? imageUri : undefined;
+  const imageUri = material.imageUri ?? material.thumbnailUrl ?? firstPage?.url;
+  return stringValue(imageUri);
 }
 
 export function mapMaterialVersion(material: ApiMaterial): ResourceFileMaterialVersion {
@@ -322,16 +341,19 @@ export function mapMaterialVersion(material: ApiMaterial): ResourceFileMaterialV
     id: String(material.id),
     materials: {
       editorState:
-        typeof raw.editorState === 'object' && raw.editorState
+        isRecord(raw) && typeof raw.editorState === 'object' && raw.editorState
           ? (raw.editorState as Record<string, unknown>)
           : undefined,
       imageUri: materialImage(raw),
-      layers: Array.isArray(raw.layers) ? raw.layers.map(String) : [],
-      note: typeof raw.note === 'string' ? raw.note : undefined,
-      pages: Array.isArray(raw.pages)
-        ? (raw.pages as Array<{ index: number; url: string }>)
-        : undefined,
-      title: typeof raw.title === 'string' ? raw.title : `Material ${material.id}`,
+      layers: isRecord(raw) && Array.isArray(raw.layers) ? raw.layers.map(String) : [],
+      note: isRecord(raw) && typeof raw.note === 'string' ? raw.note : undefined,
+      pages:
+        isRecord(raw) && Array.isArray(raw.pages)
+          ? (raw.pages as Array<{ index: number; url: string }>)
+          : undefined,
+      title:
+        material.name ??
+        (isRecord(raw) && typeof raw.title === 'string' ? raw.title : `Material ${material.id}`),
     },
     updatedAt: material.updatedAt,
     updatedBy: String(material.updatedBy ?? material.updatedByUser?.id ?? ''),
@@ -403,12 +425,18 @@ export function mapFrame(frame: ApiFrame): ResourceTaskFrame {
   const endY = Number(frame.endY);
 
   return {
-    description: `Frame ${frame.id}`,
+    description: frame.name ?? `Frame ${frame.id}`,
     endX,
     endY,
     height: endY - startY,
     id: String(frame.id),
-    name: `Frame ${frame.id}`,
+    materialId:
+      frame.materialId === undefined || frame.materialId === null
+        ? frame.material?.id === undefined
+          ? undefined
+          : String(frame.material.id)
+        : String(frame.materialId),
+    name: frame.name ?? `Frame ${frame.id}`,
     startX,
     startY,
     width: endX - startX,
@@ -421,6 +449,8 @@ export function mapComment(comment: ApiComment): ResourceTaskComment {
   const text =
     typeof comment.content === 'string' ? comment.content : (comment.content?.text ?? '');
   const author = displayName(creatorUser(comment));
+  const frameId = comment.frameId ?? comment.frame?.id;
+  const material = comment.material ?? comment.frame?.material ?? null;
 
   return {
     applicationId:
@@ -437,9 +467,19 @@ export function mapComment(comment: ApiComment): ResourceTaskComment {
     },
     fileId:
       comment.fileId === undefined || comment.fileId === null ? undefined : String(comment.fileId),
-    frameId: String(comment.frameId ?? ''),
+    frameId: frameId === undefined || frameId === null ? '' : String(frameId),
+    frameName: comment.frame?.name ?? undefined,
     id: String(comment.id),
     initials: initials(author),
+    materialFileId:
+      material?.fileId === undefined
+        ? material?.file?.id === undefined
+          ? undefined
+          : String(material.file.id)
+        : String(material.fileId),
+    materialId:
+      material?.id === undefined || material.id === null ? undefined : String(material.id),
+    materialName: material?.name ?? undefined,
     taskId:
       comment.taskId === undefined || comment.taskId === null ? undefined : String(comment.taskId),
     time: relativeDate(comment.createdAt),

@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -8,19 +8,13 @@ import BottomNavBar from '@/src/components/shared/BottomNavBar';
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
 import { RootStackParamList } from '@/src/navigation/types';
-import { fetchEditorBoardBundle } from '@/src/services/editorBoardApi';
-import {
-  ProjectDetailMenuItem,
-  ProjectDetailTopBar,
-} from '@/src/screens/projectDetail/components';
+import { fetchEditorBoardBundle, leaveEditorBoard } from '@/src/services/editorBoardApi';
+import { ProjectDetailMenuItem, ProjectDetailTopBar } from '@/src/screens/projectDetail/components';
 import { ApplicationItem } from '@/src/types/applications';
 import { EditorBoardItem, EditorBoardMember } from '@/src/types/editorBoards';
 import { ProjectItem } from '@/src/types/projects';
 
-type EditorBoardDetailScreenProps = NativeStackScreenProps<
-  RootStackParamList,
-  'EditorBoardDetail'
->;
+type EditorBoardDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'EditorBoardDetail'>;
 
 function getBoardInitials(name: string) {
   return name
@@ -97,6 +91,8 @@ export default function EditorBoardDetailScreen({
   const [boardProjects, setBoardProjects] = useState<ProjectItem[]>([]);
   const [publishRequests, setPublishRequests] = useState<ApplicationItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLeavingBoard, setIsLeavingBoard] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
   const loadBoard = useCallback(async () => {
@@ -147,6 +143,32 @@ export default function EditorBoardDetailScreen({
   const lead = members.find((member) => member.role === 'Lead');
   const primaryProject = boardProjects[0];
 
+  const performLeaveBoard = async () => {
+    if (isLeavingBoard) return;
+
+    setIsMoreMenuOpen(false);
+    setIsLeavingBoard(true);
+    try {
+      await leaveEditorBoard(route.params.boardId);
+      navigation.navigate('EditorBoards');
+    } catch (error) {
+      Alert.alert(
+        'Cannot leave board',
+        error instanceof Error ? error.message : 'Không thể rời editor board.',
+      );
+    } finally {
+      setIsLeavingBoard(false);
+    }
+  };
+
+  const handleOutPress = () => {
+    setIsMoreMenuOpen(false);
+    Alert.alert('Out', `Leave ${board.name}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Out', style: 'destructive', onPress: performLeaveBoard },
+    ]);
+  };
+
   const menuItems = [
     {
       label: 'Project',
@@ -180,7 +202,39 @@ export default function EditorBoardDetailScreen({
 
   return (
     <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
-      <ProjectDetailTopBar onBack={() => navigation.goBack()} />
+      <ProjectDetailTopBar
+        onBack={() => navigation.goBack()}
+        onMorePress={() => setIsMoreMenuOpen((value) => !value)}
+      />
+
+      {isMoreMenuOpen ? (
+        <View
+          className="absolute right-4 top-20 z-50 rounded-xl p-2"
+          style={{
+            backgroundColor: Colors.surface,
+            borderColor: Colors.borderSubtle,
+            borderWidth: 1,
+          }}
+        >
+          <TouchableOpacity
+            activeOpacity={0.76}
+            accessibilityRole="button"
+            disabled={isLeavingBoard}
+            className="min-w-[132px] flex-row items-center rounded-lg px-3 py-3"
+            onPress={handleOutPress}
+            style={{ opacity: isLeavingBoard ? 0.56 : 1 }}
+          >
+            {isLeavingBoard ? (
+              <ActivityIndicator color="#EF4444" size="small" />
+            ) : (
+              <MaterialIcon name="logout" color="#EF4444" size={18} />
+            )}
+            <Text className="ml-2 text-[14px] font-semibold" style={{ color: '#EF4444' }}>
+              Out
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       <ScrollView
         className="flex-1"
