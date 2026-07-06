@@ -11,8 +11,8 @@ import { fetchProjectBundle } from '@/src/services/projectApi';
 import { fetchTasks } from '@/src/services/taskApi';
 import {
   FilterChip,
-  FilterChipBar,
   TaskCard,
+  TaskFilterSelect,
   TasksSearchBar,
   TasksSectionHeader,
   TasksTopBar,
@@ -88,8 +88,10 @@ export default function TasksScreen({ navigation, route }: TasksScreenProps) {
         // }
         showsVerticalScrollIndicator={false}
       >
-        <TasksSearchBar search={search} onSearchChange={setSearch} />
-        <FilterChipBar activeFilter={activeFilter} onFilterChange={setActiveFilter} />
+        <View className="relative z-20 mt-4 flex-row items-center gap-3">
+          <TasksSearchBar search={search} onSearchChange={setSearch} />
+          <TaskFilterSelect activeFilter={activeFilter} onFilterChange={setActiveFilter} />
+        </View>
         {isLoading ? (
           <ApiStateView type="loading" />
         ) : errorMessage ? (

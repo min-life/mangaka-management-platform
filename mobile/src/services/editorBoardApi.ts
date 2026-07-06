@@ -13,7 +13,7 @@ export async function fetchEditorBoards(params: { name?: string } = {}) {
   const response = await apiRequest<ApiListResponse<ApiEditorBoard>>('/editor-boards', {
     params: {
       limit: 50,
-      me: true,
+      me: false,
       name: params.name,
       page: 1,
     },
@@ -56,48 +56,61 @@ function mapBoardMemberResponse(item: BoardMemberResponseItem | null) {
 
 function unwrapBoardProject(item: BoardProjectResponseItem | null) {
   if (!item) return undefined;
-  return 'project' in item ? item.project ?? undefined : item;
+  return 'project' in item ? (item.project ?? undefined) : item;
 }
 
 function unwrapBoardApplication(item: BoardApplicationResponseItem | null) {
   if (!item) return undefined;
-  return 'application' in item ? item.application ?? undefined : item;
+  return 'application' in item ? (item.application ?? undefined) : item;
 }
 
 type MappedBoardMember = NonNullable<ReturnType<typeof mapBoardMemberResponse>>;
 
 export async function fetchEditorBoardBundle(boardId: string) {
-  const [boardResponse, membersResponse, projectsResponse, applicationsResponse] = await Promise.all([
-    apiRequest<ApiDataResponse<ApiEditorBoard>>(`/editor-boards/${boardId}`),
-    apiRequest<ApiListResponse<BoardMemberResponseItem | null>>(
-      `/editor-boards/${boardId}/members`,
-      { params: { limit: 100, page: 1 } },
-    ).catch(() => ({ data: [] })),
-    apiRequest<ApiListResponse<BoardProjectResponseItem | null>>(
-      `/editor-boards/${boardId}/projects`,
-      { params: { limit: 100, page: 1 } },
-    ).catch(() => ({ data: [] })),
-    apiRequest<ApiListResponse<BoardApplicationResponseItem | null>>(
-      `/editor-boards/${boardId}/applications`,
-      { params: { limit: 100, page: 1 } },
-    ).catch(() => ({ data: [] })),
-  ]);
+  const [boardResponse, membersResponse, projectsResponse, applicationsResponse] =
+    await Promise.all([
+      apiRequest<ApiDataResponse<ApiEditorBoard>>(`/editor-boards/${boardId}`),
+      apiRequest<ApiListResponse<BoardMemberResponseItem | null>>(
+        `/editor-boards/${boardId}/members`,
+        { params: { limit: 100, page: 1 } },
+      ).catch(() => ({ data: [] })),
+      apiRequest<ApiListResponse<BoardProjectResponseItem | null>>(
+        `/editor-boards/${boardId}/projects`,
+        { params: { limit: 100, page: 1 } },
+      ).catch(() => ({ data: [] })),
+      apiRequest<ApiListResponse<BoardApplicationResponseItem | null>>(
+        `/editor-boards/${boardId}/applications`,
+        { params: { limit: 100, page: 1 } },
+      ).catch(() => ({ data: [] })),
+    ]);
 
   if (!boardResponse.data) throw new Error('Editor board not found');
 
   return {
     board: mapEditorBoard(boardResponse.data),
-    applications: uniqueById((applicationsResponse.data ?? [])
-      .map(unwrapBoardApplication)
-      .filter((application): application is ApiApplication => Boolean(application))
-      .map(mapApplication)),
-    members: uniqueById((membersResponse.data ?? [])
-      .map(mapBoardMemberResponse)
-      .filter((member): member is MappedBoardMember => Boolean(member))
-      .map(mapBoardMember)),
-    projects: uniqueById((projectsResponse.data ?? [])
-      .map(unwrapBoardProject)
-      .filter((project): project is ApiProject => Boolean(project))
-      .map((project) => mapProject(project))),
+    applications: uniqueById(
+      (applicationsResponse.data ?? [])
+        .map(unwrapBoardApplication)
+        .filter((application): application is ApiApplication => Boolean(application))
+        .map(mapApplication),
+    ),
+    members: uniqueById(
+      (membersResponse.data ?? [])
+        .map(mapBoardMemberResponse)
+        .filter((member): member is MappedBoardMember => Boolean(member))
+        .map(mapBoardMember),
+    ),
+    projects: uniqueById(
+      (projectsResponse.data ?? [])
+        .map(unwrapBoardProject)
+        .filter((project): project is ApiProject => Boolean(project))
+        .map((project) => mapProject(project)),
+    ),
   };
+}
+
+export async function leaveEditorBoard(boardId: string) {
+  return apiRequest<void>(`/editor-boards/${boardId}/members/me`, {
+    method: 'DELETE',
+  });
 }

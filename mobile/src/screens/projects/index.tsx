@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ScrollView, TouchableOpacity, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
 import ApiStateView from '@/src/components/shared/ApiStateView';
-import AppRefreshControl from '@/src/components/shared/AppRefreshControl';
 import BottomNavBar from '@/src/components/shared/BottomNavBar';
+import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
 import { RootStackNavProp } from '@/src/navigation/types';
 import { fetchProjects } from '@/src/services/projectApi';
@@ -16,38 +16,34 @@ import {
   ProjectsEmptyState,
   ProjectsSearchBar,
   ProjectsTopBar,
-  ProjectTypeFilter,
-  ProjectTypeFilterValue,
   ProjectViewMode,
-  ProjectViewModeToggle,
 } from './components';
 
 export default function ProjectsScreen() {
   const navigation = useNavigation<RootStackNavProp>();
   const [search, setSearch] = useState('');
-  const [activeType, setActiveType] = useState<ProjectTypeFilterValue>('All');
+  const [isOwnerFilterActive, setIsOwnerFilterActive] = useState(false);
   const [viewMode, setViewMode] = useState<ProjectViewMode>('list');
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const loadProjects = useCallback(async (options: { showLoading?: boolean } = {}) => {
-    const showLoading = options.showLoading ?? true;
-    if (showLoading) setIsLoading(true);
-    else setIsRefreshing(true);
+  const loadProjects = useCallback(async () => {
+    setIsLoading(true);
     setErrorMessage('');
 
     try {
-      const result = await fetchProjects({ name: search.trim() || undefined });
+      const result = await fetchProjects({
+        me: isOwnerFilterActive,
+        name: search.trim() || undefined,
+      });
       setProjects(result.projects);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải projects.');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load projects.');
     } finally {
       setIsLoading(false);
-      setIsRefreshing(false);
     }
-  }, [search]);
+  }, [isOwnerFilterActive, search]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -57,38 +53,42 @@ export default function ProjectsScreen() {
     return () => clearTimeout(timeout);
   }, [loadProjects]);
 
-  const handleRefresh = useCallback(() => {
-    void loadProjects({ showLoading: false });
-  }, [loadProjects]);
-
-  const filteredProjects = useMemo(() => {
-    return projects.filter((project) => {
-      const matchesType = activeType === 'All' || project.type === activeType;
-
-      return matchesType;
-    });
-  }, [activeType, projects]);
-
   return (
     <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
-      <ProjectsTopBar onBack={() => navigation.goBack()} />
+      <ProjectsTopBar
+        onBack={() => navigation.goBack()}
+        onViewModeChange={setViewMode}
+        viewMode={viewMode}
+      />
 
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 112 }}
         keyboardShouldPersistTaps="handled"
-        // refreshControl={
-        //   <AppRefreshControl onRefresh={handleRefresh} refreshing={isRefreshing} />
-        // }
         showsVerticalScrollIndicator={false}
       >
-        <View className="px-4">
-          <ProjectsSearchBar search={search} onSearchChange={setSearch} />
-          <View className="flex-row items-center gap-3">
-            <View className="flex-1">
-              <ProjectTypeFilter activeType={activeType} onTypeChange={setActiveType} />
-            </View>
-            <ProjectViewModeToggle viewMode={viewMode} onViewModeChange={setViewMode} />
+        <View className="px-4 pb-4">
+          <View className="mt-3 flex-row items-center gap-3">
+            <ProjectsSearchBar search={search} onSearchChange={setSearch} />
+            <TouchableOpacity
+              activeOpacity={0.76}
+              accessibilityLabel="Show projects owned by me"
+              accessibilityRole="button"
+              accessibilityState={{ selected: isOwnerFilterActive }}
+              className="h-12 w-12 items-center justify-center rounded-xl"
+              onPress={() => setIsOwnerFilterActive((current) => !current)}
+              style={{
+                backgroundColor: isOwnerFilterActive ? Colors.surfaceContainer : Colors.surface,
+                borderColor: isOwnerFilterActive ? Colors.accent : Colors.borderFaint,
+                borderWidth: 1,
+              }}
+            >
+              <MaterialIcon
+                name="filter"
+                color={isOwnerFilterActive ? Colors.accent : Colors.textMuted}
+                size={22}
+              />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -109,13 +109,13 @@ export default function ProjectsScreen() {
                 : undefined
             }
           >
-            {filteredProjects.length > 0 ? (
-              filteredProjects.map((project, index) =>
+            {projects.length > 0 ? (
+              projects.map((project, index) =>
                 viewMode === 'list' ? (
                   <ProjectListItem
                     key={project.id}
                     project={project}
-                    isLast={index === filteredProjects.length - 1}
+                    isLast={index === projects.length - 1}
                     onPress={() => navigation.navigate('ProjectDetail', { projectId: project.id })}
                   />
                 ) : (

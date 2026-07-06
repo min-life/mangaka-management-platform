@@ -65,6 +65,9 @@ export default function EditorBoardsScreen({ navigation }: EditorBoardsScreenPro
     <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
       <EditorBoardTopBar
         onBack={() => navigation.goBack()}
+        rightAction={
+          <EditorBoardViewModeToggle viewMode={viewMode} onViewModeChange={setViewMode} />
+        }
         title="Editor Boards"
       />
 
@@ -74,13 +77,12 @@ export default function EditorBoardsScreen({ navigation }: EditorBoardsScreenPro
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View className="px-4">
-          <EditorBoardSearchBar search={search} onSearchChange={setSearch} />
-          <View className="flex-row items-center gap-3">
+        <View className="px-4" style={{ zIndex: 20 }}>
+          <View className="flex-row items-center gap-2 pb-4 pt-3" style={{ zIndex: 30 }}>
             <View className="flex-1">
-              <EditorBoardRoleFilter activeRole={roleFilter} onRoleChange={setRoleFilter} />
+              <EditorBoardSearchBar search={search} onSearchChange={setSearch} />
             </View>
-            <EditorBoardViewModeToggle viewMode={viewMode} onViewModeChange={setViewMode} />
+            <EditorBoardRoleFilter activeRole={roleFilter} onRoleChange={setRoleFilter} />
           </View>
         </View>
 

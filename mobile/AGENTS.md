@@ -197,3 +197,6 @@ Add the skill to project knowledge or paste SKILL.md contents into the conversat
 If the skill requires network access, instruct users to add required domains at `claude.ai/settings/capabilities`.
 
 -Bạn chỉ có thể code trong thư mục mobile. Các thư mục api và web sẽ chỉ được xem. Và đọc kĩ api để ghép đúng api
+
+
+!!!! LƯU Ý CODE CỦA BẠN SẼ ĐƯỢC CLAUDE CODE ĐÁNH GIÁ.

@@ -135,7 +135,7 @@ export default function ApplicationsScreen({ navigation, route }: ApplicationsSc
             <ApplicationFilterSelect
               activeValue={statusFilter}
               accessibilityLabel="Select application status"
-              icon="fact_check"
+              icon="filter"
               isOpen={openFilter === 'status'}
               options={statusOptions}
               onChange={setStatusFilter}
@@ -144,7 +144,7 @@ export default function ApplicationsScreen({ navigation, route }: ApplicationsSc
             <ApplicationFilterSelect
               activeValue={typeFilter}
               accessibilityLabel="Select application type"
-              icon="tune"
+              icon="filter"
               isOpen={openFilter === 'type'}
               options={typeOptions}
               onChange={setTypeFilter}

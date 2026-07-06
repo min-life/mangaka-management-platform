@@ -6,6 +6,7 @@ import {
   ApiListResponse,
   ApiProject,
   ApiProjectMember,
+  ApiRoleSummary,
   ApiTask,
 } from './apiTypes';
 import { apiRequest } from './apiClient';
@@ -16,13 +17,13 @@ function emptyListResponse<T>(): ApiListResponse<T> {
   return { data: [], pagination: undefined };
 }
 
-export async function fetchProjects(params: { name?: string } = {}) {
+export async function fetchProjects(params: { me?: boolean; name?: string } = {}) {
   const response = await apiRequest<ApiListResponse<ApiProject>>('/projects', {
     params: {
       // field: '',
       limit: 10,
-      me: false,
-      // name: params.name,
+      me: params.me ?? false,
+      name: params.name,
       order: 'desc',
       page: 1,
     },
@@ -33,6 +34,22 @@ export async function fetchProjects(params: { name?: string } = {}) {
     projects: uniqueById((response.data ?? []).map((project) => mapProject(project))),
     rawProjects: response.data ?? [],
   };
+}
+
+export async function updateProject(
+  projectId: string,
+  data: { imageUrl?: string; name?: string },
+) {
+  const response = await apiRequest<ApiDataResponse<ApiProject>>(`/projects/${projectId}`, {
+    body: data,
+    method: 'PATCH',
+  });
+
+  if (!response.data) {
+    throw new Error('Project update response is missing.');
+  }
+
+  return response.data;
 }
 
 export async function fetchProjectBundle(
@@ -122,4 +139,36 @@ export async function fetchProjectMembers(projectId: string, params: { search?: 
     pagination: response.pagination,
     rawMembers: response.data ?? [],
   };
+}
+
+export async function addProjectMembers(projectId: string, userIds: number[], roleId: number) {
+  return apiRequest<void>(`/projects/${projectId}/members`, {
+    body: { userIds, roleId },
+    method: 'POST',
+  });
+}
+
+export async function fetchProjectRoles(): Promise<ApiRoleSummary[]> {
+  const response = await apiRequest<ApiListResponse<ApiRoleSummary>>('/roles', {
+    params: {
+      scope: 'PRJ',
+    },
+  });
+
+  return (response.data ?? []).filter((role) => typeof role.id === 'number');
+}
+
+export async function removeProjectMember(projectId: string, userId: string) {
+  return apiRequest<void>(`/projects/${projectId}/members/${userId}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function fetchDefaultProjectRoleId(): Promise<number> {
+  const projectRoles = await fetchProjectRoles();
+  const defaultRole = projectRoles.find((role) => role.isDefault === true) ?? projectRoles[0];
+  if (!defaultRole || defaultRole.id === undefined) {
+    throw new Error('Default project role not found');
+  }
+  return defaultRole.id;
 }

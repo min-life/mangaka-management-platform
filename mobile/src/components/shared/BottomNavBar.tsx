@@ -1,16 +1,18 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
 import { RootStackNavProp, RootStackParamList } from '@/src/navigation/types';
+import { fetchNotifications } from '@/src/services/notificationApi';
 
 export type BottomTab = 'inbox' | 'home' | 'profile';
 
 interface BottomNavBarProps {
   activeTab?: BottomTab;
   avatarUri?: string;
+  unreadInboxCount?: number;
 }
 
 const TABS: Array<{
@@ -27,8 +29,31 @@ const TABS: Array<{
 export default function BottomNavBar({
   activeTab = 'home',
   avatarUri,
+  unreadInboxCount,
 }: BottomNavBarProps) {
   const navigation = useNavigation<RootStackNavProp>();
+  const [fetchedUnreadCount, setFetchedUnreadCount] = useState(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (unreadInboxCount !== undefined) return undefined;
+
+      let isActive = true;
+
+      void fetchNotifications()
+        .then((result) => {
+          if (!isActive) return;
+          setFetchedUnreadCount(result.items.filter((item) => item.isUnread).length);
+        })
+        .catch(() => {
+          if (isActive) setFetchedUnreadCount(0);
+        });
+
+      return () => {
+        isActive = false;
+      };
+    }, [unreadInboxCount]),
+  );
 
   const handlePress = (tab: BottomTab) => {
     const target = TABS.find((item) => item.key === tab);
@@ -39,6 +64,7 @@ export default function BottomNavBar({
 
   const activeColor = '#1F2329';
   const inactiveColor = Colors.textPlaceholder;
+  const resolvedUnreadCount = unreadInboxCount ?? fetchedUnreadCount;
 
   return (
     <SafeAreaView
@@ -67,11 +93,18 @@ export default function BottomNavBar({
             const isActive = activeTab === tab.key;
             const iconColor = isActive ? activeColor : inactiveColor;
             const textColor = isActive ? activeColor : Colors.textMuted;
+            const showUnreadBadge = tab.key === 'inbox' && resolvedUnreadCount > 0;
+            const unreadBadgeLabel = resolvedUnreadCount > 99 ? '99+' : String(resolvedUnreadCount);
 
             return (
               <TouchableOpacity
                 key={tab.key}
                 activeOpacity={0.78}
+                accessibilityLabel={
+                  tab.key === 'inbox' && resolvedUnreadCount > 0
+                    ? `Inbox, ${resolvedUnreadCount} unread notifications`
+                    : tab.label
+                }
                 onPress={() => handlePress(tab.key)}
                 className="min-w-0 flex-1 flex-row items-center justify-center rounded-full"
                 style={{
@@ -106,6 +139,35 @@ export default function BottomNavBar({
                     }}
                   >
                     <MaterialIcon name={tab.icon} color={iconColor} size={18} />
+                    {showUnreadBadge ? (
+                      <View
+                        className="items-center justify-center"
+                        style={{
+                          backgroundColor: Colors.iconTask,
+                          borderColor: isActive ? Colors.accent : 'rgba(57, 62, 70, 0.96)',
+                          borderRadius: 999,
+                          borderWidth: 1.5,
+                          minWidth: unreadBadgeLabel.length > 2 ? 24 : 18,
+                          height: 18,
+                          paddingHorizontal: unreadBadgeLabel.length > 1 ? 4 : 0,
+                          position: 'absolute',
+                          right: -8,
+                          top: -7,
+                        }}
+                      >
+                        <Text
+                          className="text-[9px] font-bold"
+                          numberOfLines={1}
+                          style={{
+                            color: '#FFFFFF',
+                            fontVariant: ['tabular-nums'],
+                            letterSpacing: 0,
+                          }}
+                        >
+                          {unreadBadgeLabel}
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
                 )}
                 <Text

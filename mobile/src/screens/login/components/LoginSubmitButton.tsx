@@ -24,7 +24,7 @@ export default function LoginSubmitButton({
       disabled={!isFormValid || isLoading}
       accessibilityRole="button"
       accessibilityState={{ disabled: !isFormValid || isLoading, busy: isLoading }}
-      className="h-14 items-center justify-center rounded-xl"
+      className="h-12 items-center justify-center rounded-xl"
       style={{
         backgroundColor: loginSuccess
           ? Colors.statusDone
@@ -41,7 +41,7 @@ export default function LoginSubmitButton({
         <View className="flex-row items-center gap-2">
           <MaterialIcon name="check_circle" color={Colors.bg} size={20} />
           <Text className="font-bold text-[16px]" style={{ color: Colors.bg }}>
-            Signed in
+            Signed In
           </Text>
         </View>
       ) : (
@@ -50,7 +50,7 @@ export default function LoginSubmitButton({
             className="font-bold text-[16px]"
             style={{ color: isFormValid ? Colors.bg : Colors.textFaint }}
           >
-            Sign in
+            Sign In
           </Text>
           {isFormValid ? <MaterialIcon name="arrow_forward" color={Colors.bg} size={17} /> : null}
         </View>

@@ -1,21 +1,21 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
 import { ActivityItem } from '@/src/types/home';
 
 interface ActivityRowProps {
   item: ActivityItem;
+  onPress?: () => void;
 }
 
 /**
  * ActivityRow — Một dòng trong feed "Today" ở Home.
  * Hiển thị icon màu status, đường dọc nối (nếu không phải cuối), tiêu đề, mô tả và thời gian.
  */
-export default function ActivityRow({ item }: ActivityRowProps) {
-  return (
-    <View className="flex-row gap-4">
-      {/* Icon + đường dọc nối */}
+export default function ActivityRow({ item, onPress }: ActivityRowProps) {
+  const content = (
+    <>
       <View className="items-center">
         <View
           className="w-8 h-8 rounded-full items-center justify-center"
@@ -31,7 +31,6 @@ export default function ActivityRow({ item }: ActivityRowProps) {
         )}
       </View>
 
-      {/* Nội dung text */}
       <View className="pb-2 flex-1">
         <Text className="text-[15px]" style={{ color: Colors.text }}>
           {item.title}
@@ -43,6 +42,25 @@ export default function ActivityRow({ item }: ActivityRowProps) {
           {item.time}
         </Text>
       </View>
+    </>
+  );
+
+  if (onPress) {
+    return (
+      <TouchableOpacity
+        activeOpacity={0.76}
+        accessibilityRole="button"
+        className="flex-row gap-4"
+        onPress={onPress}
+      >
+        {content}
+      </TouchableOpacity>
+    );
+  }
+
+  return (
+    <View className="flex-row gap-4">
+      {content}
     </View>
   );
 }

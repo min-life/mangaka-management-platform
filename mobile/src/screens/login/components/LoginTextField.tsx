@@ -6,7 +6,8 @@ import { Colors } from '@/src/constants/colors';
 
 interface LoginTextFieldProps extends TextInputProps {
   label: string;
-  iconName: string;
+  iconName?: string;
+  showLeadingIcon?: boolean;
   onToggleSecureText?: () => void;
   showSecureTextToggle?: boolean;
   secureTextVisible?: boolean;
@@ -15,28 +16,33 @@ interface LoginTextFieldProps extends TextInputProps {
 export default function LoginTextField({
   label,
   iconName,
+  showLeadingIcon = true,
   onToggleSecureText,
   showSecureTextToggle,
   secureTextVisible,
   ...inputProps
 }: LoginTextFieldProps) {
+  const shouldShowLeadingIcon = showLeadingIcon && Boolean(iconName);
+  const inputPaddingClass = `${shouldShowLeadingIcon ? 'pl-12' : 'pl-4'} ${
+    showSecureTextToggle ? 'pr-12' : 'pr-4'
+  }`;
+
   return (
     <View className={showSecureTextToggle ? 'mb-5' : 'mb-4'}>
-      <Text
-        className="mb-2 text-[12px] font-semibold uppercase"
-        style={{ color: Colors.textMuted }}
-      >
+      <Text className="mb-2 ml-1 text-[12px] font-semibold" style={{ color: Colors.textMuted }}>
         {label}
       </Text>
       <View className="relative">
-        <View className="absolute left-4 z-10 h-12 items-center justify-center">
-          <MaterialIcon name={iconName} color={Colors.textMuted} size={20} />
-        </View>
+        {shouldShowLeadingIcon ? (
+          <View className="absolute left-4 z-10 h-12 items-center justify-center">
+            <MaterialIcon name={iconName ?? ''} color={Colors.textMuted} size={20} />
+          </View>
+        ) : null}
         <TextInput
           {...inputProps}
           placeholderTextColor={Colors.textFaint}
           accessibilityLabel={label}
-          className={`h-12 rounded-xl pl-12 text-[16px] ${showSecureTextToggle ? 'pr-12' : 'pr-4'}`}
+          className={`h-12 rounded-xl text-[16px] ${inputPaddingClass}`}
           style={{
             backgroundColor: 'rgba(34,40,49,0.58)',
             color: Colors.text,

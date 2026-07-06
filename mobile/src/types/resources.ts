@@ -4,6 +4,7 @@ export type ResourceTaskStatus = 'PENDING' | 'INPROGRESS' | 'REVIEW' | 'DONE';
 
 export interface ResourceTaskFrame {
   id: string;
+  materialId?: string;
   name: string;
   description?: string;
   startX: number;
@@ -21,6 +22,10 @@ export interface ResourceTaskComment {
   fileId?: string;
   taskId?: string;
   frameId: string;
+  frameName?: string;
+  materialFileId?: string;
+  materialId?: string;
+  materialName?: string;
   applicationId?: string;
   initials: string;
   author: string;

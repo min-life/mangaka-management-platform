@@ -7,9 +7,13 @@ import { Colors } from '@/src/constants/colors';
 
 interface ProjectDetailTopBarProps {
   onBack: () => void;
+  onMorePress?: () => void;
 }
 
-export default function ProjectDetailTopBar({ onBack }: ProjectDetailTopBarProps) {
+export default function ProjectDetailTopBar({
+  onBack,
+  onMorePress,
+}: ProjectDetailTopBarProps) {
   return (
     <SafeAreaView edges={['top']} style={{ backgroundColor: Colors.bg }}>
       <View className="h-16 flex-row items-center justify-between px-3">
@@ -29,6 +33,8 @@ export default function ProjectDetailTopBar({ onBack }: ProjectDetailTopBarProps
             accessibilityRole="button"
             accessibilityLabel="More project actions"
             className="h-10 w-10 items-center justify-center rounded-full"
+            disabled={!onMorePress}
+            onPress={onMorePress}
           >
             <MaterialIcon name="more_vert" color={Colors.statusProgress} size={24} />
           </TouchableOpacity>
