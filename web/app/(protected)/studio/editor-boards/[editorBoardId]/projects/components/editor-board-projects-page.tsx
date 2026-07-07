@@ -38,14 +38,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
+import { ProjectMetrics } from '@/components/project/ProjectMetrics';
+
 import {
   getEditorBoardProjects,
   type EditorBoardProject,
 } from '../services/editor-board-projects-service';
-
-function getTargetChapter(project: EditorBoardProject) {
-  return project.projectStats[0]?.metrics.targetChapter ?? 'Chapter --';
-}
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('en', {
@@ -111,6 +109,8 @@ function ProjectDrawer({
     return null;
   }
 
+  const stat = project.projectStats[0];
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
@@ -143,20 +143,21 @@ function ProjectDrawer({
           <h3 className="text-[18px] font-semibold leading-6 text-[#FFD369]">{project.name}</h3>
           <p className="mt-1 text-sm leading-5 text-[#C8C8C8]">{project.description}</p>
 
-          <div className="mt-8 grid grid-cols-2 gap-4">
-            <div className="rounded-[4px] border border-[#50555D] bg-[#0e141c] p-4">
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                Current Target
-              </p>
-              <p className="text-[13px] font-medium text-white">{getTargetChapter(project)}</p>
-            </div>
-            <div className="rounded-[4px] border border-[#50555D] bg-[#0e141c] p-4">
-              <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                Contact
-              </p>
-              <p className="text-[13px] font-medium text-white">{project.contactName}</p>
-            </div>
+          <div className="mt-8 rounded-[4px] border border-[#50555D] bg-[#0e141c] p-4">
+            <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
+              Contact
+            </p>
+            <p className="text-[13px] font-medium text-white">{project.contactName}</p>
           </div>
+
+          {stat ? (
+            <div className="mt-6">
+              <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
+                Production Metrics
+              </p>
+              <ProjectMetrics columns={2} metrics={stat.metrics} updatedAt={stat.updatedAt} />
+            </div>
+          ) : null}
         </div>
 
         <SheetFooter className="grid grid-cols-2 gap-2 border-t border-[#50555D] bg-[#242a33] p-6">
