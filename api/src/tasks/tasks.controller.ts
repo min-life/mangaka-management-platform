@@ -20,6 +20,8 @@ import {
 import { CurrentUser, Permissions } from '../share/decorators';
 import type { JwtPayload } from '../auth/interfaces';
 import { TasksService } from './tasks.service';
+import { QueryFileVersionsReqDto } from '../files/dto/query-file-versions.req.dto';
+import { MaterialsResponseDto } from '../files/dto/file.res.dto';
 import {
   QueryMyTasksReqDto,
   QueryTasksReqDto,
@@ -228,15 +230,22 @@ export class TasksController {
     permissions: ['project:read', 'project:owner'],
     resource: 'TASK',
   })
-  @ApiOperation({ summary: 'Get task materials for select' })
+  @ApiOperation({ summary: 'Get task materials' })
   @ApiParam({ name: 'id', type: Number, description: 'Task id' })
-  @ApiOkResponse({ description: 'Task materials for select retrieved successfully' })
+  @ApiOkResponse({ 
+    description: 'Task materials retrieved successfully',
+    type: MaterialsResponseDto,
+  })
   @Get(':id/materials')
-  async getTaskMaterialsForSelect(@Param('id', ParseIntPipe) id: number) {
-    const data = await this.tasksService.getTaskMaterialsForSelect(id);
-    return {
-      data,
-    };
+  async getTaskMaterials(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: QueryFileVersionsReqDto,
+  ) {
+    const result = await this.tasksService.getTaskMaterials(
+      id,
+      query.page && query.limit ? { page: query.page, limit: query.limit } : undefined,
+    );
+    return result;
   }
 
 }

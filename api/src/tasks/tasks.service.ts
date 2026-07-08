@@ -14,6 +14,7 @@ import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
 import { CacheService } from '../redis/cache.service';
 import { UseCache, InvalidateCache } from '../share/decorators/cache.decorator';
+import { MATERIAL_LIST_SELECT } from '../files/files.service';
 
 const USER_SELECT = {
   select: {
@@ -455,27 +456,30 @@ export class TasksService {
   }
 
   @UseCache((args) => `task:${args[0]}:materials-select`)
-  async getTaskMaterialsForSelect(taskId: number) {
+  async getTaskMaterials(taskId: number, pagination?: Pagination) {
     try {
       await this.ensureTask(taskId);
 
-      const materials = await this.prisma.fileMaterial.findMany({
-        where: { taskId },
-        orderBy: { createdAt: 'desc' },
-      });
+      const where: Prisma.FileMaterialWhereInput = { taskId };
+      const { page, limit, skip } = this.buildPagination(pagination);
 
-      return materials.map((m) => {
-        let displayName = m.name;
-        if (!displayName && Array.isArray(m.materials) && m.materials.length > 0) {
-          displayName = (m.materials[0] as any).originalName;
-        }
-        return {
-          id: m.id,
-          name: displayName || `Material #${m.id}`,
-        };
-      });
+      const [total, materials] = await this.prisma.$transaction([
+        this.prisma.fileMaterial.count({ where }),
+        this.prisma.fileMaterial.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit,
+          select: MATERIAL_LIST_SELECT,
+        }),
+      ]);
+
+      return {
+        data: materials,
+        pagination: this.buildPaginationMeta(total, page, limit),
+      };
     } catch (error) {
-      this.handleError(error, 'Get task materials for select fail', ERROR.SVGETTASK);
+      this.handleError(error, 'Get task materials fail', ERROR.SVGETTASK);
     }
   }
 
