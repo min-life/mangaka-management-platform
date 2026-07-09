@@ -23,14 +23,19 @@ import {
   createFileTask,
   getFileMaterialVersions,
 } from '@/services/file.service';
+import { updateTask, createTaskComment } from '@/services/task.service';
 import { LoadingState } from '@/components/ui/loading-state';
 import { RefreshingIndicator } from '@/components/ui/refreshing-indicator';
 import { useAsyncResource } from '@/hooks/useAsyncResource';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/use-permissions';
+
+import { useRealtimeProjectActivity } from '@/hooks/use-realtime-activity';
 
 import { CreateTaskDialog } from './CreateTaskDialog';
 import { TaskKanban } from './TaskKanban';
 import { TaskTable } from './TaskTable';
+import { Pagination } from '../../../components/Pagination';
 import {
   type TaskWorkspaceItem,
   type TaskStatus,
@@ -53,9 +58,19 @@ const scopeLabels: Record<TaskScope, string> = {
 export function TasksClient({ projectId }: TasksClientProps) {
   const router = useRouter();
   const { user } = useAuth();
+  const { can: canProject } = usePermissions({ resource: 'PROJECT', resourceId: projectId });
   const [query, setQuery] = useState('');
   const [scope, setScope] = useState<TaskScope>('ALL');
   const [view, setView] = useState<TaskView>('TABLE');
+  const [localTasks, setLocalTasks] = useState<TaskWorkspaceItem[]>([]);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, scope, view]);
+
+  const { activities } = useRealtimeProjectActivity(projectId);
 
   const { data, error, isInitialLoading, isRefreshing, reload } = useAsyncResource(async () => {
     const foldersRes = await getProjectFolders(projectId);
@@ -178,6 +193,28 @@ export function TasksClient({ projectId }: TasksClientProps) {
   const projectFiles = data?.projectFiles ?? [];
   const tasks = data?.tasks ?? [];
 
+  // Sync localTasks when API data refreshes
+  useEffect(() => {
+    setLocalTasks(tasks);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
+  useEffect(() => {
+    if (activities.length > 0) {
+      const latestActivity = activities[0];
+      if (
+        latestActivity?.action?.startsWith('TASK_') ||
+        latestActivity?.action?.startsWith('FILE_') ||
+        latestActivity?.action?.startsWith('MATERIAL_')
+      ) {
+        void reload();
+      }
+    }
+  }, [activities.length, reload]);
+
+  // Determine reviewer permission for dragging cards (backend checks specific ownership details)
+  const canReview = canProject('project:task.update') || canProject('admin');
+
   const visibleTasks = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
@@ -196,6 +233,13 @@ export function TasksClient({ projectId }: TasksClientProps) {
       return matchesQuery && matchesScope;
     });
   }, [query, scope, tasks]);
+
+  const paginatedTasks = useMemo(() => {
+    const startIndex = (page - 1) * limit;
+    return visibleTasks.slice(startIndex, startIndex + limit);
+  }, [visibleTasks, page, limit]);
+
+  const totalPages = Math.ceil(visibleTasks.length / limit);
 
   const handleCreate = async (input: {
     title: string;
@@ -236,6 +280,25 @@ export function TasksClient({ projectId }: TasksClientProps) {
     );
   };
 
+  const handleStatusChange = async (taskId: string, newStatus: TaskStatus, comment?: string) => {
+    // 1. Optimistic update immediately
+    const prevTasks = localTasks;
+    setLocalTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)),
+    );
+    try {
+      await updateTask(taskId, { status: newStatus });
+      // 2. Post revision comment if provided (request revision flow)
+      if (comment?.trim()) {
+        await createTaskComment(taskId, `[Revision requested] ${comment.trim()}`);
+      }
+    } catch {
+      // 3. Rollback on failure
+      setLocalTasks(prevTasks);
+      toast.error('Failed to update task status. Please try again.');
+    }
+  };
+
   const stats = [
     { icon: ListChecks, label: 'Total Tasks', value: tasks.length, tone: 'text-white' },
     {
@@ -265,7 +328,7 @@ export function TasksClient({ projectId }: TasksClientProps) {
   }
 
   return (
-    <section className="min-h-full bg-[#101820] px-5 py-6">
+    <section className="min-h-full w-full max-w-full bg-[#101820] px-5 py-6 overflow-hidden">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
@@ -297,7 +360,7 @@ export function TasksClient({ projectId }: TasksClientProps) {
         ))}
       </div>
 
-      <div className={`mt-5 border border-[#303842] bg-[#0d151e] transition-opacity duration-200 ${isRefreshing ? 'opacity-50 pointer-events-none' : ''}`}>
+      <div className={`mt-5 w-full max-w-full overflow-x-auto border border-[#303842] bg-[#0d151e] transition-opacity duration-200 ${isRefreshing ? 'opacity-50 pointer-events-none' : ''}`}>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#303842] px-4 py-3">
           <div className="flex min-w-[240px] flex-1 items-center gap-2 border border-[#39424f] bg-[#151c25] px-3">
             <Search className="size-4 text-[#8b94a1]" />
@@ -347,14 +410,48 @@ export function TasksClient({ projectId }: TasksClientProps) {
 
         <div className="overflow-x-auto p-4">
           {view === 'TABLE' ? (
-            <TaskTable onOpenTask={openTask} tasks={visibleTasks} />
+            <TaskTable onOpenTask={openTask} tasks={paginatedTasks} />
           ) : (
-            <TaskKanban onOpenTask={openTask} tasks={visibleTasks} />
+            <TaskKanban
+              canReview={canReview}
+              onOpenTask={openTask}
+              onStatusChange={handleStatusChange}
+              tasks={localTasks.filter((task) => {
+                const normalizedQuery = query.trim().toLowerCase();
+                const matchesQuery =
+                  !normalizedQuery ||
+                  [task.title, task.fileTitle, task.assignee, task.description].some((v) =>
+                    v.toLowerCase().includes(normalizedQuery),
+                  );
+                const matchesScope =
+                  scope === 'ALL' ||
+                  (scope === 'MINE' && task.isMine) ||
+                  (scope === 'REVIEW' && task.status === 'REVIEW') ||
+                  (scope === 'OVERDUE' &&
+                    task.dueDate !== 'No due date' &&
+                    new Date(task.dueDate) < new Date());
+                return matchesQuery && matchesScope;
+              })}
+            />
           )}
         </div>
-        <footer className="border-t border-[#303842] px-4 py-3 text-[10px] font-bold text-[#8b94a1]">
-          Showing {visibleTasks.length} tasks.
-        </footer>
+        {view === 'TABLE' ? (
+          <Pagination
+            page={page}
+            limit={limit}
+            total={visibleTasks.length}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            onLimitChange={(newLimit: number) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
+          />
+        ) : (
+          <footer className="border-t border-[#303842] px-4 py-3 text-[10px] font-bold text-[#8b94a1]">
+            Showing {visibleTasks.length} tasks.
+          </footer>
+        )}
       </div>
     </section>
   );

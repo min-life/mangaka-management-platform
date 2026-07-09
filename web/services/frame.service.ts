@@ -8,7 +8,7 @@ export type FrameResponse = {
   id: number;
   startX: number | string;
   startY: number | string;
-  taskId: number;
+  taskId?: number | null;
   updatedAt: string;
   updatedBy: number | null;
 };

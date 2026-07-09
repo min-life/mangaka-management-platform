@@ -29,6 +29,12 @@ export function ProjectMembersClient({ projectId }: ProjectMembersClientProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery]);
   const [totalMembers, setTotalMembers] = useState(0);
   const [projectRoles, setProjectRoles] = useState<RoleResponse[]>([]);
   const [selectedMember, setSelectedMember] = useState<ProjectMemberResponse | null>(null);
@@ -108,6 +114,13 @@ export function ProjectMembersClient({ projectId }: ProjectMembersClientProps) {
       ),
     );
   }, [members, searchQuery, project]);
+
+  const paginatedMembers = useMemo(() => {
+    const startIndex = (page - 1) * limit;
+    return filteredMembers.slice(startIndex, startIndex + limit);
+  }, [filteredMembers, page, limit]);
+
+  const totalPages = Math.ceil(filteredMembers.length / limit);
 
   const subtitle = 'Manage project access and roles for this production workspace.';
 
@@ -193,12 +206,21 @@ export function ProjectMembersClient({ projectId }: ProjectMembersClientProps) {
       </div>
 
       <DirectoryMembersTable
-        filteredMembers={filteredMembers}
+        filteredMembers={paginatedMembers}
         isLoading={isLoading}
         onChangeRole={handleOpenRoleDialog}
         onRemoveMember={handleOpenRemoveDialog}
         onViewMember={setSelectedMember}
-        totalMembers={totalMembers}
+        totalMembers={filteredMembers.length}
+        page={page}
+        limit={limit}
+        totalPages={totalPages}
+        onPageChange={setPage}
+        onLimitChange={(newLimit) => {
+          setLimit(newLimit);
+          setPage(1);
+        }}
+        visibleCount={paginatedMembers.length}
       />
 
       <MemberDetailDrawer

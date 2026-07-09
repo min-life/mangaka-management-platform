@@ -23,7 +23,7 @@ import {
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { getTaskById, getTaskFrames, updateTask, deleteTask } from '@/services/task.service';
+import { getTaskById, getTaskFrames, updateTask, deleteTask, getTaskMaterials } from '@/services/task.service';
 import { createMaterial, getFileMaterialVersions } from '@/services/file.service';
 import { getProjectMembers } from '@/services/project.service';
 import { LoadingState } from '@/components/ui/loading-state';
@@ -133,7 +133,7 @@ export function TaskDetailClient({ projectId, taskId }: TaskDetailClientProps) {
     let previewUrl = '';
     try {
       const versionsRes = await getFileMaterialVersions(result.fileId);
-      const rawArray = (versionsRes.versions || []) as any[];
+      const rawArray = (versionsRes.data || versionsRes.versions || []) as any[];
       const latestVersion = rawArray.find((v: any) => v.isCurrent) || rawArray[0];
       if (latestVersion && latestVersion.materials?.length > 0) {
         const thumbnailMaterial =
@@ -225,7 +225,7 @@ export function TaskDetailClient({ projectId, taskId }: TaskDetailClientProps) {
     setEditDescription(task.description);
     setEditAssigneeId(task.assigneeId ? String(task.assigneeId) : '');
     setEditStatus(task.status);
-    
+
     if (task.dueDate && task.dueDate !== 'No due date') {
       const parsedDate = new Date(task.dueDate);
       if (!isNaN(parsedDate.getTime())) {
@@ -239,7 +239,7 @@ export function TaskDetailClient({ projectId, taskId }: TaskDetailClientProps) {
     } else {
       setEditDueDate('');
     }
-    
+
     setIsEditDialogOpen(true);
   };
 
@@ -304,10 +304,8 @@ export function TaskDetailClient({ projectId, taskId }: TaskDetailClientProps) {
       formData.append('taskId', String(task.id));
       await createMaterial(task.fileId, formData);
 
-      const versionsRes = await getFileMaterialVersions(task.fileId);
-      const rawArray = (versionsRes.versions || []) as any[];
-      const currentVersion = rawArray.find((version: any) => version.isCurrent) || rawArray[0];
-      const targetVersionTag = `v${currentVersion?.version ?? rawArray.length}`;
+      const taskMaterials = await getTaskMaterials(task.id);
+      const targetVersionTag = `v${(taskMaterials || []).length || 1}`;
 
       await updateTask(task.id, {
         status: 'REVIEW',

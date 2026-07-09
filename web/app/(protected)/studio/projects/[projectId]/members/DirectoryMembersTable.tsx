@@ -19,6 +19,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { ProjectMemberResponse } from '@/services/project.service';
+import { Pagination } from '../../../components/Pagination';
 
 import { formatOptionalDate, getInitials, getRoleClassName } from './member-ui';
 
@@ -29,6 +30,12 @@ type DirectoryMembersTableProps = {
   onRemoveMember: (member: ProjectMemberResponse) => void;
   onViewMember: (member: ProjectMemberResponse) => void;
   totalMembers: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  onLimitChange: (limit: number) => void;
+  visibleCount: number;
 };
 
 export function DirectoryMembersTable({
@@ -38,6 +45,12 @@ export function DirectoryMembersTable({
   onRemoveMember,
   onViewMember,
   totalMembers,
+  page,
+  limit,
+  totalPages,
+  onPageChange,
+  onLimitChange,
+  visibleCount,
 }: DirectoryMembersTableProps) {
   const skeletonRows = Array.from({ length: 5 });
 
@@ -46,19 +59,19 @@ export function DirectoryMembersTable({
       <Table>
         <TableHeader>
           <TableRow className="h-[40px] border-[#39424f] bg-[#222a34] hover:bg-[#222a34]">
-            <TableHead className="w-[32%] px-5 text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
+            <TableHead className="w-[30%] px-5 text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
               Member
             </TableHead>
             <TableHead className="w-[20%] text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
               Project Role
             </TableHead>
-            <TableHead className="w-[12%] text-right text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
+            <TableHead className="w-[10%] pl-6 text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3] text-left">
               Tasks
             </TableHead>
-            <TableHead className="w-[16%] text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
+            <TableHead className="w-[18%] text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
               Joined
             </TableHead>
-            <TableHead className="w-[16%] text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
+            <TableHead className="w-[18%] text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
               Last Updated
             </TableHead>
             <TableHead className="w-[72px] pr-5 text-right text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
@@ -85,8 +98,8 @@ export function DirectoryMembersTable({
                 <TableCell>
                   <div className="h-6 w-28 animate-pulse rounded-[3px] bg-[#1f2937]" />
                 </TableCell>
-                <TableCell>
-                  <div className="ml-auto h-4 w-12 animate-pulse rounded-[4px] bg-[#1f2937]" />
+                <TableCell className="pl-6">
+                  <div className="h-4 w-10 animate-pulse rounded-[4px] bg-[#1f2937]" />
                 </TableCell>
                 <TableCell>
                   <div className="h-4 w-24 animate-pulse rounded-[4px] bg-[#1f2937]" />
@@ -138,7 +151,7 @@ export function DirectoryMembersTable({
                     {member.role.name}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right text-xs font-black text-[#FFD369]">
+                <TableCell className="pl-6 text-left text-xs font-black text-[#FFD369]">
                   {member.numberOfTasks ?? 0}
                 </TableCell>
                 <TableCell className="text-xs font-bold text-[#dce7f3]">
@@ -202,15 +215,14 @@ export function DirectoryMembersTable({
         </TableBody>
       </Table>
 
-      <footer className="flex h-[54px] items-center justify-between border-t border-[#39424f] bg-[#151c25] px-5">
-        <div className="flex items-center gap-5 text-[11px] font-black uppercase tracking-[0.06em] text-[#8b94a1]">
-          <span>Total Members: {totalMembers}</span>
-          <span>Visible: {filteredMembers.length}</span>
-        </div>
-        <p className="text-[11px] font-black uppercase tracking-[0.06em] text-[#8b94a1]">
-          Live member data
-        </p>
-      </footer>
+      <Pagination
+        page={page}
+        limit={limit}
+        total={totalMembers}
+        totalPages={totalPages}
+        onPageChange={onPageChange}
+        onLimitChange={onLimitChange}
+      />
     </section>
   );
 }

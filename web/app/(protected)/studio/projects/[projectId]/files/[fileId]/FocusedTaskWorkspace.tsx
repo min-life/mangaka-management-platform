@@ -36,6 +36,7 @@ type FocusedTaskWorkspaceProps = {
     source?: File;
     note: string;
   }) => void;
+  onMarkReadyForReview?: () => Promise<void>;
   onTaskChange: (task: TaskWorkspaceItem) => void;
   selectedSubmissionId: string | null;
   task: TaskWorkspaceItem;
@@ -50,6 +51,7 @@ export function FocusedTaskWorkspace({
   onClose,
   onStartFrameComment,
   onSubmitWork,
+  onMarkReadyForReview,
   onTaskChange,
   selectedSubmissionId,
   task,
@@ -413,8 +415,17 @@ export function FocusedTaskWorkspace({
               </div>
             </div>
           ) : (
-            <div className="mt-3">
+            <div className="mt-3 space-y-2">
               <SubmitWorkDialog onSubmit={onSubmitWork ?? (() => undefined)} />
+              {onMarkReadyForReview && (
+                <button
+                  className="w-full rounded-[3px] border border-[#FFD369]/30 bg-[#30270d] py-2 text-[10px] font-black text-[#FFD369] transition hover:border-[#FFD369]/60 hover:bg-[#3a3011]"
+                  onClick={onMarkReadyForReview}
+                  type="button"
+                >
+                  ✓ Mark as Ready for Review
+                </button>
+              )}
             </div>
           )
         ) : null}
@@ -470,11 +481,7 @@ export function FocusedTaskWorkspace({
       <div className="mt-3 border border-[#303842] bg-[#151c25] p-3">
         <p className="text-xs font-black text-white">{task.title}</p>
         <p className="mt-2 text-[10px] leading-4 text-[#dce7f3]">{task.description}</p>
-        {targetVersion ? (
-          <p className="mt-2 text-[9px] font-black uppercase tracking-[0.08em] text-[#FFD369]">
-            Target {targetVersion}
-          </p>
-        ) : null}
+
         <p className="mt-2 flex items-center gap-1 text-[9px] font-bold text-[#8b94a1]">
           <UserRound className="size-3" /> {task.assignee} · Due {task.dueDate}
         </p>
@@ -492,7 +499,18 @@ export function FocusedTaskWorkspace({
             </div>
           </div>
         ) : (
-          <div className="mt-3"><SubmitWorkDialog onSubmit={onSubmitWork ?? (() => undefined)} /></div>
+          <div className="mt-3 space-y-2">
+            <SubmitWorkDialog onSubmit={onSubmitWork ?? (() => undefined)} />
+            {onMarkReadyForReview && (
+              <button
+                className="w-full rounded-[3px] border border-[#FFD369]/30 bg-[#30270d] py-2 text-[10px] font-black text-[#FFD369] transition hover:border-[#FFD369]/60 hover:bg-[#3a3011]"
+                onClick={onMarkReadyForReview}
+                type="button"
+              >
+                ✓ Mark as Ready for Review
+              </button>
+            )}
+          </div>
         )
       ) : null}
 

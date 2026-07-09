@@ -35,6 +35,7 @@ type FileTaskSidebarProps = {
   onSelectTask: (taskId: string | null) => void;
   onStartFrameComment: () => void;
   onSubmitTaskWork: (input: SubmitTaskWorkInput) => void;
+  onMarkReadyForReview?: () => Promise<void>;
   onTaskChange: (task: TaskWorkspaceItem) => void;
   selectedSubmissionId: string | null;
   selectedTaskId: string | null;
@@ -94,6 +95,7 @@ function TaskDetailPanel({
   onCloseFocusedTask,
   onStartFrameComment,
   onSubmitTaskWork,
+  onMarkReadyForReview,
   onTaskChange,
   selectedSubmissionId,
   versions,
@@ -107,6 +109,7 @@ function TaskDetailPanel({
   | 'onCloseFocusedTask'
   | 'onStartFrameComment'
   | 'onSubmitTaskWork'
+  | 'onMarkReadyForReview'
   | 'onTaskChange'
   | 'selectedSubmissionId'
   | 'versions'
@@ -124,6 +127,7 @@ function TaskDetailPanel({
       onClose={onCloseFocusedTask}
       onStartFrameComment={onStartFrameComment}
       onSubmitWork={onSubmitTaskWork}
+      onMarkReadyForReview={onMarkReadyForReview}
       onTaskChange={onTaskChange}
       selectedSubmissionId={selectedSubmissionId}
       task={focusedTask}
@@ -148,6 +152,7 @@ export function DesktopTaskSidebar({
   onSelectTask,
   onStartFrameComment,
   onSubmitTaskWork,
+  onMarkReadyForReview,
   onTaskChange,
   selectedSubmissionId,
   selectedTaskId,
@@ -203,6 +208,7 @@ export function DesktopTaskSidebar({
             onCloseFocusedTask={onCloseFocusedTask}
             onStartFrameComment={onStartFrameComment}
             onSubmitTaskWork={onSubmitTaskWork}
+            onMarkReadyForReview={onMarkReadyForReview}
             onTaskChange={onTaskChange}
             selectedSubmissionId={selectedSubmissionId}
             versions={versions}
@@ -233,6 +239,7 @@ export function MobileTaskDrawer({
   onSelectTask,
   onStartFrameComment,
   onSubmitTaskWork,
+  onMarkReadyForReview,
   onTaskChange,
   open,
   selectedSubmissionId,
@@ -274,6 +281,7 @@ export function MobileTaskDrawer({
               onCloseFocusedTask={onCloseFocusedTask}
               onStartFrameComment={onStartFrameComment}
               onSubmitTaskWork={onSubmitTaskWork}
+              onMarkReadyForReview={onMarkReadyForReview}
               onTaskChange={onTaskChange}
               selectedSubmissionId={selectedSubmissionId}
               versions={versions}

@@ -2,7 +2,7 @@
 
 import { toast } from '@/lib/toast';
 import { createFileTask, getFileMaterialVersions, createMaterial } from '@/services/file.service';
-import { createTaskFrame, updateTask } from '@/services/task.service';
+import { updateTask, getTaskMaterials, createTaskFrame } from '@/services/task.service';
 import { updateMaterial } from '@/services/material.service';
 import { buildStableMaterialVersions, type FileMaterialVersionRecord } from '../file-detail-types';
 import type { FileExplorerItem, FileTaskItem, FileVersionItem } from '../../file-ui';
@@ -76,29 +76,38 @@ export function useFileDetailTaskActions({
           ? `v${versions[0].version}`
           : 'v1';
 
+      const description = `${task.description.replace(/\s*\*$/, '')}\n[version:${targetVersionTag}]`;
+
       const createdTaskRes = await createFileTask(fileId, {
         title: task.title.replace(/\s*\*$/, ''),
-        description: `${task.description.replace(/\s*\*$/, '')} [version:${targetVersionTag}]`,
+        description,
         status: statusValue,
         deadline: deadline,
         assignedBy: options?.assignedBy,
         parentId: options?.parentId,
+        cloneBaseMaterial: !!task.region,
       });
 
       const newTaskId = createdTaskRes?.id;
 
       if (task.region && newTaskId) {
-        await createTaskFrame(newTaskId, {
-          startX: task.region.startX,
-          startY: task.region.startY,
-          endX: task.region.endX,
-          endY: task.region.endY,
-        });
+        // Fetch materials cloned for this task
+        const materials = await getTaskMaterials(newTaskId);
+        const clonedMaterial = Array.isArray(materials) ? materials[0] : (materials?.data?.[0] || materials);
+        if (clonedMaterial && clonedMaterial.id) {
+          await createTaskFrame(clonedMaterial.id, {
+            startX: task.region.startX,
+            startY: task.region.startY,
+            endX: task.region.endX,
+            endY: task.region.endY,
+          });
+        }
       }
 
       await loadFile();
       toast.success('Task created successfully.');
     } catch (err) {
+      console.error('Failed to create task:', err);
       toast.error('Failed to create task.');
       setError('Failed to create task on the server.');
     }
@@ -139,6 +148,7 @@ export function useFileDetailTaskActions({
       fileTitle: file?.title ?? `File #${fileId}`,
       id: task.id,
       isMine: user?.id != null && task.assignedToUserId === user.id,
+      assignedByUserId: task.assignedByUserId,
       previewUrl: file?.previewUrl ?? '',
       priority: 'MEDIUM',
       region: task.region,
@@ -232,29 +242,19 @@ export function useFileDetailTaskActions({
       if (input.image) formData.append('image', input.image);
       if (input.text) formData.append('text', input.text);
       if (input.source) formData.append('source', input.source);
-      const currentMaterial = versions.find((version) => version.isCurrent) ?? versions[0];
-      if (currentMaterial) {
-        await updateMaterial(currentMaterial.id, formData);
-      } else {
-        formData.append('taskId', focusedTask.id);
-        formData.append('name', `${file?.title ?? `File ${fileId}`} submission`);
-        await createMaterial(fileId, formData);
-      }
+      formData.append('taskId', focusedTask.id);
+      formData.append('name', input.note.trim() || `${file?.title ?? `File ${fileId}`} submission`);
+      await createMaterial(fileId, formData);
 
-      const versionsRes = await getFileMaterialVersions(fileId);
-      const rawArray = ((versionsRes as { data?: FileMaterialVersionRecord[] }).data ||
-        versionsRes.versions ||
-        []) as FileMaterialVersionRecord[];
-      const currentVersion = buildStableMaterialVersions(rawArray).find((version) => version.isCurrent);
-      const targetVersionTag = `v${currentVersion?.version ?? rawArray.length}`;
+      const taskMaterials = await getTaskMaterials(focusedTask.id);
+      const targetVersionTag = `v${(taskMaterials || []).length || 1}`;
 
       await updateTask(focusedTask.id, {
-        status: 'REVIEW',
         description: `${focusedTask.description}\n[Note: ${input.note.trim()}] [version:${targetVersionTag}]`,
       });
 
-      toast.success('Work submitted for review.', {
-        description: `New version ${targetVersionTag} created.`,
+      toast.success('Files uploaded.', {
+        description: `Version ${targetVersionTag} saved. Mark as ready when you want to submit for review.`,
       });
       await loadFile();
       setSelectedSubmissionId(null);
@@ -270,10 +270,28 @@ export function useFileDetailTaskActions({
     }
   };
 
+  const handleMarkReadyForReview = async () => {
+    if (!focusedTask) return;
+    setIsLoading(true);
+    try {
+      await updateTask(focusedTask.id, { status: 'REVIEW' });
+      await loadFile();
+      toast.success('Task submitted for review.', {
+        description: 'The task is now in the review queue.',
+      });
+    } catch (err) {
+      console.error('Failed to mark task as ready for review:', err);
+      toast.error('Failed to submit for review. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return {
     handleCreateAnnotatedTask,
     focusFileTask,
     handleFocusedTaskChange,
     handleSubmitTaskWork,
+    handleMarkReadyForReview,
   };
 }

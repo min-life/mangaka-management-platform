@@ -243,7 +243,7 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
           </Button>
           <Button
             asChild
-            className="h-9 rounded-[4px] bg-white px-4 text-xs font-black text-[#101820] hover:bg-[#e6e8eb]"
+            className="h-9 rounded-[4px] bg-[#FFD369] px-4 text-xs font-black text-[#101820] hover:bg-[#e6c94f]"
           >
             <Link href={`/studio/editor-boards/${editorBoardId}/projects`}>View Projects</Link>
           </Button>

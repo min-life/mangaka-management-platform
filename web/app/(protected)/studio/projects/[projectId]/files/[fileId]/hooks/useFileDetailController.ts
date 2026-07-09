@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -11,10 +12,10 @@ import { useCanvasViewport } from './useCanvasViewport';
 import { useCanvasAnnotations } from './useCanvasAnnotations';
 
 import { getProjectFolders, getProjectMembers, getProjectById, type ProjectFolderResponse, type ProjectResponse } from '@/services/project.service';
-import { getFileById, getFileComments, getFileMaterialVersions, getFileTasks } from '@/services/file.service';
-import { getTaskFrames, getTaskComments } from '@/services/task.service';
+import { getFileById, getFileComments, getFileMaterials, getFileTasks } from '@/services/file.service';
+import { getTaskFrames, getTaskComments, getTaskMaterials } from '@/services/task.service';
 import { getFrameComments } from '@/services/frame.service';
-import { getMaterialFrames } from '@/services/material.service';
+import { getMaterialById, getMaterialFrames } from '@/services/material.service';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/use-permissions';
 import { useAsyncResource } from '@/hooks/useAsyncResource';
@@ -63,6 +64,8 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
   const [deletingVersionId, setDeletingVersionId] = useState<string | null>(null);
   const [mobileTasksOpen, setMobileTasksOpen] = useState(false);
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
+
+
 
   const viewport = useCanvasViewport();
 
@@ -147,11 +150,65 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
 
     let dbVersions: FileVersionItem[] = [];
     try {
-      const versionsRes = await getFileMaterialVersions(fileId);
-      const versionsArray = ((versionsRes as { data?: FileMaterialVersionRecord[] }).data ||
-        versionsRes.versions ||
-        []) as FileMaterialVersionRecord[];
-      dbVersions = buildStableMaterialVersions(versionsArray);
+      if (!selectedTaskId) {
+        // 1. Khi KHÔNG bấm vào task: Gọi GET /files/:id/materials chỉ lấy các version gốc
+        const materialsRes = await getFileMaterials(fileId);
+        const versionsArray = (materialsRes || []) as FileMaterialVersionRecord[];
+        dbVersions = buildStableMaterialVersions(versionsArray);
+      } else {
+        const taskIdNum = Number(selectedTaskId);
+        if (selectedTaskId && !isNaN(taskIdNum) && taskIdNum > 0) {
+          // 2. Khi BẤM vào task: Gọi GET /tasks/:id/materials để lấy danh sách,
+          // sau đó gọi GET /materials/:id song song để lấy đầy đủ materials + presigned URL
+          const taskMaterials = await getTaskMaterials(selectedTaskId);
+          const rawList: any[] = Array.isArray(taskMaterials)
+            ? taskMaterials
+            : (taskMaterials?.data ?? (taskMaterials ?? []));
+
+          // Fetch full detail (with presigned URLs) for each material in parallel
+          const fullMaterials = await Promise.all(
+            rawList.map(async (m: any) => {
+              try {
+                const res = await getMaterialById(m.id);
+                const full = (res as any)?.data ?? res;
+                return full ?? m;
+              } catch {
+                return m; // fallback to basic data on error
+              }
+            })
+          );
+
+          const isFileName = (name: string) => /\.[a-zA-Z0-9]+$/.test(name);
+          
+          // Sắp xếp tăng dần theo thời gian tạo (cũ nhất lên đầu) để đánh số phiên bản chính xác
+          const sortedMaterials = [...fullMaterials].sort(
+            (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          );
+          const newestId = sortedMaterials.at(-1)?.id;
+
+          dbVersions = sortedMaterials
+            .map((m: any, index: number) => {
+              const thumbnail = m.materials?.find((item: any) => item.isThumbnail) || m.materials?.[0];
+              return {
+                id: String(m.id),
+                note: (m.name && !isFileName(m.name)) ? m.name : `Material v${index + 1}`,
+                author: m.createdByUser?.displayName || m.createdByUser?.email || '',
+                createdAt: m.createdAt ? formatFileDate(m.createdAt) : '',
+                isCurrent: m.id === newestId,
+                version: index + 1,
+                materials: m.materials || [],
+                previewUrl: thumbnail?.url || undefined,
+                taskId: Number(selectedTaskId),
+              } as FileVersionItem;
+            })
+            .reverse(); // Đảo ngược để phiên bản mới nhất nằm ở đầu (index 0)
+        } else {
+          // Fallback if taskId is not a valid number
+          const materialsRes = await getFileMaterials(fileId);
+          const versionsArray = (materialsRes || []) as FileMaterialVersionRecord[];
+          dbVersions = buildStableMaterialVersions(versionsArray);
+        }
+      }
     } catch (err) {
       console.error('Failed to load version history:', err);
     }
@@ -163,13 +220,13 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
         let region: FileTaskRegion | undefined = undefined;
         try {
           const frames = await getTaskFrames(t.id);
-          const frame = frames[0];
-          if (frame) {
+          const taskFrame = frames[frames.length - 1]; // Lấy frame định vị gốc (tạo đầu tiên) của task
+          if (taskFrame) {
             region = {
-              endX: Number(frame.endX),
-              endY: Number(frame.endY),
-              startX: Number(frame.startX),
-              startY: Number(frame.startY),
+              endX: Number(taskFrame.endX),
+              endY: Number(taskFrame.endY),
+              startX: Number(taskFrame.startX),
+              startY: Number(taskFrame.startY),
             };
           }
         } catch (frameErr) {
@@ -250,6 +307,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
         return {
           assignedTo: t.assignedByUser?.displayName || t.assignedByUser?.email || 'Unassigned',
           assignedToUserId: t.assignedByUser?.id,
+          assignedByUserId: t.assignedBy,
           description: cleanDesc,
           id: String(t.id),
           region,
@@ -380,7 +438,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
       taskComments: dbTaskComments,
       file: mappedFile,
     };
-  }, [fileId, projectId]);
+  }, [fileId, projectId, selectedTaskId]);
 
   useEffect(() => {
     void reload().catch(() => { });
@@ -390,12 +448,22 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
   const project = data?.project ?? null;
   const folders = data?.folders ?? [];
   const tasks = data?.tasks ?? [];
-  const versions = data?.versions ?? [];
+  const versions = useMemo(() => {
+    const rawVersions = data?.versions ?? [];
+    return rawVersions.filter((v: any) => {
+      if (!focusedTask) {
+        return v.taskId === null || v.taskId === undefined;
+      }
+      return v.taskId === Number(focusedTask.id);
+    });
+  }, [data?.versions, focusedTask]);
   const frameComments = data?.frameComments ?? [];
   const fileComments = data?.fileComments ?? [];
   const taskComments = data?.taskComments ?? [];
   const members = data?.members ?? [];
-  const isLoading = isInitialLoading;
+  const isLoading = isInitialLoading || isRefreshing;
+
+
 
   const loadFile = useCallback(async () => {
     await reload();
@@ -441,6 +509,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
         region: dbTask.region,
         submissions: dbTask.submissions || [],
         isMine: user?.id != null && dbTask.assignedToUserId === user.id,
+        assignedByUserId: dbTask.assignedByUserId,
         updatedAt: dbTask.updatedAt ?? new Date().toISOString(),
       };
 
@@ -476,9 +545,13 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     (user?.id != null && project?.createdByUser?.id === user.id) ||
     canProject('project:owner');
 
-  const canReviewTask = canProject('project:task.update') || canProject('admin') || isProjectOwner;
-  const canSubmitTask = canProject('project:material.create') || canProject('admin') || true; // members can always submit
-  const canCreateTask = canProject('project:task.create') || canProject('admin') || true; // project members can create tasks
+  // Reviewer = is owner/admin or the user who assigned the task, but not the worker themselves (unless self-assigned)
+  const isTaskAssigner = user?.id != null && focusedTask?.assignedByUserId === user.id;
+  const isTaskAssignee = focusedTask?.isMine === true;
+
+  const canReviewTask = (isTaskAssigner && !isTaskAssignee) || canProject('admin') || isProjectOwner;
+  const canSubmitTask = canProject('project:material.create') || canProject('admin') || isProjectOwner;
+  const canCreateTask = canProject('project:task.create') || canProject('admin') || isProjectOwner;
   const canRestoreVersion = canProject('project:material.restore') || canProject('project:material.update') || canProject('admin') || isProjectOwner;
   const canDeleteVersion = canProject('project:material.delete') || canProject('admin') || isProjectOwner;
 
@@ -530,6 +603,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     focusFileTask,
     handleFocusedTaskChange,
     handleSubmitTaskWork,
+    handleMarkReadyForReview,
   } = useFileDetailTaskActions({
     fileId,
     projectId,
@@ -591,8 +665,9 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
   const folder = file ? folders.find((candidate) => candidate.id === file.folderId) : undefined;
   const selectedSubmission =
     focusedTask?.submissions.find((submission) => submission.id === selectedSubmissionId) ?? null;
+  const currentVersion = versions.find((v) => v.isCurrent) ?? versions[0] ?? null;
   const displayedPreviewUrl =
-    selectedSubmission?.previewUrl ?? selectedVersion?.previewUrl ?? file?.previewUrl ?? '';
+    selectedSubmission?.previewUrl ?? selectedVersion?.previewUrl ?? currentVersion?.previewUrl ?? file?.previewUrl ?? '';
   const isViewingHistoricalVersion = Boolean(selectedVersion && !selectedVersion.isCurrent);
   const currentVersionName = selectedVersion
     ? `v${selectedVersion.version}`
@@ -664,6 +739,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     handleFocusedTaskChange,
     handleRestoreVersion,
     handleSubmitTaskWork,
+    handleMarkReadyForReview: canSubmitTask ? handleMarkReadyForReview : undefined,
     handleUpdateDiscussionComment,
     isLoading,
     isPanning,

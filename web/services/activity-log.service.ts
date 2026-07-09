@@ -36,6 +36,7 @@ export type ActivityLogResponse = {
   id: number;
   metadata?: unknown;
   projectId?: number | null;
+  fileId?: number | null;
 };
 
 type ActivityLogsResponse = {

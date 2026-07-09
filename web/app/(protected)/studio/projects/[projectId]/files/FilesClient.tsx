@@ -84,7 +84,7 @@ export function FilesClient({ projectId }: FilesClientProps) {
     try {
       const proj = await getProjectById(projectId);
       projName = proj.name;
-    } catch {}
+    } catch { }
 
     const result = await getProjectFolders(projectId, { type: 'ARC' });
     const rootFolders = result.folders.map((folder) => ({

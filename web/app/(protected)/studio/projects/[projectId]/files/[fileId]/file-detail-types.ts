@@ -31,6 +31,7 @@ export type FileMaterialVersionRecord = {
     url?: string;
   }>;
   name?: string | null;
+  taskId?: number | null;
 };
 
 export function buildStableMaterialVersions(rawVersions: FileMaterialVersionRecord[]) {
@@ -53,6 +54,7 @@ export function buildStableMaterialVersions(rawVersions: FileMaterialVersionReco
           'Unknown',
         createdAt: formatFileDate(versionRecord.createdAt),
         id: String(versionRecord.id),
+        taskId: versionRecord.taskId != null ? Number(versionRecord.taskId) : null,
         isCurrent: versionRecord.id === newestId,
         materials: versionRecord.materials,
         note: versionRecord.name || `Version ${versionNumber}`,

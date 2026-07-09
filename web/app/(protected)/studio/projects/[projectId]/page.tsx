@@ -28,6 +28,7 @@ import {
 } from '@/services/project.service';
 import { getFileTasks } from '@/services/file.service';
 import { getProjectApplications } from '@/services/application.service';
+import { useRealtimeProjectActivity } from '@/hooks/use-realtime-activity';
 
 function formatUpdatedAt(dateStr: string) {
   try {
@@ -49,6 +50,8 @@ export default function ProjectDashboardPage() {
   const router = useRouter();
   const params = useParams();
   const projectId = params.projectId ? String(params.projectId) : '';
+
+  const { activities } = useRealtimeProjectActivity(projectId);
 
   const [project, setProject] = useState<ProjectResponse | null>(null);
   const [membersCount, setMembersCount] = useState(0);
@@ -120,7 +123,7 @@ export default function ProjectDashboardPage() {
     return () => {
       isMounted = false;
     };
-  }, [projectId]);
+  }, [projectId, activities.length]);
 
   if (isLoading) {
     return <LoadingState message="Loading project workspace..." minHeight="70vh" />;

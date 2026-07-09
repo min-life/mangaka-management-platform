@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { FileActivityPanel } from './FileActivityPanel';
 import { FileCanvas } from './FileCanvas';
 import { FileCommentsPanel } from './FileCommentsPanel';
@@ -16,6 +17,7 @@ import { CreateFrameCommentDialog } from './CreateFrameCommentDialog';
 import { VersionHistoryDrawer } from './VersionHistoryDrawer';
 import { type FileVersionItem } from '../file-ui';
 import type { FileDetailController } from './hooks/useFileDetailController';
+import { useRealtimeProjectActivity, useRealtimeComments } from '@/hooks/use-realtime-activity';
 
 type FileDetailViewProps = {
   controller: FileDetailController;
@@ -62,6 +64,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
     handleFocusedTaskChange,
     handleRestoreVersion,
     handleSubmitTaskWork,
+    handleMarkReadyForReview,
     handleUpdateDiscussionComment,
     isLoading,
     isPanning,
@@ -112,6 +115,31 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
     versions,
     zoom,
   } = controller;
+
+  const { activities } = useRealtimeProjectActivity(projectId);
+  const { createdComments, updatedComments, deletedCommentIds } = useRealtimeComments(
+    'FILE',
+    file?.id ?? 0
+  );
+
+  // Reload file data when there is any new activity related to this file
+  useEffect(() => {
+    if (!file?.id) return;
+    if (activities.length > 0) {
+      const latestActivity = activities[0];
+      if (latestActivity?.fileId === Number(file.id)) {
+        void loadFile();
+      }
+    }
+  }, [activities.length, file?.id, loadFile]);
+
+  // Reload file comments when there is a new direct file comment event
+  useEffect(() => {
+    if (!file?.id) return;
+    if (createdComments.length > 0 || updatedComments.length > 0 || deletedCommentIds.length > 0) {
+      void loadFile();
+    }
+  }, [createdComments.length, updatedComments.length, deletedCommentIds.length, file?.id, loadFile]);
 
   if (!file) {
     return null;
@@ -277,7 +305,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
                   canDelete={canDeleteVersion}
                 />
               ) : resourceTab === 'activity' ? (
-                <FileActivityPanel fileId={file.id} />
+                <FileActivityPanel fileId={file.id} projectId={projectId} />
               ) : null}
             </div>
           </section>
@@ -314,6 +342,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
             setFrameAnnotationMode(true);
           }}
           onSubmitTaskWork={handleSubmitTaskWork}
+          onMarkReadyForReview={handleMarkReadyForReview}
           onTaskChange={handleFocusedTaskChange}
           selectedSubmissionId={selectedSubmissionId}
           selectedTaskId={selectedTaskId}
@@ -352,6 +381,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
             setMobileTasksOpen(false);
           }}
           onSubmitTaskWork={handleSubmitTaskWork}
+          onMarkReadyForReview={handleMarkReadyForReview}
           onTaskChange={handleFocusedTaskChange}
           open={mobileTasksOpen}
           selectedSubmissionId={selectedSubmissionId}

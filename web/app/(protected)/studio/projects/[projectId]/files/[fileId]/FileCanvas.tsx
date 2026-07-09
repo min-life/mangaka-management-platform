@@ -10,6 +10,7 @@ import {
   Plus,
   RotateCw,
   ScanLine,
+  Loader2,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -62,6 +63,7 @@ export function FileCanvas({ controller }: FileCanvasProps) {
     tasks,
     versions,
     zoom,
+    isLoading,
   } = controller;
 
   return (
@@ -356,7 +358,17 @@ export function FileCanvas({ controller }: FileCanvasProps) {
               }}
             />
           )}
-          {!displayedPreviewUrl ? (
+          {isLoading ? (
+            <div className="absolute inset-0 grid place-items-center px-6 text-center bg-[#111923]/80 z-10">
+              <div>
+                <Loader2 className="mx-auto size-10 text-[#FFD369] animate-spin" />
+                <p className="mt-3 text-sm font-black text-white">Loading preview...</p>
+                <p className="mt-1 text-xs font-bold text-[#8b94a1]">
+                  Please wait while the image preview is being retrieved.
+                </p>
+              </div>
+            </div>
+          ) : !displayedPreviewUrl ? (
             <div className="absolute inset-0 grid place-items-center px-6 text-center">
               <div>
                 <FileQuestion className="mx-auto size-10 text-[#5b626d]" />
@@ -375,7 +387,7 @@ export function FileCanvas({ controller }: FileCanvasProps) {
               ? `v${versions[0].version}`
               : 'v1';
 
-            if (task.region) {
+            if (task.region && selectedTaskId === task.id) {
               if (task.targetVersion && task.targetVersion !== canvasVersion) {
                 return null;
               }
