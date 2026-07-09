@@ -132,6 +132,11 @@ function normalizeProject(project: ApiUserProject): UserProject {
   };
 }
 
+export function getGoogleLinkAccountUrl() {
+  const baseUrl = (api.defaults.baseURL ?? 'http://localhost:3001/api').replace(/\/$/, '');
+  return `${baseUrl}/users/me/link-account`;
+}
+
 export async function getCurrentUserProfile() {
   const response = await api.get<ApiResponse<ApiUserProfile>, ApiResponse<ApiUserProfile>>(
     '/users/me',

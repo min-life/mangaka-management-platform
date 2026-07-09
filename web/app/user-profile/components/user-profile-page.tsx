@@ -10,6 +10,7 @@ import {
   ChevronRight,
   FilePenLine,
   Languages,
+  Link2,
   LogOut,
   Palette,
   Pencil,
@@ -53,6 +54,7 @@ import {
   getCurrentUserContextActivities,
   getCurrentUserProfile,
   getApiErrorMessage,
+  getGoogleLinkAccountUrl,
   mapActivityLogToUserActivity,
   updateCurrentUserPassword,
   updateCurrentUserProfile,
@@ -97,7 +99,9 @@ const copy: Record<
     appearance: (isDark: boolean) => string;
     assignedEditorBoards: string;
     assignedProjects: string;
+    googleAccountLinked: string;
     language: string;
+    linkGoogleAccount: string;
     noActivities: string;
     noBoards: string;
     noProjects: string;
@@ -113,7 +117,9 @@ const copy: Record<
     appearance: (isDark) => `Appearance (State ${isDark ? 'Dark' : 'Light'})`,
     assignedEditorBoards: 'Assigned Editor Boards',
     assignedProjects: 'Assigned Projects',
+    googleAccountLinked: 'Google Account Linked',
     language: 'Language (English/VI)',
+    linkGoogleAccount: 'Link Google Account',
     noActivities: 'No recent activity found.',
     noBoards: 'No assigned editor boards found.',
     noProjects: 'No assigned projects found.',
@@ -128,7 +134,9 @@ const copy: Record<
     appearance: (isDark) => `Giao diện (${isDark ? 'Tối' : 'Sáng'})`,
     assignedEditorBoards: 'Bảng biên tập được giao',
     assignedProjects: 'Dự án được giao',
+    googleAccountLinked: 'Đã liên kết Google',
     language: 'Ngôn ngữ (Tiếng Việt/EN)',
+    linkGoogleAccount: 'Liên kết tài khoản Google',
     noActivities: 'Chưa có hoạt động gần đây.',
     noBoards: 'Chưa có bảng biên tập được giao.',
     noProjects: 'Chưa có dự án được giao.',
@@ -252,17 +260,20 @@ function EmptyState({ message }: { message: string }) {
 }
 
 function SettingsButton({
+  disabled,
   icon: Icon,
   label,
   onClick,
 }: {
+  disabled?: boolean;
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   onClick?: () => void;
 }) {
   return (
     <button
-      className="flex w-full items-center justify-between rounded-lg bg-[var(--profile-surface-highest)]/30 p-3 text-left text-[var(--profile-title)] transition-colors hover:bg-[var(--profile-surface-highest)]"
+      className="flex w-full items-center justify-between rounded-lg bg-[var(--profile-surface-highest)]/30 p-3 text-left text-[var(--profile-title)] transition-colors hover:bg-[var(--profile-surface-highest)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-[var(--profile-surface-highest)]/30"
+      disabled={disabled}
       onClick={onClick}
       type="button"
     >
@@ -270,7 +281,11 @@ function SettingsButton({
         <Icon className="size-5 text-[var(--profile-muted)]" />
         <span className="text-[13px] font-medium leading-4 tracking-[0.02em]">{label}</span>
       </div>
-      <ChevronRight className="size-5 text-[var(--profile-muted)]" />
+      {disabled ? (
+        <Check className="size-5 text-[var(--profile-accent)]" />
+      ) : (
+        <ChevronRight className="size-5 text-[var(--profile-muted)]" />
+      )}
     </button>
   );
 }
@@ -855,6 +870,14 @@ export function UserProfilePage() {
             </h3>
             <Card className="gap-0 rounded-xl border border-[var(--profile-border)] bg-[var(--profile-surface)] p-4 text-[var(--profile-text)] ring-0">
               <div className="space-y-2">
+                <SettingsButton
+                  disabled={currentUser?.googleLinked}
+                  icon={Link2}
+                  label={currentUser?.googleLinked ? text.googleAccountLinked : text.linkGoogleAccount}
+                  onClick={() => {
+                    window.location.href = getGoogleLinkAccountUrl();
+                  }}
+                />
                 <SettingsButton
                   icon={ShieldCheck}
                   label={text.securityPassword}
