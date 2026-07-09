@@ -5,6 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import ApiStateView from '@/src/components/shared/ApiStateView';
 import AppRefreshControl from '@/src/components/shared/AppRefreshControl';
 import { RootStackNavProp } from '@/src/navigation/types';
+import { navigateToNotificationTarget } from '@/src/navigation/notificationTargetNavigation';
 import { Colors } from '@/src/constants/colors';
 import BottomNavBar from '@/src/components/shared/BottomNavBar';
 import { fetchHomeSummary } from '@/src/services/homeApi';
@@ -49,6 +50,13 @@ export default function HomeScreen() {
     void loadHome({ showLoading: false });
   }, [loadHome]);
 
+  const handleActivityPress = useCallback(
+    (activity: ActivityItem) => {
+      navigateToNotificationTarget(navigation, activity.target);
+    },
+    [navigation],
+  );
+
   const headerBg = scrollY.interpolate({
     inputRange: [0, 20],
     outputRange: ['rgba(34,40,49,0.95)', 'rgba(34,40,49,0.99)'],
@@ -86,7 +94,7 @@ export default function HomeScreen() {
               onTasksPress={() => navigation.navigate('Tasks')}
               onProjectsPress={() => navigation.navigate('Projects')}
             />
-            <TodayActivitySection activities={activities} />
+            <TodayActivitySection activities={activities} onActivityPress={handleActivityPress} />
           </>
         )}
       </Animated.ScrollView>

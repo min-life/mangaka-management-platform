@@ -16,8 +16,11 @@ export interface NotificationItem {
   target?: {
     applicationId?: string;
     boardId?: string;
+    commentId?: string;
     fileId?: string;
     folderId?: string;
+    frameId?: string;
+    initialDiscussionScope?: 'file' | 'task' | 'frame';
     initialTab?: 'Overview' | 'Tasks' | 'Discussion' | 'Materials';
     parentFolderId?: string;
     projectId?: string;

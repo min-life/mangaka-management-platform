@@ -21,6 +21,7 @@ import type { ProjectResourceStats } from './resourceApi';
 
 import {
   ApiApplication,
+  ApiActivityLog,
   ApiComment,
   ApiEditorBoard,
   ApiFile,
@@ -101,7 +102,9 @@ export function mapProject(
 
   const creator = displayName(creatorUser(project));
   const completionRate =
-    Number(extras.stats?.progress ?? extras.stats?.completionRate ?? extras.stats?.completedTasks) || 0;
+    Number(
+      extras.stats?.progress ?? extras.stats?.completionRate ?? extras.stats?.completedTasks,
+    ) || 0;
   const tasks = taskSummary(extras.tasks);
   const applicationTotal =
     extras.applicationTotal ?? extras.applications?.length ?? project._count?.applications ?? 0;
@@ -123,7 +126,9 @@ export function mapProject(
       pending:
         extras.applications?.filter((item) =>
           ['INTERNAL_APPROVED', 'PENDING', 'SUBMITTED'].includes(item.status),
-        ).length ?? project._count?.applications ?? 0,
+        ).length ??
+        project._count?.applications ??
+        0,
       rejected: extras.applications?.filter((item) => item.status === 'REJECT').length ?? 0,
     },
     applicationTotal,
@@ -199,12 +204,18 @@ export function mapEditorBoard(board: ApiEditorBoard): EditorBoardItem {
     leadMemberId: creatorId(board),
     memberIds: Array.from({ length: board._count?.members ?? 0 }, (_, index) => `member-${index}`),
     name: board.name,
-    projectIds: Array.from({ length: board._count?.projects ?? 0 }, (_, index) => `project-${index}`),
+    projectIds: Array.from(
+      { length: board._count?.projects ?? 0 },
+      (_, index) => `project-${index}`,
+    ),
     updatedAtLabel: `Updated ${relativeDate(board.updatedAt)}`,
   };
 }
 
-export function mapBoardMember(item: { user?: ApiUserSummary; isLead?: boolean }): EditorBoardMember {
+export function mapBoardMember(item: {
+  user?: ApiUserSummary;
+  isLead?: boolean;
+}): EditorBoardMember {
   const user = item.user;
   const name = displayName(user);
 
@@ -261,7 +272,10 @@ export function mapApplication(application: ApiApplication): ApplicationItem {
   };
 }
 
-export function mapFolder(folder: ApiFolder, children: Array<ResourceFolderNode | ResourceFileNode> = []): ResourceFolderNode {
+export function mapFolder(
+  folder: ApiFolder,
+  children: Array<ResourceFolderNode | ResourceFileNode> = [],
+): ResourceFolderNode {
   return {
     children,
     coverUri: folder.imageUrl ?? undefined,
@@ -271,18 +285,49 @@ export function mapFolder(folder: ApiFolder, children: Array<ResourceFolderNode 
     description: folder.description ?? undefined,
     id: String(folder.id),
     name: folder.title,
-    parentId: folder.parentId === undefined ? (folder.parent ? String(folder.parent.id) : null) : folder.parentId === null ? null : String(folder.parentId),
-    projectId: folder.projectId === undefined ? (folder.project ? String(folder.project.id) : undefined) : String(folder.projectId),
+    parentId:
+      folder.parentId === undefined
+        ? folder.parent
+          ? String(folder.parent.id)
+          : null
+        : folder.parentId === null
+          ? null
+          : String(folder.parentId),
+    projectId:
+      folder.projectId === undefined
+        ? folder.project
+          ? String(folder.project.id)
+          : undefined
+        : String(folder.projectId),
     type: 'folder',
     updatedAt: folder.updatedAt,
   };
 }
 
-export function materialImage(material?: Record<string, unknown>) {
-  const pages = Array.isArray(material?.pages) ? material.pages : [];
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function stringValue(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+export function materialImage(material?: Record<string, unknown> | Array<Record<string, unknown>>) {
+  if (Array.isArray(material)) {
+    const thumbnail =
+      material.find((item) => item.isThumbnail === true && stringValue(item.url)) ??
+      material.find((item) => item.type === 'IMAGE' && stringValue(item.url)) ??
+      material.find((item) => stringValue(item.url));
+
+    return stringValue(thumbnail?.url);
+  }
+
+  if (!isRecord(material)) return undefined;
+
+  const pages = Array.isArray(material.pages) ? material.pages : [];
   const firstPage = pages[0] as { url?: unknown } | undefined;
-  const imageUri = material?.imageUri ?? material?.thumbnailUrl ?? firstPage?.url;
-  return typeof imageUri === 'string' && imageUri.trim() ? imageUri : undefined;
+  const imageUri = material.imageUri ?? material.thumbnailUrl ?? firstPage?.url;
+  return stringValue(imageUri);
 }
 
 export function mapMaterialVersion(material: ApiMaterial): ResourceFileMaterialVersion {
@@ -295,12 +340,20 @@ export function mapMaterialVersion(material: ApiMaterial): ResourceFileMaterialV
     fileId: String(material.fileId ?? material.file?.id ?? ''),
     id: String(material.id),
     materials: {
-      editorState: typeof raw.editorState === 'object' && raw.editorState ? raw.editorState as Record<string, unknown> : undefined,
+      editorState:
+        isRecord(raw) && typeof raw.editorState === 'object' && raw.editorState
+          ? (raw.editorState as Record<string, unknown>)
+          : undefined,
       imageUri: materialImage(raw),
-      layers: Array.isArray(raw.layers) ? raw.layers.map(String) : [],
-      note: typeof raw.note === 'string' ? raw.note : undefined,
-      pages: Array.isArray(raw.pages) ? raw.pages as Array<{ index: number; url: string }> : undefined,
-      title: typeof raw.title === 'string' ? raw.title : `Material ${material.id}`,
+      layers: isRecord(raw) && Array.isArray(raw.layers) ? raw.layers.map(String) : [],
+      note: isRecord(raw) && typeof raw.note === 'string' ? raw.note : undefined,
+      pages:
+        isRecord(raw) && Array.isArray(raw.pages)
+          ? (raw.pages as Array<{ index: number; url: string }>)
+          : undefined,
+      title:
+        material.name ??
+        (isRecord(raw) && typeof raw.title === 'string' ? raw.title : `Material ${material.id}`),
     },
     updatedAt: material.updatedAt,
     updatedBy: String(material.updatedBy ?? material.updatedByUser?.id ?? ''),
@@ -324,7 +377,12 @@ export function mapFile(
     createdBy: creatorId(file),
     createdByName: displayName(creatorUser(file)),
     description: file.description ?? undefined,
-    folderId: file.folderId === undefined ? (file.folder ? String(file.folder.id) : undefined) : String(file.folderId),
+    folderId:
+      file.folderId === undefined
+        ? file.folder
+          ? String(file.folder.id)
+          : undefined
+        : String(file.folderId),
     id: String(file.id),
     language: 'Manga Page',
     materialVersions: mappedVersions,
@@ -344,10 +402,9 @@ function mapTaskStatus(status: ApiTaskStatus): TaskStatus {
 }
 
 export function mapTaskCard(task: ApiTask): Task {
-  const assignees = [
-    task.assignedByUser?.avatarUrl,
-    creatorUser(task)?.avatarUrl,
-  ].filter((uri): uri is string => Boolean(uri?.trim()));
+  const assignees = [task.assignedByUser?.avatarUrl, creatorUser(task)?.avatarUrl].filter(
+    (uri): uri is string => Boolean(uri?.trim()),
+  );
 
   return {
     assignees,
@@ -368,12 +425,18 @@ export function mapFrame(frame: ApiFrame): ResourceTaskFrame {
   const endY = Number(frame.endY);
 
   return {
-    description: `Frame ${frame.id}`,
+    description: frame.name ?? `Frame ${frame.id}`,
     endX,
     endY,
     height: endY - startY,
     id: String(frame.id),
-    name: `Frame ${frame.id}`,
+    materialId:
+      frame.materialId === undefined || frame.materialId === null
+        ? frame.material?.id === undefined
+          ? undefined
+          : String(frame.material.id)
+        : String(frame.materialId),
+    name: frame.name ?? `Frame ${frame.id}`,
     startX,
     startY,
     width: endX - startX,
@@ -384,13 +447,16 @@ export function mapFrame(frame: ApiFrame): ResourceTaskFrame {
 
 export function mapComment(comment: ApiComment): ResourceTaskComment {
   const text =
-    typeof comment.content === 'string'
-      ? comment.content
-      : comment.content?.text ?? '';
+    typeof comment.content === 'string' ? comment.content : (comment.content?.text ?? '');
   const author = displayName(creatorUser(comment));
+  const frameId = comment.frameId ?? comment.frame?.id;
+  const material = comment.material ?? comment.frame?.material ?? null;
 
   return {
-    applicationId: comment.applicationId === undefined || comment.applicationId === null ? undefined : String(comment.applicationId),
+    applicationId:
+      comment.applicationId === undefined || comment.applicationId === null
+        ? undefined
+        : String(comment.applicationId),
     author,
     authorRole: '',
     body: text,
@@ -399,16 +465,32 @@ export function mapComment(comment: ApiComment): ResourceTaskComment {
       mentions: typeof comment.content === 'object' ? comment.content?.mentions : [],
       text,
     },
-    fileId: comment.fileId === undefined || comment.fileId === null ? undefined : String(comment.fileId),
-    frameId: String(comment.frameId ?? ''),
+    fileId:
+      comment.fileId === undefined || comment.fileId === null ? undefined : String(comment.fileId),
+    frameId: frameId === undefined || frameId === null ? '' : String(frameId),
+    frameName: comment.frame?.name ?? undefined,
     id: String(comment.id),
     initials: initials(author),
-    taskId: comment.taskId === undefined || comment.taskId === null ? undefined : String(comment.taskId),
+    materialFileId:
+      material?.fileId === undefined
+        ? material?.file?.id === undefined
+          ? undefined
+          : String(material.file.id)
+        : String(material.fileId),
+    materialId:
+      material?.id === undefined || material.id === null ? undefined : String(material.id),
+    materialName: material?.name ?? undefined,
+    taskId:
+      comment.taskId === undefined || comment.taskId === null ? undefined : String(comment.taskId),
     time: relativeDate(comment.createdAt),
   };
 }
 
-export function mapResourceTask(task: ApiTask, frames: ApiFrame[] = [], comments: ApiComment[] = []): ResourceFileTask {
+export function mapResourceTask(
+  task: ApiTask,
+  frames: ApiFrame[] = [],
+  comments: ApiComment[] = [],
+): ResourceFileTask {
   return {
     assignedBy: String(task.assignedBy ?? task.assignedByUser?.id ?? ''),
     assignedByName: displayName(task.assignedByUser),
@@ -465,8 +547,8 @@ function metadataStringId(metadata: Record<string, unknown> | null | undefined, 
   return stringId(metadata?.[key]);
 }
 
-function mapNotificationTarget(
-  activityLog?: ApiNotification['activityLog'] | null,
+export function mapActivityLogTarget(
+  activityLog?: ApiActivityLog | ApiNotification['activityLog'] | null,
 ): NotificationItem['target'] | undefined {
   const entityType = activityLog?.entityType?.toUpperCase();
   const entityId = stringId(activityLog?.entityId);
@@ -474,10 +556,9 @@ function mapNotificationTarget(
   const boardId = stringId(activityLog?.editorBoardId);
   const fileId = stringId(activityLog?.fileId);
   const metadata =
-    activityLog?.metadata && typeof activityLog.metadata === 'object'
-      ? activityLog.metadata
-      : null;
+    activityLog?.metadata && typeof activityLog.metadata === 'object' ? activityLog.metadata : null;
   const metadataApplicationId = metadataStringId(metadata, 'applicationId');
+  const metadataFrameId = metadataStringId(metadata, 'frameId');
   const metadataTaskId = metadataStringId(metadata, 'taskId');
 
   if (entityType === 'PROJECT' && entityId) return { projectId: entityId, type: 'project' };
@@ -499,12 +580,57 @@ function mapNotificationTarget(
     return { fileId, initialTab: 'Discussion', projectId, type: 'resourceFile' };
   }
   if (entityType === 'COMMENT') {
+    const commentId = entityId;
+
     if (metadataApplicationId) {
-      return { applicationId: metadataApplicationId, projectId, type: 'application' };
+      return {
+        applicationId: metadataApplicationId,
+        commentId,
+        initialTab: 'Discussion',
+        projectId,
+        type: 'application',
+      };
     }
-    if (metadataTaskId) return { taskId: metadataTaskId, type: 'task' };
+    if (metadataFrameId && fileId && projectId) {
+      return {
+        commentId,
+        fileId,
+        frameId: metadataFrameId,
+        initialDiscussionScope: 'frame',
+        initialTab: 'Discussion',
+        projectId,
+        type: 'resourceFile',
+      };
+    }
+    if (metadataTaskId && fileId && projectId) {
+      return {
+        commentId,
+        fileId,
+        initialDiscussionScope: 'task',
+        initialTab: 'Discussion',
+        projectId,
+        taskId: metadataTaskId,
+        type: 'resourceFile',
+      };
+    }
     if (fileId && projectId) {
-      return { fileId, initialTab: 'Discussion', projectId, type: 'resourceFile' };
+      return {
+        commentId,
+        fileId,
+        initialDiscussionScope: 'file',
+        initialTab: 'Discussion',
+        projectId,
+        type: 'resourceFile',
+      };
+    }
+    if (metadataTaskId) {
+      return {
+        commentId,
+        initialDiscussionScope: 'task',
+        initialTab: 'Discussion',
+        taskId: metadataTaskId,
+        type: 'task',
+      };
     }
     if (projectId) return { projectId, type: 'project' };
   }
@@ -518,7 +644,7 @@ export function mapNotification(notification: ApiNotification): NotificationItem
   const filter = notification.type
     ? notificationFilter(notification.type)
     : notificationFilterFromEntity(activityLog?.entityType);
-  const target = mapNotificationTarget(activityLog);
+  const target = mapActivityLogTarget(activityLog);
 
   return {
     filter,

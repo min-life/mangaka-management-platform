@@ -14,7 +14,7 @@ export default function EditorBoardSearchBar({
   onSearchChange,
 }: EditorBoardSearchBarProps) {
   return (
-    <View className="relative mt-3">
+    <View className="relative">
       <View className="absolute bottom-0 left-3 top-0 z-10 justify-center">
         <MaterialIcon name="search" color={Colors.textPlaceholder} size={18} />
       </View>

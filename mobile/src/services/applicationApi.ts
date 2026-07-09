@@ -2,12 +2,14 @@ import { ApiApplication, ApiComment, ApiDataResponse, ApiListResponse } from './
 import { apiRequest } from './apiClient';
 import { mapApplication, mapComment, uniqueById } from './mappers';
 
-export async function fetchApplications(params: {
-  projectId?: string;
-  search?: string;
-  status?: string;
-  type?: string;
-} = {}) {
+export async function fetchApplications(
+  params: {
+    projectId?: string;
+    search?: string;
+    status?: string;
+    type?: string;
+  } = {},
+) {
   const path = params.projectId ? `/projects/${params.projectId}/applications` : '/applications';
   const response = await apiRequest<ApiListResponse<ApiApplication>>(path, {
     params: {
@@ -29,7 +31,9 @@ export async function fetchApplications(params: {
 }
 
 export async function fetchApplication(applicationId: string) {
-  const response = await apiRequest<ApiDataResponse<ApiApplication>>(`/applications/${applicationId}`);
+  const response = await apiRequest<ApiDataResponse<ApiApplication>>(
+    `/applications/${applicationId}`,
+  );
   if (!response.data) throw new Error('Application not found');
   return mapApplication(response.data);
 }
@@ -38,19 +42,16 @@ export async function fetchApplicationComments(applicationId: string) {
   const response = await apiRequest<ApiListResponse<ApiComment>>(
     `/applications/${applicationId}/comments`,
     {
-      params: { field: 'createdAt', limit: 100, order: 'desc', page: 1 },
+      params: { field: 'createdAt', limit: 100, order: 'asc', page: 1 },
     },
   );
 
   return uniqueById((response.data ?? []).map(mapComment));
 }
 
-export async function createApplicationComment(params: {
-  applicationId: string;
-  text: string;
-}) {
+export async function createApplicationComment(params: { applicationId: string; text: string }) {
   const text = params.text.trim();
-  if (!text) throw new Error('Vui lòng nhập nội dung bình luận.');
+  if (!text) throw new Error('Please enter a comment.');
 
   const response = await apiRequest<ApiDataResponse<ApiComment>>(
     `/applications/${params.applicationId}/comments`,
@@ -60,7 +61,6 @@ export async function createApplicationComment(params: {
     },
   );
 
-  if (!response.data) throw new Error('Không thể tạo bình luận.');
+  if (!response.data) throw new Error('Unable to create the comment.');
   return mapComment(response.data);
 }
-

@@ -16,9 +16,12 @@ import { ResourceFolderNode } from '@/src/types/resources';
 
 import {
   ResourceFolderCardItem,
+  ResourceFolderListItem,
   ResourceMaterialCardItem,
+  ResourceMaterialListItem,
   ResourceSearchBar,
   ResourceTopBar,
+  ResourceViewMode,
   ResourcesEmptyState,
 } from './components';
 
@@ -79,6 +82,7 @@ function ResourceLibraryToggle({
 export default function ResourcesScreen({ navigation, route }: ResourcesScreenProps) {
   const [search, setSearch] = useState('');
   const [activeMode, setActiveMode] = useState<ResourceLibraryMode>('arcs');
+  const [viewMode, setViewMode] = useState<ResourceViewMode>('list');
   const [rootFolders, setRootFolders] = useState<ResourceFolderNode[]>([]);
   const [materialFiles, setMaterialFiles] = useState<ProjectMaterialFile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -147,7 +151,13 @@ export default function ResourcesScreen({ navigation, route }: ResourcesScreenPr
 
   return (
     <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
-      <ResourceTopBar backLabel="Back" title="Resource" onBack={() => navigation.goBack()} />
+      <ResourceTopBar
+        backLabel="Back"
+        onBack={() => navigation.goBack()}
+        onViewModeChange={setViewMode}
+        title="Resource"
+        viewMode={viewMode}
+      />
 
       <ScrollView
         className="flex-1"
@@ -167,42 +177,79 @@ export default function ResourcesScreen({ navigation, route }: ResourcesScreenPr
         ) : errorMessage ? (
           <ApiStateView type="error" message={errorMessage} onRetry={loadResources} />
         ) : (
-          <View className="gap-4 px-4 pt-4">
+          <View
+            className={viewMode === 'card' ? 'gap-4 px-4 pt-4' : 'pt-2'}
+            style={
+              viewMode === 'list'
+                ? { borderTopColor: Colors.borderFaint, borderTopWidth: 1 }
+                : undefined
+            }
+          >
             {activeMode === 'arcs' && visibleFolders.length > 0 ? (
-              visibleFolders.map((folder) => (
-                <ResourceFolderCardItem
-                  key={folder.id}
-                  folder={folder}
-                  onPress={() =>
-                    navigation.navigate('ResourceFolderDetail', {
-                      projectId: route.params.projectId,
-                      folderId: folder.id,
-                    })
-                  }
-                />
-              ))
+              visibleFolders.map((folder, index) =>
+                viewMode === 'list' ? (
+                  <ResourceFolderListItem
+                    key={folder.id}
+                    folder={folder}
+                    isLast={index === visibleFolders.length - 1}
+                    onPress={() =>
+                      navigation.navigate('ResourceFolderDetail', {
+                        projectId: route.params.projectId,
+                        folderId: folder.id,
+                      })
+                    }
+                  />
+                ) : (
+                  <ResourceFolderCardItem
+                    key={folder.id}
+                    folder={folder}
+                    onPress={() =>
+                      navigation.navigate('ResourceFolderDetail', {
+                        projectId: route.params.projectId,
+                        folderId: folder.id,
+                      })
+                    }
+                  />
+                ),
+              )
             ) : activeMode === 'materials' && visibleMaterials.length > 0 ? (
-              visibleMaterials.map((material) => (
-                <ResourceMaterialCardItem
-                  key={material.latestVersion.id}
-                  material={material}
-                  onPress={() =>
-                    navigation.navigate('ResourceFile', {
-                      projectId: route.params.projectId,
-                      fileId: material.file.id,
-                      parentFolderId: material.folderId,
-                      initialTab: 'Materials',
-                    })
-                  }
-                />
-              ))
+              visibleMaterials.map((material, index) =>
+                viewMode === 'list' ? (
+                  <ResourceMaterialListItem
+                    key={material.latestVersion.id}
+                    isLast={index === visibleMaterials.length - 1}
+                    material={material}
+                    onPress={() =>
+                      navigation.navigate('ResourceFile', {
+                        projectId: route.params.projectId,
+                        fileId: material.file.id,
+                        parentFolderId: material.folderId,
+                        initialTab: 'Materials',
+                      })
+                    }
+                  />
+                ) : (
+                  <ResourceMaterialCardItem
+                    key={material.latestVersion.id}
+                    material={material}
+                    onPress={() =>
+                      navigation.navigate('ResourceFile', {
+                        projectId: route.params.projectId,
+                        fileId: material.file.id,
+                        parentFolderId: material.folderId,
+                        initialTab: 'Materials',
+                      })
+                    }
+                  />
+                ),
+              )
             ) : (
               <ResourcesEmptyState
                 title={activeMode === 'arcs' ? 'No resource folders' : 'No materials found'}
                 message={
                   activeMode === 'arcs'
                     ? 'Story arcs and chapter folders will appear here.'
-                    : 'Try another search term or add material versions to project pages.'
+                    : 'Try another search term or add project materials.'
                 }
               />
             )}

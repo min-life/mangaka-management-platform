@@ -1,4 +1,4 @@
-import { ApiCurrentUser, ApiDataResponse } from './apiTypes';
+import { ApiCurrentUser, ApiDataResponse, ApiListResponse, ApiUserSummary } from './apiTypes';
 import { apiRequest } from './apiClient';
 import { saveAccessToken } from './tokenStorage';
 
@@ -27,8 +27,20 @@ export async function updatePassword(params: { currentPassword: string; newPassw
   });
 
   const accessToken = response.data?.accessToken;
-  if (!accessToken) throw new Error('Không thể cập nhật phiên đăng nhập mới.');
+  if (!accessToken) throw new Error('Unable to update the login session.');
 
   await saveAccessToken(accessToken);
 }
+
+export async function searchUsers(search: string) {
+  const response = await apiRequest<ApiListResponse<ApiUserSummary>>('/users', {
+    params: {
+      limit: 10,
+      page: 1,
+      search,
+    },
+  });
+  return response.data ?? [];
+}
+
 

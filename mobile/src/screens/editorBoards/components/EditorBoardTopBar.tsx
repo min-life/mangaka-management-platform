@@ -9,6 +9,7 @@ interface EditorBoardTopBarProps {
   actionIcon?: string;
   onActionPress?: () => void;
   onBack: () => void;
+  rightAction?: React.ReactNode;
   subtitle?: string;
   title: string;
 }
@@ -17,6 +18,7 @@ export default function EditorBoardTopBar({
   actionIcon,
   onActionPress,
   onBack,
+  rightAction,
   subtitle,
   title,
 }: EditorBoardTopBarProps) {
@@ -32,13 +34,12 @@ export default function EditorBoardTopBar({
             className="absolute left-3 z-10 flex-row items-center rounded-full py-2 pr-3"
           >
             <MaterialIcon name="arrow_back" color={Colors.statusProgress} size={22} />
-            <Text
-              className="ml-1 text-[15px] font-medium"
-              style={{ color: Colors.statusProgress }}
-            >
+            <Text className="ml-1 text-[15px] font-medium" style={{ color: Colors.statusProgress }}>
               Back
             </Text>
           </TouchableOpacity>
+
+          {rightAction ? <View className="absolute right-3 top-2 z-10">{rightAction}</View> : null}
 
           <Text
             className="text-center text-3xl font-bold leading-tight"
@@ -92,6 +93,8 @@ export default function EditorBoardTopBar({
           >
             <MaterialIcon name={actionIcon} color={Colors.text} size={22} />
           </TouchableOpacity>
+        ) : rightAction ? (
+          rightAction
         ) : (
           <View className="w-10" />
         )}

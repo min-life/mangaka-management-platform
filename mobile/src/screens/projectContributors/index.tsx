@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Image, ScrollView, Text, TextInput, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Alert, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import ApiStateView from '@/src/components/shared/ApiStateView';
@@ -8,37 +8,28 @@ import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
 import { RootStackParamList } from '@/src/navigation/types';
 import EditorBoardTopBar from '@/src/screens/editorBoards/components/EditorBoardTopBar';
-import { fetchProjectBundle, fetchProjectMembers } from '@/src/services/projectApi';
+import { fetchProjectBundle, fetchProjectMembers, removeProjectMember } from '@/src/services/projectApi';
 import { ProjectMemberItem } from '@/src/types/projects';
+import AddMemberModal from './AddMemberModal';
 
 type ProjectContributorsScreenProps = NativeStackScreenProps<
   RootStackParamList,
   'ProjectContributors'
 >;
 
-function TaskMetric({
-  label,
-  value,
+function ContributorRow({
+  isOwner,
+  member,
+  onDelete,
 }: {
-  label: string;
-  value?: number;
+  isOwner?: boolean;
+  member: ProjectMemberItem;
+  onDelete?: () => void;
 }) {
-  return (
-    <View
-      className="items-center rounded-lg px-3 py-2"
-      style={{ backgroundColor: Colors.overlayLight }}
-    >
-      <Text className="text-[14px] font-bold" style={{ color: Colors.text }}>
-        {value ?? 0}
-      </Text>
-      <Text className="mt-0.5 text-[10px] font-semibold uppercase" style={{ color: Colors.textMuted }}>
-        {label}
-      </Text>
-    </View>
-  );
-}
+  const roleLabel = isOwner ? 'Owner' : member.roleName;
+  const roleColor = isOwner ? Colors.accent : Colors.statusProgress;
+  const roleBackground = isOwner ? 'rgba(255,211,105,0.16)' : 'rgba(77,166,255,0.16)';
 
-function ContributorRow({ member }: { member: ProjectMemberItem }) {
   return (
     <View
       className="rounded-xl p-4"
@@ -71,26 +62,27 @@ function ContributorRow({ member }: { member: ProjectMemberItem }) {
           </Text>
         </View>
 
-        <View
-          className="rounded-full px-3 py-1"
-          style={{ backgroundColor: 'rgba(77,166,255,0.16)' }}
-        >
-          <Text className="text-[11px] font-bold" style={{ color: Colors.statusProgress }}>
-            {member.roleName}
-          </Text>
+        <View className="flex-row items-center gap-2">
+          <View
+            className="rounded-full px-3 py-1"
+            style={{ backgroundColor: roleBackground }}
+          >
+            <Text className="text-[11px] font-bold" style={{ color: roleColor }}>
+              {roleLabel}
+            </Text>
+          </View>
+
+          {!isOwner && onDelete && (
+            <TouchableOpacity onPress={onDelete} activeOpacity={0.7} className="p-1">
+              <MaterialIcon name="delete" color={Colors.iconTask} size={20} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
       <Text className="mt-3 text-[12px]" style={{ color: Colors.textFaint }}>
         {member.joinedAtLabel}
       </Text>
-
-      <View className="mt-4 flex-row flex-wrap gap-2">
-        <TaskMetric label="Tasks" value={member.numberOfTasks} />
-        <TaskMetric label="Pending" value={member.taskOverview?.pending} />
-        <TaskMetric label="Review" value={member.taskOverview?.review} />
-        <TaskMetric label="Done" value={member.taskOverview?.done} />
-      </View>
     </View>
   );
 }
@@ -100,10 +92,12 @@ export default function ProjectContributorsScreen({
   route,
 }: ProjectContributorsScreenProps) {
   const [members, setMembers] = useState<ProjectMemberItem[]>([]);
+  const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState('Project');
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
+  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
 
   const loadMembers = useCallback(async () => {
     setIsLoading(true);
@@ -115,6 +109,7 @@ export default function ProjectContributorsScreen({
         fetchProjectBundle(route.params.projectId).catch(() => null),
       ]);
       setMembers(memberResult.members);
+      setOwnerUserId(projectBundle?.project.createdBy || null);
       setProjectName(projectBundle?.project.name ?? 'Project');
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Không thể tải thành viên.');
@@ -131,10 +126,30 @@ export default function ProjectContributorsScreen({
     return () => clearTimeout(timeout);
   }, [loadMembers]);
 
-  const totalTasks = useMemo(
-    () => members.reduce((sum, member) => sum + member.numberOfTasks, 0),
-    [members],
-  );
+  const handleDeleteMember = (member: ProjectMemberItem) => {
+    Alert.alert(
+      'Remove Member',
+      `Are you sure you want to remove ${member.name} from the project?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsLoading(true);
+              await removeProjectMember(route.params.projectId, member.id);
+              await loadMembers();
+            } catch (error) {
+              Alert.alert('Error', error instanceof Error ? error.message : 'Không thể xóa thành viên.');
+            } finally {
+              setIsLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
@@ -142,6 +157,8 @@ export default function ProjectContributorsScreen({
         onBack={() => navigation.goBack()}
         subtitle={projectName}
         title="Contribute"
+        actionIcon="add"
+        onActionPress={() => setIsAddModalVisible(true)}
       />
 
       <ScrollView
@@ -163,11 +180,6 @@ export default function ProjectContributorsScreen({
           />
         </View>
 
-        <View className="mt-4 flex-row gap-2">
-          <TaskMetric label="Members" value={members.length} />
-          <TaskMetric label="Tasks" value={totalTasks} />
-        </View>
-
         {isLoading ? (
           <ApiStateView type="loading" />
         ) : errorMessage ? (
@@ -175,7 +187,12 @@ export default function ProjectContributorsScreen({
         ) : members.length > 0 ? (
           <View className="mt-4 gap-3">
             {members.map((member) => (
-              <ContributorRow key={member.id} member={member} />
+              <ContributorRow
+                key={member.id}
+                isOwner={member.id === ownerUserId}
+                member={member}
+                onDelete={() => handleDeleteMember(member)}
+              />
             ))}
           </View>
         ) : (
@@ -186,6 +203,17 @@ export default function ProjectContributorsScreen({
           />
         )}
       </ScrollView>
+
+      <AddMemberModal
+        visible={isAddModalVisible}
+        onClose={() => setIsAddModalVisible(false)}
+        onSuccess={() => {
+          setIsAddModalVisible(false);
+          void loadMembers();
+        }}
+        projectId={route.params.projectId}
+        existingMemberIds={new Set(members.map((m) => m.id))}
+      />
 
       <BottomNavBar activeTab="home" />
     </View>

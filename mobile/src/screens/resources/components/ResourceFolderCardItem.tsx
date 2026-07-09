@@ -6,9 +6,6 @@ import { Colors } from '@/src/constants/colors';
 import { ResourceFolderNode } from '@/src/types/resources';
 
 import {
-  getDirectChapterCount,
-  getMaterialVersionCount,
-  getPageCount,
   getResourceDateRange,
   getResourceInitials,
 } from './resourceFormatters';
@@ -23,16 +20,13 @@ export default function ResourceFolderCardItem({
   onPress,
 }: ResourceFolderCardItemProps) {
   const dateRange = getResourceDateRange(folder);
-  const chapterCount = getDirectChapterCount(folder);
-  const pageCount = getPageCount(folder);
-  const materialCount = getMaterialVersionCount(folder);
 
   return (
     <TouchableOpacity
       activeOpacity={0.78}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${folder.name}, ${chapterCount} chapters, ${pageCount} pages`}
+      accessibilityLabel={folder.name}
       className="overflow-hidden rounded-[18px]"
       style={{
         backgroundColor: Colors.surface,
@@ -74,28 +68,7 @@ export default function ResourceFolderCardItem({
           {folder.description ?? 'Story arc materials and chapter pages.'}
         </Text>
 
-        <View className="mt-4 flex-row items-center">
-          <View className="flex-row items-center">
-            <MaterialIcon name="folder" color={Colors.iconFolder} size={17} />
-            <Text className="ml-1.5 text-[12px] font-semibold" style={{ color: Colors.text }}>
-              {chapterCount} chapter{chapterCount === 1 ? '' : 's'}
-            </Text>
-          </View>
-          <View className="ml-4 flex-row items-center">
-            <MaterialIcon name="image" color={Colors.statusProgress} size={17} />
-            <Text className="ml-1.5 text-[12px] font-semibold" style={{ color: Colors.text }}>
-              {pageCount} page{pageCount === 1 ? '' : 's'}
-            </Text>
-          </View>
-          <View className="ml-4 flex-row items-center">
-            <MaterialIcon name="file" color={Colors.statusDone} size={17} />
-            <Text className="ml-1.5 text-[12px] font-semibold" style={{ color: Colors.text }}>
-              {materialCount} version{materialCount === 1 ? '' : 's'}
-            </Text>
-          </View>
-        </View>
-
-        <Text className="mt-3 text-[12px]" style={{ color: Colors.textFaint }} numberOfLines={1}>
+        <Text className="mt-4 text-[12px]" style={{ color: Colors.textFaint }} numberOfLines={1}>
           {dateRange}
         </Text>
       </View>

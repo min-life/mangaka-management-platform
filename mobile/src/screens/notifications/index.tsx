@@ -7,8 +7,13 @@ import AppRefreshControl from '@/src/components/shared/AppRefreshControl';
 import { NotifFilter } from '@/src/types/notifications';
 import { Colors } from '@/src/constants/colors';
 import BottomNavBar from '@/src/components/shared/BottomNavBar';
-import { markNotificationAsRead, fetchNotifications } from '@/src/services/notificationApi';
+import {
+  markAllNotificationsAsRead,
+  markNotificationAsRead,
+  fetchNotifications,
+} from '@/src/services/notificationApi';
 import { RootStackNavProp } from '@/src/navigation/types';
+import { navigateToNotificationTarget } from '@/src/navigation/notificationTargetNavigation';
 import { ApiNotification } from '@/src/services/apiTypes';
 import { groupNotifications, mapNotification, uniqueById } from '@/src/services/mappers';
 import { subscribeToNotifications } from '@/src/services/realtimeClient';
@@ -87,6 +92,17 @@ export default function NotificationsScreen() {
     );
   }, []);
 
+  const handleMarkAllRead = useCallback(() => {
+    if (unreadCount === 0) return;
+
+    setItems((currentItems) => currentItems.map((item) => ({ ...item, isUnread: false })));
+
+    void markAllNotificationsAsRead().catch((error) => {
+      console.warn('[NotificationsScreen] Mark all notifications as read failed.', error);
+      void loadNotifications({ showLoading: false });
+    });
+  }, [loadNotifications, unreadCount]);
+
   const handleNotificationPress = useCallback(
     (item: NotificationItem) => {
       if (item.isUnread) {
@@ -96,47 +112,7 @@ export default function NotificationsScreen() {
         });
       }
 
-      if (!item.target) return;
-
-      if (item.target.type === 'project' && item.target.projectId) {
-        navigation.navigate('ProjectDetail', { projectId: item.target.projectId });
-        return;
-      }
-
-      if (item.target.type === 'task' && item.target.taskId) {
-        navigation.navigate('TaskDetail', { taskId: item.target.taskId });
-        return;
-      }
-
-      if (item.target.type === 'application' && item.target.applicationId) {
-        navigation.navigate('ApplicationDetail', {
-          applicationId: item.target.applicationId,
-          ...(item.target.projectId ? { projectId: item.target.projectId } : {}),
-        });
-        return;
-      }
-
-      if (item.target.type === 'resourceFolder' && item.target.projectId && item.target.folderId) {
-        navigation.navigate('ResourceFolderDetail', {
-          folderId: item.target.folderId,
-          projectId: item.target.projectId,
-        });
-        return;
-      }
-
-      if (item.target.type === 'resourceFile' && item.target.projectId && item.target.fileId) {
-        navigation.navigate('ResourceFile', {
-          fileId: item.target.fileId,
-          initialTab: item.target.initialTab,
-          parentFolderId: item.target.parentFolderId,
-          projectId: item.target.projectId,
-        });
-        return;
-      }
-
-      if (item.target.type === 'board' && item.target.boardId) {
-        navigation.navigate('EditorBoardDetail', { boardId: item.target.boardId });
-      }
+      navigateToNotificationTarget(navigation, item.target);
     },
     [markItemAsRead, navigation],
   );
@@ -147,6 +123,7 @@ export default function NotificationsScreen() {
         activeFilter={activeFilter}
         unreadCount={unreadCount}
         onFilterChange={setActiveFilter}
+        onMarkAllRead={handleMarkAllRead}
       />
 
       {isLoading ? (
@@ -173,7 +150,7 @@ export default function NotificationsScreen() {
         </ScrollView>
       )}
 
-      <BottomNavBar activeTab="inbox" />
+      <BottomNavBar activeTab="inbox" unreadInboxCount={unreadCount} />
     </View>
   );
 }

@@ -11,7 +11,7 @@ interface TasksSearchBarProps {
 
 export default function TasksSearchBar({ search, onSearchChange }: TasksSearchBarProps) {
   return (
-    <View className="mt-4 relative">
+    <View className="relative flex-1">
       <View className="absolute left-3 top-0 bottom-0 justify-center z-10">
         <MaterialIcon name="search" color="rgba(237,241,251,0.5)" size={18} />
       </View>

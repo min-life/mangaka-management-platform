@@ -1,12 +1,15 @@
 import React from 'react';
-import { View, Text, Image } from 'react-native';
+import { ActivityIndicator, Image, Text, TouchableOpacity, View } from 'react-native';
 import { Colors } from '@/src/constants/colors';
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
 
 interface ProfileHeaderCardProps {
   avatarUri?: string | null;
   email?: string;
+  isAvatarUploading?: boolean;
   name?: string | null;
+  onAvatarPress?: () => void;
+  onEditNamePress?: () => void;
   onSettingsPress?: () => void;
   roleLabel?: string;
 }
@@ -17,7 +20,10 @@ interface ProfileHeaderCardProps {
 export default function ProfileHeaderCard({
   avatarUri,
   email,
+  isAvatarUploading,
   name,
+  onAvatarPress,
+  onEditNamePress,
   onSettingsPress,
   roleLabel,
 }: ProfileHeaderCardProps) {
@@ -42,28 +48,67 @@ export default function ProfileHeaderCard({
       {/* Avatar + Info row */}
       <View className="flex-row items-start gap-4">
         {/* Avatar */}
-        <View
-          className="w-16 h-16 rounded-full overflow-hidden items-center justify-center"
+        <TouchableOpacity
+          activeOpacity={0.78}
+          className="h-16 w-16 items-center justify-center rounded-full"
+          disabled={isAvatarUploading}
+          onPress={onAvatarPress}
           style={{ borderWidth: 2, borderColor: Colors.surface }}
         >
-          {avatarUri ? (
-            <Image
-              source={{ uri: avatarUri }}
-              className="w-full h-full"
-              resizeMode="cover"
-            />
-          ) : (
-            <Text className="text-[20px] font-bold" style={{ color: Colors.accent }}>
-              {initials}
-            </Text>
-          )}
-        </View>
+          <View className="h-full w-full overflow-hidden rounded-full items-center justify-center">
+            {avatarUri ? (
+              <Image
+                source={{ uri: avatarUri }}
+                className="h-full w-full"
+                resizeMode="cover"
+              />
+            ) : (
+              <Text className="text-[20px] font-bold" style={{ color: Colors.accent }}>
+                {initials}
+              </Text>
+            )}
+
+            {isAvatarUploading ? (
+              <View
+                className="absolute inset-0 items-center justify-center"
+                style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}
+              >
+                <ActivityIndicator color={Colors.accent} size="small" />
+              </View>
+            ) : null}
+          </View>
+
+          <View
+            className="absolute -right-1 -top-1 h-7 w-7 items-center justify-center rounded-full"
+            style={{
+              backgroundColor: Colors.accent,
+              borderColor: Colors.surface,
+              borderWidth: 2,
+            }}
+          >
+            <MaterialIcon name="edit" color={Colors.bg} size={14} />
+          </View>
+        </TouchableOpacity>
 
         {/* Name / email / badge */}
         <View className="flex-1">
-          <Text className="text-[18px] font-semibold" style={{ color: Colors.text }}>
-            {displayName}
-          </Text>
+          <View className="flex-row items-center gap-2">
+            <Text
+              className="flex-1 text-[18px] font-semibold"
+              numberOfLines={1}
+              style={{ color: Colors.text }}
+            >
+              {displayName}
+            </Text>
+            <TouchableOpacity
+              activeOpacity={0.75}
+              className="h-8 w-8 items-center justify-center rounded-full"
+              onPress={onEditNamePress ?? onSettingsPress}
+              style={{ backgroundColor: Colors.surfaceContainer }}
+            >
+              <MaterialIcon name="edit" color={Colors.text} size={16} />
+            </TouchableOpacity>
+          </View>
           <Text className="text-[14px] mt-0.5" style={{ color: Colors.textMuted }}>
             {displayEmail}
           </Text>
