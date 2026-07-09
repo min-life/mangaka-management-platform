@@ -55,13 +55,6 @@ export function WorkspaceHeader() {
       <div className="flex items-center gap-2">
         <NotificationBell />
 
-        <button
-          type="button"
-          className="rounded-lg p-2 text-[#B8BEC8] transition hover:bg-[#2F3742] hover:text-white"
-        >
-          <Settings className="size-5" />
-        </button>
-
         <div className="mx-2 h-8 w-px bg-[#434A55]" />
 
         <DropdownMenu>

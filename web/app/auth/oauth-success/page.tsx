@@ -6,6 +6,7 @@ import { Loader2 } from 'lucide-react';
 
 import { useAuth } from '@/hooks/useAuth';
 import { setAccessToken } from '@/lib/auth-storage';
+import { toast } from '@/lib/toast';
 
 function LoadingState() {
   return (
@@ -26,6 +27,19 @@ function OAuthSuccessContent() {
     const accessToken = searchParams.get('access_token');
     const nextPath = searchParams.get('next') ?? '/studio';
     const safeNextPath = nextPath.startsWith('/') ? nextPath : '/studio';
+
+    if (searchParams.get('linked') === 'google') {
+      toast.success('Google account linked successfully');
+      void refreshUser().finally(() => {
+        if (isMounted) {
+          router.replace('/user-profile');
+        }
+      });
+
+      return () => {
+        isMounted = false;
+      };
+    }
 
     if (!accessToken) {
       router.replace('/login?error=oauth_failed');

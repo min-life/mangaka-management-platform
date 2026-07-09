@@ -71,20 +71,40 @@ export type FileVersionsResponse = {
   versions: FileVersionResponse[];
 };
 
+export function isFrameAnchorMaterial(v: any) {
+  if (!v) return false;
+  if (!Array.isArray(v.materials)) return false;
+  return (
+    v.materials.length === 0 ||
+    v.materials.every((m: any) => m === null || (!m.url && !m.downloadUrl))
+  );
+}
+
 export async function getFileMaterialVersions(fileId: number | string) {
-  const response = await api.get<FileVersionsResponse, FileVersionsResponse>(
+  const response = await api.get<any, any>(
     `/files/${fileId}/versions`,
     { params: { page: 1, limit: 100 } },
   );
+  if (response) {
+    if (Array.isArray(response.versions)) {
+      response.versions = response.versions.filter(
+        (v: any) => !isFrameAnchorMaterial(v)
+      );
+    } else if (Array.isArray(response.data)) {
+      response.data = response.data.filter(
+        (v: any) => !isFrameAnchorMaterial(v)
+      );
+    }
+  }
   return response;
 }
 
 export async function getFileMaterials(fileId: number | string) {
-  const response = await api.get<{ data: FileVersionResponse[] }, { data: FileVersionResponse[] }>(
+  const response = await api.get<any, any>(
     `/files/${fileId}/materials`,
     { params: { page: 1, limit: 100 } },
   );
-  return response.data ?? [];
+  return response.materials ?? response.data ?? response ?? [];
 }
 
 export async function createMaterial(fileId: number | string, formData: FormData) {
@@ -115,6 +135,7 @@ export async function createFileTask(
     parentId?: number;
     status?: string;
     title: string;
+    cloneBaseMaterial?: boolean;
   },
 ) {
   const response = await api.post<{ data: { id: number } }, { data: { id: number } }>(

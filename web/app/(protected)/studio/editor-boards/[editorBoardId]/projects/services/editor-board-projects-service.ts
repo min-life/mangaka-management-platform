@@ -8,8 +8,9 @@ import {
   type ProjectResponse,
   type ProjectStatResponse,
 } from '@/services/project.service';
+import { normalizeProjectMetrics, type ProjectStatus } from '@/services/project-metrics';
 
-export type ProjectStatus = 'HIATUS' | 'IN_PRODUCTION' | 'STORYBOARDING';
+export type { ProjectStatus };
 export type PublishingStatus = 'LIVE' | 'PENDING_APPROVAL' | 'SCHEDULED';
 
 export type ProjectMember = {
@@ -55,17 +56,21 @@ export type EditorBoardProjectsSummary = {
   projectCount: number;
 };
 
+type EditorBoardProjectBase = Omit<
+  EditorBoardProject,
+  'applicationsCount' | 'projectStats' | 'publishingStatus'
+>;
+
 function mapProjectResponse(
   project: ProjectResponse,
   editorBoardId: number | string,
-): EditorBoardProject {
+): EditorBoardProjectBase {
   const createdByName =
     project.createdByUser?.displayName ?? project.createdByUser?.email ?? 'Unassigned';
   const updatedByName =
     project.updatedByUser?.displayName ?? project.updatedByUser?.email ?? createdByName;
 
   return {
-    applicationsCount: 0,
     contactName: updatedByName,
     createdAt: project.createdAt,
     description: project.description ?? 'No production summary has been added yet.',
@@ -82,54 +87,8 @@ function mapProjectResponse(
       })) ?? [],
     name: project.name,
     nextDeadline: project.updatedAt,
-    projectStats: [
-      {
-        id: project.id,
-        metrics: {
-          cycleTimeDays: 0,
-          progress: 0,
-          status: 'IN_PRODUCTION',
-          targetChapter: 'Chapter --',
-        },
-        projectId: project.id,
-        updatedAt: project.updatedAt,
-      },
-    ],
-    publishingStatus: 'PENDING_APPROVAL',
     updatedAt: project.updatedAt,
   };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function getNumberMetric(metrics: unknown, key: string, fallback: number) {
-  if (!isRecord(metrics)) {
-    return fallback;
-  }
-
-  const value = metrics[key];
-  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
-}
-
-function getStringMetric(metrics: unknown, key: string, fallback: string) {
-  if (!isRecord(metrics)) {
-    return fallback;
-  }
-
-  const value = metrics[key];
-  return typeof value === 'string' && value.trim().length > 0 ? value : fallback;
-}
-
-function getProjectStatus(metrics: unknown): ProjectStatus {
-  const status = getStringMetric(metrics, 'status', 'IN_PRODUCTION');
-
-  if (status === 'HIATUS' || status === 'IN_PRODUCTION' || status === 'STORYBOARDING') {
-    return status;
-  }
-
-  return 'IN_PRODUCTION';
 }
 
 function mapMembers(members: ProjectMemberResponse[]): ProjectMember[] {
@@ -147,12 +106,7 @@ function mapStats(project: ProjectResponse, stat: ProjectStatResponse | null) {
   return [
     {
       id: stat?.id ?? project.id,
-      metrics: {
-        cycleTimeDays: getNumberMetric(metrics, 'cycleTimeDays', 0),
-        progress: getNumberMetric(metrics, 'progress', 0),
-        status: getProjectStatus(metrics),
-        targetChapter: getStringMetric(metrics, 'targetChapter', 'Chapter --'),
-      },
+      metrics: normalizeProjectMetrics(metrics),
       projectId: stat?.projectId ?? project.id,
       updatedAt: stat?.updatedAt ?? project.updatedAt,
     },

@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AxiosError } from 'axios';
 import { toast } from '@/lib/toast';
 import { Check, CheckCircle2, ChevronDown, FileText, Plus, Search, Trash2, UploadCloud } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { CreateBoardDialog } from './CreateBoardDialog';
 import {
   Dialog,
   DialogClose,
@@ -78,9 +79,16 @@ export function CreateProjectDialog({ editorBoards = [], onCreated }: CreateProj
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = name.trim().length > 0 && !isSubmitting;
-  const selectedBoard = editorBoards.find((board) => String(board.id) === editorBoardId);
-  const filteredBoards = editorBoards.filter((board) => {
+  const [boardsList, setBoardsList] = useState<EditorBoardResponse[]>(editorBoards);
+  const [createBoardOpen, setCreateBoardOpen] = useState(false);
+
+  useEffect(() => {
+    setBoardsList(editorBoards);
+  }, [editorBoards]);
+
+  const canSubmit = name.trim().length > 0 && editorBoardId !== 'none' && !isSubmitting;
+  const selectedBoard = boardsList.find((board) => String(board.id) === editorBoardId);
+  const filteredBoards = boardsList.filter((board) => {
     const query = boardSearch.trim().toLowerCase();
 
     if (!query) {
@@ -221,7 +229,7 @@ export function CreateProjectDialog({ editorBoards = [], onCreated }: CreateProj
 
                 <div className="space-y-3">
                   <label className={labelClassName}>
-                    Editor Board
+                    Editor Board <span className="text-red-300">*</span>
                   </label>
                   <Popover onOpenChange={setBoardPickerOpen} open={boardPickerOpen}>
                     <PopoverTrigger asChild>
@@ -246,10 +254,10 @@ export function CreateProjectDialog({ editorBoards = [], onCreated }: CreateProj
                         ) : (
                           <span className="min-w-0">
                             <span className="block truncate text-sm font-black text-white">
-                              No editor board yet
+                              New editor board
                             </span>
                             <span className="block truncate text-xs font-bold text-[#8b94a1]">
-                              Search system boards or assign later
+                              Create a new board or search system boards
                             </span>
                           </span>
                         )}
@@ -274,21 +282,20 @@ export function CreateProjectDialog({ editorBoards = [], onCreated }: CreateProj
                         <button
                           className="flex w-full items-center gap-3 rounded-[4px] px-3 py-3 text-left hover:bg-[#202832]"
                           onClick={() => {
-                            setEditorBoardId('none');
-                            setBoardSearch('');
+                            setCreateBoardOpen(true);
                             setBoardPickerOpen(false);
                           }}
                           type="button"
                         >
-                          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[#202832] text-[10px] font-black text-[#8b94a1]">
-                            NA
+                          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[#FFD369]/10 text-xs font-black text-[#FFD369]">
+                            +
                           </span>
                           <span className="min-w-0 flex-1">
-                            <span className="block text-xs font-black text-white">
-                              No editor board yet
+                            <span className="block text-xs font-black text-[#FFD369]">
+                              New editor board
                             </span>
                             <span className="block text-[11px] font-bold text-[#8b94a1]">
-                              Assign a board after the project is created
+                              Create a new editor board immediately
                             </span>
                           </span>
                           {editorBoardId === 'none' ? (
@@ -471,16 +478,21 @@ export function CreateProjectDialog({ editorBoards = [], onCreated }: CreateProj
               disabled={!canSubmit}
               type="submit"
             >
-              {isSubmitting ? 'Creating...' : (
-                <span className="inline-flex items-center gap-2">
-                  Create Project
-                  <Plus className="size-4" />
-                </span>
-              )}
+              {isSubmitting ? 'Creating...' : 'Create Project'}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
+      <CreateBoardDialog
+        open={createBoardOpen}
+        onOpenChange={setCreateBoardOpen}
+        trigger={null}
+        onCreated={(board) => {
+          setBoardsList((prev) => [board, ...prev]);
+          setEditorBoardId(String(board.id));
+          setCreateBoardOpen(false);
+        }}
+      />
     </Dialog>
   );
 }

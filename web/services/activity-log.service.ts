@@ -36,6 +36,7 @@ export type ActivityLogResponse = {
   id: number;
   metadata?: unknown;
   projectId?: number | null;
+  fileId?: number | null;
 };
 
 type ActivityLogsResponse = {
@@ -90,3 +91,25 @@ export async function getEditorBoardActivityLogs(
     meta: response.meta ?? response.pagination,
   };
 }
+
+export async function getProjectActivityLogs(
+  projectId: number | string,
+  params?: {
+    limit?: number;
+    page?: number;
+  },
+) {
+  const response = await api.get<ActivityLogsResponse, ActivityLogsResponse>(
+    `/projects/${projectId}/activity-logs`,
+    {
+      params,
+    },
+  );
+
+  return {
+    activities: response.data ?? [],
+    meta: response.meta ?? response.pagination,
+  };
+}
+
+

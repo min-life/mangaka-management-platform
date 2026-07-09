@@ -2,7 +2,7 @@ export const apiActions = {
   search: { method: 'GET', endpoint: '/projects' },
   notifications: { method: 'GET', endpoint: '/users/me' },
   settings: { method: 'GET', endpoint: '/users/me' },
-  shareProfile: { method: 'GET', endpoint: '/users/me' },
+  linkGoogleAccount: { method: 'GET', endpoint: '/users/me/link-account' },
   editProfile: { method: 'PATCH', endpoint: '/users/me' },
   updateAvatar: { method: 'PATCH', endpoint: '/users/me' },
   activities: { method: 'LOCAL', endpoint: 'derived-empty-state-until-activity-api-exists' },
