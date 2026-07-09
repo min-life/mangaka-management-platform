@@ -54,7 +54,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function getEditorBoardName(notification: NotificationResponse, boardNameById: Map<number, string>) {
+function getEditorBoardName(
+  notification: NotificationResponse,
+  boardNameById: Map<number, string>,
+) {
   const editorBoardId =
     notification.activityLog?.editorBoardId ?? notification.activityLog?.entityId ?? null;
 
@@ -89,7 +92,10 @@ function getEntityName(notification: NotificationResponse) {
   return '';
 }
 
-function getNotificationText(notification: NotificationResponse, boardNameById: Map<number, string>) {
+function getNotificationText(
+  notification: NotificationResponse,
+  boardNameById: Map<number, string>,
+) {
   const activity = notification.activityLog;
   const actorName =
     activity?.actor?.displayName ?? activity?.actor?.email ?? `User #${activity?.actorId ?? ''}`;
