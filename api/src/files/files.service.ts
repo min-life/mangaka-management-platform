@@ -56,18 +56,25 @@ const FILE_SELECT = {
 
 export const MATERIAL_LIST_SELECT = {
   id: true,
-  materials: true,
+  name: true,
   createdByUser: USER_SELECT,
   updatedByUser: USER_SELECT,
   createdAt: true,
   updatedAt: true,
-};
-
-const MATERIAL_SELECT = {
-  ...MATERIAL_LIST_SELECT,
   file: {
-    select: FILE_SELECT,
+    select: {
+      id: true,
+      title: true,
+      description: true,
+    }
   },
+  task: {
+    select: {
+      id: true,
+      title: true,
+      description: true,
+    }
+  }
 };
 
 export const TASK_LIST_SELECT = {
@@ -181,29 +188,8 @@ export class FilesService {
         }),
       ]);
 
-      const signedVersions = await Promise.all(
-        versions.map(async (version) => {
-          const materialsData = version.materials as any[];
-          if (Array.isArray(materialsData)) {
-            await Promise.all(
-              materialsData.map(async (materialData) => {
-                if (materialData?.url) {
-                  const [url, downloadUrl] = await Promise.all([
-                    this.awsS3Service.getPresignedUrl(materialData.url),
-                    this.awsS3Service.getPresignedUrl(materialData.url, 3600, materialData.originalName),
-                  ]);
-                  materialData.url = url;
-                  materialData.downloadUrl = downloadUrl;
-                }
-              })
-            );
-          }
-          return version;
-        }),
-      );
-
       return {
-        versions: signedVersions,
+        versions,
         pagination: this.buildPaginationMeta(total, page, limit),
       };
     } catch (error) {
@@ -226,33 +212,12 @@ export class FilesService {
           orderBy: { createdAt: 'desc' },
           skip,
           take: limit,
-          select: MATERIAL_SELECT,
+          select: MATERIAL_LIST_SELECT,
         }),
       ]);
 
-      const signedMaterials = await Promise.all(
-        materials.map(async (material) => {
-          const materialsData = material.materials as any[];
-          if (Array.isArray(materialsData)) {
-            await Promise.all(
-              materialsData.map(async (materialData) => {
-                if (materialData?.url) {
-                  const [url, downloadUrl] = await Promise.all([
-                    this.awsS3Service.getPresignedUrl(materialData.url),
-                    this.awsS3Service.getPresignedUrl(materialData.url, 3600, materialData.originalName),
-                  ]);
-                  materialData.url = url;
-                  materialData.downloadUrl = downloadUrl;
-                }
-              })
-            );
-          }
-          return material;
-        }),
-      );
-
       return {
-        data: signedMaterials,
+        data: materials,
         pagination: this.buildPaginationMeta(total, page, limit),
       };
     } catch (error) {
@@ -326,7 +291,7 @@ export class FilesService {
           createdBy: data.userId,
           updatedBy: data.userId,
         },
-        select: MATERIAL_SELECT,
+        select: MATERIAL_LIST_SELECT,
       });
 
       const fileWithFolder = await this.prisma.file.findUnique({

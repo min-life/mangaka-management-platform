@@ -2054,7 +2054,7 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
   **Response Schema:**
   | Field | Type | Description |
   |-------|------|-------------|
-  | `data` | `array` |  |
+  | `data` | `array` | Danh sách materials đã được chuẩn hóa (có name, file, task) |
   | `pagination` | `string` |  |
 
 
@@ -2067,6 +2067,8 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 | Name | In | Required | Type | Description |
 |------|----|----------|------|-------------|
 | `id` | `path` | `Yes` | `number` | File id |
+| `page` | `query` | `No` | `number` |  |
+| `limit` | `query` | `No` | `number` |  |
 
 #### Responses
 - **200**: File materials retrieved successfully (Excludes materials linked to any tasks)
@@ -2074,7 +2076,8 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
   **Response Schema:**
   | Field | Type | Description |
   |-------|------|-------------|
-  | `data` | `string` |  |
+  | `data` | `array` | Danh sách materials đã được chuẩn hóa (có name, file, task) |
+  | `pagination` | `string` |  |
 
 
 ---
@@ -2486,16 +2489,24 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 
 ---
 
-### Get task materials for select 
+### Get task materials 
 **GET** `/api/tasks/{id}/materials`
 
 #### Parameters
 | Name | In | Required | Type | Description |
 |------|----|----------|------|-------------|
 | `id` | `path` | `Yes` | `number` | Task id |
+| `page` | `query` | `No` | `number` |  |
+| `limit` | `query` | `No` | `number` |  |
 
 #### Responses
-- **200**: Task materials for select retrieved successfully
+- **200**: Task materials retrieved successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `array` | Danh sách materials đã được chuẩn hóa (có name, file, task) |
+  | `pagination` | `string` |  |
 
 ---
 
