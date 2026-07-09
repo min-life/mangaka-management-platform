@@ -1,140 +1,169 @@
-import { Plus, Settings, ShieldCheck, UserCheck, UserPlus, Users } from 'lucide-react';
+'use client';
+
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { ShieldCheck, UserCheck, UserPlus, Users } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 
+import { getAdminRoles, getAdminUserStats, getAdminUsers } from './admin-api';
 import { MetricCard } from './components/MetricCard';
 import { PageHeader } from './components/PageHeader';
-import { ADMIN_USERS, RECENT_ACTIVITIES, USER_GROWTH_POINTS } from './data/admin-data';
 
-const USER_GROWTH_BAR_CLASSES = [
-  'h-[42%]',
-  'h-[50%]',
-  'h-[48%]',
-  'h-[59%]',
-  'h-[56%]',
-  'h-[68%]',
-  'h-[74%]',
-  'h-[81%]',
-  'h-[86%]',
-  'h-[91%]',
-  'h-[94%]',
-  'h-[100%]',
-] as const;
+type GrowthPoint = {
+  label: string;
+  value: number;
+};
+
+function getRecentMonthKeys(count: number) {
+  const now = new Date();
+
+  return Array.from({ length: count }, (_, index) => {
+    const date = new Date(now.getFullYear(), now.getMonth() - (count - 1 - index), 1);
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    const label = date.toLocaleDateString('en-US', { month: 'short' });
+
+    return { key, label };
+  });
+}
+
+function buildGrowthPoints(growthByMonth: Record<string, number> = {}) {
+  return getRecentMonthKeys(12).map(({ key, label }) => ({
+    label,
+    value: growthByMonth[key] ?? 0,
+  }));
+}
 
 // Codex #admin-ui start
 export default function AdminDashboardPage() {
-  const activeUsers = ADMIN_USERS.filter((user) => user.status === 'Active').length;
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [activeUsers, setActiveUsers] = useState(0);
+  const [newUsersThisMonth, setNewUsersThisMonth] = useState(0);
+  const [totalRoles, setTotalRoles] = useState(0);
+  const [growthPoints, setGrowthPoints] = useState<GrowthPoint[]>(() => buildGrowthPoints());
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      void Promise.all([getAdminUserStats(), getAdminUsers({ limit: 100 }), getAdminRoles()])
+        .then(([stats, usersResult, roles]) => {
+          const currentMonth = new Date().getMonth();
+          const currentYear = new Date().getFullYear();
+          const monthlyUsers = usersResult.users.filter((user) => {
+            const createdAt = new Date(user.createdAt);
+            return createdAt.getMonth() === currentMonth && createdAt.getFullYear() === currentYear;
+          });
+
+          setTotalUsers(stats.total);
+          setActiveUsers(stats.active);
+          setTotalRoles(roles.length);
+          setNewUsersThisMonth(monthlyUsers.length);
+          setGrowthPoints(buildGrowthPoints(stats.growthByMonth));
+        })
+        .catch(() => setError('Unable to load admin dashboard metrics.'));
+    });
+  }, []);
+
+  const maxGrowthValue = Math.max(...growthPoints.map((point) => point.value), 1);
 
   return (
     <>
       <PageHeader
         title="Dashboard"
-        description="Operational overview for admin staff, roles, activity, and access settings."
+        description="Operational overview for admin staff, users, and role coverage."
       />
 
+      {error ? (
+        <p className="rounded-lg border border-red-400/40 bg-red-950/30 px-4 py-3 text-sm font-medium text-red-200">
+          {error}
+        </p>
+      ) : null}
+
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Total Staff" value="128" change="+12 this month" icon={Users} />
-        <MetricCard label="Total Roles" value="6" change="Default role set" icon={ShieldCheck} />
-        <MetricCard label="Active Users" value={`${activeUsers}`} change="Mock active sample" icon={UserCheck} />
-        <MetricCard label="New Staff This Month" value="18" change="+9.4% from last month" icon={UserPlus} />
+        <MetricCard
+          label="Total Users"
+          value={`${totalUsers}`}
+          change="From users/stats"
+          icon={Users}
+        />
+        <MetricCard
+          label="Total Roles"
+          value={`${totalRoles}`}
+          change="SYS and PRJ roles"
+          icon={ShieldCheck}
+        />
+        <MetricCard
+          label="Active Users"
+          value={`${activeUsers}`}
+          change="Currently enabled"
+          icon={UserCheck}
+        />
+        <MetricCard
+          label="New Users This Month"
+          value={`${newUsersThisMonth}`}
+          change="Based on createdAt"
+          icon={UserPlus}
+        />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[1.45fr_0.8fr]">
-        <Card className="border-[#4A5260] bg-[#0c1219] shadow-sm">
+        <Card className="border-[var(--admin-border)] bg-[var(--admin-table)] shadow-sm">
           <CardHeader className="flex flex-row items-start justify-between gap-4">
             <div>
-              <CardTitle className="text-lg text-[#EEEEEE]">Staff Growth</CardTitle>
-              <p className="mt-1 text-sm text-[#aeb7c2]">Monthly staff volume across the admin module.</p>
+              <CardTitle className="text-lg text-[var(--admin-text)]">User Growth</CardTitle>
+              <p className="mt-1 text-sm font-medium text-[var(--admin-text-secondary)]">
+                Monthly user volume across the admin module.
+              </p>
             </div>
-            <Badge className="bg-[#FFD369] text-[#222831]">+24%</Badge>
+            <Badge className="bg-[#FFD369] text-[#222831]">Live-ready</Badge>
           </CardHeader>
           <CardContent>
-            <div className="flex h-72 items-end gap-3 rounded-lg border border-[#4b535f] bg-[#0b1118] p-5">
-              {USER_GROWTH_POINTS.map((point, index) => (
-                <div key={point} className="flex h-full flex-1 items-end">
+            <div className="flex h-72 items-end gap-3 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-row)] p-5">
+              {growthPoints.map((point) => (
+                <div className="flex h-full flex-1 flex-col justify-end gap-2" key={point.label}>
                   <div
-                    className={`w-full rounded-t-md bg-[#FFD369] ${USER_GROWTH_BAR_CLASSES[index]}`}
-                    aria-label={`Growth point ${point}`}
+                    aria-label={`${point.label}: ${point.value} users`}
+                    className="w-full rounded-t-md bg-[var(--admin-chart-bar)] transition-[height]"
+                    style={{ height: `${Math.max((point.value / maxGrowthValue) * 100, 4)}%` }}
                   />
+                  <span className="text-center text-[10px] font-semibold text-[var(--admin-text-muted)]">
+                    {point.label}
+                  </span>
                 </div>
               ))}
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-[#4A5260] bg-[#393E46] shadow-sm">
+        <Card className="border-[var(--admin-border)] bg-[var(--admin-surface)] shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg text-[#EEEEEE]">Quick Actions</CardTitle>
+            <CardTitle className="text-lg text-[var(--admin-text)]">Quick Actions</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3">
-            <Button className="justify-start bg-[#FFD369] text-[#222831] hover:bg-white">
-              <UserPlus className="size-4" />
-              Create Staff
+            <Button
+              asChild
+              className="justify-start !bg-[#FFD369] !text-[#222831] hover:!bg-[#ffe29a]"
+            >
+              <Link href="/admin/users?create=staff">
+                <UserPlus className="size-4" />
+                Create Staff
+              </Link>
             </Button>
             <Button
-              variant="outline"
+              asChild
               className="justify-start border-[#4A5260] bg-[#393E46] text-[#EEEEEE] hover:border-[#FFD369] hover:bg-[#303640]"
-            >
-              <ShieldCheck className="size-4" />
-              Review Roles
-            </Button>
-            <Button
               variant="outline"
-              className="justify-start border-[#4A5260] bg-[#393E46] text-[#EEEEEE] hover:border-[#FFD369] hover:bg-[#303640]"
             >
-              <Settings className="size-4" />
-              Open Settings
+              <Link href="/admin/roles">
+                <ShieldCheck className="size-4" />
+                Review Roles
+              </Link>
             </Button>
           </CardContent>
         </Card>
       </section>
-
-      <Card className="border-[#4A5260] bg-[#0c1219] shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-lg text-[#EEEEEE]">Recent Activities</CardTitle>
-          <Button
-            variant="outline"
-            size="sm"
-            className="border-[#4A5260] bg-[#393E46] text-[#EEEEEE] hover:border-[#FFD369] hover:bg-[#303640]"
-          >
-            <Plus className="size-4" />
-            Export
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader className="bg-[#1d242d]">
-              <TableRow className="border-[#4b535f] hover:bg-[#1d242d]">
-                <TableHead className="text-[#dce7f3]">Actor</TableHead>
-                <TableHead className="text-[#dce7f3]">Activity</TableHead>
-                <TableHead className="text-right text-[#dce7f3]">Time</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {RECENT_ACTIVITIES.map((activity) => (
-                <TableRow
-                  key={`${activity.actor}-${activity.time}`}
-                  className="border-[#4b535f] bg-[#0b1118] hover:bg-[#202832]"
-                >
-                  <TableCell className="font-medium text-[#EEEEEE]">{activity.actor}</TableCell>
-                  <TableCell className="text-[#aeb7c2]">{activity.action}</TableCell>
-                  <TableCell className="text-right text-[#aeb7c2]">{activity.time}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
     </>
   );
 }

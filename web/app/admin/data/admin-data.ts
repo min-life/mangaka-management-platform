@@ -1,10 +1,5 @@
 export type AdminRole =
-  | 'System Admin'
-  | 'Publisher'
-  | 'Editorial Board'
-  | 'Tantou Editor'
-  | 'Mangaka'
-  | 'Assistant';
+  'System Admin' | 'Publisher' | 'Editorial Board' | 'Tantou Editor' | 'Mangaka' | 'Assistant';
 
 export type AdminUserStatus = 'Active' | 'Invited' | 'Disabled';
 
@@ -23,7 +18,6 @@ export const ADMIN_NAV_ITEMS = [
   { href: '/admin', label: 'Dashboard' },
   { href: '/admin/users', label: 'Users' },
   { href: '/admin/roles', label: 'Roles' },
-  { href: '/admin/settings', label: 'Settings' },
 ] as const;
 
 export const ADMIN_USERS: AdminUser[] = [
@@ -105,28 +99,5 @@ export const ADMIN_ROLES = [
 export const PERMISSION_RESOURCES = ['Users', 'Roles', 'Projects', 'Tasks', 'Files'] as const;
 
 export const PERMISSION_ACTIONS = ['Create', 'Read', 'Update', 'Delete'] as const;
-
-export const RECENT_ACTIVITIES = [
-  {
-    actor: 'Elena Rostova',
-    action: 'updated Tantou Editor permissions',
-    time: '12 min ago',
-  },
-  {
-    actor: 'Nadia Park',
-    action: 'invited 3 new assistants',
-    time: '48 min ago',
-  },
-  {
-    actor: 'System Admin',
-    action: 'changed password policy',
-    time: '2 hr ago',
-  },
-  {
-    actor: 'Marcus Sterling',
-    action: 'completed email verification',
-    time: 'Today',
-  },
-] as const;
 
 export const USER_GROWTH_POINTS = [32, 48, 44, 63, 58, 76, 92, 108, 124, 138, 146, 162] as const;
