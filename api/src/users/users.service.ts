@@ -1110,7 +1110,8 @@ export class UsersService {
     };
   }
 
-  getGoogleLinkUrl(userId: number) {
+  async getGoogleLinkUrl(userId: number) {
+    const user = await this.ensureUser(userId);
     const clientId = requireEnv('GOOGLE_CLIENT_ID');
     const redirectUri =
       process.env.GOOGLE_LINK_CALLBACK_URL ??
@@ -1130,6 +1131,7 @@ export class UsersService {
       response_type: 'code',
       scope: 'email profile',
       state: state,
+      login_hint: user.email,
     });
 
     return { data: { url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}` } };
