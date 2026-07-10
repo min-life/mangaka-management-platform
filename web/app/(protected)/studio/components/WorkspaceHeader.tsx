@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ChevronDown, LogOut, Settings, User } from 'lucide-react';
+import { ChevronDown, LogOut, User } from 'lucide-react';
 
 import { useAuth } from '@/hooks/useAuth';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
@@ -29,22 +29,19 @@ export function WorkspaceHeader({
   const displayName = user?.displayName || user?.email || 'Current user';
   const email = user?.email ?? 'No email';
   const roleLabel = user?.role ?? 'Workspace Member';
-  const initials = displayName
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join('') || 'U';
+  const initials =
+    displayName
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part.charAt(0).toUpperCase())
+      .join('') || 'U';
 
   return (
     <header className="flex h-16 items-center justify-between border-b border-[#393E46] bg-[#222831] px-6">
       {/* LEFT */}
       <div className="flex items-center gap-4">
-        <img
-          src="/brand/1.png"
-          alt="Inkly"
-          className="h-[50px] w-auto object-contain"
-        />
+        <img src="/brand/1.png" alt="Inkly" className="h-[50px] w-auto object-contain" />
 
         <div className="h-7 w-px bg-[#434A55]" />
 
@@ -84,13 +81,9 @@ export function WorkspaceHeader({
               )}
 
               <div className="hidden text-left md:block">
-                <p className="text-sm font-semibold leading-none text-white">
-                  {displayName}
-                </p>
+                <p className="text-sm font-semibold leading-none text-white">{displayName}</p>
 
-                <p className="mt-1 text-[11px] font-medium text-[#8B93A5]">
-                  {roleLabel}
-                </p>
+                <p className="mt-1 text-[11px] font-medium text-[#8B93A5]">{roleLabel}</p>
               </div>
 
               <ChevronDown className="size-4 text-[#8B93A5]" />
@@ -107,7 +100,7 @@ export function WorkspaceHeader({
                   <img
                     src={user.avatarUrl}
                     alt={displayName}
-                    className="h-10 w-10 rounded-full object-cover"
+                    className="object-cover w-10 h-10 rounded-full"
                   />
                 ) : (
                   <span className="grid h-10 w-10 place-items-center rounded-full border border-[#FFD369] bg-[#101820] text-xs font-black text-white">
@@ -118,13 +111,9 @@ export function WorkspaceHeader({
                 <div>
                   <p className="font-semibold">{displayName}</p>
 
-                  <p className="text-xs text-[#8B93A5]">
-                    {email}
-                  </p>
+                  <p className="text-xs text-[#8B93A5]">{email}</p>
 
-                  <p className="text-[11px] font-bold text-[#FFD369]">
-                    {roleLabel}
-                  </p>
+                  <p className="text-[11px] font-bold text-[#FFD369]">{roleLabel}</p>
                 </div>
               </div>
             </DropdownMenuLabel>

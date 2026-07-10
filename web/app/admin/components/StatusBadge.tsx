@@ -12,7 +12,6 @@ type StatusBadgeProps = {
   status: AdminUserStatus;
 };
 
-// Codex #admin-ui start
 export function StatusBadge({ status }: StatusBadgeProps) {
   return (
     <Badge variant="outline" className={STATUS_CLASS_NAMES[status]}>
@@ -20,4 +19,3 @@ export function StatusBadge({ status }: StatusBadgeProps) {
     </Badge>
   );
 }
-// Codex #admin-ui end

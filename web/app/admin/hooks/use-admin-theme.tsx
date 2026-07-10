@@ -18,17 +18,19 @@ type AdminThemeProviderProps = {
   children: React.ReactNode;
 };
 
-// Codex #admin-ui start
 export function AdminThemeProvider({ children }: AdminThemeProviderProps) {
-  const [theme, setTheme] = useState<AdminTheme>('dark');
-
-  useEffect(() => {
-    const storedTheme = window.localStorage.getItem(ADMIN_THEME_STORAGE_KEY);
-
-    if (storedTheme === 'light' || storedTheme === 'dark') {
-      setTheme(storedTheme);
+  const [theme, setTheme] = useState<AdminTheme>(() => {
+    if (typeof window === 'undefined') {
+      return 'dark';
     }
-  }, []);
+
+    const storedTheme = window.localStorage.getItem(ADMIN_THEME_STORAGE_KEY);
+    if (storedTheme === 'light' || storedTheme === 'dark') {
+      return storedTheme;
+    }
+
+    return 'dark';
+  });
 
   useEffect(() => {
     window.localStorage.setItem(ADMIN_THEME_STORAGE_KEY, theme);
@@ -53,9 +55,7 @@ export function AdminThemeProvider({ children }: AdminThemeProviderProps) {
     </AdminThemeContext.Provider>
   );
 }
-// Codex #admin-ui end
 
-// Codex #admin-ui start
 export function useAdminTheme() {
   const context = useContext(AdminThemeContext);
 
@@ -65,4 +65,3 @@ export function useAdminTheme() {
 
   return context;
 }
-// Codex #admin-ui end

@@ -20,8 +20,6 @@ type UserFiltersProps = {
   searchQuery: string;
   setRoleFilter: (value: string) => void;
   setSearchQuery: (value: string) => void;
-  setStatusFilter: (value: string) => void;
-  statusFilter: string;
 };
 
 export function UserFilters({
@@ -30,12 +28,10 @@ export function UserFilters({
   searchQuery,
   setRoleFilter,
   setSearchQuery,
-  setStatusFilter,
-  statusFilter,
 }: UserFiltersProps) {
   return (
     <Card className="border-[#4A5260] bg-[#393E46] shadow-sm">
-      <CardContent className="grid gap-3 pt-1 md:grid-cols-[1fr_180px_180px]">
+      <CardContent className="grid gap-3 pt-1 md:grid-cols-[1fr_220px]">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#8f9aa8]" />
           <Input
@@ -56,16 +52,6 @@ export function UserFilters({
                 {role.name}
               </SelectItem>
             ))}
-          </SelectContent>
-        </Select>
-        <Select onValueChange={setStatusFilter} value={statusFilter}>
-          <SelectTrigger className="h-10 w-full border-[#4A5260] bg-[#393E46] text-[#EEEEEE] focus-visible:border-[#FFD369] focus-visible:ring-[#FFD369]/20">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent className="border-[#4A5260] bg-[#393E46] text-[#EEEEEE]">
-            <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="disabled">Disabled</SelectItem>
           </SelectContent>
         </Select>
       </CardContent>
