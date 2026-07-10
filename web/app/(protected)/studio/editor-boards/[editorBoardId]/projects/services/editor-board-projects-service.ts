@@ -2,15 +2,11 @@ import { getEditorBoardProjects as getEditorBoardProjectsRequest } from '@/servi
 import {
   getProjectApplications,
   getProjectMembers,
-  getProjectStats,
   type ProjectApplicationResponse,
   type ProjectMemberResponse,
   type ProjectResponse,
-  type ProjectStatResponse,
 } from '@/services/project.service';
-import { normalizeProjectMetrics, type ProjectStatus } from '@/services/project-metrics';
 
-export type { ProjectStatus };
 export type PublishingStatus = 'LIVE' | 'PENDING_APPROVAL' | 'SCHEDULED';
 
 export type ProjectMember = {
@@ -32,17 +28,6 @@ export type EditorBoardProject = {
   members: ProjectMember[];
   name: string;
   nextDeadline: string;
-  projectStats: Array<{
-    id: number;
-    metrics: {
-      cycleTimeDays: number;
-      progress: number;
-      status: ProjectStatus;
-      targetChapter: string;
-    };
-    projectId: number;
-    updatedAt: string;
-  }>;
   publishingStatus: PublishingStatus;
   updatedAt: string;
 };
@@ -58,7 +43,7 @@ export type EditorBoardProjectsSummary = {
 
 type EditorBoardProjectBase = Omit<
   EditorBoardProject,
-  'applicationsCount' | 'projectStats' | 'publishingStatus'
+  'applicationsCount' | 'publishingStatus'
 >;
 
 function mapProjectResponse(
@@ -100,19 +85,6 @@ function mapMembers(members: ProjectMemberResponse[]): ProjectMember[] {
   }));
 }
 
-function mapStats(project: ProjectResponse, stat: ProjectStatResponse | null) {
-  const metrics = stat?.metrics;
-
-  return [
-    {
-      id: stat?.id ?? project.id,
-      metrics: normalizeProjectMetrics(metrics),
-      projectId: stat?.projectId ?? project.id,
-      updatedAt: stat?.updatedAt ?? project.updatedAt,
-    },
-  ];
-}
-
 function getPublishingStatus(applications: ProjectApplicationResponse[]): PublishingStatus {
   if (applications.some((application) => application.status === 'APPROVE')) {
     return 'LIVE';
@@ -126,14 +98,13 @@ function getPublishingStatus(applications: ProjectApplicationResponse[]): Publis
 }
 
 async function getProjectDetails(project: ProjectResponse, editorBoardId: number | string) {
-  const [membersResult, statResult, applicationsResult] = await Promise.allSettled([
+  const [membersResult, applicationsResult] = await Promise.allSettled([
     getProjectMembers(project.id, {
       field: 'displayName',
       limit: 100,
       order: 'asc',
       page: 1,
     }),
-    getProjectStats(project.id),
     getProjectApplications(project.id, {
       field: 'updatedAt',
       limit: 100,
@@ -144,7 +115,6 @@ async function getProjectDetails(project: ProjectResponse, editorBoardId: number
 
   const baseProject = mapProjectResponse(project, editorBoardId);
   const members = membersResult.status === 'fulfilled' ? membersResult.value.members : [];
-  const stat = statResult.status === 'fulfilled' ? statResult.value : null;
   const applications =
     applicationsResult.status === 'fulfilled' ? applicationsResult.value.applications : [];
 
@@ -152,8 +122,7 @@ async function getProjectDetails(project: ProjectResponse, editorBoardId: number
     ...baseProject,
     applicationsCount: applications.length,
     members: mapMembers(members),
-    nextDeadline: applications[0]?.updatedAt ?? stat?.updatedAt ?? project.updatedAt,
-    projectStats: mapStats(project, stat),
+    nextDeadline: applications[0]?.updatedAt ?? project.updatedAt,
     publishingStatus: getPublishingStatus(applications),
   } satisfies EditorBoardProject;
 }
@@ -173,9 +142,6 @@ export async function getEditorBoardProjects(editorBoardId: number | string) {
 
 export async function getEditorBoardProjectsSummary(editorBoardId: number | string) {
   const boardProjects = await getEditorBoardProjects(editorBoardId);
-  const cycleTimes = boardProjects.map(
-    (project) => project.projectStats[0]?.metrics.cycleTimeDays ?? 0,
-  );
   const activeStafferIds = new Set(
     boardProjects.flatMap((project) => project.members.map((member) => member.id)),
   );
@@ -185,12 +151,7 @@ export async function getEditorBoardProjectsSummary(editorBoardId: number | stri
 
   return {
     activeStaffers: activeStafferIds.size,
-    averageCycleTimeDays:
-      cycleTimes.length > 0
-        ? Number(
-            (cycleTimes.reduce((total, value) => total + value, 0) / cycleTimes.length).toFixed(1),
-          )
-        : 0,
+    averageCycleTimeDays: 0,
     averageCycleTimeTrendPercent: 0,
     criticalDeadlines: 0,
     editorialTeamCount: roleNames.size,
