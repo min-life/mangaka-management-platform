@@ -18,15 +18,15 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 2. **Đặt lại pass (`/reset-password`)**: Nhận token từ URL, nhập pass mới -> Gọi `POST /api/auth/reset`. Đổi thành công sẽ tự động đăng xuất các thiết bị khác.
 
 ### 1.4 Luồng Đăng nhập Google
-1. **Điều hướng**: Từ `/login`, bấm nút Google -> Redirect Location sang `GET /api/auth/google`.
-2. **Callback**: Google trả về backend -> Backend redirect ngược về Frontend (`/auth/oauth-success`) kèm Access Token trong URL parameter (`?access_token=...`).
+1. **Điều hướng**: Từ `/login`, bấm nút Google -> Frontend gọi `GET /api/auth/google`. API trả về JSON chứa URL của Google (`{ data: { url: '...' } }`). Frontend lấy URL này và chủ động chuyển hướng (ví dụ: `window.location.href = url`).
+2. **Callback**: Google trả về backend -> Backend xử lý đăng nhập hoặc tự động tạo tài khoản mới nếu chưa tồn tại. Sau đó backend redirect ngược về Frontend (`/auth/oauth-success` hoặc `oauth-error`).
 
 ## 2. Luồng Quản lý Người dùng (Users Flow)
 
 ### 2.1 Cá nhân (Profile)
 1. **Xem & Sửa Profile**: Vào `/profile`, gọi `GET /api/users/me`. Khi cập nhật thông tin gọi `PATCH /api/users/me`.
 2. **Đổi mật khẩu**: Gọi `PATCH /api/users/me/password`. Thành công, backend trả về cặp token mới -> Frontend lưu lại ngầm mà không làm văng user.
-3. **Liên kết Google**: Bấm nút -> Chuyển hướng `GET /api/users/me/link-account`. Khi quay lại sẽ hiện Toast thành công/thất bại.
+3. **Liên kết Google**: Bấm nút -> Frontend gọi `GET /api/users/me/link-account` kèm Bearer Token. API trả về JSON chứa URL của Google (`{ data: { url: '...' } }`). Frontend chuyển hướng đến URL này. Khi quay lại sẽ hiện Toast thành công/thất bại dựa trên tham số trả về ở URL.
 
 ### 2.2 Quản trị viên (Admin)
 1. **Dashboard Users (`/admin/users`)**: Gọi `GET /api/users/stats` để vẽ chart, gọi `GET /api/users` đổ data vào Table.
@@ -233,7 +233,7 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 **GET** `/api/auth/google`
 
 #### Responses
-- **200**: Redirects to Google OAuth
+- **200**: Returns Google OAuth URL (`{ data: { url: '...' } }`)
 
 ---
 
@@ -339,7 +339,7 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 **GET** `/api/users/me/link-account`
 
 #### Responses
-- **200**: Redirects to Google OAuth
+- **200**: Returns Google OAuth URL (`{ data: { url: '...' } }`)
 
 ---
 

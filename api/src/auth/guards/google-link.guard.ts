@@ -10,24 +10,10 @@ export class GoogleLinkGuard extends AuthGuard('google') {
     super();
   }
 
-  getAuthenticateOptions(context: ExecutionContext) {
-    const request = context.switchToHttp().getRequest();
-    const options: { callbackURL: string; state?: string } = {
+  getAuthenticateOptions() {
+    return {
       callbackURL: this.getLinkCallbackUrl(),
     };
-
-    if (!request.path?.endsWith('/callback')) {
-      const currentUser = request.user as JwtPayload | undefined;
-      options.state = this.jwtService.sign(
-        { userId: currentUser?.userId },
-        {
-          secret: requireEnv('ACCESS_TOKEN_SECRET'),
-          expiresIn: '10m',
-        },
-      );
-    }
-
-    return options;
   }
 
   private getLinkCallbackUrl() {

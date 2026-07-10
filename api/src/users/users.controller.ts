@@ -101,12 +101,11 @@ export class UsersController {
     return { data: { accessToken: result.accessToken } };
   }
 
-  @ApiOperation({ summary: 'Initiate Google account linking' })
-  @ApiOkResponse({ description: 'Redirects to Google OAuth' })
+  @ApiOperation({ summary: 'Get Google OAuth URL for Account Linking' })
+  @ApiOkResponse({ description: 'Returns Google OAuth URL' })
   @Get('me/link-account')
-  @UseGuards(GoogleLinkGuard)
-  linkGoogleAccount() {
-    return;
+  getGoogleLinkUrl(@CurrentUser() currentUser: JwtPayload) {
+    return this.usersService.getGoogleLinkUrl(currentUser.userId);
   }
 
   @Public()
