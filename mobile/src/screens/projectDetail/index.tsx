@@ -1,18 +1,25 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
 
 import ApiStateView from '@/src/components/shared/ApiStateView';
 import BottomNavBar from '@/src/components/shared/BottomNavBar';
+import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
 import { navigateToNotificationTarget } from '@/src/navigation/notificationTargetNavigation';
 import { RootStackParamList } from '@/src/navigation/types';
 import { fetchProjectActivityLogs } from '@/src/services/activityLogApi';
 import { ApiEditorBoard } from '@/src/services/apiTypes';
 import { uploadProjectImageToCloudinary } from '@/src/services/cloudinaryUpload';
-import { fetchProjectBundle, updateProject } from '@/src/services/projectApi';
+import {
+  deleteProject,
+  fetchProjectBundle,
+  leaveProject,
+  updateProject,
+} from '@/src/services/projectApi';
+import { fetchMe } from '@/src/services/userApi';
 import { ActivityItem } from '@/src/types/home';
 import { ProjectItem } from '@/src/types/projects';
 
@@ -26,21 +33,27 @@ import {
 } from './components';
 
 type ProjectDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'ProjectDetail'>;
+type ProjectAction = 'delete' | 'leave' | null;
 
 export default function ProjectDetailScreen({ navigation, route }: ProjectDetailScreenProps) {
   const scrollViewRef = useRef<ScrollView>(null);
   const [project, setProject] = useState<ProjectItem | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [editorBoard, setEditorBoard] = useState<ApiEditorBoard | null>(null);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [isActivityLoading, setIsActivityLoading] = useState(true);
   const [activityErrorMessage, setActivityErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
+  const [activeProjectAction, setActiveProjectAction] = useState<ProjectAction>(null);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isRenameVisible, setIsRenameVisible] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameErrorMessage, setRenameErrorMessage] = useState('');
   const [renameForm, setRenameForm] = useState('');
-  const [projectImageAsset, setProjectImageAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [projectImageAsset, setProjectImageAsset] = useState<ImagePicker.ImagePickerAsset | null>(
+    null,
+  );
   const [projectImagePreviewUri, setProjectImagePreviewUri] = useState<string | undefined>();
 
   const loadProject = useCallback(async () => {
@@ -50,10 +63,14 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
     setActivityErrorMessage('');
 
     try {
-      const bundle = await fetchProjectBundle(route.params.projectId, {
-        includeResourceStats: true,
-      });
+      const [bundle, currentUser] = await Promise.all([
+        fetchProjectBundle(route.params.projectId, {
+          includeResourceStats: true,
+        }),
+        fetchMe(),
+      ]);
       setProject(bundle.project);
+      setCurrentUserId(String(currentUser.id));
       setEditorBoard(bundle.board);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to load project.');
@@ -96,6 +113,7 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
 
   const openRenameModal = useCallback(() => {
     if (!project) return;
+    setIsMoreMenuOpen(false);
     setRenameForm(project.name);
     setProjectImageAsset(null);
     setProjectImagePreviewUri(project.coverUri);
@@ -172,13 +190,70 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
       setProjectImageAsset(null);
       setProjectImagePreviewUri(undefined);
     } catch (error) {
-      setRenameErrorMessage(
-        error instanceof Error ? error.message : 'Unable to update project.',
-      );
+      setRenameErrorMessage(error instanceof Error ? error.message : 'Unable to update project.');
     } finally {
       setIsRenaming(false);
     }
   }, [isRenaming, project, projectImageAsset, renameForm]);
+
+  const resetToProjects = useCallback(() => {
+    navigation.reset({
+      index: 1,
+      routes: [{ name: 'Home' }, { name: 'Projects' }],
+    });
+  }, [navigation]);
+
+  const performDeleteProject = useCallback(async () => {
+    if (!project || activeProjectAction) return;
+
+    setActiveProjectAction('delete');
+    try {
+      await deleteProject(project.id);
+      resetToProjects();
+    } catch (error) {
+      Alert.alert(
+        'Cannot delete project',
+        error instanceof Error ? error.message : 'Không thể xoá project.',
+      );
+    } finally {
+      setActiveProjectAction(null);
+    }
+  }, [activeProjectAction, project, resetToProjects]);
+
+  const performLeaveProject = useCallback(async () => {
+    if (!project || activeProjectAction) return;
+
+    setActiveProjectAction('leave');
+    try {
+      await leaveProject(project.id);
+      resetToProjects();
+    } catch (error) {
+      Alert.alert(
+        'Cannot leave project',
+        error instanceof Error ? error.message : 'Không thể rời project.',
+      );
+    } finally {
+      setActiveProjectAction(null);
+    }
+  }, [activeProjectAction, project, resetToProjects]);
+
+  const handleDeletePress = useCallback(() => {
+    if (!project) return;
+    setIsMoreMenuOpen(false);
+    Alert.alert('Delete project', `Delete ${project.name}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: performDeleteProject },
+    ]);
+  }, [performDeleteProject, project]);
+
+  const handleLeavePress = useCallback(() => {
+    if (!project) return;
+    setIsMoreMenuOpen(false);
+    Alert.alert('Leave project', `Leave ${project.name}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Leave', style: 'destructive', onPress: performLeaveProject },
+    ]);
+  }, [performLeaveProject, project]);
 
   if (isLoading) {
     return (
@@ -245,10 +320,82 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
       onPress: () => navigation.navigate('ProjectReport', { projectId: project.id }),
     },
   ];
+  const isProjectOwner = Boolean(
+    currentUserId && project.createdBy && currentUserId === project.createdBy,
+  );
+  const isProjectActionRunning = activeProjectAction !== null;
 
   return (
     <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
-      <ProjectDetailTopBar onBack={() => navigation.goBack()} onMorePress={openRenameModal} />
+      <ProjectDetailTopBar
+        onBack={() => navigation.goBack()}
+        onMorePress={() => setIsMoreMenuOpen((value) => !value)}
+      />
+
+      {isMoreMenuOpen ? (
+        <View
+          className="absolute right-4 top-20 z-50 rounded-xl p-2"
+          style={{
+            backgroundColor: Colors.surface,
+            borderColor: Colors.borderSubtle,
+            borderWidth: 1,
+          }}
+        >
+          {isProjectOwner ? (
+            <>
+              <TouchableOpacity
+                activeOpacity={0.76}
+                accessibilityRole="button"
+                className="min-w-[132px] flex-row items-center rounded-lg px-3 py-3"
+                disabled={isProjectActionRunning}
+                onPress={openRenameModal}
+                style={{ opacity: isProjectActionRunning ? 0.56 : 1 }}
+              >
+                <MaterialIcon name="edit" color={Colors.text} size={18} />
+                <Text className="ml-2 text-[14px] font-semibold" style={{ color: Colors.text }}>
+                  Edit
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.76}
+                accessibilityRole="button"
+                className="min-w-[132px] flex-row items-center rounded-lg px-3 py-3"
+                disabled={isProjectActionRunning}
+                onPress={handleDeletePress}
+                style={{ opacity: isProjectActionRunning ? 0.56 : 1 }}
+              >
+                {activeProjectAction === 'delete' ? (
+                  <ActivityIndicator color="#EF4444" size="small" />
+                ) : (
+                  <MaterialIcon name="delete" color="#EF4444" size={18} />
+                )}
+                <Text className="ml-2 text-[14px] font-semibold" style={{ color: '#EF4444' }}>
+                  Delete
+                </Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <TouchableOpacity
+              activeOpacity={0.76}
+              accessibilityRole="button"
+              className="min-w-[132px] flex-row items-center rounded-lg px-3 py-3"
+              disabled={isProjectActionRunning}
+              onPress={handleLeavePress}
+              style={{ opacity: isProjectActionRunning ? 0.56 : 1 }}
+            >
+              {activeProjectAction === 'leave' ? (
+                <ActivityIndicator color="#EF4444" size="small" />
+              ) : (
+                <MaterialIcon name="logout" color="#EF4444" size={18} />
+              )}
+              <Text className="ml-2 text-[14px] font-semibold" style={{ color: '#EF4444' }}>
+                Leave
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      ) : null}
 
       <ScrollView
         ref={scrollViewRef}

@@ -19,6 +19,7 @@ import { groupNotifications, mapNotification, uniqueById } from '@/src/services/
 import { subscribeToNotifications } from '@/src/services/realtimeClient';
 import { NotificationItem } from '@/src/types/notifications';
 import NotificationList from './components/NotificationList';
+import NotificationsFilterBar from './components/NotificationsFilterBar';
 import NotificationsEmptyState from './components/NotificationsEmptyState';
 import NotificationsTopBar from './components/NotificationsTopBar';
 
@@ -119,12 +120,9 @@ export default function NotificationsScreen() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
-      <NotificationsTopBar
-        activeFilter={activeFilter}
-        unreadCount={unreadCount}
-        onFilterChange={setActiveFilter}
-        onMarkAllRead={handleMarkAllRead}
-      />
+      <NotificationsTopBar unreadCount={unreadCount} onMarkAllRead={handleMarkAllRead} />
+
+      <NotificationsFilterBar activeFilter={activeFilter} onFilterChange={setActiveFilter} />
 
       {isLoading ? (
         <ApiStateView type="loading" />

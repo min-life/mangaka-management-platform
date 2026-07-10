@@ -29,7 +29,6 @@ export default function TaskCard({ task, onPress }: TaskCardProps) {
       <View className="flex-row justify-between items-start">
         <View className="flex-1 gap-1">
           <View className="flex-row items-center gap-2 flex-wrap">
-            <PriorityBadge priority={task.priority} />
             <Text className="font-semibold text-[15px] flex-shrink" style={{ color: Colors.text }}>
               {task.title}
             </Text>
@@ -53,4 +52,3 @@ export default function TaskCard({ task, onPress }: TaskCardProps) {
     </TouchableOpacity>
   );
 }
-

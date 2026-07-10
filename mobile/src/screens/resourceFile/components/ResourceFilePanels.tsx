@@ -786,19 +786,10 @@ function TaskRow({
 }: {
   task: ResourceFileTask;
   isSelected: boolean;
-  onPress: () => void;
+  onPress?: () => void;
 }) {
-  return (
-    <TouchableOpacity
-      activeOpacity={0.78}
-      onPress={onPress}
-      className="rounded-xl p-4"
-      style={{
-        backgroundColor: isSelected ? 'rgba(255,211,105,0.12)' : C.surface,
-        borderWidth: 1,
-        borderColor: isSelected ? C.accent : C.border,
-      }}
-    >
+  const content = (
+    <>
       <View className="flex-row items-start gap-3">
         <View
           className="h-10 w-10 items-center justify-center rounded-lg"
@@ -851,6 +842,30 @@ function TaskRow({
           </View>
         </View>
       </View>
+    </>
+  );
+  const containerStyle = {
+    backgroundColor: isSelected ? 'rgba(255,211,105,0.12)' : C.surface,
+    borderWidth: 1,
+    borderColor: isSelected ? C.accent : C.border,
+  };
+
+  if (!onPress) {
+    return (
+      <View className="rounded-xl p-4" style={containerStyle}>
+        {content}
+      </View>
+    );
+  }
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.78}
+      onPress={onPress}
+      className="rounded-xl p-4"
+      style={containerStyle}
+    >
+      {content}
     </TouchableOpacity>
   );
 }
@@ -1025,78 +1040,6 @@ function TaskDiscussion({
   );
 }
 
-function TaskFramePanel({ task }: { task: ResourceFileTask }) {
-  const description = task.description?.trim();
-
-  return (
-    <View
-      className="gap-4 rounded-xl p-4"
-      style={{ backgroundColor: 'rgba(255,255,255,0.035)', borderWidth: 1, borderColor: C.border }}
-    >
-      <View className="gap-2">
-        <View className="flex-row items-start justify-between gap-3">
-          <Text className="flex-1 text-[15px] font-bold" style={{ color: C.text }}>
-            {task.title}
-          </Text>
-          <StatusBadge status={task.status} />
-        </View>
-      </View>
-
-      <View>
-        <TaskMetadataRow
-          icon="person"
-          label="Assigned"
-          value={task.assignedByName || 'Unassigned'}
-        />
-        <TaskMetadataRow icon="person" label="Created by" value={task.createdByName} />
-        <TaskMetadataRow icon="calendar_today" label="Created" value={formatDate(task.createdAt)} />
-        <TaskMetadataRow
-          icon="event"
-          label="Deadline"
-          value={task.deadline ? formatDate(task.deadline) : 'No due date'}
-        />
-        <TaskMetadataRow icon="update" label="Updated" value={formatDate(task.updatedAt)} />
-        {task.updatedByName ? (
-          <TaskMetadataRow icon="manage_accounts" label="Updated by" value={task.updatedByName} />
-        ) : null}
-      </View>
-
-      <View className="gap-2 pt-3" style={{ borderTopWidth: 1, borderTopColor: C.border }}>
-        <Text className="text-[11px] font-bold uppercase" style={{ color: C.textMuted }}>
-          Description
-        </Text>
-        <Text className="text-[13px] leading-5" style={{ color: C.text }}>
-          {description || 'No description.'}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-function TaskMetadataRow({ icon, label, value }: { icon: string; label: string; value: string }) {
-  return (
-    <View
-      className="flex-row items-start gap-3 py-3"
-      style={{ borderTopWidth: 1, borderTopColor: C.borderFaint }}
-    >
-      <View
-        className="h-8 w-8 items-center justify-center rounded-lg"
-        style={{ backgroundColor: Colors.iconBg }}
-      >
-        <MaterialIcon name={icon} color={C.accent} size={16} />
-      </View>
-      <View className="flex-1">
-        <Text className="text-[10px] font-bold uppercase" style={{ color: C.textMuted }}>
-          {label}
-        </Text>
-        <Text className="mt-0.5 text-[13px] font-semibold" style={{ color: C.text }}>
-          {value}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
 function TaskSection({
   onCreateComment,
   onSelectFrame,
@@ -1251,12 +1194,7 @@ function TaskStatusFilterButton({
 }
 
 export function TasksPanel({
-  onCreateComment,
-  onSelectFrame,
-  onSelectTask,
-  selectedFrame,
   selectedTaskId,
-  showTaskDiscussion = true,
   tasks,
 }: {
   onCreateComment?: (params: {
@@ -1274,7 +1212,6 @@ export function TasksPanel({
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>('ALL');
   const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
-  const selectedTask = tasks.find((t) => t.id === selectedTaskId);
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const filteredTasks = tasks.filter((task) => {
     const matchesSearch =
@@ -1284,42 +1221,6 @@ export function TasksPanel({
 
     return matchesSearch && matchesStatus;
   });
-
-  if (selectedTask) {
-    return (
-      <View className="mt-6 gap-4">
-        <TouchableOpacity
-          activeOpacity={0.78}
-          onPress={() => onSelectTask(null)}
-          className="flex-row items-center gap-2 pb-2"
-          style={{ borderBottomWidth: 1, borderBottomColor: C.border }}
-        >
-          <MaterialIcon name="arrow_back" color={C.accent} size={20} />
-          <Text className="text-[14px] font-bold" style={{ color: C.text }}>
-            Back to Tasks
-          </Text>
-          <Text
-            className="text-[14px] font-medium ml-2 truncate flex-1"
-            numberOfLines={1}
-            style={{ color: C.textMuted }}
-          >
-            ({selectedTask.title})
-          </Text>
-        </TouchableOpacity>
-
-        {showTaskDiscussion && onCreateComment ? (
-          <TaskDiscussion
-            onCreateComment={onCreateComment}
-            selectedFrame={selectedFrame}
-            task={selectedTask}
-            onSelectFrame={onSelectFrame}
-          />
-        ) : (
-          <TaskFramePanel task={selectedTask} />
-        )}
-      </View>
-    );
-  }
 
   return (
     <View className="mt-6 gap-4" style={{ zIndex: isStatusFilterOpen ? 30 : 1 }}>
@@ -1381,12 +1282,7 @@ export function TasksPanel({
           <EmptyState title="No matching tasks" />
         ) : (
           filteredTasks.map((task) => (
-            <TaskRow
-              key={task.id}
-              task={task}
-              isSelected={false}
-              onPress={() => onSelectTask(task)}
-            />
+            <TaskRow key={task.id} task={task} isSelected={task.id === selectedTaskId} />
           ))
         )}
       </View>

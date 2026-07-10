@@ -92,3 +92,50 @@ sửa câu thông báo - notification -> theo đông
 Report : Tên project
 
 Member
+
+đưa lọc lên trên header phải
+
+-Task: - thêm decription short trong card
+-Task Detail: -Thay x frame -> nhảy sang discussion để xem comment
+
+---
+
+-Discussion : - Task không cho lướt lên
+-Material: thêm filter task
+-Project detail: 3 chấm hiển thị 3 cái edit, delete project if(project owner), else leave project
+-Contribute: đổi sọt rác thành dấu 3 chấm để thêm tính năng thay đổi role
+
+-Profile: Link account gg
+
+---
+
+Inbox : - Unread sẽ nằm ngoài
+
+Task -> Task detail chưa cùng trang với file.
+
+Up avatar thiếu env
+
+Đưa filter xuống dưới ô search - Projects
+
+File Detail -> Overview -> thêm ngày tạo
+
+Sửa các thông báo thành tiếng anh
+
+Sửa navigate
+
+Project -> Application -> bỏ thống kê
+
+Contribute -> thêm edit
+
+Application -> tách 2 filter
+-> type application chỉ còn 2 cái CREATE_ARC và CREATE_CHAPTER
+
+Editor Boards -> thêm các thông tin ở card
+-> out đang call api bị sai
+
+Member bỏ sao
+cho edit role
+thêm join ngày nào
+bỏ role tag
+
+Application -> nếu là lead thì cho xem được bao nhiêu lượt vote

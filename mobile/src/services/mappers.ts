@@ -186,6 +186,7 @@ export function mapProjectMember(member: ApiProjectMember): ProjectMemberItem {
     name,
     numberOfTasks: member.numberOfTasks ?? member.taskOverview?.total ?? 0,
     roleCode: member.role?.code ?? '',
+    roleId: member.role?.id,
     roleName: member.role?.name ?? 'Member',
     taskOverview: member.taskOverview ?? null,
   };

@@ -18,10 +18,10 @@ export default function ProjectsSearchBar({ search, onSearchChange }: ProjectsSe
       <TextInput
         value={search}
         onChangeText={onSearchChange}
-        placeholder="Search"
-        placeholderTextColor="rgba(237,241,251,0.58)"
+        placeholder="Search projects"
+        placeholderTextColor="rgba(237,241,251,0.65)"
         accessibilityLabel="Search projects"
-        className="h-12 rounded-xl pl-10 pr-4 text-[15px]"
+        className="h-11 rounded-lg pl-10 pr-4 text-[15px]"
         style={{
           backgroundColor: Colors.surface,
           color: Colors.text,

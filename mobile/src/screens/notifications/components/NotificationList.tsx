@@ -5,8 +5,6 @@ import NotificationRow from '@/src/components/sub-component/NotificationRow';
 import AppRefreshControl from '@/src/components/shared/AppRefreshControl';
 import { NotificationItem } from '@/src/types/notifications';
 
-import NotificationSectionHeader from './NotificationSectionHeader';
-
 interface FilteredNotificationSection {
   sectionKey: string;
   label: string;
@@ -36,16 +34,9 @@ export default function NotificationList({
       // refreshControl={
       //   <AppRefreshControl onRefresh={onRefresh} refreshing={refreshing} />
       // }
-      renderSectionHeader={({ section }) => (
-        <NotificationSectionHeader label={section.label} sectionKey={section.sectionKey} />
-      )}
       renderItem={({ item }: { item: NotificationItem }) => (
-        <NotificationRow
-          item={item}
-          onPress={() => onNotificationPress(item)}
-        />
+        <NotificationRow item={item} onPress={() => onNotificationPress(item)} />
       )}
     />
   );
 }
-

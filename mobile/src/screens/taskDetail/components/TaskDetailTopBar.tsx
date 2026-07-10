@@ -1,8 +1,8 @@
 import React from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import MaterialIcon from '@/src/components/shared/MaterialIcon';
+import HeaderBackButton from '@/src/components/shared/HeaderBackButton';
 
 import { C } from './theme';
 
@@ -24,28 +24,17 @@ export default function TaskDetailTopBar({
         style={{ borderBottomWidth: 1, borderBottomColor: C.border }}
       >
         <View className="flex-1 flex-row items-center gap-3 pr-3">
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={onBack}
-            className="w-9 h-9 items-center justify-center rounded-full"
-            style={{ backgroundColor: C.surfaceHighest }}
-          >
-            <MaterialIcon name="arrow_back" color={C.text} size={20} />
-          </TouchableOpacity>
+          <HeaderBackButton iconSize={20} onPress={onBack} />
 
           <View className="flex-1">
-            <Text
+            {/* <Text
               className="text-[11px] font-medium uppercase tracking-widest"
               style={{ color: C.textMuted, letterSpacing: 1.5 }}
               numberOfLines={1}
             >
               {subtitle}
-            </Text>
-            <Text
-              className="text-[16px] font-bold"
-              style={{ color: C.text }}
-              numberOfLines={1}
-            >
+            </Text> */}
+            <Text className="text-[16px] font-bold" style={{ color: C.text }} numberOfLines={1}>
               {title}
             </Text>
           </View>

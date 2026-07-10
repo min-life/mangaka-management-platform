@@ -8,7 +8,11 @@ import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
 import { RootStackParamList } from '@/src/navigation/types';
 import EditorBoardTopBar from '@/src/screens/editorBoards/components/EditorBoardTopBar';
-import { fetchProjectBundle, fetchProjectMembers, removeProjectMember } from '@/src/services/projectApi';
+import {
+  fetchProjectBundle,
+  fetchProjectMembers,
+  removeProjectMember,
+} from '@/src/services/projectApi';
 import { ProjectMemberItem } from '@/src/types/projects';
 import AddMemberModal from './AddMemberModal';
 
@@ -45,7 +49,11 @@ function ContributorRow({
           style={{ backgroundColor: Colors.iconBg }}
         >
           {member.avatarUri ? (
-            <Image source={{ uri: member.avatarUri }} className="h-full w-full" resizeMode="cover" />
+            <Image
+              source={{ uri: member.avatarUri }}
+              className="h-full w-full"
+              resizeMode="cover"
+            />
           ) : (
             <Text className="text-[13px] font-bold" style={{ color: Colors.accent }}>
               {member.initials}
@@ -57,16 +65,17 @@ function ContributorRow({
           <Text className="text-[15px] font-bold" style={{ color: Colors.text }} numberOfLines={1}>
             {member.name}
           </Text>
-          <Text className="mt-0.5 text-[12px]" style={{ color: Colors.textMuted }} numberOfLines={1}>
+          <Text
+            className="mt-0.5 text-[12px]"
+            style={{ color: Colors.textMuted }}
+            numberOfLines={1}
+          >
             {member.email || 'No email'}
           </Text>
         </View>
 
         <View className="flex-row items-center gap-2">
-          <View
-            className="rounded-full px-3 py-1"
-            style={{ backgroundColor: roleBackground }}
-          >
+          <View className="rounded-full px-3 py-1" style={{ backgroundColor: roleBackground }}>
             <Text className="text-[11px] font-bold" style={{ color: roleColor }}>
               {roleLabel}
             </Text>
@@ -93,7 +102,6 @@ export default function ProjectContributorsScreen({
 }: ProjectContributorsScreenProps) {
   const [members, setMembers] = useState<ProjectMemberItem[]>([]);
   const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
-  const [projectName, setProjectName] = useState('Project');
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
@@ -110,7 +118,6 @@ export default function ProjectContributorsScreen({
       ]);
       setMembers(memberResult.members);
       setOwnerUserId(projectBundle?.project.createdBy || null);
-      setProjectName(projectBundle?.project.name ?? 'Project');
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Không thể tải thành viên.');
     } finally {
@@ -141,13 +148,16 @@ export default function ProjectContributorsScreen({
               await removeProjectMember(route.params.projectId, member.id);
               await loadMembers();
             } catch (error) {
-              Alert.alert('Error', error instanceof Error ? error.message : 'Không thể xóa thành viên.');
+              Alert.alert(
+                'Error',
+                error instanceof Error ? error.message : 'Không thể xóa thành viên.',
+              );
             } finally {
               setIsLoading(false);
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -155,7 +165,6 @@ export default function ProjectContributorsScreen({
     <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
       <EditorBoardTopBar
         onBack={() => navigation.goBack()}
-        subtitle={projectName}
         title="Contribute"
         actionIcon="add"
         onActionPress={() => setIsAddModalVisible(true)}

@@ -36,10 +36,7 @@ export async function fetchProjects(params: { me?: boolean; name?: string } = {}
   };
 }
 
-export async function updateProject(
-  projectId: string,
-  data: { imageUrl?: string; name?: string },
-) {
+export async function updateProject(projectId: string, data: { imageUrl?: string; name?: string }) {
   const response = await apiRequest<ApiDataResponse<ApiProject>>(`/projects/${projectId}`, {
     body: data,
     method: 'PATCH',
@@ -50,6 +47,18 @@ export async function updateProject(
   }
 
   return response.data;
+}
+
+export async function deleteProject(projectId: string) {
+  return apiRequest<void>(`/projects/${projectId}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function leaveProject(projectId: string) {
+  return apiRequest<void>(`/projects/${projectId}/members/me`, {
+    method: 'DELETE',
+  });
 }
 
 export async function fetchProjectBundle(
