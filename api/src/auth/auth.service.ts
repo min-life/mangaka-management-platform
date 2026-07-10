@@ -434,6 +434,20 @@ export class AuthService {
     return `${baseUrl.replace(/\/$/, '')}${path}`;
   }
 
+  getGoogleAuthUrl() {
+    const clientId = requireEnv('GOOGLE_CLIENT_ID');
+    const redirectUri = requireEnv('GOOGLE_CALLBACK_URL');
+    
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: 'email profile',
+    });
+
+    return { data: { url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}` } };
+  }
+
   private handleError(error: unknown, logMessage: string, clientMessage: string): never {
     this.logger.error(logMessage, error instanceof Error ? error.stack : String(error));
     if (error instanceof HttpException) {
