@@ -1,39 +1,184 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { ShieldCheck, UserCheck, UserPlus, Users } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Activity, ShieldCheck, UserCheck, UserPlus, Users } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 import { getAdminRoles, getAdminUserStats, getAdminUsers } from './admin-api';
 import { MetricCard } from './components/MetricCard';
 import { PageHeader } from './components/PageHeader';
 
-type GrowthPoint = {
+type ChartPoint = {
+  key: string;
   label: string;
   value: number;
 };
 
-function getRecentMonthKeys(count: number) {
-  const now = new Date();
+function formatMonthKey(year: number, monthIndex: number) {
+  return `${year}-${String(monthIndex + 1).padStart(2, '0')}`;
+}
 
-  return Array.from({ length: count }, (_, index) => {
-    const date = new Date(now.getFullYear(), now.getMonth() - (count - 1 - index), 1);
-    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    const label = date.toLocaleDateString('en-US', { month: 'short' });
+function getYearMonthKeys(year: number) {
+  return Array.from({ length: 12 }, (_, index) => {
+    const date = new Date(year, index, 1);
 
-    return { key, label };
+    return {
+      key: formatMonthKey(year, index),
+      label: date.toLocaleDateString('en-US', { month: 'short' }),
+    };
   });
 }
 
-function buildGrowthPoints(growthByMonth: Record<string, number> = {}) {
-  return getRecentMonthKeys(12).map(({ key, label }) => ({
+function buildGrowthPoints(growthByMonth: Record<string, number>, year: number) {
+  return getYearMonthKeys(year).map(({ key, label }) => ({
+    key,
     label,
     value: growthByMonth[key] ?? 0,
   }));
+}
+
+function getGrowthYears(growthByMonth: Record<string, number>) {
+  const currentYear = new Date().getFullYear();
+  const years = Object.keys(growthByMonth)
+    .map((key) => Number(key.slice(0, 4)))
+    .filter((year) => Number.isFinite(year));
+
+  return Array.from(new Set([currentYear, ...years])).sort(
+    (firstYear, secondYear) => secondYear - firstYear,
+  );
+}
+
+function formatMetric(value: number) {
+  return new Intl.NumberFormat('en-US').format(value);
+}
+
+function getNiceChartScale(maxValue: number, tickCount = 5) {
+  if (maxValue <= 0) {
+    return {
+      max: 4,
+      ticks: [4, 3, 2, 1, 0],
+    };
+  }
+
+  const stepBase = maxValue / (tickCount - 1);
+  const magnitude = 10 ** Math.floor(Math.log10(stepBase));
+  const normalizedStep = stepBase / magnitude;
+  const niceStep = normalizedStep <= 1 ? 1 : normalizedStep <= 2 ? 2 : normalizedStep <= 5 ? 5 : 10;
+  const step = niceStep * magnitude;
+  const max = step * (tickCount - 1);
+
+  return {
+    max,
+    ticks: Array.from({ length: tickCount }, (_, index) => max - step * index),
+  };
+}
+
+function buildLinePoints(values: number[], axisMax: number) {
+  const width = 1000;
+  const height = 230;
+  const horizontalPadding = 44;
+  const verticalPadding = 26;
+  const drawableWidth = width - horizontalPadding * 2;
+  const drawableHeight = height - verticalPadding * 2;
+
+  return values.map((value, index) => {
+    const x =
+      horizontalPadding + (values.length <= 1 ? 0 : (index / (values.length - 1)) * drawableWidth);
+    const y = height - verticalPadding - (value / axisMax) * drawableHeight;
+
+    return { x, y };
+  });
+}
+
+function UserGrowthLineChart({ points }: { points: ChartPoint[] }) {
+  const maxValue = Math.max(...points.map((point) => point.value), 0);
+  const axis = getNiceChartScale(maxValue);
+  const linePoints = buildLinePoints(
+    points.map((point) => point.value),
+    axis.max,
+  );
+  const linePath = linePoints.map((point) => `${point.x},${point.y}`).join(' ');
+  const gridLines = axis.ticks.map((_, index) => 26 + index * 44.5);
+
+  return (
+    <div className="rounded-[5px] border border-[#303842] bg-[#0f1720] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <div className="mb-3 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.08em] text-[#aeb7c2]">
+        <Activity className="size-4" />
+        Users Over Time
+      </div>
+      <div>
+        <div className="h-[230px] border-b border-[#303842]">
+          <svg
+            aria-label="User growth"
+            className="h-full w-full overflow-visible"
+            preserveAspectRatio="none"
+            role="img"
+            viewBox="0 0 1000 230"
+          >
+            {gridLines.map((y) => (
+              <line
+                key={y}
+                stroke="#26303b"
+                strokeWidth="1"
+                vectorEffect="non-scaling-stroke"
+                x1="0"
+                x2="1000"
+                y1={y}
+                y2={y}
+              />
+            ))}
+            <polyline
+              fill="none"
+              points={linePath}
+              stroke="#FFD369"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="3"
+              vectorEffect="non-scaling-stroke"
+            />
+            {linePoints.map((point, index) => (
+              <g key={points[index].key}>
+                <circle
+                  cx={point.x}
+                  cy={point.y}
+                  fill="#FFD369"
+                  r="5"
+                  stroke="#101820"
+                  strokeWidth="2"
+                  vectorEffect="non-scaling-stroke"
+                />
+                <text
+                  className="fill-[#dce7f3] text-[13px] font-black"
+                  textAnchor="middle"
+                  x={point.x}
+                  y={Math.max(point.y - 14, 14)}
+                >
+                  {formatMetric(points[index].value)}
+                </text>
+              </g>
+            ))}
+          </svg>
+        </div>
+        <div className="mt-2 grid grid-cols-12 text-[11px] font-medium text-[#5f6875]">
+          {points.map((point) => (
+            <span className="text-center" key={point.key}>
+              {point.label}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // Codex #admin-ui start
@@ -42,8 +187,14 @@ export default function AdminDashboardPage() {
   const [activeUsers, setActiveUsers] = useState(0);
   const [newUsersThisMonth, setNewUsersThisMonth] = useState(0);
   const [totalRoles, setTotalRoles] = useState(0);
-  const [growthPoints, setGrowthPoints] = useState<GrowthPoint[]>(() => buildGrowthPoints());
+  const [growthByMonth, setGrowthByMonth] = useState<Record<string, number>>({});
+  const [growthYear, setGrowthYear] = useState(new Date().getFullYear());
   const [error, setError] = useState<string | null>(null);
+  const growthYears = getGrowthYears(growthByMonth);
+  const growthPoints = useMemo(
+    () => buildGrowthPoints(growthByMonth, growthYear),
+    [growthByMonth, growthYear],
+  );
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -60,13 +211,11 @@ export default function AdminDashboardPage() {
           setActiveUsers(stats.active);
           setTotalRoles(roles.length);
           setNewUsersThisMonth(monthlyUsers.length);
-          setGrowthPoints(buildGrowthPoints(stats.growthByMonth));
+          setGrowthByMonth(stats.growthByMonth ?? {});
         })
         .catch(() => setError('Unable to load admin dashboard metrics.'));
     });
   }, []);
-
-  const maxGrowthValue = Math.max(...growthPoints.map((point) => point.value), 1);
 
   return (
     <>
@@ -82,30 +231,10 @@ export default function AdminDashboardPage() {
       ) : null}
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Total Users"
-          value={`${totalUsers}`}
-          change="From users/stats"
-          icon={Users}
-        />
-        <MetricCard
-          label="Total Roles"
-          value={`${totalRoles}`}
-          change="SYS and PRJ roles"
-          icon={ShieldCheck}
-        />
-        <MetricCard
-          label="Active Users"
-          value={`${activeUsers}`}
-          change="Currently enabled"
-          icon={UserCheck}
-        />
-        <MetricCard
-          label="New Users This Month"
-          value={`${newUsersThisMonth}`}
-          change="Based on createdAt"
-          icon={UserPlus}
-        />
+        <MetricCard label="Total Users" value={`${totalUsers}`} icon={Users} />
+        <MetricCard label="Total Roles" value={`${totalRoles}`} icon={ShieldCheck} />
+        <MetricCard label="Active Users" value={`${activeUsers}`} icon={UserCheck} />
+        <MetricCard label="New Users This Month" value={`${newUsersThisMonth}`} icon={UserPlus} />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[1.45fr_0.8fr]">
@@ -113,27 +242,29 @@ export default function AdminDashboardPage() {
           <CardHeader className="flex flex-row items-start justify-between gap-4">
             <div>
               <CardTitle className="text-lg text-[var(--admin-text)]">User Growth</CardTitle>
-              <p className="mt-1 text-sm font-medium text-[var(--admin-text-secondary)]">
-                Monthly user volume across the admin module.
-              </p>
             </div>
-            <Badge className="bg-[#FFD369] text-[#222831]">Live-ready</Badge>
+            <Select
+              onValueChange={(value) => setGrowthYear(Number(value))}
+              value={String(growthYear)}
+            >
+              <SelectTrigger className="h-9 w-28 border-[var(--admin-border)] bg-[var(--admin-surface)] text-[var(--admin-text)]">
+                <SelectValue placeholder="Year" />
+              </SelectTrigger>
+              <SelectContent
+                align="start"
+                className="w-[var(--radix-select-trigger-width)] min-w-0 border-[var(--admin-border)] bg-[var(--admin-surface)] text-[var(--admin-text)]"
+                position="popper"
+              >
+                {growthYears.map((year) => (
+                  <SelectItem key={year} value={String(year)}>
+                    {year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </CardHeader>
           <CardContent>
-            <div className="flex h-72 items-end gap-3 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-table-row)] p-5">
-              {growthPoints.map((point) => (
-                <div className="flex h-full flex-1 flex-col justify-end gap-2" key={point.label}>
-                  <div
-                    aria-label={`${point.label}: ${point.value} users`}
-                    className="w-full rounded-t-md bg-[var(--admin-chart-bar)] transition-[height]"
-                    style={{ height: `${Math.max((point.value / maxGrowthValue) * 100, 4)}%` }}
-                  />
-                  <span className="text-center text-[10px] font-semibold text-[var(--admin-text-muted)]">
-                    {point.label}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <UserGrowthLineChart points={growthPoints} />
           </CardContent>
         </Card>
 

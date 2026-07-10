@@ -1,8 +1,9 @@
 'use client';
 
-import { KeyRound, UserCheck, UserX } from 'lucide-react';
+import { KeyRound } from 'lucide-react';
 
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Pagination } from '@/app/(protected)/studio/components/Pagination';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -15,34 +16,36 @@ import {
 } from '@/components/ui/table';
 
 import type { AdminRoleResponse, AdminUserResponse } from '../../admin-api';
-import { StatusBadge } from '../../components/StatusBadge';
 import { ManageRolesDialog } from './UserDialogs';
 import { getInitials, getUserRoleNames } from './user-utils';
 
 type UsersTableProps = {
   handleForceResetPassword: (user: AdminUserResponse) => Promise<void>;
   handleReplaceRoles: (userId: number, roleIds: number[]) => Promise<void>;
-  handleUpdateUser: (
-    userId: number,
-    payload: {
-      displayName?: string;
-      email?: string;
-      isActive?: boolean;
-    },
-  ) => Promise<void>;
   isLoading: boolean;
   isSubmitting: boolean;
+  limit: number;
+  onLimitChange: (limit: number) => void;
+  onPageChange: (page: number) => void;
+  page: number;
   roles: AdminRoleResponse[];
+  total: number;
+  totalPages: number;
   users: AdminUserResponse[];
 };
 
 export function UsersTable({
   handleForceResetPassword,
   handleReplaceRoles,
-  handleUpdateUser,
   isLoading,
   isSubmitting,
+  limit,
+  onLimitChange,
+  onPageChange,
+  page,
   roles,
+  total,
+  totalPages,
   users,
 }: UsersTableProps) {
   return (
@@ -58,7 +61,6 @@ export function UsersTable({
               <TableHead className="text-[#dce7f3]">Name</TableHead>
               <TableHead className="text-[#dce7f3]">Email</TableHead>
               <TableHead className="text-[#dce7f3]">Roles</TableHead>
-              <TableHead className="text-[#dce7f3]">Status</TableHead>
               <TableHead className="text-[#dce7f3]">Created Date</TableHead>
               <TableHead className="text-right text-[#dce7f3]">Actions</TableHead>
             </TableRow>
@@ -66,13 +68,13 @@ export function UsersTable({
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell className="h-24 text-center text-[#aeb7c2]" colSpan={7}>
+                <TableCell className="h-24 text-center text-[#aeb7c2]" colSpan={6}>
                   Loading users...
                 </TableCell>
               </TableRow>
             ) : users.length === 0 ? (
               <TableRow>
-                <TableCell className="h-24 text-center text-[#aeb7c2]" colSpan={7}>
+                <TableCell className="h-24 text-center text-[#aeb7c2]" colSpan={6}>
                   No users found.
                 </TableCell>
               </TableRow>
@@ -84,6 +86,9 @@ export function UsersTable({
                 >
                   <TableCell>
                     <Avatar>
+                      {user.avatarUrl ? (
+                        <AvatarImage alt={user.displayName || user.email} src={user.avatarUrl} />
+                      ) : null}
                       <AvatarFallback className="bg-[#393E46] text-[#EEEEEE]">
                         {getInitials(user)}
                       </AvatarFallback>
@@ -95,9 +100,6 @@ export function UsersTable({
                   <TableCell className="text-[#aeb7c2]">{user.email}</TableCell>
                   <TableCell className="max-w-[220px] truncate text-[#aeb7c2]">
                     {getUserRoleNames(user)}
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge status={user.isActive ? 'Active' : 'Disabled'} />
                   </TableCell>
                   <TableCell className="text-[#aeb7c2]">
                     {new Date(user.createdAt).toLocaleDateString()}
@@ -122,26 +124,6 @@ export function UsersTable({
                           <KeyRound className="size-3.5" />
                           Reset
                         </Button>
-                        <Button
-                          className={
-                            user.isActive
-                              ? 'border-transparent bg-red-950/60 text-red-200 hover:bg-red-900'
-                              : 'border-transparent bg-[#FFD369] text-[#222831] hover:bg-white'
-                          }
-                          disabled={isSubmitting}
-                          onClick={() =>
-                            void handleUpdateUser(user.id, { isActive: !user.isActive })
-                          }
-                          size="sm"
-                          variant={user.isActive ? 'outline' : 'default'}
-                        >
-                          {user.isActive ? (
-                            <UserX className="size-3.5" />
-                          ) : (
-                            <UserCheck className="size-3.5" />
-                          )}
-                          {user.isActive ? 'Disable' : 'Enable'}
-                        </Button>
                       </div>
                     </div>
                   </TableCell>
@@ -151,6 +133,14 @@ export function UsersTable({
           </TableBody>
         </Table>
       </CardContent>
+      <Pagination
+        limit={limit}
+        onLimitChange={onLimitChange}
+        onPageChange={onPageChange}
+        page={page}
+        total={total}
+        totalPages={totalPages}
+      />
     </Card>
   );
 }

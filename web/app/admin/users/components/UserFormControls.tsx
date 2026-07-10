@@ -7,10 +7,12 @@ import { Label } from '@/components/ui/label';
 import type { AdminRoleResponse } from '../../admin-api';
 
 export function RoleCheckboxList({
+  label = 'Roles',
   onChange,
   roles,
   selectedRoleIds,
 }: {
+  label?: string;
   onChange: (roleIds: number[]) => void;
   roles: AdminRoleResponse[];
   selectedRoleIds: number[];
@@ -25,7 +27,7 @@ export function RoleCheckboxList({
 
   return (
     <div className="grid gap-2">
-      <Label>SYS Roles</Label>
+      <Label>{label}</Label>
       <div className="grid max-h-56 gap-2 overflow-y-auto rounded-lg border border-[#4A5260] bg-[#393E46] p-3">
         {roles.length ? (
           roles.map((role) => (

@@ -3,9 +3,9 @@ import type { LucideIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
 type MetricCardProps = {
+  change?: string;
   label: string;
   value: string;
-  change: string;
   icon: LucideIcon;
 };
 
@@ -17,7 +17,9 @@ export function MetricCard({ label, value, change, icon: Icon }: MetricCardProps
         <div>
           <p className="text-sm font-semibold text-[var(--admin-text-secondary)]">{label}</p>
           <p className="mt-3 text-3xl font-semibold text-[var(--admin-text)]">{value}</p>
-          <p className="mt-2 text-sm font-medium text-[var(--admin-text-muted)]">{change}</p>
+          {change ? (
+            <p className="mt-2 text-sm font-medium text-[var(--admin-text-muted)]">{change}</p>
+          ) : null}
         </div>
         <div className="grid size-10 place-items-center rounded-lg bg-[#FFD369] text-[#222831]">
           <Icon className="size-5" />

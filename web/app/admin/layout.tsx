@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 
 import { AdminShell } from './components/AdminShell';
-import { AdminThemeProvider } from './hooks/use-admin-theme';
 import './admin-theme.css';
 
 type AdminLayoutProps = {
@@ -11,9 +10,9 @@ type AdminLayoutProps = {
 // Codex #admin-ui start
 export default function AdminLayout({ children }: AdminLayoutProps) {
   return (
-    <AdminThemeProvider>
+    <div className="admin-theme min-h-screen">
       <AdminShell>{children}</AdminShell>
-    </AdminThemeProvider>
+    </div>
   );
 }
 // Codex #admin-ui end

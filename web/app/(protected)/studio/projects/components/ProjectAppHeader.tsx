@@ -1,16 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import {
-  ArrowLeft,
-  ChevronDown,
-  FolderKanban,
-  HelpCircle,
-  LogOut,
-  Search,
-  Settings,
-  User,
-} from 'lucide-react';
+import { ChevronDown, FolderKanban, LogOut, User } from 'lucide-react';
 
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
@@ -99,7 +90,9 @@ export function ProjectAppHeader({ projectId, projectName }: ProjectAppHeaderPro
                 </DropdownMenuItem>
               ))}
               {allProjects.length === 0 && (
-                <p className="px-2 py-1.5 text-[11px] font-bold text-[#8b94a1]">No other workspace projects</p>
+                <p className="px-2 py-1.5 text-[11px] font-bold text-[#8b94a1]">
+                  No other workspace projects
+                </p>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
@@ -130,9 +123,7 @@ export function ProjectAppHeader({ projectId, projectName }: ProjectAppHeaderPro
               )}
 
               <div className="hidden text-left md:block">
-                <p className="text-sm font-semibold leading-none text-white">
-                  {displayName}
-                </p>
+                <p className="text-sm font-semibold leading-none text-white">{displayName}</p>
                 <p className="mt-1 text-[11px] font-medium text-[#8B93A5]">
                   {user?.role ?? 'Workspace Member'}
                 </p>
@@ -169,10 +160,7 @@ export function ProjectAppHeader({ projectId, projectName }: ProjectAppHeaderPro
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator className="bg-[#393E46]" />
-            <DropdownMenuItem
-              asChild
-              className="cursor-pointer focus:bg-[#2F3742]"
-            >
+            <DropdownMenuItem asChild className="cursor-pointer focus:bg-[#2F3742]">
               <Link href="/user-profile">
                 <User className="mr-2 size-4" />
                 My Profile

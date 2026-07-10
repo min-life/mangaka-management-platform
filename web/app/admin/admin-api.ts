@@ -113,7 +113,6 @@ export async function getAdminUserStats() {
 export async function createAdminUser(payload: {
   displayName?: string;
   email: string;
-  password?: string;
   roleIds: number[];
 }) {
   const response = await api.post<ApiEnvelope<AdminUserResponse>, ApiEnvelope<AdminUserResponse>>(
@@ -152,8 +151,8 @@ export async function updateAdminUser(
 
 export async function forceResetAdminUserPassword(userId: number) {
   const response = await api.post<
-    ApiEnvelope<{ newPassword: string }>,
-    ApiEnvelope<{ newPassword: string }>
+    ApiEnvelope<{ success: boolean }>,
+    ApiEnvelope<{ success: boolean }>
   >(`/users/${userId}/force-reset-password`);
 
   return getEnvelopeData(response);
