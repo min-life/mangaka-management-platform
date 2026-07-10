@@ -51,10 +51,6 @@ export class ActivityLogResDto {
   actor?: UserResDto;
 }
 
-export class ActivityLogResponseDto {
-  @ApiProperty({ type: ActivityLogResDto })
-  data!: ActivityLogResDto;
-}
 
 export class ActivityLogsResponseDto {
   @ApiProperty({ type: [ActivityLogResDto] })

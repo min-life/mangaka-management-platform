@@ -17,7 +17,7 @@ export function ProjectShell({
       <ProjectSidebar projectId={projectId} />
       <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
         <ProjectAppHeader projectId={projectId} projectName={projectName} />
-        <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+        <div className="min-h-0 flex-1 w-full max-w-full overflow-x-hidden overflow-y-auto">{children}</div>
       </div>
     </main>
   );

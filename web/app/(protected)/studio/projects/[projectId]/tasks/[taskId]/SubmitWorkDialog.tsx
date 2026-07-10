@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { FileUp, Upload } from 'lucide-react';
+import { FileUp, Upload, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -64,7 +64,10 @@ export function SubmitWorkDialog({ onSubmit }: SubmitWorkDialogProps) {
   };
 
   return (
-    <Dialog onOpenChange={setOpen} open={open}>
+    <Dialog onOpenChange={(val) => {
+      if (isSubmitting) return;
+      setOpen(val);
+    }} open={open}>
       <DialogTrigger asChild>
         <Button className="h-9 rounded-[4px] bg-[#FFD369] px-4 text-xs font-black text-[#222831] hover:bg-[#eac04f]">
           <Upload className="size-4" />
@@ -179,7 +182,7 @@ export function SubmitWorkDialog({ onSubmit }: SubmitWorkDialogProps) {
             />
           </div>
 
-          <label className="flex items-start gap-3 border border-[#303842] bg-[#151c25] p-3 text-xs font-bold text-[#dce7f3] disabled:opacity-50">
+          <label className={`flex items-start gap-3 border border-[#303842] bg-[#151c25] p-3 text-xs font-bold text-[#dce7f3] transition-opacity ${isSubmitting ? 'opacity-50 pointer-events-none' : ''}`}>
             <input className="mt-0.5 accent-[#FFD369]" checked={confirmed} disabled={isSubmitting} onChange={(event) => setConfirmed(event.target.checked)} type="checkbox" />
             The selected task requirements have been completed.
           </label>
@@ -192,8 +195,15 @@ export function SubmitWorkDialog({ onSubmit }: SubmitWorkDialogProps) {
         </div>
         <DialogFooter className="mx-0 mb-0 rounded-none border-[#39424f] bg-[#151c25] px-6 py-4">
           <DialogClose asChild><Button variant="outline" disabled={isSubmitting}>Cancel</Button></DialogClose>
-          <Button className="bg-[#FFD369] text-[#222831] hover:bg-[#eac04f]" disabled={!imageFile || !note.trim() || !confirmed || isSubmitting} onClick={handleSubmit}>
-            {isSubmitting ? 'Submitting...' : 'Submit for Review'}
+          <Button className="bg-[#FFD369] text-[#222831] hover:bg-[#eac04f] inline-flex items-center justify-center gap-1.5" disabled={!imageFile || !note.trim() || !confirmed || isSubmitting} onClick={handleSubmit}>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Submitting...
+              </>
+            ) : (
+              'Submit for Review'
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

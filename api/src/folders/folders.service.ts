@@ -7,9 +7,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
+import { AwsS3Service } from '../share/services/aws-s3.service';
 
 const USER_SELECT = {
   select: {
@@ -96,7 +98,10 @@ const FILE_SELECT = {
 export class FoldersService {
   private readonly logger = new Logger(FoldersService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly awsS3Service: AwsS3Service,
+  ) {}
 
   async getFolderById(id: number) {
     try {
@@ -137,6 +142,24 @@ export class FoldersService {
       });
     } catch (error) {
       this.handleError(error, 'Update folder fail', ERROR.SVUPDATEFOLDER);
+    }
+  }
+
+  async uploadFolderImage(folderId: number, file: Express.Multer.File, userId: number) {
+    try {
+      const folder = await this.ensureFolder(folderId);
+
+      const ext = file.originalname.split('.').pop();
+      const key = `folders/${folder.projectId}/${folderId}/${randomUUID()}.${ext}`;
+      const imageUrl = await this.awsS3Service.uploadFile(file, key);
+
+      return await this.prisma.folder.update({
+        where: { id: folderId },
+        data: { imageUrl, updatedBy: userId },
+        select: FOLDER_SELECT,
+      });
+    } catch (error) {
+      this.handleError(error, 'Upload folder image fail', ERROR.SVUPDATEFOLDER);
     }
   }
 

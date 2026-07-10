@@ -53,6 +53,26 @@ export class MailService {
     });
   }
 
+  async sendForceResetPasswordEmail(email: string, newPassword: string) {
+    const appName = process.env.APP_NAME ?? 'Mangaka Management Platform';
+
+    if (!process.env.SMTP_HOST) {
+      this.logger.log(`Force reset password for ${email}: ${newPassword}`);
+    }
+
+    await this.transporter.sendMail({
+      from: process.env.MAIL_FROM ?? process.env.SMTP_FROM ?? `"${appName}" <no-reply@example.com>`,
+      to: email,
+      subject: 'Your password has been reset',
+      text: `Your password has been reset by an administrator. Your new password is: ${newPassword}`,
+      html: `
+        <p>Your password has been reset by an administrator.</p>
+        <p>Your new password is: <strong>${newPassword}</strong></p>
+        <p>Please log in and change your password immediately.</p>
+      `,
+    });
+  }
+
   private createTransporter(): Transporter {
     if (process.env.SMTP_HOST) {
       return nodemailer.createTransport({

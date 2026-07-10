@@ -63,130 +63,128 @@ export function ProjectAppHeader({ projectId, projectName }: ProjectAppHeaderPro
       .join('') || 'U';
 
   return (
-    <header className="z-30 flex h-16 shrink-0 items-center justify-between border-b border-[#26303b] bg-[#171e27] px-5">
+    <header className="z-30 flex h-16 shrink-0 items-center justify-between border-b border-[#393E46] bg-[#222831] px-6">
       <div className="flex items-center gap-5">
-        <div className="flex h-9 w-[360px] items-center gap-3 rounded-[4px] border border-[#39424f] bg-[#222a34] px-3 text-[#8b94a1]">
-          <Search className="size-4 text-[#dce7f3]" />
-          <span className="text-xs font-medium">Search production data...</span>
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              className="hidden h-9 items-center gap-2 rounded-[4px] border border-transparent px-3 text-xs font-black uppercase tracking-[0.08em] text-[#aeb7c2] hover:border-[#39424f] hover:bg-[#222a34] lg:flex"
-              type="button"
-            >
-              <FolderKanban className="size-4 text-[#FFD369]" />
-              <span>Workspace</span>
-              <span className="text-[#5b626d]">/</span>
-              <span className="text-[#FFD369]">{displayProjectName}</span>
-              <ChevronDown className="size-3.5 text-[#dce7f3]" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="start"
-            className="min-w-56 rounded-[4px] border border-[#39424f] bg-[#101820] p-1 text-white animate-in fade-in-50 duration-100"
+        <div className="flex items-center text-xs font-black uppercase tracking-[0.08em] text-[#aeb7c2]">
+          <Link
+            href="/studio"
+            className="flex h-9 items-center gap-1.5 rounded-[4px] border border-transparent px-3 text-[#aeb7c2] hover:border-[#39424f] hover:bg-[#222a34]"
           >
-            {allProjects.map((p) => (
-              <DropdownMenuItem
-                className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold focus:bg-[#303842] focus:text-white"
-                key={p.id}
-                onSelect={() => router.push(`/studio/projects/${p.id}`)}
+            <FolderKanban className="size-4 text-[#FFD369]" />
+            <span>Workspace</span>
+          </Link>
+          <span className="text-[#5b626d] px-1">/</span>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="flex h-9 items-center gap-1 rounded-[4px] border border-transparent px-3 text-[#FFD369] hover:border-[#39424f] hover:bg-[#222a34]"
+                type="button"
               >
-                <FolderKanban className="size-3.5 text-[#8b94a1]" />
-                {p.name}
-              </DropdownMenuItem>
-            ))}
-            {allProjects.length === 0 && (
-              <p className="px-2 py-1.5 text-[11px] font-bold text-[#8b94a1]">No other workspace projects</p>
-            )}
-            <DropdownMenuSeparator className="bg-[#39424f]" />
-            <DropdownMenuItem
-              asChild
-              className="cursor-pointer rounded-[3px] px-2 py-2.5 text-[#FFD369] focus:bg-[#303842] focus:text-[#FFD369]"
+                <span>{displayProjectName}</span>
+                <ChevronDown className="size-3.5 text-[#dce7f3] ml-0.5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="start"
+              className="min-w-56 rounded-[4px] border border-[#39424f] bg-[#101820] p-1 text-white animate-in fade-in-50 duration-100"
             >
-              <Link href="/studio">
-                <ArrowLeft className="size-3.5" />
-                <span className="min-w-0">
-                  <span className="block text-xs font-black">View all workspace projects</span>
-                  <span className="mt-0.5 block text-[10px] font-bold text-[#8b94a1]">
-                    Return to the workspace overview
-                  </span>
-                </span>
-              </Link>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              {allProjects.map((p) => (
+                <DropdownMenuItem
+                  className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold focus:bg-[#303842] focus:text-white"
+                  key={p.id}
+                  onSelect={() => router.push(`/studio/projects/${p.id}`)}
+                >
+                  <FolderKanban className="size-3.5 text-[#8b94a1] mr-1.5" />
+                  {p.name}
+                </DropdownMenuItem>
+              ))}
+              {allProjects.length === 0 && (
+                <p className="px-2 py-1.5 text-[11px] font-bold text-[#8b94a1]">No other workspace projects</p>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <NotificationBell
-          dotClassName="-right-0.5 -top-1 size-2 border-0"
-          triggerClassName="rounded-[4px] p-1.5 text-white hover:bg-[#222a34]"
-        />
-        <button
-          aria-label="Help"
-          className="grid size-8 place-items-center rounded-[4px] text-white hover:bg-[#222a34]"
-          type="button"
-        >
-          <HelpCircle className="size-5" />
-        </button>
+      <div className="flex items-center gap-2">
+        <NotificationBell />
+
+        <div className="mx-2 h-8 w-px bg-[#434A55]" />
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
-              className="flex items-center gap-2 rounded-full border border-transparent px-1 py-1 hover:border-[#39424f] hover:bg-[#222a34]"
+              className="flex items-center gap-4 rounded-xl px-2 py-1.5 transition hover:bg-[#2F3742]"
               type="button"
             >
               {user?.avatarUrl && user.avatarUrl.trim() !== '' ? (
                 <img
                   alt={displayName}
-                  className="size-8 rounded-full border border-[#FFD369] object-cover"
-                  src={user.avatarUrl || undefined}
+                  className="size-9 rounded-full border border-[#FFD369] object-cover"
+                  src={user.avatarUrl}
                 />
               ) : (
-                <span className="grid size-8 place-items-center rounded-full border border-[#FFD369] bg-[#151c25] text-xs font-black text-white">
+                <span className="grid size-9 place-items-center rounded-full border border-[#FFD369] bg-[#101820] text-xs font-black text-white">
                   {initials}
                 </span>
               )}
-              <ChevronDown className="size-3.5 text-[#aeb7c2]" />
+
+              <div className="hidden text-left md:block">
+                <p className="text-sm font-semibold leading-none text-white">
+                  {displayName}
+                </p>
+                <p className="mt-1 text-[11px] font-medium text-[#8B93A5]">
+                  {user?.role ?? 'Workspace Member'}
+                </p>
+              </div>
+
+              <ChevronDown className="size-4 text-[#8B93A5]" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="end"
-            className="w-64 rounded-[4px] border border-[#39424f] bg-[#101820] p-1 text-white"
+            className="w-72 border-[#393E46] bg-[#222831] text-white"
           >
-            <DropdownMenuLabel className="px-3 py-3">
-              <p className="truncate text-sm font-black text-white">{displayName}</p>
-              <p className="mt-1 truncate text-xs font-bold text-[#8b94a1]">{email}</p>
+            <DropdownMenuLabel className="py-3">
+              <div className="flex items-center gap-4">
+                {user?.avatarUrl && user.avatarUrl.trim() !== '' ? (
+                  <img
+                    alt={displayName}
+                    className="size-10 rounded-full object-cover"
+                    src={user.avatarUrl}
+                  />
+                ) : (
+                  <span className="grid size-10 place-items-center rounded-full border border-[#FFD369] bg-[#101820] text-xs font-black text-white">
+                    {initials}
+                  </span>
+                )}
+
+                <div>
+                  <p className="font-semibold">{displayName}</p>
+                  <p className="text-xs text-[#8B93A5]">{email}</p>
+                  <p className="text-[11px] font-bold text-[#FFD369]">
+                    {user?.role ?? 'Workspace Member'}
+                  </p>
+                </div>
+              </div>
             </DropdownMenuLabel>
-            <DropdownMenuSeparator className="bg-[#39424f]" />
+            <DropdownMenuSeparator className="bg-[#393E46]" />
             <DropdownMenuItem
               asChild
-              className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold focus:bg-[#303842] focus:text-white"
+              className="cursor-pointer focus:bg-[#2F3742]"
             >
               <Link href="/user-profile">
-                <User className="size-4" />
+                <User className="mr-2 size-4" />
                 My Profile
               </Link>
             </DropdownMenuItem>
+
+            <DropdownMenuSeparator className="bg-[#393E46]" />
             <DropdownMenuItem
-              asChild
-              className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold focus:bg-[#303842] focus:text-white"
-            >
-              <Link href={`/studio/projects/${projectId}`}>
-                <Settings className="size-4" />
-                Workspace Home
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold focus:bg-[#303842] focus:text-white">
-              <Settings className="size-4" />
-              Account Settings
-            </DropdownMenuItem>
-            <DropdownMenuSeparator className="bg-[#39424f]" />
-            <DropdownMenuItem
-              className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold text-red-300 focus:bg-red-950/30 focus:text-red-200"
+              className="cursor-pointer text-red-400 focus:bg-[#2F3742] focus:text-red-400"
               onClick={logout}
             >
-              <LogOut className="size-4" />
+              <LogOut className="mr-2 size-4" />
               Logout
             </DropdownMenuItem>
           </DropdownMenuContent>

@@ -22,6 +22,20 @@ export class SimpleFileResDto {
 
   @ApiProperty({ example: 'Chapter 01 Page 1' })
   title!: string;
+
+  @ApiPropertyOptional({ example: 'First page of chapter 01.', nullable: true })
+  description?: string | null;
+}
+
+export class SimpleTaskForMaterialResDto {
+  @ApiProperty({ example: 10 })
+  id!: number;
+
+  @ApiProperty({ example: 'Review page 1' })
+  title!: string;
+
+  @ApiPropertyOptional({ example: 'Check for errors', nullable: true })
+  description?: string | null;
 }
 
 export class FileResDto {
@@ -54,26 +68,14 @@ export class MaterialResDto {
   @ApiProperty({ example: 1 })
   id!: number;
 
+  @ApiPropertyOptional({ example: 'Material name', nullable: true })
+  name?: string | null;
+
   @ApiPropertyOptional({ type: () => SimpleFileResDto, nullable: true })
   file?: SimpleFileResDto | null;
 
-  @ApiProperty({
-    example: [
-      {
-        url: 'https://...',
-        downloadUrl: 'https://...',
-        originalName: 'image.png',
-        size: 1024,
-        mimeType: 'image/png',
-        type: 'IMAGE',
-        width: 1920,
-        height: 1080,
-        ratio: 1.77,
-        isThumbnail: true,
-      }
-    ]
-  })
-  materials!: unknown;
+  @ApiPropertyOptional({ type: () => SimpleTaskForMaterialResDto, nullable: true })
+  task?: SimpleTaskForMaterialResDto | null;
 
   @ApiPropertyOptional({ type: UserResDto, nullable: true })
   createdByUser?: UserResDto | null;

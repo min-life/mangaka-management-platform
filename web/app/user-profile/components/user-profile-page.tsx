@@ -2,24 +2,38 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
+  Check,
   CheckCheck,
+  ChevronDown,
   ChevronRight,
   FilePenLine,
   Languages,
+  Link2,
+  LogOut,
   Palette,
-  Search,
+  Pencil,
   Settings,
   ShieldCheck,
-  Upload,
+  User,
   UserPlus,
+  X,
 } from 'lucide-react';
 import { toast } from '@/lib/toast';
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Dialog,
   DialogContent,
@@ -29,9 +43,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { usePlatformLanguage, type PlatformLanguage } from '@/contexts/language-context';
+import { useAuth } from '@/hooks/useAuth';
 import { useRealtimeNotifications } from '@/hooks/use-realtime-notifications';
 import { clearAccessToken, getAccessToken } from '@/lib/auth-storage';
 import { cn } from '@/lib/utils';
@@ -40,10 +54,11 @@ import {
   getCurrentUserContextActivities,
   getCurrentUserProfile,
   getApiErrorMessage,
+  getGoogleLinkAccountUrl,
   mapActivityLogToUserActivity,
   updateCurrentUserPassword,
   updateCurrentUserProfile,
-  uploadAvatarToDataUrl,
+  uploadAvatarImage,
   type UpdatePasswordPayload,
   type UserActivity,
   type UserProfile,
@@ -84,14 +99,14 @@ const copy: Record<
     appearance: (isDark: boolean) => string;
     assignedEditorBoards: string;
     assignedProjects: string;
-    editProfile: string;
+    googleAccountLinked: string;
     language: string;
+    linkGoogleAccount: string;
     noActivities: string;
     noBoards: string;
     noProjects: string;
     retry: string;
     securityPassword: string;
-    shareProfile: string;
     viewAll: string;
   }
 > = {
@@ -102,14 +117,14 @@ const copy: Record<
     appearance: (isDark) => `Appearance (State ${isDark ? 'Dark' : 'Light'})`,
     assignedEditorBoards: 'Assigned Editor Boards',
     assignedProjects: 'Assigned Projects',
-    editProfile: 'Edit Profile',
+    googleAccountLinked: 'Google Account Linked',
     language: 'Language (English/VI)',
+    linkGoogleAccount: 'Link Google Account',
     noActivities: 'No recent activity found.',
     noBoards: 'No assigned editor boards found.',
     noProjects: 'No assigned projects found.',
     retry: 'Retry',
     securityPassword: 'Security & Password',
-    shareProfile: 'Share Profile',
     viewAll: 'View All',
   },
   vi: {
@@ -119,14 +134,14 @@ const copy: Record<
     appearance: (isDark) => `Giao diện (${isDark ? 'Tối' : 'Sáng'})`,
     assignedEditorBoards: 'Bảng biên tập được giao',
     assignedProjects: 'Dự án được giao',
-    editProfile: 'Chỉnh sửa hồ sơ',
+    googleAccountLinked: 'Đã liên kết Google',
     language: 'Ngôn ngữ (Tiếng Việt/EN)',
+    linkGoogleAccount: 'Liên kết tài khoản Google',
     noActivities: 'Chưa có hoạt động gần đây.',
     noBoards: 'Chưa có bảng biên tập được giao.',
     noProjects: 'Chưa có dự án được giao.',
     retry: 'Thử lại',
     securityPassword: 'Bảo mật & mật khẩu',
-    shareProfile: 'Chia sẻ hồ sơ',
     viewAll: 'Xem tất cả',
   },
 };
@@ -245,17 +260,20 @@ function EmptyState({ message }: { message: string }) {
 }
 
 function SettingsButton({
+  disabled,
   icon: Icon,
   label,
   onClick,
 }: {
+  disabled?: boolean;
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   onClick?: () => void;
 }) {
   return (
     <button
-      className="flex w-full items-center justify-between rounded-lg bg-[var(--profile-surface-highest)]/30 p-3 text-left text-[var(--profile-title)] transition-colors hover:bg-[var(--profile-surface-highest)]"
+      className="flex w-full items-center justify-between rounded-lg bg-[var(--profile-surface-highest)]/30 p-3 text-left text-[var(--profile-title)] transition-colors hover:bg-[var(--profile-surface-highest)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-[var(--profile-surface-highest)]/30"
+      disabled={disabled}
       onClick={onClick}
       type="button"
     >
@@ -263,138 +281,12 @@ function SettingsButton({
         <Icon className="size-5 text-[var(--profile-muted)]" />
         <span className="text-[13px] font-medium leading-4 tracking-[0.02em]">{label}</span>
       </div>
-      <ChevronRight className="size-5 text-[var(--profile-muted)]" />
+      {disabled ? (
+        <Check className="size-5 text-[var(--profile-accent)]" />
+      ) : (
+        <ChevronRight className="size-5 text-[var(--profile-muted)]" />
+      )}
     </button>
-  );
-}
-
-function EditProfileDialog({
-  user,
-  open,
-  isSubmitting,
-  onOpenChange,
-  onSubmit,
-}: {
-  user: UserProfile | null;
-  open: boolean;
-  isSubmitting: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSubmit: (values: { displayName: string; avatarFile: File | null }) => Promise<void>;
-}) {
-  const [displayName, setDisplayName] = useState('');
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState('');
-
-  useEffect(() => {
-    if (!open || !user) {
-      return;
-    }
-
-    setDisplayName(user.displayName ?? '');
-    setAvatarFile(null);
-    setPreviewUrl(user.avatarUrl ?? '');
-  }, [open, user]);
-
-  useEffect(() => {
-    if (!avatarFile) {
-      return;
-    }
-
-    const nextPreview = URL.createObjectURL(avatarFile);
-    setPreviewUrl(nextPreview);
-    return () => URL.revokeObjectURL(nextPreview);
-  }, [avatarFile]);
-
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const trimmedDisplayName = displayName.trim();
-
-    if (trimmedDisplayName.length < 2) {
-      toast.error('Display name must be at least 2 characters.');
-      return;
-    }
-
-    await onSubmit({ displayName: trimmedDisplayName, avatarFile });
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[480px] max-w-[calc(100vw-32px)] overflow-hidden rounded-2xl border border-white/[0.12] bg-[#151b24] p-0 text-[#eef3fb] shadow-[0_24px_80px_rgba(0,0,0,0.55)]">
-        <form onSubmit={handleSubmit}>
-          <DialogHeader className="border-b border-white/[0.08] bg-[#18202c] px-6 py-5">
-            <DialogTitle className="text-[22px] text-white">Edit Profile</DialogTitle>
-            <DialogDescription className="text-[#b8c3d2]">
-              Update your display name and avatar.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-6 p-6">
-            <div className="space-y-3">
-              <Label className="text-[#e5ecf7]">Avatar</Label>
-              <div className="flex items-center gap-4 rounded-xl border border-white/[0.08] bg-[#0f1620] p-4">
-                <Avatar className="h-20 w-20 border border-[var(--profile-accent)]">
-                  {previewUrl ? <AvatarImage alt="Avatar preview" src={previewUrl} /> : null}
-                  <AvatarFallback>{getInitials(displayName)}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <Input
-                    accept="image/*"
-                    className="sr-only"
-                    disabled={isSubmitting}
-                    id="avatarFile"
-                    type="file"
-                    onChange={(event) => setAvatarFile(event.target.files?.[0] ?? null)}
-                  />
-                  <Label
-                    className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-white/[0.14] bg-[#202938] px-4 text-[13px] font-medium text-white hover:bg-[#2b3648]"
-                    htmlFor="avatarFile"
-                  >
-                    <Upload className="size-4" />
-                    Upload avatar
-                  </Label>
-                  <p className="mt-2 text-[12px] text-[#9aa7b8]">PNG, JPG up to 2MB</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-[#e5ecf7]" htmlFor="displayName">
-                Display name
-              </Label>
-              <Input
-                autoFocus
-                className="h-10 border-white/[0.14] bg-[#0f1620] text-[#eef3fb] placeholder:text-[#7f8da1]"
-                disabled={isSubmitting}
-                id="displayName"
-                placeholder="Enter display name"
-                value={displayName}
-                onChange={(event) => setDisplayName(event.target.value)}
-              />
-            </div>
-          </div>
-
-          <DialogFooter className="border-t border-white/[0.08] bg-[#101722] px-6 py-4">
-            <Button
-              className="border-black bg-black text-white hover:border-black hover:bg-black/85 hover:text-white"
-              disabled={isSubmitting}
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              className="border-black bg-black text-white hover:border-black hover:bg-black/85 hover:text-white"
-              disabled={isSubmitting}
-              type="submit"
-              variant="outline"
-            >
-              {isSubmitting ? 'Saving...' : 'Save'}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }
 
@@ -501,18 +393,21 @@ function ChangePasswordDialog({
 
 export function UserProfilePage() {
   const router = useRouter();
+  const { logout } = useAuth();
   const { language, toggleLanguage } = usePlatformLanguage();
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const { notifications } = useRealtimeNotifications(Boolean(currentUser));
   const [allActivities, setAllActivities] = useState<UserActivity[]>([]);
   const [visibleActivityCount, setVisibleActivityCount] = useState(ACTIVITY_PAGE_SIZE);
   const activityScrollRef = useRef<HTMLDivElement | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isPasswordOpen, setIsPasswordOpen] = useState(false);
   const [isProfileSubmitting, setIsProfileSubmitting] = useState(false);
   const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
+  const [isEditingDisplayName, setIsEditingDisplayName] = useState(false);
+  const [draftDisplayName, setDraftDisplayName] = useState('');
   // Always start with the server-rendered default ('dark') so the client's first
   // render matches SSR output; the stored preference is applied after mount below.
   const [theme, setTheme] = useState<ProfileTheme>('dark');
@@ -647,24 +542,15 @@ export function UserProfilePage() {
     return () => container.removeEventListener('scroll', handleScroll);
   }, [hasMoreActivities, loadMoreActivities]);
 
-  async function handleShareProfile() {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      toast.success('Profile link copied');
-    } catch {
-      toast.error('Unable to copy profile link.');
-    }
-  }
-
-  async function handleUpdateProfile(values: { displayName: string; avatarFile: File | null }) {
+  async function saveProfileUpdate(input: { displayName?: string; avatarFile?: File | null }) {
     setIsProfileSubmitting(true);
 
     try {
-      const uploadResult = values.avatarFile
-        ? await uploadAvatarToDataUrl(values.avatarFile)
+      const uploadResult = input.avatarFile
+        ? await uploadAvatarImage(input.avatarFile)
         : null;
       const updatedUser = await updateCurrentUserProfile({
-        displayName: values.displayName,
+        displayName: input.displayName ?? currentUser?.displayName ?? '',
         ...(uploadResult?.avatarUrl ? { avatarUrl: uploadResult.avatarUrl } : {}),
       });
 
@@ -673,12 +559,45 @@ export function UserProfilePage() {
         ...updatedUser,
         roles: updatedUser.roles.length ? updatedUser.roles : (currentUser?.roles ?? []),
       }));
-      setIsEditProfileOpen(false);
       toast.success('Profile updated successfully');
+      return true;
     } catch (updateError) {
       toast.error(getApiErrorMessage(updateError, 'Unable to update your profile.'));
+      return false;
     } finally {
       setIsProfileSubmitting(false);
+    }
+  }
+
+  async function handleAvatarFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    event.target.value = '';
+
+    if (file) {
+      await saveProfileUpdate({ avatarFile: file });
+    }
+  }
+
+  function handleStartEditDisplayName() {
+    setDraftDisplayName(currentUser?.displayName ?? '');
+    setIsEditingDisplayName(true);
+  }
+
+  function handleCancelEditDisplayName() {
+    setIsEditingDisplayName(false);
+  }
+
+  async function handleSaveDisplayName() {
+    const trimmedDisplayName = draftDisplayName.trim();
+
+    if (trimmedDisplayName.length < 2) {
+      toast.error('Display name must be at least 2 characters.');
+      return;
+    }
+
+    const succeeded = await saveProfileUpdate({ displayName: trimmedDisplayName });
+    if (succeeded) {
+      setIsEditingDisplayName(false);
     }
   }
 
@@ -704,13 +623,6 @@ export function UserProfilePage() {
       )}
       style={themeStyle}
     >
-      <EditProfileDialog
-        isSubmitting={isProfileSubmitting}
-        open={isEditProfileOpen}
-        user={currentUser}
-        onOpenChange={setIsEditProfileOpen}
-        onSubmit={handleUpdateProfile}
-      />
       <ChangePasswordDialog
         isSubmitting={isPasswordSubmitting}
         open={isPasswordOpen}
@@ -718,51 +630,106 @@ export function UserProfilePage() {
         onSubmit={handleUpdatePassword}
       />
 
-      <header className="sticky top-0 z-40 border-b border-[var(--profile-border)] bg-[var(--profile-header)] px-8 py-4">
-        <div className="flex items-center justify-between gap-8">
-          <div className="flex items-center gap-8">
-            <img alt="Inkly" className="h-[50px] w-auto object-contain" src="/brand/1.png" />
-            <Separator
-              className="hidden h-6 bg-[var(--profile-border)] md:block"
-              orientation="vertical"
-            />
-            <nav className="hidden items-center gap-2 text-[13px] font-medium md:flex">
-              <span className="text-[var(--profile-muted)]">Workspace</span>
-              <ChevronRight className="size-4 text-[var(--profile-muted)]" />
-              <span className="text-[var(--profile-title)]">Profile</span>
-            </nav>
-          </div>
+      <header className="flex h-16 items-center justify-between border-b border-[#393E46] bg-[#222831] px-6">
+        {/* LEFT */}
+        <div className="flex items-center gap-4">
+          <img alt="Inkly" className="h-[50px] w-auto object-contain" src="/brand/1.png" />
 
-          <div className="hidden max-w-xl flex-1 lg:block">
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 size-5 -translate-y-1/2 text-[var(--profile-muted)]" />
-              <Input
-                className="h-9 rounded-lg border-[var(--profile-border)] bg-[var(--profile-surface)] pl-11 text-[12px]"
-                placeholder="Search projects, assets, or team..."
-              />
-            </div>
-          </div>
+          <div className="h-7 w-px bg-[#434A55]" />
 
-          <div className="flex items-center gap-6">
-            <NotificationBell
-              triggerClassName="text-[var(--profile-muted)] hover:bg-[var(--profile-surface-high)] hover:text-[var(--profile-title)]"
-              dotClassName="border-[var(--profile-header)]"
-            />
-            <Settings className="size-6 text-[var(--profile-muted)]" />
-            <Separator className="h-8 bg-[var(--profile-border)]" orientation="vertical" />
-            <div className="flex items-center gap-4">
-              <Avatar className="h-9 w-9 border border-[var(--profile-accent)]">
-                {avatarUrl ? <AvatarImage alt={displayName} src={avatarUrl} /> : null}
-                <AvatarFallback>{initials}</AvatarFallback>
-              </Avatar>
-              <div className="hidden sm:block">
-                <p className="text-[13px] font-medium text-[var(--profile-title)]">{displayName}</p>
-                <p className="text-[10px] font-semibold tracking-[0.05em] text-[var(--profile-muted)]/70">
-                  {roleName}
-                </p>
-              </div>
-            </div>
+          <div className="leading-tight">
+            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8B93A5]">
+              Workspace
+            </p>
+            <h1 className="text-[15px] font-semibold text-white">Profile</h1>
           </div>
+        </div>
+
+        {/* RIGHT */}
+        <div className="flex items-center gap-2">
+          <NotificationBell />
+
+          <button
+            className="rounded-lg p-2 text-[#B8BEC8] transition hover:bg-[#2F3742] hover:text-white"
+            type="button"
+          >
+            <Settings className="size-5" />
+          </button>
+
+          <div className="mx-2 h-8 w-px bg-[#434A55]" />
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="flex items-center gap-4 rounded-xl px-2 py-1.5 transition hover:bg-[#2F3742]"
+                type="button"
+              >
+                {avatarUrl ? (
+                  <img
+                    alt={displayName}
+                    className="h-9 w-9 rounded-full border border-[#FFD369] object-cover"
+                    src={avatarUrl}
+                  />
+                ) : (
+                  <span className="grid h-9 w-9 place-items-center rounded-full border border-[#FFD369] bg-[#101820] text-xs font-black text-white">
+                    {initials}
+                  </span>
+                )}
+
+                <div className="hidden text-left md:block">
+                  <p className="text-sm font-semibold leading-none text-white">{displayName}</p>
+                  <p className="mt-1 text-[11px] font-medium text-[#8B93A5]">{roleName}</p>
+                </div>
+
+                <ChevronDown className="size-4 text-[#8B93A5]" />
+              </button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent align="end" className="w-72 border-[#393E46] bg-[#222831] text-white">
+              <DropdownMenuLabel className="py-3">
+                <div className="flex items-center gap-4">
+                  {avatarUrl ? (
+                    <img
+                      alt={displayName}
+                      className="h-10 w-10 rounded-full object-cover"
+                      src={avatarUrl}
+                    />
+                  ) : (
+                    <span className="grid h-10 w-10 place-items-center rounded-full border border-[#FFD369] bg-[#101820] text-xs font-black text-white">
+                      {initials}
+                    </span>
+                  )}
+
+                  <div>
+                    <p className="font-semibold">{displayName}</p>
+                    <p className="text-xs text-[#8B93A5]">{currentUser?.email ?? 'No email'}</p>
+                    <p className="text-[11px] font-bold text-[#FFD369]">{roleName}</p>
+                  </div>
+                </div>
+              </DropdownMenuLabel>
+
+              <DropdownMenuSeparator className="bg-[#393E46]" />
+
+              <DropdownMenuGroup>
+                <DropdownMenuItem asChild className="cursor-pointer focus:bg-[#2F3742]">
+                  <Link href="/user-profile">
+                    <User className="mr-2 size-4" />
+                    My Profile
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+
+              <DropdownMenuSeparator className="bg-[#393E46]" />
+
+              <DropdownMenuItem
+                className="cursor-pointer text-red-400 focus:bg-[#2F3742] focus:text-red-400"
+                onClick={logout}
+              >
+                <LogOut className="mr-2 size-4" />
+                Logout
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 
@@ -773,24 +740,92 @@ export function UserProfilePage() {
               MONOLITH
             </h2>
           </div>
-          <div className="h-32 w-32 overflow-hidden rounded-lg border-2 border-[var(--profile-accent)] bg-[var(--profile-surface-highest)]">
-            {avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                alt={`${displayName} profile`}
-                className="h-full w-full object-cover"
-                src={avatarUrl}
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-[32px] font-bold text-[var(--profile-muted)]">
-                {initials}
-              </div>
-            )}
+          <div className="group relative h-32 w-32 shrink-0">
+            <div className="h-32 w-32 overflow-hidden rounded-lg border-2 border-[var(--profile-accent)] bg-[var(--profile-surface-highest)]">
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  alt={`${displayName} profile`}
+                  className="h-full w-full object-cover"
+                  src={avatarUrl}
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-[32px] font-bold text-[var(--profile-muted)]">
+                  {initials}
+                </div>
+              )}
+            </div>
+            <input
+              accept="image/*"
+              className="hidden"
+              disabled={isProfileSubmitting}
+              ref={avatarInputRef}
+              type="file"
+              onChange={(event) => void handleAvatarFileChange(event)}
+            />
+            <button
+              aria-label="Edit avatar"
+              className="absolute bottom-1 right-1 flex size-8 items-center justify-center rounded-full border border-[var(--profile-border)] bg-[var(--profile-surface)] text-[var(--profile-muted)] shadow transition hover:bg-[var(--profile-surface-highest)] hover:text-[var(--profile-title)] disabled:opacity-60"
+              disabled={isProfileSubmitting}
+              type="button"
+              onClick={() => avatarInputRef.current?.click()}
+            >
+              <Pencil className="size-4" />
+            </button>
           </div>
           <div className="relative z-10 flex-1">
-            <h2 className="mb-1 text-[32px] font-bold leading-10 text-[var(--profile-title)]">
-              {displayName}
-            </h2>
+            {isEditingDisplayName ? (
+              <div className="mb-1 flex items-center gap-2">
+                <Input
+                  aria-label="Display name"
+                  autoFocus
+                  className="h-10 max-w-xs border-[var(--profile-border)] bg-[var(--profile-surface)] text-[24px] font-bold text-[var(--profile-title)]"
+                  disabled={isProfileSubmitting}
+                  value={draftDisplayName}
+                  onChange={(event) => setDraftDisplayName(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      void handleSaveDisplayName();
+                    } else if (event.key === 'Escape') {
+                      handleCancelEditDisplayName();
+                    }
+                  }}
+                />
+                <button
+                  aria-label="Save display name"
+                  className="flex size-8 items-center justify-center rounded-full text-[var(--profile-accent)] transition hover:bg-[var(--profile-surface-highest)] disabled:opacity-60"
+                  disabled={isProfileSubmitting}
+                  type="button"
+                  onClick={() => void handleSaveDisplayName()}
+                >
+                  <Check className="size-4" />
+                </button>
+                <button
+                  aria-label="Cancel edit"
+                  className="flex size-8 items-center justify-center rounded-full text-[var(--profile-muted)] transition hover:bg-[var(--profile-surface-highest)] disabled:opacity-60"
+                  disabled={isProfileSubmitting}
+                  type="button"
+                  onClick={handleCancelEditDisplayName}
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="mb-1 flex items-center gap-2">
+                <h2 className="text-[32px] font-bold leading-10 text-[var(--profile-title)]">
+                  {displayName}
+                </h2>
+                <button
+                  aria-label="Edit display name"
+                  className="flex size-8 items-center justify-center rounded-full text-[var(--profile-muted)] transition hover:bg-[var(--profile-surface-highest)] hover:text-[var(--profile-title)] disabled:opacity-60"
+                  disabled={!currentUser}
+                  type="button"
+                  onClick={handleStartEditDisplayName}
+                >
+                  <Pencil className="size-4" />
+                </button>
+              </div>
+            )}
             <div className="flex flex-wrap items-center gap-4 text-[var(--profile-muted)]">
               <span className="text-[14px]">{currentUser?.email ?? 'Loading...'}</span>
               <Separator className="h-4 bg-[var(--profile-border)]" orientation="vertical" />
@@ -799,22 +834,6 @@ export function UserProfilePage() {
                 {roleName}
               </span>
             </div>
-          </div>
-          <div className="relative z-10 flex gap-4">
-            <Button
-              className="h-9 rounded-lg border-[var(--profile-border)] bg-transparent px-6 text-[13px] text-[var(--profile-text)]"
-              variant="outline"
-              onClick={handleShareProfile}
-            >
-              {text.shareProfile}
-            </Button>
-            <Button
-              className="h-9 rounded-lg bg-[var(--profile-button)] px-6 text-[13px] text-[var(--profile-button-text)]"
-              disabled={!currentUser}
-              onClick={() => setIsEditProfileOpen(true)}
-            >
-              {text.editProfile}
-            </Button>
           </div>
         </section>
 
@@ -851,6 +870,14 @@ export function UserProfilePage() {
             </h3>
             <Card className="gap-0 rounded-xl border border-[var(--profile-border)] bg-[var(--profile-surface)] p-4 text-[var(--profile-text)] ring-0">
               <div className="space-y-2">
+                <SettingsButton
+                  disabled={currentUser?.googleLinked}
+                  icon={Link2}
+                  label={currentUser?.googleLinked ? text.googleAccountLinked : text.linkGoogleAccount}
+                  onClick={() => {
+                    window.location.href = getGoogleLinkAccountUrl();
+                  }}
+                />
                 <SettingsButton
                   icon={ShieldCheck}
                   label={text.securityPassword}

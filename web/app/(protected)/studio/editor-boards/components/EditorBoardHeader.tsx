@@ -40,65 +40,61 @@ export function EditorBoardHeader({ editorBoardId, boardName }: EditorBoardHeade
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-[#393E46] bg-[#222831] px-6">
       {/* LEFT */}
       <div className="flex items-center gap-5">
-        <div className="flex h-9 w-[360px] items-center gap-3 rounded-[4px] border border-[#39424f] bg-[#222a34] px-3 text-[#8b94a1]">
-          <Search className="size-4 text-[#dce7f3]" />
-          <span className="text-xs font-medium">Search board data...</span>
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              className="hidden h-9 items-center gap-2 rounded-[4px] border border-transparent px-3 text-xs font-black uppercase tracking-[0.08em] text-[#aeb7c2] hover:border-[#39424f] hover:bg-[#222a34] lg:flex"
-              type="button"
-            >
-              <Library className="size-4 text-[#FFD369]" />
-              <span>Editor Board</span>
-              <span className="text-[#5b626d]">/</span>
-              <span className="text-[#FFD369]">{boardName}</span>
-              <ChevronDown className="size-3.5 text-[#dce7f3]" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="start"
-            className="min-w-56 rounded-[4px] border border-[#39424f] bg-[#101820] p-1 text-white"
+        <div className="flex items-center text-xs font-black uppercase tracking-[0.08em] text-[#aeb7c2]">
+          <Link
+            href="/studio?tab=editorBoards"
+            className="flex h-9 items-center gap-1.5 rounded-[4px] border border-transparent px-3 text-[#aeb7c2] hover:border-[#39424f] hover:bg-[#222a34]"
           >
-            {['Manga Publishing', 'Webtoon Reviews', 'Light Novel Submissions'].map((name) => (
-              <DropdownMenuItem
-                className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold focus:bg-[#303842] focus:text-white"
-                key={name}
+            <Library className="size-4 text-[#FFD369]" />
+            <span>Editor Boards</span>
+          </Link>
+          <span className="text-[#5b626d] px-1">/</span>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="flex h-9 items-center gap-1 rounded-[4px] border border-transparent px-3 text-[#FFD369] hover:border-[#39424f] hover:bg-[#222a34]"
+                type="button"
               >
-                <Library className="size-3.5 text-[#8b94a1]" />
-                {name}
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator className="bg-[#39424f]" />
-            <DropdownMenuItem
-              asChild
-              className="cursor-pointer rounded-[3px] px-2 py-2.5 text-[#FFD369] focus:bg-[#303842] focus:text-[#FFD369]"
+                <span>{boardName}</span>
+                <ChevronDown className="size-3.5 text-[#dce7f3] ml-0.5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="start"
+              className="min-w-56 rounded-[4px] border border-[#39424f] bg-[#101820] p-1 text-white animate-in fade-in-50 duration-100"
             >
-              <Link href="/studio?tab=editorBoards">
-                <ArrowLeft className="size-3.5" />
-                <span className="min-w-0">
-                  <span className="block text-xs font-black">View all boards</span>
-                  <span className="mt-0.5 block text-[10px] font-bold text-[#8b94a1]">
-                    Return to the studio overview
+              {['Manga Publishing', 'Webtoon Reviews', 'Light Novel Submissions'].map((name) => (
+                <DropdownMenuItem
+                  className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold focus:bg-[#303842] focus:text-white"
+                  key={name}
+                >
+                  <Library className="size-3.5 text-[#8b94a1] mr-1.5" />
+                  {name}
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator className="bg-[#39424f]" />
+              <DropdownMenuItem
+                asChild
+                className="cursor-pointer rounded-[3px] px-2 py-2.5 text-[#FFD369] focus:bg-[#303842] focus:text-[#FFD369]"
+              >
+                <Link href="/studio?tab=editorBoards">
+                  <ArrowLeft className="size-3.5" />
+                  <span className="min-w-0">
+                    <span className="block text-xs font-black">View all boards</span>
+                    <span className="mt-0.5 block text-[10px] font-bold text-[#8b94a1]">
+                      Return to the studio overview
+                    </span>
                   </span>
-                </span>
-              </Link>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {/* RIGHT */}
       <div className="flex items-center gap-2">
         <NotificationBell />
-
-        <button
-          type="button"
-          className="rounded-lg p-2 text-[#B8BEC8] transition hover:bg-[#2F3742] hover:text-white"
-        >
-          <Settings className="size-5" />
-        </button>
 
         <div className="mx-2 h-8 w-px bg-[#434A55]" />
 
