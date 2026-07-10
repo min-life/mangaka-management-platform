@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   FileQuestion,
   Maximize2,
@@ -40,6 +40,8 @@ export function FileCanvas({ controller }: FileCanvasProps) {
     handleCanvasPointerUp,
     isPanning,
     isViewingHistoricalVersion,
+    isLoading,
+    isRefreshing,
     panOffset,
     pendingFrameRegion,
     pendingTaskRegion,
@@ -63,8 +65,9 @@ export function FileCanvas({ controller }: FileCanvasProps) {
     tasks,
     versions,
     zoom,
-    isLoading,
   } = controller;
+
+  const [loadedImageUrl, setLoadedImageUrl] = useState<string | null>(null);
 
   return (
     <>
@@ -148,11 +151,10 @@ export function FileCanvas({ controller }: FileCanvasProps) {
                 : version.isCurrent;
               return (
                 <button
-                  className={`relative h-7 shrink-0 rounded-full border px-3 text-[10px] font-black transition-all duration-100 ${
-                    isActive
-                      ? 'border-[#FFD369] bg-[#FFD369] text-[#222831] shadow-[0_0_8px_rgba(255,211,105,0.35)]'
-                      : 'border-[#39424f] bg-[#0d151e] text-[#aeb7c2] hover:border-[#FFD369]/50 hover:text-white'
-                  }`}
+                  className={`relative h-7 shrink-0 rounded-full border px-3 text-[10px] font-black transition-all duration-100 ${isActive
+                    ? 'border-[#FFD369] bg-[#FFD369] text-[#222831] shadow-[0_0_8px_rgba(255,211,105,0.35)]'
+                    : 'border-[#39424f] bg-[#0d151e] text-[#aeb7c2] hover:border-[#FFD369]/50 hover:text-white'
+                    }`}
                   key={version.id}
                   onClick={() => {
                     setSelectedSubmissionId(null);
@@ -263,29 +265,8 @@ export function FileCanvas({ controller }: FileCanvasProps) {
               setPendingFrameRegion(null);
               setDraftRegion(null);
               setAnnotationStart(null);
-
-              if (!focusedTask) {
-                const reviewTask = tasks.find((t) => t.status === 'REVIEW');
-                if (reviewTask) {
-                  focusFileTask(reviewTask);
-                  setAnnotationMode(false);
-                  setFrameAnnotationMode(true);
-                } else if (tasks.length > 0) {
-                  const activeTask = tasks.find((t) => t.status !== 'DONE') || tasks[0];
-                  focusFileTask(activeTask);
-                  setAnnotationMode(false);
-                  setFrameAnnotationMode(true);
-                } else {
-                  setAnnotationMode(true);
-                  setFrameAnnotationMode(false);
-                  toast.warning(
-                    'To place a frame comment, please draw a region to create a task first.'
-                  );
-                }
-              } else {
-                setAnnotationMode(false);
-                setFrameAnnotationMode((current) => !current);
-              }
+              setAnnotationMode(false);
+              setFrameAnnotationMode((current) => !current);
             }}
           >
             <MessageSquare className="size-4 text-[#FFD369]" />
@@ -310,13 +291,12 @@ export function FileCanvas({ controller }: FileCanvasProps) {
       </div>
 
       <div
-        className={`relative grid aspect-[16/10] max-h-[680px] w-full touch-none place-items-center overflow-hidden rounded-[4px] border bg-[#111923] shadow-[0_20px_60px_rgba(0,0,0,0.35)] ${
-          annotationMode || frameAnnotationMode
-            ? 'cursor-crosshair border-[#FFD369]'
-            : isPanning
+        className={`relative grid aspect-[16/10] max-h-[680px] w-full touch-none place-items-center overflow-hidden rounded-[4px] border bg-[#111923] shadow-[0_20px_60px_rgba(0,0,0,0.35)] ${annotationMode || frameAnnotationMode
+          ? 'cursor-crosshair border-[#FFD369]'
+          : isPanning
             ? 'cursor-grabbing border-[#303842]'
             : 'cursor-grab border-[#303842]'
-        }`}
+          }`}
         onPointerDown={handleCanvasPointerDown}
         onPointerMove={handleCanvasPointerMove}
         onPointerUp={handleCanvasPointerUp}
@@ -325,25 +305,55 @@ export function FileCanvas({ controller }: FileCanvasProps) {
         <div
           className="w-full h-full absolute inset-0 origin-center"
           style={{
-            transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${
-              zoom / 100
-            }) rotate(${rotation}deg)`,
+            transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom / 100
+              }) rotate(${rotation}deg)`,
             transition: isPanning ? 'none' : 'transform 0.15s ease-out',
           }}
         >
           {/* Layer 1: Base Image (The clicked version or current version when no historical version is selected) */}
-          {displayedPreviewUrl && (
-            <div
-              className="w-full h-full absolute inset-0"
-              style={{
-                backgroundImage: `url(${displayedPreviewUrl})`,
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat',
-                backgroundSize: 'contain',
-                opacity: 1,
-              }}
-            />
-          )}
+          {displayedPreviewUrl ? (
+            <>
+              {/* Hidden img to track load state */}
+              <img
+                src={displayedPreviewUrl}
+                className="hidden"
+                onLoad={() => setLoadedImageUrl(displayedPreviewUrl)}
+                alt="preload"
+              />
+              
+              <div
+                className={`w-full h-full absolute inset-0 transition-all duration-300 ${
+                  loadedImageUrl !== displayedPreviewUrl || isLoading || isRefreshing
+                    ? 'opacity-30 blur-[2px] grayscale-[0.5]'
+                    : 'opacity-100'
+                }`}
+                style={{
+                  backgroundImage: `url(${displayedPreviewUrl})`,
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat',
+                  backgroundSize: 'contain',
+                }}
+              />
+              
+              {(loadedImageUrl !== displayedPreviewUrl || isLoading || isRefreshing) && (
+                <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+                  <div className="flex flex-col items-center gap-3 bg-[#0d151e]/80 p-4 rounded-lg shadow-2xl backdrop-blur-sm border border-[#39424f]">
+                    <Loader2 className="size-8 animate-spin text-[#FFD369]" />
+                    <span className="text-xs font-bold text-[#FFD369] uppercase tracking-wider">Loading Version...</span>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : isRefreshing ? (
+            /* versions was just cleared (task switch) – show full-canvas spinner */
+            <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+              <div className="flex flex-col items-center gap-3 bg-[#0d151e]/80 p-4 rounded-lg shadow-2xl backdrop-blur-sm border border-[#39424f]">
+                <Loader2 className="size-8 animate-spin text-[#FFD369]" />
+                <span className="text-xs font-bold text-[#FFD369] uppercase tracking-wider">Loading Version...</span>
+              </div>
+            </div>
+          ) : null}
+
 
           {/* Layer 2: Overlay Image (Current version on top, only active during historical comparison with comparisonOpacity > 0) */}
           {isViewingHistoricalVersion && comparisonOpacity > 0 && versions[0]?.previewUrl && (
@@ -358,7 +368,17 @@ export function FileCanvas({ controller }: FileCanvasProps) {
               }}
             />
           )}
-          {isLoading ? (
+          {/* Refresh overlay: semi-transparent pulse when refreshing in background */}
+          {isRefreshing && (
+            <div className="absolute inset-0 pointer-events-none z-10 flex items-start justify-end p-3">
+              <div className="flex items-center gap-1.5 rounded-[4px] border border-[#39424f] bg-[#0d151e]/80 px-2.5 py-1.5 backdrop-blur-sm">
+                <Loader2 className="size-3 text-[#FFD369] animate-spin" />
+                <span className="text-[10px] font-black text-[#aeb7c2]">Updating...</span>
+              </div>
+            </div>
+          )}
+          {/* Initial load overlay: full blocking spinner when no preview yet */}
+          {isLoading && !isRefreshing ? (
             <div className="absolute inset-0 grid place-items-center px-6 text-center bg-[#111923]/80 z-10">
               <div>
                 <Loader2 className="mx-auto size-10 text-[#FFD369] animate-spin" />
@@ -384,24 +404,23 @@ export function FileCanvas({ controller }: FileCanvasProps) {
             const canvasVersion = selectedVersion
               ? `v${selectedVersion.version}`
               : versions[0]
-              ? `v${versions[0].version}`
-              : 'v1';
+                ? `v${versions[0].version}`
+                : 'v1';
 
             if (task.region && selectedTaskId === task.id) {
-              if (task.targetVersion && task.targetVersion !== canvasVersion) {
+              if (canvasVersion !== 'v1') {
                 return null;
               }
 
               return (
                 <button
                   aria-label={`Open task ${task.title}`}
-                  className={`absolute border-2 transition-all ${
-                    selectedTaskId === task.id
-                      ? 'z-20 border-[#FFD369] bg-[#FFD369]/20'
-                      : selectedTaskId
+                  className={`absolute border-2 transition-all ${selectedTaskId === task.id
+                    ? 'z-20 border-[#FFD369] bg-[#FFD369]/20'
+                    : selectedTaskId
                       ? 'z-10 border-transparent bg-transparent opacity-30 hover:opacity-100 hover:border-[#FFD369]/30 hover:bg-[#FFD369]/5'
                       : 'z-10 border-transparent bg-transparent hover:border-[#FFD369]/50 hover:bg-[#FFD369]/10'
-                  }`}
+                    }`}
                   key={task.id}
                   onClick={(event) => {
                     event.stopPropagation();
@@ -489,9 +508,8 @@ function ToolbarButton({
   return (
     <Button
       aria-label={label}
-      className={`size-7 rounded-[3px] ${
-        active ? 'bg-[#303842] text-[#FFD369]' : 'text-[#aeb7c2] hover:bg-[#17202b] hover:text-white'
-      }`}
+      className={`size-7 rounded-[3px] ${active ? 'bg-[#303842] text-[#FFD369]' : 'text-[#aeb7c2] hover:bg-[#17202b] hover:text-white'
+        }`}
       onClick={onClick}
       size="icon"
       title={label}

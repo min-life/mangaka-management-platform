@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { AdminAuthWrapper } from '@/components/auth/AdminAuthWrapper';
 import { AdminShell } from './components/AdminShell';
 import './admin-theme.css';
 
@@ -10,9 +11,11 @@ type AdminLayoutProps = {
 // Codex #admin-ui start
 export default function AdminLayout({ children }: AdminLayoutProps) {
   return (
-    <div className="admin-theme min-h-screen">
-      <AdminShell>{children}</AdminShell>
-    </div>
+    <AdminAuthWrapper>
+      <div className="min-h-screen admin-theme">
+        <AdminShell>{children}</AdminShell>
+      </div>
+    </AdminAuthWrapper>
   );
 }
 // Codex #admin-ui end

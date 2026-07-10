@@ -10,7 +10,7 @@ type EditorBoardSidebarProps = {
 // PhucTD #editor-board start
 export function EditorBoardSidebar({ editorBoardId }: EditorBoardSidebarProps) {
   const baseHref = `/studio/editor-boards/${editorBoardId}`;
-  
+
   const navItems: StudioSidebarItem[] = [
     { exact: true, href: baseHref, icon: LayoutDashboard, label: 'Dashboard' },
     { href: `${baseHref}/members`, icon: Users, label: 'Members' },

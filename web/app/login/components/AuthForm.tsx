@@ -70,9 +70,10 @@ export function AuthForm({
   useEffect(() => {
     if (status === 'authenticated') {
       setIsRedirecting(true);
-      router.replace(submitHref);
+      const isAdmin = user?.roles?.some(r => r.code === 'ADMIN' || r.code === 'STAFF') || false;
+      router.replace(isAdmin && (submitHref === '/studio' || submitHref === '/') ? '/admin' : submitHref);
     }
-  }, [status, router, submitHref]);
+  }, [status, router, submitHref, user]);
   const apiBaseUrl = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api').replace(
     /\/$/,
     '',
@@ -107,8 +108,7 @@ export function AuthForm({
 
       setAccessToken(response.accessToken);
       await refreshUser();
-      setIsRedirecting(true);
-      router.push(submitHref);
+      // The redirect will be handled by the useEffect above once status becomes 'authenticated'
     } catch (error) {
       const axiosError = error as AxiosError<{ message?: string }>;
       const message = axiosError.response?.data?.message;

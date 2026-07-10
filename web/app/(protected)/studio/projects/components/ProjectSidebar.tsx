@@ -1,11 +1,13 @@
 'use client';
 
 import {
+  BarChart3,
   ClipboardList,
   FileCheck2,
   FolderOpen,
   LayoutDashboard,
   Users,
+  Settings,
 } from 'lucide-react';
 
 import { StudioSidebar, type StudioSidebarItem } from '../../components/StudioSidebar';
@@ -22,6 +24,7 @@ export function ProjectSidebar({ projectId }: ProjectSidebarProps) {
     { href: `${baseHref}/applications`, icon: FileCheck2, label: 'Applications' },
     { href: `${baseHref}/files`, icon: FolderOpen, label: 'Files' },
     { href: `${baseHref}/tasks`, icon: ClipboardList, label: 'Tasks' },
+    { href: `${baseHref}/statistics`, icon: BarChart3, label: 'Statistics' },
   ];
 
   return (

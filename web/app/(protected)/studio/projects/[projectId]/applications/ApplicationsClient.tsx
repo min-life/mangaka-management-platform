@@ -9,6 +9,7 @@ import { useRealtimeProjectActivity } from '@/hooks/use-realtime-activity';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { LoadingState } from '@/components/ui/loading-state';
 import {
   Select,
   SelectContent,
@@ -416,6 +417,10 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
     }
   };
 
+  if (isLoading) {
+    return <LoadingState message="Loading applications..." minHeight="70vh" />;
+  }
+
   return (
     <section className="px-5 py-6">
       <div className="flex items-end justify-between">
@@ -506,9 +511,7 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
       </div>
 
       <section className="mt-4 space-y-3">
-        {isLoading ? (
-          <ApplicationListSkeleton />
-        ) : filteredApplications.length ? (
+        {filteredApplications.length ? (
           filteredApplications.map((application) => (
             <article
               className="rounded-[5px] border border-[#39424f] bg-[#101820] px-5 py-4 transition-colors hover:border-[#FFD369]/60 hover:bg-[#17202b]"
