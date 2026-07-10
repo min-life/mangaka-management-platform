@@ -40,10 +40,15 @@ function getErrorMessage(error: unknown) {
 
 type CreateBoardDialogProps = {
   onCreated?: (board: EditorBoardResponse) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  trigger?: React.ReactNode;
 };
 
-export function CreateBoardDialog({ onCreated }: CreateBoardDialogProps) {
-  const [open, setOpen] = useState(false);
+export function CreateBoardDialog({ onCreated, open: controlledOpen, onOpenChange: controlledOnOpenChange, trigger }: CreateBoardDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = controlledOnOpenChange !== undefined ? controlledOnOpenChange : setInternalOpen;
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [boardImage, setBoardImage] = useState('');
@@ -139,12 +144,16 @@ export function CreateBoardDialog({ onCreated }: CreateBoardDialogProps) {
 
   return (
     <Dialog onOpenChange={handleOpenChange} open={open}>
-      <DialogTrigger asChild>
-        <Button className="h-9 rounded-[4px] bg-[#FFD369] px-4 text-xs font-black text-[#222831] hover:bg-[#eac04f]">
-          <Plus className="size-4" />
-          New Board
-        </Button>
-      </DialogTrigger>
+      {trigger !== undefined ? (
+        trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null
+      ) : (
+        <DialogTrigger asChild>
+          <Button className="h-9 rounded-[4px] bg-[#FFD369] px-4 text-xs font-black text-[#222831] hover:bg-[#eac04f]">
+            <Plus className="size-4" />
+            New Board
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent
         className="w-[calc(100vw-2rem)] max-h-[88dvh] max-w-[720px] gap-0 overflow-hidden rounded-[7px] border border-[#393E46] bg-[#0c1219] p-0 text-[#eeeeee] ring-0 sm:max-w-[720px]"
         showCloseButton

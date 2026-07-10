@@ -35,3 +35,18 @@ export async function markNotificationAsRead(notificationId: number) {
 export async function markAllNotificationsAsRead() {
   await api.patch('/notifications/read-all');
 }
+
+type UnreadCountResponse = {
+  count?: number;
+  data?: {
+    count?: number;
+  };
+};
+
+export async function getUnreadNotificationCount() {
+  const response = await api.get<UnreadCountResponse, UnreadCountResponse>('/notifications/unread-count');
+  return response?.count ?? response?.data?.count ?? 0;
+}
+
+
+

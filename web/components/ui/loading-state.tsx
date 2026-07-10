@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { ChevronLeft, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type LoadingStateProps = {
@@ -8,131 +10,75 @@ type LoadingStateProps = {
   variant?: 'workspace' | 'detail' | 'list';
 };
 
-function SkeletonBlock({ className }: { className?: string }) {
-  return (
-    <div
-      className={cn(
-        'relative overflow-hidden rounded-[5px] bg-[#1f2937]',
-        'before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.25s_linear_infinite]',
-        'before:bg-gradient-to-r before:from-transparent before:via-[#374151]/70 before:to-transparent',
-        className,
-      )}
-    />
-  );
-}
-
-function LoadingLabel({ message }: { message: string }) {
-  return (
-    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.08em] text-[#8b94a1]">
-      <span className="size-2 rounded-full bg-[#FFD369]" />
-      {message}
-    </div>
-  );
-}
-
 function WorkspaceSkeleton({ message }: { message: string }) {
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between gap-4">
-        <div className="space-y-3">
-          <SkeletonBlock className="h-8 w-56" />
-          <SkeletonBlock className="h-4 w-[360px] max-w-full" />
-        </div>
-        <SkeletonBlock className="hidden h-10 w-32 sm:block" />
+    <div className="flex flex-col items-center justify-center min-h-[350px] p-8 text-center animate-in fade-in duration-200">
+      <div className="relative mb-4">
+        <div className="size-10 rounded-full border-2 border-[#FFD369]/20 border-t-[#FFD369] animate-spin" />
       </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <SkeletonBlock className="h-10 w-full max-w-[360px]" />
-        <SkeletonBlock className="h-10 w-40" />
-        <SkeletonBlock className="h-10 w-24" />
-      </div>
-
-      <LoadingLabel message={message} />
-
-      <div className="overflow-hidden rounded-[7px] border border-[#303842] bg-[#0c1219]">
-        <div className="grid h-11 grid-cols-[2fr_1fr_1fr_120px_120px] gap-5 border-b border-[#303842] bg-[#202832] px-5 py-3">
-          {Array.from({ length: 5 }).map((_, index) => (
-            <SkeletonBlock className="h-4" key={index} />
-          ))}
-        </div>
-        <div className="divide-y divide-[#303842]">
-          {Array.from({ length: 5 }).map((_, index) => (
-            <div
-              className="grid min-h-[82px] grid-cols-[2fr_1fr_1fr_120px_120px] items-center gap-5 px-5 py-4"
-              key={index}
-            >
-              <div className="flex items-center gap-3">
-                <SkeletonBlock className="size-14 shrink-0 rounded-md" />
-                <div className="min-w-0 flex-1 space-y-2">
-                  <SkeletonBlock className="h-4 w-44 max-w-full" />
-                  <SkeletonBlock className="h-3 w-24" />
-                </div>
-              </div>
-              <SkeletonBlock className="h-4" />
-              <SkeletonBlock className="h-4" />
-              <SkeletonBlock className="h-4" />
-              <SkeletonBlock className="h-4" />
-            </div>
-          ))}
-        </div>
-      </div>
+      <p className="text-xs font-black uppercase tracking-[0.1em] text-white animate-pulse">
+        {message}
+      </p>
+      <p className="text-[10px] font-bold text-[#8b94a1] mt-1">
+        Synchronizing studio assets...
+      </p>
     </div>
   );
 }
 
 function DetailSkeleton({ message }: { message: string }) {
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between gap-4">
-        <div className="space-y-3">
-          <SkeletonBlock className="h-4 w-32" />
-          <SkeletonBlock className="h-8 w-64" />
-          <SkeletonBlock className="h-4 w-[420px] max-w-full" />
+    <div className="space-y-6 animate-in fade-in duration-200">
+      <div className="flex flex-col gap-2 border-b border-[#26303b] pb-4">
+        <div className="flex items-center gap-2 text-xs font-bold text-[#8b94a1]">
+          <span className="inline-flex items-center gap-1 hover:text-white transition-colors cursor-default">
+            <ChevronLeft className="size-3.5" /> Back to Files
+          </span>
+          <span>·</span>
+          <span>Studio</span>
+          <span>/</span>
+          <span>Projects</span>
+          <span>/</span>
+          <span className="text-[#FFD369]">Workspace</span>
         </div>
-        <div className="flex gap-2">
-          <SkeletonBlock className="h-10 w-28" />
-          <SkeletonBlock className="h-10 w-28" />
+        <div className="flex items-center justify-between gap-4 mt-1">
+          <div>
+            <h1 className="text-xl font-black text-white tracking-wide">Loading File...</h1>
+            <p className="text-xs font-bold text-[#8b94a1] mt-1">Preparing drawing canvas and syncing workspace details</p>
+          </div>
+          <div className="flex gap-2">
+            <div className="h-8 w-24 rounded bg-[#1f2937]/50 border border-[#303842] flex items-center justify-center text-[10px] text-[#8b94a1] font-bold">
+              History
+            </div>
+            <div className="h-8 w-24 rounded bg-[#FFD369]/10 border border-[#FFD369]/20 flex items-center justify-center text-[10px] text-[#FFD369] font-black uppercase">
+              Current Version
+            </div>
+          </div>
         </div>
       </div>
 
-      <LoadingLabel message={message} />
-
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="space-y-4">
-          <div className="overflow-hidden rounded-[7px] border border-[#303842] bg-[#0c1219]">
-            <div className="flex h-12 items-center justify-between border-b border-[#303842] px-4">
-              <SkeletonBlock className="h-4 w-40" />
-              <SkeletonBlock className="h-8 w-32" />
-            </div>
-            <div className="p-4">
-              <SkeletonBlock className="aspect-[16/10] min-h-[320px] w-full rounded-[6px]" />
-            </div>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-3">
-            <SkeletonBlock className="h-24" />
-            <SkeletonBlock className="h-24" />
-            <SkeletonBlock className="h-24" />
+      <div className="overflow-hidden rounded-[8px] border border-[#26303b] bg-[#0c1219]/60 backdrop-blur-sm">
+        <div className="flex h-11 items-center justify-between border-b border-[#26303b] bg-[#151c25]/30 px-4">
+          <div className="flex items-center gap-2 text-xs font-bold text-[#8b94a1]">
+            <span>Canvas View</span>
           </div>
         </div>
-
-        <div className="space-y-4">
-          <div className="rounded-[7px] border border-[#303842] bg-[#0c1219] p-4">
-            <SkeletonBlock className="h-5 w-36" />
-            <div className="mt-4 space-y-3">
-              {Array.from({ length: 5 }).map((_, index) => (
-                <SkeletonBlock className="h-16" key={index} />
-              ))}
+        <div className="p-8 flex flex-col items-center justify-center min-h-[420px] relative">
+          <div className="flex flex-col items-center gap-4 text-center z-10">
+            <div className="relative">
+              <div className="size-12 rounded-full border-2 border-[#FFD369]/20 border-t-[#FFD369] animate-spin" />
+              <Loader2 className="size-5 text-[#FFD369] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-black uppercase tracking-[0.1em] text-white animate-pulse">
+                {message}
+              </p>
+              <p className="text-[10px] font-bold text-[#8b94a1]">
+                Synchronizing file version & layers...
+              </p>
             </div>
           </div>
-          <div className="rounded-[7px] border border-[#303842] bg-[#0c1219] p-4">
-            <SkeletonBlock className="h-5 w-32" />
-            <div className="mt-4 space-y-2">
-              <SkeletonBlock className="h-4 w-full" />
-              <SkeletonBlock className="h-4 w-3/4" />
-              <SkeletonBlock className="h-4 w-5/6" />
-            </div>
-          </div>
+          <div className="absolute inset-0 bg-[radial-gradient(#1f2937_1px,transparent_1px)] [background-size:16px_16px] opacity-25" />
         </div>
       </div>
     </div>
@@ -144,6 +90,19 @@ export function LoadingState({
   minHeight = '560px',
   variant = 'workspace',
 }: LoadingStateProps) {
+  const [shouldShow, setShouldShow] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShouldShow(true);
+    }, 700);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!shouldShow) {
+    return <div style={{ minHeight }} />;
+  }
+
   return (
     <div className="w-full px-0 py-1" style={{ minHeight }}>
       {variant === 'detail' ? (

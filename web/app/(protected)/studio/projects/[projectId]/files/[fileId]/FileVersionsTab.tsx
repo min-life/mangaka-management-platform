@@ -3,14 +3,13 @@
 import { useState, useEffect } from 'react';
 import { History, ChevronRight, Plus, Eye, RotateCw, X, Trash2, Download, FileImage, FileText, FileArchive, FileCode, FileQuestion, Upload, Loader2 } from 'lucide-react';
 
-import { getFileMaterialVersions } from '@/services/file.service';
-import { updateMaterial } from '@/services/material.service';
+import { getMaterialById, updateMaterial } from '@/services/material.service';
 import { toast } from '@/lib/toast';
 import {
   type FileExplorerItem,
   type FileVersionItem,
 } from '../file-ui';
-import { buildStableMaterialVersions, type FileMaterialVersionRecord } from './file-detail-types';
+
 
 // Let's import proper components: Button should be imported from @/components/ui/button
 import { Button as UIButton } from '@/components/ui/button';
@@ -95,6 +94,7 @@ export function FileVersionsTab({
   });
   const [hasChanges, setHasChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 
   const getFileIcon = (name: string, type: 'IMAGE' | 'TEXT' | 'SOURCE', url?: string) => {
     const extension = name.split('.').pop()?.toLowerCase() || '';
@@ -177,9 +177,39 @@ export function FileVersionsTab({
     if (!selectedVersionForDetails) {
       setLocalMaterials({ image: null, text: null, source: null });
       setHasChanges(false);
+      setIsLoadingDetail(false);
       return;
     }
+
     const mats = (selectedVersionForDetails as any).materials ?? [];
+
+    // Nếu material chưa có data (task material chỉ có id+name), gọi API getMaterialById để lấy chi tiết
+    if (mats.length === 0 && selectedVersionForDetails.id) {
+      setIsLoadingDetail(true);
+      getMaterialById(selectedVersionForDetails.id)
+        .then((res: any) => {
+          const fullMaterial = res.data ?? res;
+          const fullMats = (fullMaterial?.materials as any[]) ?? [];
+          const imageMat = fullMats.find((m: any) => m.type === 'IMAGE') ?? null;
+          const textMat = fullMats.find((m: any) => m.type === 'TEXT') ?? null;
+          const sourceMat = fullMats.find((m: any) => m.type === 'SOURCE') ?? null;
+          setLocalMaterials({
+            image: imageMat ? { url: imageMat.downloadUrl || imageMat.url, originalName: imageMat.originalName || imageMat.name, size: imageMat.size, type: 'IMAGE' } : null,
+            text: textMat ? { url: textMat.downloadUrl || textMat.url, originalName: textMat.originalName || textMat.name, size: textMat.size, type: 'TEXT' } : null,
+            source: sourceMat ? { url: sourceMat.downloadUrl || sourceMat.url, originalName: sourceMat.originalName || sourceMat.name, size: sourceMat.size, type: 'SOURCE' } : null,
+          });
+        })
+        .catch((err) => {
+          console.error('Failed to load material detail:', err);
+          toast.error('Could not load material details.');
+        })
+        .finally(() => {
+          setIsLoadingDetail(false);
+        });
+      setHasChanges(false);
+      return;
+    }
+
     const imageMat = mats.find((m: any) => m.type === 'IMAGE') ?? null;
     const textMat = mats.find((m: any) => m.type === 'TEXT') ?? null;
     const sourceMat = mats.find((m: any) => m.type === 'SOURCE') ?? null;
@@ -219,17 +249,13 @@ export function FileVersionsTab({
 
           {/* Versions List */}
           <div className="divide-y divide-[#26303b] border border-[#26303b] bg-[#0d151e] rounded-[6px] overflow-hidden">
-            {versions.map((version, index) => {
-              const isViewingThis = selectedVersion
-                ? String(selectedVersion.id) === String(version.id)
-                : version.isCurrent;
-              const matsCount = (version as any).materials?.length ?? 0;
+            {versions.map((version) => {
 
               return (
                 <div
                   key={version.id}
                   className={`flex items-center justify-between gap-4 p-4 cursor-pointer transition-all duration-150 border-l-2 hover:bg-[#182330] ${
-                    isViewingThis
+                    selectedVersion && String(selectedVersion.id) === String(version.id)
                       ? 'border-l-[#FFD369] bg-[#151c25]/80'
                       : 'border-l-transparent hover:border-l-[#FFD369]/50'
                   }`}
@@ -240,54 +266,15 @@ export function FileVersionsTab({
                     setVersionTabMode('detail');
                   }}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    {/* Thumbnail mini */}
-                    {version.previewUrl && version.previewUrl.trim() !== '' ? (
-                      <div className="size-10 rounded-[4px] overflow-hidden border border-[#303842] bg-[#091018] shrink-0">
-                        <img
-                          alt={`v${version.version} mini`}
-                          className="h-full w-full object-cover opacity-75 hover:opacity-100"
-                          src={version.previewUrl || undefined}
-                        />
-                      </div>
-                    ) : (
-                      <div className="size-10 rounded-[4px] border border-[#303842] bg-[#151c25] shrink-0 flex items-center justify-center text-[10px] text-[#8b94a1] font-black uppercase">
-                        v{version.version}
-                      </div>
-                    )}
-
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm font-black text-white">v{version.version}</span>
-                        {version.isCurrent && (
-                          <span className="rounded-[3px] border border-[#315846] bg-[#14291f] px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-[#9df2c7]">
-                            Current
-                          </span>
-                        )}
-                        {isViewingThis && !version.isCurrent && (
-                          <span className="rounded-[3px] border border-[#6c5516] bg-[#30270d] px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-[#FFD369]">
-                            Viewing
-                          </span>
-                        )}
-                        {index === 0 && !version.isCurrent && (
-                          <span className="rounded-[3px] border border-[#4f6e73] bg-[#2a454a] px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-[#e9fbff]">
-                            Latest
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-1 text-[10px] text-[#8b94a1] font-bold">
-                        {version.author} · {version.createdAt}
-                      </div>
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="min-w-0 flex-1">
+                      <span className="block text-sm font-bold text-white truncate">
+                        {version.note || `Material #${version.id}`}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Quick Metadata */}
-                  <div className="flex items-center gap-4 text-[10px] text-[#8b94a1] font-bold">
-                    <span className="rounded-[3px] bg-[#1a232d] border border-[#26303b] px-2 py-0.5 text-[9px] text-[#FFD369] font-black">
-                      {matsCount} file{matsCount !== 1 ? 's' : ''}
-                    </span>
-                    <ChevronRight className="size-4 text-[#8b94a1] shrink-0" />
-                  </div>
+                  <ChevronRight className="size-4 text-[#8b94a1] shrink-0" />
                 </div>
               );
             })}
@@ -318,7 +305,14 @@ export function FileVersionsTab({
 
           {/* Main Details Stacked Container */}
           <div className="border border-[#26303b] bg-[#0d151e] rounded-[6px] p-6 space-y-6">
-            
+            {/* Loading overlay when fetching material detail on click */}
+            {isLoadingDetail ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-3">
+                <Loader2 className="size-7 text-[#FFD369] animate-spin" />
+                <p className="text-xs font-bold text-[#8b94a1]">Loading material details...</p>
+              </div>
+            ) : (
+              <>
             {/* Section 1: Header / Primary Actions at Top */}
             <div className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-[#26303b]">
               <div className="space-y-1">
@@ -678,15 +672,15 @@ export function FileVersionsTab({
                         await updateMaterial(selectedVersionForDetails.id, formData, deleteOptions);
                         toast.success('Materials updated successfully.');
                         await loadFile();
-                        
-                        const updatedVersionsRes = await getFileMaterialVersions(fileId);
-                        const rawArray = ((updatedVersionsRes as { data?: FileMaterialVersionRecord[] }).data ||
-                          updatedVersionsRes.versions ||
-                          []) as FileMaterialVersionRecord[];
-                        const stableVersions = buildStableMaterialVersions(rawArray);
-                        const freshVer = stableVersions.find(v => String(v.id) === String(selectedVersionForDetails.id));
-                        if (freshVer) {
-                          setSelectedVersionForDetails(freshVer);
+
+                        // Refresh the detail view with updated data
+                        const freshRes = await getMaterialById(selectedVersionForDetails.id);
+                        const freshMaterial = (freshRes as any)?.data ?? freshRes;
+                        if (freshMaterial) {
+                          setSelectedVersionForDetails({
+                            ...selectedVersionForDetails,
+                            materials: freshMaterial.materials ?? [],
+                          });
                         }
                       } catch {
                         setError('Failed to save material changes.');
@@ -732,6 +726,8 @@ export function FileVersionsTab({
               </div>
             </div>
 
+              </>
+            )}
           </div>
         </>
       ) : null}

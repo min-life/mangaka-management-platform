@@ -5,7 +5,6 @@ import { Crosshair, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 import {
-  taskPriorityClassName,
   taskStatusClassName,
   taskStatusLabels,
   type TaskWorkspaceItem,
@@ -15,20 +14,20 @@ type TaskTableProps = { onOpenTask: (task: TaskWorkspaceItem) => void; tasks: Ta
 
 export function TaskTable({ onOpenTask, tasks }: TaskTableProps) {
   return (
-    <div className="rounded-[5px] border border-[#303842]">
-      <div className="hidden overflow-x-auto lg:block">
-        <div className="grid min-w-[980px] grid-cols-[minmax(340px,1.5fr)_190px_180px_96px_112px_118px] bg-[#242d37] px-4 py-3 text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
+    <div className="w-full rounded-[5px] border border-[#303842]">
+      <div className="hidden w-full lg:block">
+        <div className="grid w-full grid-cols-[minmax(180px,2fr)_minmax(80px,1fr)_minmax(120px,1.2fr)_100px_90px_110px] gap-x-4 bg-[#242d37] px-4 py-3 text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
           <span>Task</span>
           <span>Related File</span>
           <span>Assignee</span>
-          <span>Priority</span>
+          <span>Update Day</span>
           <span>Status</span>
           <span>Due</span>
         </div>
         {tasks.length ? (
           tasks.map((task) => (
             <button
-              className="grid min-h-[72px] w-full min-w-[980px] grid-cols-[minmax(340px,1.5fr)_190px_180px_96px_112px_118px] items-center border-t border-[#303842] bg-[#151c25] px-4 text-left transition hover:border-[#FFD369]/40 hover:bg-[#1b2530]"
+              className="grid min-h-[72px] w-full grid-cols-[minmax(180px,2fr)_minmax(80px,1fr)_minmax(120px,1.2fr)_100px_90px_110px] gap-x-4 items-center border-t border-[#303842] bg-[#151c25] px-4 text-left transition hover:border-[#FFD369]/40 hover:bg-[#1b2530]"
               key={task.id}
               onClick={() => onOpenTask(task)}
               type="button"
@@ -41,15 +40,14 @@ export function TaskTable({ onOpenTask, tasks }: TaskTableProps) {
                   <span className="block truncate text-sm font-black text-white">{task.title}</span>
                   <span className="mt-1 block truncate text-[10px] font-bold text-[#8b94a1]">
                     Updated {task.updatedAt}
-                    {task.targetVersion ? ` - Target ${task.targetVersion}` : ''}
                   </span>
                 </span>
               </span>
               <span className="truncate text-xs font-bold text-[#dce7f3]">{task.fileTitle}</span>
               <span className="truncate text-xs font-bold text-white">{task.assignee}</span>
-              <Badge className={`w-fit rounded-[3px] border ${taskPriorityClassName[task.priority]}`}>
-                {task.priority}
-              </Badge>
+              <span className="truncate text-xs font-bold text-[#aeb7c2]">
+                {task.updatedAt}
+              </span>
               <Badge className={`w-fit rounded-[3px] border ${taskStatusClassName[task.status]}`}>
                 {taskStatusLabels[task.status]}
               </Badge>
@@ -82,12 +80,11 @@ export function TaskTable({ onOpenTask, tasks }: TaskTableProps) {
                 </span>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <Badge className={`rounded-[3px] border ${taskPriorityClassName[task.priority]}`}>
-                  {task.priority}
-                </Badge>
                 <Badge className={`rounded-[3px] border ${taskStatusClassName[task.status]}`}>
                   {taskStatusLabels[task.status]}
                 </Badge>
+                <span className="text-[11px] font-bold text-[#8b94a1]">Updated {task.updatedAt}</span>
+                <span className="text-[11px] font-bold text-[#8b94a1]">•</span>
                 <span className="text-[11px] font-bold text-[#8b94a1]">{task.dueDate}</span>
               </div>
             </button>

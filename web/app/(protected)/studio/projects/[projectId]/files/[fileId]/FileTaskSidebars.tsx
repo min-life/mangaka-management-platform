@@ -35,12 +35,15 @@ type FileTaskSidebarProps = {
   onSelectTask: (taskId: string | null) => void;
   onStartFrameComment: () => void;
   onSubmitTaskWork: (input: SubmitTaskWorkInput) => void;
+  onMarkReadyForReview?: () => Promise<void>;
   onTaskChange: (task: TaskWorkspaceItem) => void;
   selectedSubmissionId: string | null;
   selectedTaskId: string | null;
   selectedVersion: FileVersionItem | null;
   tasks: FileTaskItem[];
   versions: FileVersionItem[];
+  members?: Array<{ id: number; name: string }>;
+  onRefresh?: () => void | Promise<void>;
 };
 
 type DesktopTaskSidebarProps = FileTaskSidebarProps & {
@@ -92,9 +95,12 @@ function TaskDetailPanel({
   onCloseFocusedTask,
   onStartFrameComment,
   onSubmitTaskWork,
+  onMarkReadyForReview,
   onTaskChange,
   selectedSubmissionId,
   versions,
+  members,
+  onRefresh,
 }: Pick<
   FileTaskSidebarProps,
   | 'canReviewTask'
@@ -103,9 +109,12 @@ function TaskDetailPanel({
   | 'onCloseFocusedTask'
   | 'onStartFrameComment'
   | 'onSubmitTaskWork'
+  | 'onMarkReadyForReview'
   | 'onTaskChange'
   | 'selectedSubmissionId'
   | 'versions'
+  | 'members'
+  | 'onRefresh'
 >) {
   if (!focusedTask) {
     return <EmptyTaskDetail />;
@@ -118,10 +127,13 @@ function TaskDetailPanel({
       onClose={onCloseFocusedTask}
       onStartFrameComment={onStartFrameComment}
       onSubmitWork={onSubmitTaskWork}
+      onMarkReadyForReview={onMarkReadyForReview}
       onTaskChange={onTaskChange}
       selectedSubmissionId={selectedSubmissionId}
       task={focusedTask}
       targetVersion={getTargetVersion(focusedTask, versions)}
+      members={members}
+      onRefresh={onRefresh}
     />
   );
 }
@@ -140,12 +152,15 @@ export function DesktopTaskSidebar({
   onSelectTask,
   onStartFrameComment,
   onSubmitTaskWork,
+  onMarkReadyForReview,
   onTaskChange,
   selectedSubmissionId,
   selectedTaskId,
   selectedVersion,
   tasks,
   versions,
+  members,
+  onRefresh,
 }: DesktopTaskSidebarProps) {
   if (!isOpen) {
     return null;
@@ -193,9 +208,12 @@ export function DesktopTaskSidebar({
             onCloseFocusedTask={onCloseFocusedTask}
             onStartFrameComment={onStartFrameComment}
             onSubmitTaskWork={onSubmitTaskWork}
+            onMarkReadyForReview={onMarkReadyForReview}
             onTaskChange={onTaskChange}
             selectedSubmissionId={selectedSubmissionId}
             versions={versions}
+            members={members}
+            onRefresh={onRefresh}
           />
         </section>
       </div>
@@ -221,12 +239,15 @@ export function MobileTaskDrawer({
   onSelectTask,
   onStartFrameComment,
   onSubmitTaskWork,
+  onMarkReadyForReview,
   onTaskChange,
   open,
   selectedSubmissionId,
   selectedTaskId,
   tasks,
   versions,
+  members,
+  onRefresh,
 }: MobileTaskDrawerProps) {
   if (!open) {
     return null;
@@ -260,9 +281,12 @@ export function MobileTaskDrawer({
               onCloseFocusedTask={onCloseFocusedTask}
               onStartFrameComment={onStartFrameComment}
               onSubmitTaskWork={onSubmitTaskWork}
+              onMarkReadyForReview={onMarkReadyForReview}
               onTaskChange={onTaskChange}
               selectedSubmissionId={selectedSubmissionId}
               versions={versions}
+              members={members}
+              onRefresh={onRefresh}
             />
           </div>
         </div>

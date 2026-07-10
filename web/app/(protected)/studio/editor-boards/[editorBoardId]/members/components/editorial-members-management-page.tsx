@@ -52,6 +52,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { UserResponse } from '@/services/user.service';
+import { Pagination } from '../../../../components/Pagination';
 
 import {
   addEditorialMembers,
@@ -92,11 +93,19 @@ function formatDate(value?: string) {
   }).format(date);
 }
 
+function getEditorialRoleClassName(roleTitle: string) {
+  const normalized = roleTitle.toLowerCase();
+  if (normalized.includes('lead')) {
+    return 'border-[#6c5516] bg-[#30270d] text-[#ffd35b]';
+  }
+  return 'border-[#39424f] bg-[#222a34] text-[#dce7f3]';
+}
+
 function MemberAvatar({ member, size = 'md' }: { member: EditorialMember; size?: 'lg' | 'md' }) {
   const dimension = size === 'lg' ? 'size-14' : 'size-10';
 
   return (
-    <Avatar className={`${dimension} rounded-[4px] border border-[#50555D] bg-[#2f353e]`}>
+    <Avatar className={`${dimension} rounded-[4px] border border-[#39424f] bg-[#2f353e]`}>
       <AvatarImage
         alt={member.displayName ?? member.email}
         className="object-cover"
@@ -128,13 +137,13 @@ function AddBoardMemberDialog({
     const normalizedQuery = searchQuery.trim().toLowerCase();
     const unavailableIds = new Set([...existingMemberIds, ...selectedUsers.map((user) => user.id)]);
 
+    if (!normalizedQuery) {
+      return [];
+    }
+
     return users
       .filter((user) => !unavailableIds.has(user.id))
       .filter((user) => {
-        if (!normalizedQuery) {
-          return true;
-        }
-
         return [user.email, user.displayName ?? ''].some((value) =>
           value.toLowerCase().includes(normalizedQuery),
         );
@@ -196,7 +205,7 @@ function AddBoardMemberDialog({
       }}
     >
       <DialogTrigger asChild>
-        <Button className="h-10 rounded-[4px] bg-white px-5 text-[13px] font-medium text-[#2f3131] hover:bg-[#c6c6c7]">
+        <Button className="h-9 rounded-[4px] bg-[#FFD369] px-4 text-xs font-black text-[#101820] hover:bg-[#eac04f]">
           <UserPlus className="size-4" />
           Add Member
         </Button>
@@ -239,6 +248,8 @@ function AddBoardMemberDialog({
               <div className="mt-3 h-[300px] overflow-y-auto rounded-[4px] border border-[#39424f] bg-[#0c1219] p-1">
                 {isLoadingUsers ? (
                   <p className="px-3 py-3 text-xs font-bold text-[#8b94a1]">Loading users...</p>
+                ) : !searchQuery.trim() ? (
+                  <p className="px-3 py-3 text-xs font-bold text-[#8b94a1]">Type name or email to search...</p>
                 ) : filteredUsers.length ? (
                   filteredUsers.map((user) => (
                     <button
@@ -455,6 +466,12 @@ export function EditorialMembersManagementPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm]);
 
   const loadMembers = useCallback(async () => {
     setIsLoading(true);
@@ -491,6 +508,13 @@ export function EditorialMembersManagementPage() {
       return matchesSearch;
     });
   }, [members, searchTerm]);
+
+  const paginatedMembers = useMemo(() => {
+    const startIndex = (page - 1) * limit;
+    return visibleMembers.slice(startIndex, startIndex + limit);
+  }, [visibleMembers, page, limit]);
+
+  const totalPages = Math.ceil(visibleMembers.length / limit);
 
   const handleAddMembers = async (users: UserResponse[]) => {
     setIsSubmitting(true);
@@ -552,186 +576,205 @@ export function EditorialMembersManagementPage() {
 
   return (
     <>
-      <main className="p-6">
-          <section className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
-            <div>
-              <h1 className="text-[32px] font-bold leading-10 text-white">
-                Editorial Members Management
-              </h1>
-              <p className="mt-1 text-sm leading-5 text-[#C8C8C8]">
-                Manage board access, lead ownership, and editorial workload across this team.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-end gap-2">
-              <div className="relative w-[320px] max-w-full">
-                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#8b94a1]" />
-                <Input
-                  className="h-10 rounded-[4px] border-[#50555D] bg-[#161c25] pl-10 text-sm text-white placeholder:text-[#8b94a1] focus-visible:border-[#FFD369] focus-visible:ring-[#FFD369]/20"
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Search members..."
-                  value={searchTerm}
-                />
-              </div>
-              <AddBoardMemberDialog
-                existingMemberIds={members.map((member) => member.id)}
-                onAddMembers={handleAddMembers}
-              />
-            </div>
-          </section>
-
-          {error ? (
-            <p className="mb-6 rounded-[6px] border border-red-400/30 bg-red-950/20 px-4 py-3 text-xs font-bold text-red-300">
-              {error}
+      <main className="px-5 py-6">
+        <section className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+          <div>
+            <h1 className="text-[24px] font-black leading-8 text-white">
+              Editorial Members
+            </h1>
+            <p className="mt-1 text-sm font-medium text-[#aeb7c2]">
+              Manage board access, lead ownership, and editorial workload across this team.
             </p>
-          ) : null}
+          </div>
+          <div className="flex items-center gap-3">
+            <AddBoardMemberDialog
+              existingMemberIds={members.map((member) => member.id)}
+              onAddMembers={handleAddMembers}
+            />
+          </div>
+        </section>
 
-          <section className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-            {[
-              { icon: Users, label: 'Total Members', value: summary?.totalMembers ?? 0 },
-              { icon: ShieldCheck, label: 'Board Leads', value: summary?.leadMembers ?? 0 },
-              { icon: CircleGauge, label: 'Review Load', value: summary?.reviewLoad ?? 0 },
-            ].map((item) => (
-              <article
-                className="rounded-[8px] border border-[#50555D] bg-[#1a2029] p-5"
-                key={item.label}
-              >
-                <div className="flex items-center justify-between">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                    {item.label}
-                  </p>
-                  <item.icon className="size-5 text-[#FFD369]" />
-                </div>
-                <p className="mt-3 text-[32px] font-bold leading-10 text-white">{item.value}</p>
-              </article>
-            ))}
-          </section>
+        {error ? (
+          <p className="mb-6 rounded-[6px] border border-red-400/30 bg-red-950/20 px-4 py-3 text-xs font-bold text-red-300">
+            {error}
+          </p>
+        ) : null}
 
-          <section>
-            <div className="overflow-hidden rounded-[8px] border border-[#50555D] bg-[#1a2029]">
-              <Table>
-                <TableHeader className="bg-[#242a33]">
-                  <TableRow className="border-[#50555D] hover:bg-transparent">
-                    <TableHead className="h-12 px-4 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                      Member
-                    </TableHead>
-                    <TableHead className="h-12 px-4 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                      Board Role
-                    </TableHead>
-                    <TableHead className="h-12 px-4 text-right text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                      Projects
-                    </TableHead>
-                    <TableHead className="h-12 px-4 text-right text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                      Reviews
-                    </TableHead>
-                    <TableHead className="h-12 px-4 text-right text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                      Actions
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    Array.from({ length: 4 }).map((_, index) => (
-                      <TableRow className="border-[#50555D]" key={index}>
-                        {Array.from({ length: 5 }).map((__, cellIndex) => (
-                          <TableCell className="px-4 py-4" key={cellIndex}>
-                            <Skeleton className="h-8 rounded-[4px] bg-[#2f353e]" />
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    ))
-                  ) : visibleMembers.length ? (
-                    visibleMembers.map((member) => (
-                      <TableRow
-                        className="cursor-pointer border-[#50555D] transition-colors hover:bg-[#50555D]/20"
-                        key={member.id}
-                        onClick={() => setSelectedMember(member)}
-                      >
-                        <TableCell className="px-4 py-4">
-                          <div className="flex items-center gap-4">
-                            <MemberAvatar member={member} />
-                            <div>
-                              <p className="text-[13px] font-medium text-white">
-                                {member.displayName ?? member.email}
-                              </p>
-                              <p className="mt-1 text-xs text-[#C8C8C8]">{member.email}</p>
-                            </div>
+        <div className="mb-6 flex h-10 items-center gap-3 rounded-[4px] border border-[#39424f] bg-[#151c25] px-4 text-[#8b94a1]">
+          <Search className="size-4 text-[#dce7f3]" />
+          <input
+            className="min-w-0 flex-1 bg-transparent text-xs font-medium text-white outline-none placeholder:text-[#8b94a1]"
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="Search by member, role, or email..."
+            value={searchTerm}
+          />
+        </div>
+
+        <section className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+          {[
+            { icon: Users, label: 'Total Members', value: summary?.totalMembers ?? 0 },
+            { icon: ShieldCheck, label: 'Board Leads', value: summary?.leadMembers ?? 0 },
+            { icon: CircleGauge, label: 'Review Load', value: summary?.reviewLoad ?? 0 },
+          ].map((item) => (
+            <article
+              className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-4"
+              key={item.label}
+            >
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-black uppercase tracking-[0.04em] text-[#aeb7c2]">
+                  {item.label}
+                </p>
+                <item.icon className="size-4 text-[#FFD369]" />
+              </div>
+              <p className="mt-2 text-2xl font-black text-white">{item.value}</p>
+            </article>
+          ))}
+        </section>
+
+        <section>
+          <div className="overflow-hidden rounded-[5px] border border-[#39424f] bg-[#101820]">
+            <Table>
+              <TableHeader>
+                <TableRow className="h-[40px] border-[#39424f] bg-[#222a34] hover:bg-[#222a34]">
+                  <TableHead className="w-[32%] px-5 text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
+                    Member
+                  </TableHead>
+                  <TableHead className="w-[20%] text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
+                    Board Role
+                  </TableHead>
+                  <TableHead className="w-[12%] text-right text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
+                    Projects
+                  </TableHead>
+                  <TableHead className="w-[16%] text-right text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
+                    Reviews
+                  </TableHead>
+                  <TableHead className="w-[72px] pr-5 text-right text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
+                    Actions
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  Array.from({ length: 4 }).map((_, index) => (
+                    <TableRow
+                      className="h-[72px] border-l-4 border-l-transparent border-r-0 border-t-0 border-b-[#303842] bg-[#101820]"
+                      key={index}
+                    >
+                      {Array.from({ length: 5 }).map((__, cellIndex) => (
+                        <TableCell className="px-4 py-4" key={cellIndex}>
+                          <Skeleton className="h-8 rounded-[4px] bg-[#2f353e]" />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : visibleMembers.length ? (
+                  paginatedMembers.map((member) => (
+                    <TableRow
+                      className="h-[72px] cursor-pointer border-l-4 border-l-transparent border-r-0 border-t-0 border-b-[#303842] bg-[#101820] transition-all hover:border-l-[#FFD369] hover:bg-[#17202b]"
+                      key={member.id}
+                      onClick={() => setSelectedMember(member)}
+                    >
+                      <TableCell className="px-5">
+                        <div className="flex items-center gap-4">
+                          <MemberAvatar member={member} />
+                          <div>
+                            <p className="text-sm font-black leading-5 text-white">
+                              {member.displayName ?? member.email}
+                            </p>
+                            <p className="mt-1 text-[11px] font-bold text-[#aeb7c2]">{member.email}</p>
                           </div>
-                        </TableCell>
-                        <TableCell className="px-4 py-4">
-                          <div className="flex items-center gap-2">
-                            <Badge className="rounded-[4px] border-[#50555D] bg-[#202832] px-2 py-1 text-[11px] font-semibold text-white">
-                              {member.roleTitle}
-                            </Badge>
-                            {member.isLead ? (
-                              <ShieldCheck className="size-4 text-[#FFD369]" />
-                            ) : null}
-                          </div>
-                        </TableCell>
-                        <TableCell className="px-4 py-4 text-right font-mono text-sm text-[#dde3ef]">
-                          {member.activeProjects}
-                        </TableCell>
-                        <TableCell className="px-4 py-4 text-right font-mono text-sm text-[#FFD369]">
-                          {member.reviewLoad}
-                        </TableCell>
-                        <TableCell className="px-4 py-4 text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button
-                                aria-label={`Open actions for ${member.displayName ?? member.email}`}
-                                className="text-[#C8C8C8] hover:text-white"
-                                onClick={(event) => event.stopPropagation()}
-                                type="button"
-                              >
-                                <MoreVertical className="size-5" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent
-                              align="end"
-                              className="min-w-44 border-[#39424f] bg-[#151c25] text-white"
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            className={`h-6 rounded-[3px] border px-3 text-[10px] font-black ${getEditorialRoleClassName(
+                              member.roleTitle,
+                            )}`}
+                            variant="outline"
+                          >
+                            {member.roleTitle}
+                          </Badge>
+                          {member.isLead ? (
+                            <ShieldCheck className="size-4 text-[#FFD369]" />
+                          ) : null}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm text-[#dde3ef]">
+                        {member.activeProjects}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm text-[#FFD369]">
+                        {member.reviewLoad}
+                      </TableCell>
+                      <TableCell className="pr-5 text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              aria-label={`Open actions for ${member.displayName ?? member.email}`}
+                              className="text-[#C8C8C8] hover:text-white"
+                              onClick={(event) => event.stopPropagation()}
+                              type="button"
                             >
-                              <DropdownMenuItem
-                                className="gap-2 focus:bg-[#303842] focus:text-white"
-                                onClick={() => setSelectedMember(member)}
-                              >
-                                <User className="size-4" />
-                                View Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="gap-2 focus:bg-[#303842] focus:text-white"
-                                disabled={member.isLead || isSubmitting}
-                                onClick={() => void handleSetLead(member)}
-                              >
-                                <ShieldCheck className="size-4" />
-                                Set as Lead
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="gap-2 text-red-300 focus:bg-red-950/30 focus:text-red-200"
-                                disabled={isSubmitting}
-                                onClick={() => void handleRemove(member)}
-                              >
-                                <Trash2 className="size-4" />
-                                Remove
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow className="border-[#50555D]">
-                      <TableCell
-                        className="px-4 py-10 text-center text-sm text-[#C8C8C8]"
-                        colSpan={5}
-                      >
-                        No editorial members found.
+                              <MoreVertical className="size-5" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="end"
+                            className="min-w-44 border-[#39424f] bg-[#151c25] text-white"
+                          >
+                            <DropdownMenuItem
+                              className="gap-2 focus:bg-[#303842] focus:text-white"
+                              onClick={() => setSelectedMember(member)}
+                            >
+                              <User className="size-4" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="gap-2 focus:bg-[#303842] focus:text-white"
+                              disabled={member.isLead || isSubmitting}
+                              onClick={() => void handleSetLead(member)}
+                            >
+                              <ShieldCheck className="size-4" />
+                              Set as Lead
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="gap-2 text-red-300 focus:bg-red-950/30 focus:text-red-200"
+                              disabled={isSubmitting}
+                              onClick={() => void handleRemove(member)}
+                            >
+                              <Trash2 className="size-4" />
+                              Remove
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-
-          </section>
+                  ))
+                ) : (
+                  <TableRow className="border-[#303842] bg-[#101820]">
+                    <TableCell
+                      className="px-5 py-10 text-center text-xs font-bold text-[#aeb7c2]"
+                      colSpan={5}
+                    >
+                      No editorial members found.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+            <Pagination
+              page={page}
+              limit={limit}
+              total={visibleMembers.length}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              onLimitChange={(newLimit) => {
+                setLimit(newLimit);
+                setPage(1);
+              }}
+            />
+          </div>
+        </section>
       </main>
       <MemberDetailDrawer member={selectedMember} onClose={() => setSelectedMember(null)} />
     </>

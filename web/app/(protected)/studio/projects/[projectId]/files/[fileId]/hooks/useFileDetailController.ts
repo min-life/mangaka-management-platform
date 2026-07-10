@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -11,12 +12,13 @@ import { useCanvasViewport } from './useCanvasViewport';
 import { useCanvasAnnotations } from './useCanvasAnnotations';
 
 import { getProjectFolders, getProjectMembers, getProjectById, type ProjectFolderResponse, type ProjectResponse } from '@/services/project.service';
-import { getFileById, getFileComments, getFileMaterialVersions, getFileTasks } from '@/services/file.service';
-import { getTaskFrames, getTaskComments } from '@/services/task.service';
+import { getFileById, getFileComments, getFileMaterials, getFileTasks } from '@/services/file.service';
+import { getTaskFrames, getTaskComments, getTaskMaterials } from '@/services/task.service';
 import { getFrameComments } from '@/services/frame.service';
-import { getMaterialFrames } from '@/services/material.service';
+import { getMaterialById, getMaterialFrames } from '@/services/material.service';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/use-permissions';
+import { useAsyncResource } from '@/hooks/useAsyncResource';
 
 import { useFileDetailVersionActions } from './useFileDetailVersionActions';
 import { useFileDetailTaskActions } from './useFileDetailTaskActions';
@@ -48,31 +50,22 @@ type UseFileDetailControllerProps = {
 export function useFileDetailController({ fileId, focusedTaskId, projectId }: UseFileDetailControllerProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const lastProcessedTaskIdRef = useRef<string | null | undefined>(undefined);
-  const [file, setFile] = useState<FileExplorerItem | null>(null);
-  const [project, setProject] = useState<ProjectResponse | null>(null);
-  const [folders, setFolders] = useState<ProjectFolderResponse[]>([]);
-  const [tasks, setTasks] = useState<FileTaskItem[]>([]);
   const [resourceTab, setResourceTab] = useState<ResourceTab>('versions');
   const [selectedVersion, setSelectedVersion] = useState<FileVersionItem | null>(null);
-  const [versions, setVersions] = useState<FileVersionItem[]>([]);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [focusedTask, setFocusedTask] = useState<TaskWorkspaceItem | null>(null);
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
-  const [frameComments, setFrameComments] = useState<SubmissionFrameComment[]>([]);
-  const [fileComments, setFileComments] = useState<FileDiscussionComment[]>([]);
-  const [taskComments, setTaskComments] = useState<FileDiscussionComment[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSavingComment, setIsSavingComment] = useState(false);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [versionTabMode, setVersionTabMode] = useState<'list' | 'detail'>('list');
   const [selectedVersionForDetails, setSelectedVersionForDetails] = useState<FileVersionItem | null>(null);
   const [deletingVersionId, setDeletingVersionId] = useState<string | null>(null);
   const [mobileTasksOpen, setMobileTasksOpen] = useState(false);
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
-  const [members, setMembers] = useState<{ id: number; name: string }[]>([]);
+
+
 
   const viewport = useCanvasViewport();
 
@@ -123,294 +116,362 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     handleCanvasPointerUp,
   } = annotations;
 
-  const loadFile = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
+  const { data, error, isInitialLoading, isRefreshing, reload, setData, setError } = useAsyncResource(async () => {
+    let projData = null;
     try {
-      try {
-        const projData = await getProjectById(projectId);
-        setProject(projData);
-      } catch (err) {
-        console.error('Failed to load project details:', err);
-      }
+      projData = await getProjectById(projectId);
+    } catch (err) {
+      console.error('Failed to load project details:', err);
+    }
 
-      const folderResult = await getProjectFolders(projectId);
-      const productionFolders = folderResult.folders;
-      setFolders(productionFolders);
+    const folderResult = await getProjectFolders(projectId);
+    const productionFolders = folderResult.folders;
 
-      try {
-        const membersRes = await getProjectMembers(projectId);
-        setMembers(
-          (membersRes.members || []).map((m) => ({
-            id: m.id,
-            name: m.displayName || m.email,
-          })),
-        );
-      } catch (err) {
-        console.error('Failed to load project members:', err);
-      }
+    let apiMembers: { id: number; name: string }[] = [];
+    try {
+      const membersRes = await getProjectMembers(projectId);
+      apiMembers = (membersRes.members || []).map((m) => ({
+        id: m.id,
+        name: m.displayName || m.email,
+      }));
+    } catch (err) {
+      console.error('Failed to load project members:', err);
+    }
 
-      if (isNaN(Number(fileId)) || fileId < 0) {
-        setError('File was not found in the current project workspace.');
-        setIsLoading(false);
-        return;
-      }
+    if (isNaN(Number(fileId)) || fileId < 0) {
+      throw new Error('File was not found in the current project workspace.');
+    }
 
-      const response = await getFileById(fileId);
-      const createdByLabel =
-        response.createdByUser?.displayName ||
-        response.createdByUser?.email ||
-        (response.createdBy ? `User #${response.createdBy}` : 'Unknown user');
+    const response = await getFileById(fileId);
+    const createdByLabel =
+      response.createdByUser?.displayName ||
+      response.createdByUser?.email ||
+      (response.createdBy ? `User #${response.createdBy}` : 'Unknown user');
 
-      let dbVersions: FileVersionItem[] = [];
-      try {
-        const versionsRes = await getFileMaterialVersions(fileId);
-        const versionsArray = ((versionsRes as { data?: FileMaterialVersionRecord[] }).data ||
-          versionsRes.versions ||
-          []) as FileMaterialVersionRecord[];
+    let dbVersions: FileVersionItem[] = [];
+    try {
+      if (!selectedTaskId) {
+        // 1. Khi KHÔNG bấm vào task: Gọi GET /files/:id/materials chỉ lấy các version gốc
+        const materialsRes = await getFileMaterials(fileId);
+        const versionsArray = (materialsRes || []) as FileMaterialVersionRecord[];
         dbVersions = buildStableMaterialVersions(versionsArray);
-      } catch (err) {
-        console.error('Failed to load version history:', err);
-      }
+      } else {
+        const taskIdNum = Number(selectedTaskId);
+        if (selectedTaskId && !isNaN(taskIdNum) && taskIdNum > 0) {
+          // 2. Khi BẤM vào task: Gọi GET /tasks/:id/materials để lấy danh sách,
+          // sau đó gọi GET /materials/:id song song để lấy đầy đủ materials + presigned URL
+          const taskMaterials = await getTaskMaterials(selectedTaskId);
+          const rawList: any[] = Array.isArray(taskMaterials)
+            ? taskMaterials
+            : (taskMaterials?.data ?? (taskMaterials ?? []));
 
-      setVersions(dbVersions);
-
-      let dbTasks: FileTaskItem[] = [];
-      try {
-        const tasksRes = await getFileTasks(fileId);
-        const tasksWithFramesPromises = (tasksRes || []).map(async (t: any) => {
-          let region: FileTaskRegion | undefined = undefined;
-          try {
-            const frames = await getTaskFrames(t.id);
-            const frame = frames[0];
-            if (frame) {
-              region = {
-                endX: Number(frame.endX),
-                endY: Number(frame.endY),
-                startX: Number(frame.startX),
-                startY: Number(frame.startY),
-              };
-            }
-          } catch (frameErr) {
-            console.error(`Failed to load frames for task ${t.id}:`, frameErr);
-          }
-
-          const versionMatch = t.description?.match(/\[version:(v\d+)\]/);
-          let taskVersion = versionMatch ? versionMatch[1] : undefined;
-
-          if (!taskVersion && dbVersions.length > 0 && t.createdAt) {
-            const sorted = [...dbVersions].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-            const taskTime = new Date(t.createdAt).getTime();
-            let matchedVer = sorted[0];
-            for (const v of sorted) {
-              if (new Date(v.createdAt).getTime() <= taskTime) {
-                matchedVer = v;
-              } else {
-                break;
+          // Fetch full detail (with presigned URLs) for each material in parallel
+          const fullMaterials = await Promise.all(
+            rawList.map(async (m: any) => {
+              try {
+                const res = await getMaterialById(m.id);
+                const full = (res as any)?.data ?? res;
+                return full ?? m;
+              } catch {
+                return m; // fallback to basic data on error
               }
-            }
-            if (matchedVer) {
-              taskVersion = `v${matchedVer.version}`;
-            }
-          }
+            })
+          );
 
-          // Parse submissions and clean description
-          const rawDesc = t.description || '';
-          const submissions: any[] = [];
-          const submissionRegex = /\[Note:\s*([\s\S]*?)\](?:\s*\[version:(v\d+)\])?/g;
-          let match;
+          const isFileName = (name: string) => /\.[a-zA-Z0-9]+$/.test(name);
+          
+          // Sắp xếp tăng dần theo thời gian tạo (cũ nhất lên đầu) để đánh số phiên bản chính xác
+          const sortedMaterials = [...fullMaterials].sort(
+            (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          );
+          const newestId = sortedMaterials.at(-1)?.id;
 
-          while ((match = submissionRegex.exec(rawDesc)) !== null) {
-            const note = match[1].trim();
-            const versionTag = match[2];
-            let previewUrl = undefined;
-            let assetName = 'submission.png';
-            if (versionTag) {
-              const matchVer = dbVersions.find(v => `v${v.version}` === versionTag);
-              if (matchVer) {
-                previewUrl = matchVer.previewUrl;
-                assetName = `submission-${versionTag}.png`;
-              }
-            } else if (dbVersions.length > 0) {
-              previewUrl = dbVersions[0].previewUrl;
-              assetName = `submission-v${dbVersions[0].version}.png`;
-            }
-
-            submissions.push({
-              id: `sub-${t.id}-${submissions.length + 1}`,
-              assetName,
-              note,
-              previewUrl,
-              status: 'PENDING_REVIEW',
-              submittedAt: t.updatedAt ? formatFileDate(t.updatedAt) : 'Submitted',
-              submittedBy: t.assignedByUser?.displayName || t.assignedByUser?.email || 'Assignee',
-            });
-          }
-
-          if (submissions.length > 0) {
-            const latest = submissions[submissions.length - 1];
-            if (t.status === 'DONE') {
-              latest.status = 'APPROVED';
-            } else if (t.status === 'INPROGRESS') {
-              latest.status = 'CHANGES_REQUESTED';
-            } else if (t.status === 'REVIEW') {
-              latest.status = 'PENDING_REVIEW';
-            }
-            for (let i = 0; i < submissions.length - 1; i++) {
-              submissions[i].status = 'CHANGES_REQUESTED';
-            }
-            // Sort newest first so that the latest submission is auto-selected
-            submissions.reverse();
-          }
-
-          const cleanDesc = rawDesc
-            .replace(/\[Note:\s*([\s\S]*?)\]/g, '')
-            .replace(/\[version:(v\d+)\]/g, '')
-            .trim();
-
-          return {
-            assignedTo: t.assignedByUser?.displayName || t.assignedByUser?.email || 'Unassigned',
-            assignedToUserId: t.assignedByUser?.id,
-            description: cleanDesc,
-            id: String(t.id),
-            region,
-            status: t.status,
-            title: t.title,
-            targetVersion: taskVersion,
-            submissions,
-            updatedAt: t.updatedAt,
-            parent: t.parent ? {
-              id: String(t.parent.id),
-              title: t.parent.title,
-              description: t.parent.description ?? null,
-              status: t.parent.status,
-            } : null,
-          };
-
-        });
-        dbTasks = await Promise.all(tasksWithFramesPromises);
-      } catch (err) {
-        console.error('Failed to load tasks:', err);
-      }
-
-      setTasks(dbTasks);
-
-      let dbComments: SubmissionFrameComment[] = [];
-      let dbFileComments: FileDiscussionComment[] = [];
-      try {
-        const frameCommentGroups = await Promise.all(
-          dbVersions.map(async (version) => {
-            const frames = await getMaterialFrames(version.id);
-            const commentsByFrame = await Promise.all(
-              frames.map(async (frame) => {
-                const frameCommentsRes = await getFrameComments(frame.id);
-                return frameCommentsRes.map((comment: any) => ({
-                  author:
-                    comment.createdByUser?.displayName ||
-                    comment.createdByUser?.email ||
-                    'Unknown User',
-                  content: getCommentText(comment.content),
-                  frameId: String(frame.id),
-                  id: String(comment.id),
-                  materialId: String(comment.material?.id ?? version.id),
-                  materialVersion: `v${version.version}`,
-                  region: {
-                    endX: Number(frame.endX),
-                    endY: Number(frame.endY),
-                    startX: Number(frame.startX),
-                    startY: Number(frame.startY),
-                  },
-                  taskId:
-                    comment.taskId != null
-                      ? String(comment.taskId)
-                      : typeof comment.content === 'object' && comment.content
-                        ? String((comment.content as any).taskId || '')
-                        : '',
-                  time: formatFileDate(comment.createdAt),
-                }));
-              }),
-            );
-            return commentsByFrame.flat();
-          }),
-        );
-        dbComments = frameCommentGroups.flat();
-      } catch (err) {
-        console.error('Failed to load frame comments:', err);
-      }
-
-      try {
-        const commentsRes = await getFileComments(fileId);
-        dbFileComments = (commentsRes || []).map((comment: any) => ({
-          author:
-            comment.createdByUser?.displayName ||
-            comment.createdByUser?.email ||
-            'Unknown User',
-          content: getCommentText(comment.content),
-          id: String(comment.id),
-          time: formatFileDate(comment.createdAt),
-        }));
-      } catch (err) {
-        console.error('Failed to load file comments:', err);
-      }
-
-      let dbTaskComments: FileDiscussionComment[] = [];
-      if (selectedTaskId) {
-        try {
-          const taskCommentsRes = await getTaskComments(selectedTaskId);
-          dbTaskComments = (taskCommentsRes || []).map((c: any) => ({
-            author: c.createdByUser?.displayName || c.createdByUser?.email || 'Unknown User',
-            content: getCommentText(c.content),
-            id: String(c.id),
-            time: formatFileDate(c.createdAt),
-          }));
-        } catch (err) {
-          console.error('Failed to load task comments:', err);
+          dbVersions = sortedMaterials
+            .map((m: any, index: number) => {
+              const thumbnail = m.materials?.find((item: any) => item.isThumbnail) || m.materials?.[0];
+              return {
+                id: String(m.id),
+                note: (m.name && !isFileName(m.name)) ? m.name : `Material v${index + 1}`,
+                author: m.createdByUser?.displayName || m.createdByUser?.email || '',
+                createdAt: m.createdAt ? formatFileDate(m.createdAt) : '',
+                isCurrent: m.id === newestId,
+                version: index + 1,
+                materials: m.materials || [],
+                previewUrl: thumbnail?.url || undefined,
+                taskId: Number(selectedTaskId),
+              } as FileVersionItem;
+            })
+            .reverse(); // Đảo ngược để phiên bản mới nhất nằm ở đầu (index 0)
+        } else {
+          // Fallback if taskId is not a valid number
+          const materialsRes = await getFileMaterials(fileId);
+          const versionsArray = (materialsRes || []) as FileMaterialVersionRecord[];
+          dbVersions = buildStableMaterialVersions(versionsArray);
         }
       }
-
-      setFrameComments(dbComments);
-      setFileComments(dbFileComments);
-      setTaskComments(dbTaskComments);
-
-      // Default the main file preview to the current version's thumbnail or file's default preview url
-      const currentVersionPreview = dbVersions.find((v) => v.isCurrent)?.previewUrl;
-
-      let fileStatus: 'PENDING' | 'INPROGRESS' | 'REVIEW' | 'DONE' = 'PENDING';
-      if (dbTasks.some((t: any) => t.status === 'REVIEW')) {
-        fileStatus = 'REVIEW';
-      } else if (dbTasks.some((t: any) => t.status === 'INPROGRESS')) {
-        fileStatus = 'INPROGRESS';
-      } else if (dbTasks.length > 0 && dbTasks.every((t: any) => t.status === 'DONE')) {
-        fileStatus = 'DONE';
-      }
-
-      setFile({
-        category: 'Production File',
-        createdAt: response.createdAt,
-        createdByLabel,
-        description: response.description,
-        folderId: response.folderId,
-        id: response.id,
-        previewUrl: currentVersionPreview || undefined,
-        status: fileStatus,
-        taskCount: dbTasks.length,
-        title: response.title,
-        updatedAt: response.updatedAt,
-      });
-    } catch {
-      setFile(null);
-      setError('Unable to load file details.');
-    } finally {
-      setIsLoading(false);
+    } catch (err) {
+      console.error('Failed to load version history:', err);
     }
+
+    let dbTasks: FileTaskItem[] = [];
+    try {
+      const tasksRes = await getFileTasks(fileId);
+      const tasksWithFramesPromises = (tasksRes || []).map(async (t: any) => {
+        let region: FileTaskRegion | undefined = undefined;
+        try {
+          const frames = await getTaskFrames(t.id);
+          const taskFrame = frames[frames.length - 1]; // Lấy frame định vị gốc (tạo đầu tiên) của task
+          if (taskFrame) {
+            region = {
+              endX: Number(taskFrame.endX),
+              endY: Number(taskFrame.endY),
+              startX: Number(taskFrame.startX),
+              startY: Number(taskFrame.startY),
+            };
+          }
+        } catch (frameErr) {
+          console.error(`Failed to load frames for task ${t.id}:`, frameErr);
+        }
+
+        const versionMatch = t.description?.match(/\[version:(v\d+)\]/);
+        let taskVersion = versionMatch ? versionMatch[1] : undefined;
+
+        if (!taskVersion && dbVersions.length > 0 && t.createdAt) {
+          const sorted = [...dbVersions].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+          const taskTime = new Date(t.createdAt).getTime();
+          let matchedVer = sorted[0];
+          for (const v of sorted) {
+            if (new Date(v.createdAt).getTime() <= taskTime) {
+              matchedVer = v;
+            } else {
+              break;
+            }
+          }
+          if (matchedVer) {
+            taskVersion = `v${matchedVer.version}`;
+          }
+        }
+
+        const rawDesc = t.description || '';
+        const submissions: any[] = [];
+        const submissionRegex = /\[Note:\s*([\s\S]*?)\](?:\s*\[version:(v\d+)\])?/g;
+        let match;
+
+        while ((match = submissionRegex.exec(rawDesc)) !== null) {
+          const note = match[1].trim();
+          const versionTag = match[2];
+          let previewUrl = undefined;
+          let assetName = 'submission.png';
+          if (versionTag) {
+            const matchVer = dbVersions.find(v => `v${v.version}` === versionTag);
+            if (matchVer) {
+              previewUrl = matchVer.previewUrl;
+              assetName = `submission-${versionTag}.png`;
+            }
+          } else if (dbVersions.length > 0) {
+            previewUrl = dbVersions[0].previewUrl;
+            assetName = `submission-v${dbVersions[0].version}.png`;
+          }
+
+          submissions.push({
+            id: `sub-${t.id}-${submissions.length + 1}`,
+            assetName,
+            note,
+            previewUrl,
+            status: 'PENDING_REVIEW',
+            submittedAt: t.updatedAt ? formatFileDate(t.updatedAt) : 'Submitted',
+            submittedBy: t.assignedByUser?.displayName || t.assignedByUser?.email || 'Assignee',
+          });
+        }
+
+        if (submissions.length > 0) {
+          const latest = submissions[submissions.length - 1];
+          if (t.status === 'DONE') {
+            latest.status = 'APPROVED';
+          } else if (t.status === 'INPROGRESS') {
+            latest.status = 'CHANGES_REQUESTED';
+          } else if (t.status === 'REVIEW') {
+            latest.status = 'PENDING_REVIEW';
+          }
+          for (let i = 0; i < submissions.length - 1; i++) {
+            submissions[i].status = 'CHANGES_REQUESTED';
+          }
+          submissions.reverse();
+        }
+
+        const cleanDesc = rawDesc
+          .replace(/\[Note:\s*([\s\S]*?)\]/g, '')
+          .replace(/\[version:(v\d+)\]/g, '')
+          .trim();
+
+        return {
+          assignedTo: t.assignedByUser?.displayName || t.assignedByUser?.email || 'Unassigned',
+          assignedToUserId: t.assignedByUser?.id,
+          assignedByUserId: t.assignedBy,
+          description: cleanDesc,
+          id: String(t.id),
+          region,
+          status: t.status,
+          title: t.title,
+          targetVersion: taskVersion,
+          submissions,
+          updatedAt: t.updatedAt,
+          parent: t.parent ? {
+            id: String(t.parent.id),
+            title: t.parent.title,
+            description: t.parent.description ?? null,
+            status: t.parent.status,
+          } : null,
+        };
+      });
+      dbTasks = await Promise.all(tasksWithFramesPromises);
+    } catch (err) {
+      console.error('Failed to load tasks:', err);
+    }
+
+    let dbComments: SubmissionFrameComment[] = [];
+    let dbFileComments: FileDiscussionComment[] = [];
+    try {
+      const frameCommentGroups = await Promise.all(
+        dbVersions.map(async (version) => {
+          const frames = await getMaterialFrames(version.id);
+          const commentsByFrame = await Promise.all(
+            frames.map(async (frame) => {
+              const frameCommentsRes = await getFrameComments(frame.id);
+              return frameCommentsRes.map((comment: any) => ({
+                author:
+                  comment.createdByUser?.displayName ||
+                  comment.createdByUser?.email ||
+                  'Unknown User',
+                content: getCommentText(comment.content),
+                frameId: String(frame.id),
+                id: String(comment.id),
+                materialId: String(comment.material?.id ?? version.id),
+                materialVersion: `v${version.version}`,
+                region: {
+                  endX: Number(frame.endX),
+                  endY: Number(frame.endY),
+                  startX: Number(frame.startX),
+                  startY: Number(frame.startY),
+                },
+                taskId:
+                  comment.taskId != null
+                    ? String(comment.taskId)
+                    : typeof comment.content === 'object' && comment.content
+                      ? String((comment.content as any).taskId || '')
+                      : '',
+                time: formatFileDate(comment.createdAt),
+              }));
+            }),
+          );
+          return commentsByFrame.flat();
+        }),
+      );
+      dbComments = frameCommentGroups.flat();
+    } catch (err) {
+      console.error('Failed to load frame comments:', err);
+    }
+
+    try {
+      const commentsRes = await getFileComments(fileId);
+      dbFileComments = (commentsRes || []).map((comment: any) => ({
+        author:
+          comment.createdByUser?.displayName ||
+          comment.createdByUser?.email ||
+          'Unknown User',
+        content: getCommentText(comment.content),
+        id: String(comment.id),
+        time: formatFileDate(comment.createdAt),
+      }));
+    } catch (err) {
+      console.error('Failed to load file comments:', err);
+    }
+
+    let dbTaskComments: FileDiscussionComment[] = [];
+    if (selectedTaskId && dbTasks.some((t) => t.id === selectedTaskId)) {
+      try {
+        const taskCommentsRes = await getTaskComments(selectedTaskId);
+        dbTaskComments = (taskCommentsRes || []).map((c: any) => ({
+          author: c.createdByUser?.displayName || c.createdByUser?.email || 'Unknown User',
+          content: getCommentText(c.content),
+          id: String(c.id),
+          time: formatFileDate(c.createdAt),
+        }));
+      } catch (err) {
+        console.error('Failed to load task comments:', err);
+      }
+    }
+
+    const currentVersionPreview = dbVersions.find((v) => v.isCurrent)?.previewUrl;
+
+    let fileStatus: 'PENDING' | 'INPROGRESS' | 'REVIEW' | 'DONE' = 'PENDING';
+    if (dbTasks.some((t: any) => t.status === 'REVIEW')) {
+      fileStatus = 'REVIEW';
+    } else if (dbTasks.some((t: any) => t.status === 'INPROGRESS')) {
+      fileStatus = 'INPROGRESS';
+    } else if (dbTasks.length > 0 && dbTasks.every((t: any) => t.status === 'DONE')) {
+      fileStatus = 'DONE';
+    }
+
+    const mappedFile = {
+      category: 'Production File',
+      createdAt: response.createdAt,
+      createdByLabel,
+      description: response.description,
+      folderId: response.folderId,
+      id: response.id,
+      previewUrl: currentVersionPreview || undefined,
+      status: fileStatus,
+      taskCount: dbTasks.length,
+      title: response.title,
+      updatedAt: response.updatedAt,
+    };
+
+    return {
+      project: projData,
+      folders: productionFolders,
+      members: apiMembers,
+      versions: dbVersions,
+      tasks: dbTasks,
+      frameComments: dbComments,
+      fileComments: dbFileComments,
+      taskComments: dbTaskComments,
+      file: mappedFile,
+    };
   }, [fileId, projectId, selectedTaskId]);
 
   useEffect(() => {
-    queueMicrotask(() => {
-      void loadFile();
+    void reload().catch(() => { });
+  }, [selectedTaskId]);
+
+  const file = data?.file ?? null;
+  const project = data?.project ?? null;
+  const folders = data?.folders ?? [];
+  const tasks = data?.tasks ?? [];
+  const versions = useMemo(() => {
+    const rawVersions = data?.versions ?? [];
+    return rawVersions.filter((v: any) => {
+      if (!focusedTask) {
+        return v.taskId === null || v.taskId === undefined;
+      }
+      return v.taskId === Number(focusedTask.id);
     });
-  }, [loadFile]);
+  }, [data?.versions, focusedTask]);
+  const frameComments = data?.frameComments ?? [];
+  const fileComments = data?.fileComments ?? [];
+  const taskComments = data?.taskComments ?? [];
+  const members = data?.members ?? [];
+  const isLoading = isInitialLoading || isRefreshing;
+
+
+
+  const loadFile = useCallback(async () => {
+    await reload();
+  }, [reload]);
+
+  const setIsLoading = useCallback((val: boolean) => {
+    // No-op
+  }, []);
 
   useEffect(() => {
     // If the URL has no task selection and it hasn't changed to null from a previous value,
@@ -448,6 +509,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
         region: dbTask.region,
         submissions: dbTask.submissions || [],
         isMine: user?.id != null && dbTask.assignedToUserId === user.id,
+        assignedByUserId: dbTask.assignedByUserId,
         updatedAt: dbTask.updatedAt ?? new Date().toISOString(),
       };
 
@@ -483,9 +545,13 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     (user?.id != null && project?.createdByUser?.id === user.id) ||
     canProject('project:owner');
 
-  const canReviewTask = canProject('project:task.update') || canProject('admin') || isProjectOwner;
-  const canSubmitTask = canProject('project:material.create') || canProject('admin') || true; // members can always submit
-  const canCreateTask = canProject('project:task.create') || canProject('admin') || true; // project members can create tasks
+  // Reviewer = is owner/admin or the user who assigned the task, but not the worker themselves (unless self-assigned)
+  const isTaskAssigner = user?.id != null && focusedTask?.assignedByUserId === user.id;
+  const isTaskAssignee = focusedTask?.isMine === true;
+
+  const canReviewTask = (isTaskAssigner && !isTaskAssignee) || canProject('admin') || isProjectOwner;
+  const canSubmitTask = canProject('project:material.create') || canProject('admin') || isProjectOwner;
+  const canCreateTask = canProject('project:task.create') || canProject('admin') || isProjectOwner;
   const canRestoreVersion = canProject('project:material.restore') || canProject('project:material.update') || canProject('admin') || isProjectOwner;
   const canDeleteVersion = canProject('project:material.delete') || canProject('admin') || isProjectOwner;
 
@@ -510,11 +576,34 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     setVersionTabMode,
   });
 
+  const setFileCustom = useCallback((update: any) => {
+    setData((currentData) => {
+      if (!currentData) return null;
+      const nextFile = typeof update === 'function' ? update(currentData.file) : update;
+      return {
+        ...currentData,
+        file: nextFile,
+      };
+    });
+  }, [setData]);
+
+  const setTasksCustom = useCallback((update: any) => {
+    setData((currentData) => {
+      if (!currentData) return null;
+      const nextTasks = typeof update === 'function' ? update(currentData.tasks) : update;
+      return {
+        ...currentData,
+        tasks: nextTasks,
+      };
+    });
+  }, [setData]);
+
   const {
     handleCreateAnnotatedTask,
     focusFileTask,
     handleFocusedTaskChange,
     handleSubmitTaskWork,
+    handleMarkReadyForReview,
   } = useFileDetailTaskActions({
     fileId,
     projectId,
@@ -534,8 +623,8 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     setSelectedSubmissionId,
     setFrameAnnotationMode,
     setFocusedTask,
-    setFile,
-    setTasks,
+    setFile: setFileCustom,
+    setTasks: setTasksCustom,
     setSelectedVersion,
   });
 
@@ -576,8 +665,9 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
   const folder = file ? folders.find((candidate) => candidate.id === file.folderId) : undefined;
   const selectedSubmission =
     focusedTask?.submissions.find((submission) => submission.id === selectedSubmissionId) ?? null;
+  const currentVersion = versions.find((v) => v.isCurrent) ?? versions[0] ?? null;
   const displayedPreviewUrl =
-    selectedSubmission?.previewUrl ?? selectedVersion?.previewUrl ?? file?.previewUrl ?? '';
+    selectedSubmission?.previewUrl ?? selectedVersion?.previewUrl ?? currentVersion?.previewUrl ?? file?.previewUrl ?? '';
   const isViewingHistoricalVersion = Boolean(selectedVersion && !selectedVersion.isCurrent);
   const currentVersionName = selectedVersion
     ? `v${selectedVersion.version}`
@@ -649,6 +739,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     handleFocusedTaskChange,
     handleRestoreVersion,
     handleSubmitTaskWork,
+    handleMarkReadyForReview: canSubmitTask ? handleMarkReadyForReview : undefined,
     handleUpdateDiscussionComment,
     isLoading,
     isPanning,

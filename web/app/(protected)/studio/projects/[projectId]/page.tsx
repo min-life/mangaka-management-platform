@@ -24,10 +24,14 @@ import {
   getProjectMembers,
   getProjectFolders,
   getFolderFiles,
+  getProjectStats,
   type ProjectResponse,
 } from '@/services/project.service';
 import { getFileTasks } from '@/services/file.service';
 import { getProjectApplications } from '@/services/application.service';
+import { useRealtimeProjectActivity } from '@/hooks/use-realtime-activity';
+import { normalizeProjectMetrics, type ProjectMetrics as ProjectMetricsValue } from '@/services/project-metrics';
+import { ProjectMetrics } from '@/components/project/ProjectMetrics';
 
 function formatUpdatedAt(dateStr: string) {
   try {
@@ -50,12 +54,15 @@ export default function ProjectDashboardPage() {
   const params = useParams();
   const projectId = params.projectId ? String(params.projectId) : '';
 
+  const { activities } = useRealtimeProjectActivity(projectId);
+
   const [project, setProject] = useState<ProjectResponse | null>(null);
   const [membersCount, setMembersCount] = useState(0);
   const [tasks, setTasks] = useState<any[]>([]);
   const [filesCount, setFilesCount] = useState(0);
   const [applicationsCount, setApplicationsCount] = useState(0);
   const [publishingRequestsCount, setPublishingRequestsCount] = useState(0);
+  const [metrics, setMetrics] = useState<ProjectMetricsValue>(() => normalizeProjectMetrics(null));
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -68,6 +75,15 @@ export default function ProjectDashboardPage() {
         const proj = await getProjectById(Number(projectId));
         if (!isMounted) return;
         setProject(proj);
+
+        try {
+          const statsRes = await getProjectStats(Number(projectId));
+          if (isMounted) {
+            setMetrics(normalizeProjectMetrics(statsRes?.metrics));
+          }
+        } catch (statsErr) {
+          console.error('Failed to load project stats:', statsErr);
+        }
 
         const membersRes = await getProjectMembers(Number(projectId));
         if (!isMounted) return;
@@ -120,10 +136,10 @@ export default function ProjectDashboardPage() {
     return () => {
       isMounted = false;
     };
-  }, [projectId]);
+  }, [projectId, activities.length]);
 
   if (isLoading) {
-    return <LoadingState message="Loading project workspace..." minHeight="75vh" />;
+    return <LoadingState message="Loading project workspace..." minHeight="70vh" />;
   }
 
   if (!project) {
@@ -206,7 +222,14 @@ export default function ProjectDashboardPage() {
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-4 gap-4">
+      <section className="mt-6">
+        <h2 className="mb-3 text-[11px] font-black uppercase tracking-[0.06em] text-[#aeb7c2]">
+          Production Metrics
+        </h2>
+        <ProjectMetrics metrics={metrics} />
+      </section>
+
+      <div className="mt-5 grid grid-cols-4 gap-4">
         {statCards.map((stat) => (
           <article className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-4" key={stat.label}>
             <p className="text-[11px] font-black uppercase tracking-[0.04em] text-[#aeb7c2]">

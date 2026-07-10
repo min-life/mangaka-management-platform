@@ -16,6 +16,7 @@ import { useRealtimeNotifications } from '@/hooks/use-realtime-notifications';
 import { cn } from '@/lib/utils';
 import { getEditorBoards } from '@/services/editor-board.service';
 import type { NotificationResponse } from '@/services/notification.service';
+import { getProjects } from '@/services/project.service';
 
 type NotificationBellProps = {
   className?: string;
@@ -54,7 +55,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function getEditorBoardName(notification: NotificationResponse, boardNameById: Map<number, string>) {
+function getEditorBoardName(
+  notification: NotificationResponse,
+  boardNameById: Map<number, string>,
+) {
   const editorBoardId =
     notification.activityLog?.editorBoardId ?? notification.activityLog?.entityId ?? null;
 
@@ -63,6 +67,17 @@ function getEditorBoardName(notification: NotificationResponse, boardNameById: M
   }
 
   return boardNameById.get(editorBoardId) ?? `#${editorBoardId}`;
+}
+
+function getProjectName(notification: NotificationResponse, projectNameById: Map<number, string>) {
+  const projectId =
+    notification.activityLog?.projectId ?? notification.activityLog?.entityId ?? null;
+
+  if (!projectId) {
+    return '';
+  }
+
+  return projectNameById.get(projectId) ?? `#${projectId}`;
 }
 
 function getApplicationTitle(notification: NotificationResponse) {
@@ -89,7 +104,11 @@ function getEntityName(notification: NotificationResponse) {
   return '';
 }
 
-function getNotificationText(notification: NotificationResponse, boardNameById: Map<number, string>) {
+function getNotificationText(
+  notification: NotificationResponse,
+  boardNameById: Map<number, string>,
+  projectNameById: Map<number, string>,
+) {
   const activity = notification.activityLog;
   const actorName =
     activity?.actor?.displayName ?? activity?.actor?.email ?? `User #${activity?.actorId ?? ''}`;
@@ -102,20 +121,30 @@ function getNotificationText(notification: NotificationResponse, boardNameById: 
   }
 
   if (activity.action === 'MEMBER_INVITED') {
-    const boardName = getEditorBoardName(notification, boardNameById);
+    const isProject = activity.entityType === 'PROJECT';
+    const entityLabel = isProject ? 'project' : 'editor board';
+    const article = isProject ? 'a' : 'an';
+    const entityName = isProject
+      ? getProjectName(notification, projectNameById)
+      : getEditorBoardName(notification, boardNameById);
 
     return {
-      description: `${actorName} added you to editor board "${boardName}".`,
-      title: 'You were added to an editor board',
+      description: `${actorName} added you to ${entityLabel} "${entityName}".`,
+      title: `You were added to ${article} ${entityLabel}`,
     };
   }
 
   if (activity.action === 'MEMBER_REMOVED') {
-    const boardName = getEditorBoardName(notification, boardNameById);
+    const isProject = activity.entityType === 'PROJECT';
+    const entityLabel = isProject ? 'project' : 'editor board';
+    const article = isProject ? 'a' : 'an';
+    const entityName = isProject
+      ? getProjectName(notification, projectNameById)
+      : getEditorBoardName(notification, boardNameById);
 
     return {
-      description: `${actorName} removed you from editor board "${boardName}".`,
-      title: 'You were removed from an editor board',
+      description: `${actorName} removed you from ${entityLabel} "${entityName}".`,
+      title: `You were removed from ${article} ${entityLabel}`,
     };
   }
 
@@ -149,6 +178,7 @@ export function NotificationBell({
   const { error, isConnected, isLoading, markAllAsRead, markAsRead, notifications, unreadCount } =
     useRealtimeNotifications();
   const [boardNameById, setBoardNameById] = useState<Map<number, string>>(new Map());
+  const [projectNameById, setProjectNameById] = useState<Map<number, string>>(new Map());
 
   useEffect(() => {
     let isMounted = true;
@@ -157,6 +187,14 @@ export function NotificationBell({
       .then((result) => {
         if (isMounted) {
           setBoardNameById(new Map(result.boards.map((board) => [board.id, board.name])));
+        }
+      })
+      .catch(() => undefined);
+
+    getProjects()
+      .then((result) => {
+        if (isMounted) {
+          setProjectNameById(new Map(result.projects.map((project) => [project.id, project.name])));
         }
       })
       .catch(() => undefined);
@@ -222,7 +260,7 @@ export function NotificationBell({
             </div>
           ) : notifications.length ? (
             notifications.slice(0, 12).map((notification) => {
-              const text = getNotificationText(notification, boardNameById);
+              const text = getNotificationText(notification, boardNameById, projectNameById);
 
               return (
                 <DropdownMenuItem

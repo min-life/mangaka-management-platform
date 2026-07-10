@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { AxiosError } from 'axios';
 import { toast } from '@/lib/toast';
 import { FileCheck2, FileUp, Rocket, Search } from 'lucide-react';
+import { useRealtimeProjectActivity } from '@/hooks/use-realtime-activity';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -107,6 +108,8 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
   const [parentFolders, setParentFolders] = useState<ProjectFolderResponse[]>([]);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedApplicationFile[]>([]);
 
+  const { activities } = useRealtimeProjectActivity(projectId);
+
   const canCreate =
     permissions.includes('admin') ||
     permissions.includes('project:owner') ||
@@ -144,6 +147,15 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
       void loadApplications();
     });
   }, [loadApplications]);
+
+  useEffect(() => {
+    if (activities.length > 0) {
+      const latestActivity = activities[0];
+      if (latestActivity?.action?.startsWith('APPLICATION_')) {
+        void loadApplications();
+      }
+    }
+  }, [activities.length, loadApplications]);
 
   const filteredApplications = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Activity, Circle } from 'lucide-react';
 
 import { getFileActivityLogs } from '@/services/file.service';
+import { useRealtimeProjectActivity } from '@/hooks/use-realtime-activity';
 import { type FileActivityItem } from '../file-ui';
 
 const activityToneClassName = {
@@ -28,6 +29,7 @@ function ActivitySkeleton() {
 
 type FileActivityPanelProps = {
   fileId: number | string;
+  projectId: number | string;
 };
 
 function formatRelativeTime(dateString: string) {
@@ -159,10 +161,12 @@ function formatActivityLog(log: any): FileActivityItem {
   };
 }
 
-export function FileActivityPanel({ fileId }: FileActivityPanelProps) {
+export function FileActivityPanel({ fileId, projectId }: FileActivityPanelProps) {
   const [activities, setActivities] = useState<FileActivityItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const { activities: realtimeLogs } = useRealtimeProjectActivity(projectId);
 
   useEffect(() => {
     async function loadActivities() {
@@ -182,6 +186,19 @@ export function FileActivityPanel({ fileId }: FileActivityPanelProps) {
 
     loadActivities();
   }, [fileId]);
+
+  useEffect(() => {
+    if (realtimeLogs.length > 0) {
+      const latestLog = realtimeLogs[0];
+      if (latestLog?.fileId === Number(fileId)) {
+        const formatted = formatActivityLog(latestLog);
+        setActivities((prev) => {
+          if (prev.some((x) => x.id === formatted.id)) return prev;
+          return [formatted, ...prev];
+        });
+      }
+    }
+  }, [realtimeLogs, fileId]);
 
   return (
     <section>
