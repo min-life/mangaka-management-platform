@@ -1,8 +1,8 @@
 import api from '@/lib/api';
-import { formatActionTitle, formatActivityLogText, getEntityTypeLabel } from '@/lib/activity-message';
+import { formatActionTitle, getEntityTypeLabel } from '@/lib/activity-message';
 import { getActivityLogs, type ActivityLogResponse } from '@/services/activity-log.service';
 import { getNotifications } from '@/services/notification.service';
-import { UserResponse } from '@/services/user.service';
+import { getUsers, type UserResponse } from '@/services/user.service';
 
 export type Scope = 'SYS' | 'PRJ' | string;
 export type ProgressStatus = 'PENDING' | 'INPROGRESS' | 'REVIEW' | 'DONE';
@@ -259,7 +259,7 @@ export function mapActivityLogToUserActivity(
   const actorName =
     activity.actor?.displayName ?? activity.actor?.email ?? `User #${activity.actorId}`;
   const resolvedEntityName = getMetadataLabel(activity.metadata, ['entityName']);
-  const entityLabel = activity.entityType.toLowerCase().replaceAll('_', ' ');
+  const entityLabel = getEntityTypeLabel(activity.entityType);
   const entityName =
     activity.entityType === 'EDITOR_BOARD' && editorBoardName
       ? `editor board "${editorBoardName}"`
@@ -292,15 +292,13 @@ export function mapActivityLogToUserActivity(
     }
   }
 
-export function mapActivityLogToUserActivity(activity: ActivityLogResponse): UserActivity {
   return {
     id: activity.id,
-    title: formatActionTitle(activity.action),
-    description: formatActivityLogText(activity),
+    title,
+    description,
     status: 'DONE',
     projectName,
     href,
-    projectName: getEntityTypeLabel(activity.entityType).replace(/\b\w/g, (c) => c.toUpperCase()),
     createdAt: activity.createdAt,
     updatedAt: activity.createdAt,
     timeLabel: formatTimeLabel(activity.createdAt),
@@ -317,10 +315,12 @@ export function mapActivityLogToUserActivity(activity: ActivityLogResponse): Use
 // user-profile-page.tsx) instead of requesting further pages from the server.
 const CONTEXT_ACTOR_ACTIVITY_LIMIT = 200;
 
-export async function getCurrentUserContextActivities(): Promise<UserActivity[]> {
-  const [actorResult, notifications] = await Promise.all([
+export async function getCurrentUserContextActivities(userId?: number): Promise<UserActivity[]> {
+  const [actorResult, notifications, editorBoards, users] = await Promise.all([
     getActivityLogs({ limit: CONTEXT_ACTOR_ACTIVITY_LIMIT, page: 1 }),
     getNotifications(),
+    getCurrentUserEditorBoards(userId).catch(() => []),
+    getUsers({ limit: 200 }).catch(() => []),
   ]);
 
   const activityById = new Map<number, ActivityLogResponse>();
@@ -335,7 +335,7 @@ export async function getCurrentUserContextActivities(): Promise<UserActivity[]>
 
   return [...activityById.values()]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .map((activity) => mapActivityLogToUserActivity(activity));
+    .map((activity) => mapActivityLogToUserActivity(activity, { editorBoards, users }));
 }
 
 export async function updateCurrentUserProfile(payload: UpdateProfilePayload) {
