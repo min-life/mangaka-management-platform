@@ -24,13 +24,10 @@ import {
   getProjectMembers,
   getProjectFolders,
   getFolderFiles,
-  getProjectStats,
   type ProjectResponse,
 } from '@/services/project.service';
 import { getFileTasks } from '@/services/file.service';
 import { getProjectApplications } from '@/services/application.service';
-import { normalizeProjectMetrics, type ProjectMetrics as ProjectMetricsValue } from '@/services/project-metrics';
-import { ProjectMetrics } from '@/components/project/ProjectMetrics';
 
 function formatUpdatedAt(dateStr: string) {
   try {
@@ -59,7 +56,6 @@ export default function ProjectDashboardPage() {
   const [filesCount, setFilesCount] = useState(0);
   const [applicationsCount, setApplicationsCount] = useState(0);
   const [publishingRequestsCount, setPublishingRequestsCount] = useState(0);
-  const [metrics, setMetrics] = useState<ProjectMetricsValue>(() => normalizeProjectMetrics(null));
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -72,15 +68,6 @@ export default function ProjectDashboardPage() {
         const proj = await getProjectById(Number(projectId));
         if (!isMounted) return;
         setProject(proj);
-
-        try {
-          const statsRes = await getProjectStats(Number(projectId));
-          if (isMounted) {
-            setMetrics(normalizeProjectMetrics(statsRes?.metrics));
-          }
-        } catch (statsErr) {
-          console.error('Failed to load project stats:', statsErr);
-        }
 
         const membersRes = await getProjectMembers(Number(projectId));
         if (!isMounted) return;
@@ -218,13 +205,6 @@ export default function ProjectDashboardPage() {
           </Button>
         </div>
       </div>
-
-      <section className="mt-6">
-        <h2 className="mb-3 text-[11px] font-black uppercase tracking-[0.06em] text-[#aeb7c2]">
-          Production Metrics
-        </h2>
-        <ProjectMetrics metrics={metrics} />
-      </section>
 
       <div className="mt-5 grid grid-cols-4 gap-4">
         {statCards.map((stat) => (
