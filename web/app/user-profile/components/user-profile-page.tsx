@@ -469,7 +469,7 @@ export function UserProfilePage() {
 
     try {
       const profileData = await getCurrentUserProfile();
-      const activityData = await getCurrentUserContextActivities(profileData.id);
+      const activityData = await getCurrentUserContextActivities();
 
       setCurrentUser(profileData);
       setAllActivities(activityData);

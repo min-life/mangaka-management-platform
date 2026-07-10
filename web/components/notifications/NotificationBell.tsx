@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { Bell, CheckCheck, Circle } from 'lucide-react';
 
 import {
@@ -13,28 +12,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useRealtimeNotifications } from '@/hooks/use-realtime-notifications';
+import { formatNotificationText } from '@/lib/activity-message';
 import { cn } from '@/lib/utils';
-import { getEditorBoards } from '@/services/editor-board.service';
-import type { NotificationResponse } from '@/services/notification.service';
-import { getProjects } from '@/services/project.service';
 
 type NotificationBellProps = {
   className?: string;
   dotClassName?: string;
   triggerClassName?: string;
 };
-
-function formatActionTitle(action?: string) {
-  if (!action) {
-    return 'New notification';
-  }
-
-  return action
-    .toLowerCase()
-    .split('_')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
-}
 
 function formatTime(value: string) {
   const date = new Date(value);
@@ -51,125 +36,6 @@ function formatTime(value: string) {
   }).format(date);
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function getEditorBoardName(
-  notification: NotificationResponse,
-  boardNameById: Map<number, string>,
-) {
-  const editorBoardId =
-    notification.activityLog?.editorBoardId ?? notification.activityLog?.entityId ?? null;
-
-  if (!editorBoardId) {
-    return '';
-  }
-
-  return boardNameById.get(editorBoardId) ?? `#${editorBoardId}`;
-}
-
-function getProjectName(notification: NotificationResponse, projectNameById: Map<number, string>) {
-  const projectId =
-    notification.activityLog?.projectId ?? notification.activityLog?.entityId ?? null;
-
-  if (!projectId) {
-    return '';
-  }
-
-  return projectNameById.get(projectId) ?? `#${projectId}`;
-}
-
-function getApplicationTitle(notification: NotificationResponse) {
-  const metadata = notification.activityLog?.metadata;
-
-  if (
-    isRecord(metadata) &&
-    typeof metadata.applicationTitle === 'string' &&
-    metadata.applicationTitle.trim()
-  ) {
-    return metadata.applicationTitle;
-  }
-
-  return '';
-}
-
-function getEntityName(notification: NotificationResponse) {
-  const metadata = notification.activityLog?.metadata;
-
-  if (isRecord(metadata) && typeof metadata.entityName === 'string' && metadata.entityName.trim()) {
-    return metadata.entityName;
-  }
-
-  return '';
-}
-
-function getNotificationText(
-  notification: NotificationResponse,
-  boardNameById: Map<number, string>,
-  projectNameById: Map<number, string>,
-) {
-  const activity = notification.activityLog;
-  const actorName =
-    activity?.actor?.displayName ?? activity?.actor?.email ?? `User #${activity?.actorId ?? ''}`;
-
-  if (!activity) {
-    return {
-      description: `Notification #${notification.id}`,
-      title: 'New notification',
-    };
-  }
-
-  if (activity.action === 'MEMBER_INVITED') {
-    const isProject = activity.entityType === 'PROJECT';
-    const entityLabel = isProject ? 'project' : 'editor board';
-    const article = isProject ? 'a' : 'an';
-    const entityName = isProject
-      ? getProjectName(notification, projectNameById)
-      : getEditorBoardName(notification, boardNameById);
-
-    return {
-      description: `${actorName} added you to ${entityLabel} "${entityName}".`,
-      title: `You were added to ${article} ${entityLabel}`,
-    };
-  }
-
-  if (activity.action === 'MEMBER_REMOVED') {
-    const isProject = activity.entityType === 'PROJECT';
-    const entityLabel = isProject ? 'project' : 'editor board';
-    const article = isProject ? 'a' : 'an';
-    const entityName = isProject
-      ? getProjectName(notification, projectNameById)
-      : getEditorBoardName(notification, boardNameById);
-
-    return {
-      description: `${actorName} removed you from ${entityLabel} "${entityName}".`,
-      title: `You were removed from ${article} ${entityLabel}`,
-    };
-  }
-
-  if (activity.action === 'COMMENT_CREATED') {
-    const applicationTitle = getApplicationTitle(notification);
-
-    return {
-      description: applicationTitle
-        ? `${actorName} commented on application "${applicationTitle}".`
-        : `${actorName} commented on an application.`,
-      title: 'New application comment',
-    };
-  }
-
-  const entityLabel = activity.entityType.toLowerCase().split('_').join(' ');
-  const entityName = getEntityName(notification);
-
-  return {
-    description: entityName
-      ? `${actorName} performed ${entityLabel} "${entityName}".`
-      : `${actorName} performed ${entityLabel} #${activity.entityId}.`,
-    title: formatActionTitle(activity.action),
-  };
-}
-
 export function NotificationBell({
   className,
   dotClassName,
@@ -177,32 +43,6 @@ export function NotificationBell({
 }: NotificationBellProps) {
   const { error, isConnected, isLoading, markAllAsRead, markAsRead, notifications, unreadCount } =
     useRealtimeNotifications();
-  const [boardNameById, setBoardNameById] = useState<Map<number, string>>(new Map());
-  const [projectNameById, setProjectNameById] = useState<Map<number, string>>(new Map());
-
-  useEffect(() => {
-    let isMounted = true;
-
-    getEditorBoards({ limit: 200 })
-      .then((result) => {
-        if (isMounted) {
-          setBoardNameById(new Map(result.boards.map((board) => [board.id, board.name])));
-        }
-      })
-      .catch(() => undefined);
-
-    getProjects()
-      .then((result) => {
-        if (isMounted) {
-          setProjectNameById(new Map(result.projects.map((project) => [project.id, project.name])));
-        }
-      })
-      .catch(() => undefined);
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   return (
     <DropdownMenu>
@@ -260,7 +100,7 @@ export function NotificationBell({
             </div>
           ) : notifications.length ? (
             notifications.slice(0, 12).map((notification) => {
-              const text = getNotificationText(notification, boardNameById, projectNameById);
+              const text = formatNotificationText(notification);
 
               return (
                 <DropdownMenuItem
