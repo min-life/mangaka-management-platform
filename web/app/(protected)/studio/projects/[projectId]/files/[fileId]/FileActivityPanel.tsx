@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Activity, Circle } from 'lucide-react';
 
+import { getActivityVerbPhrase, getActorLabel } from '@/lib/activity-message';
 import { getFileActivityLogs } from '@/services/file.service';
 import { useRealtimeProjectActivity } from '@/hooks/use-realtime-activity';
 import { type FileActivityItem } from '../file-ui';
@@ -53,111 +54,30 @@ function formatRelativeTime(dateString: string) {
   });
 }
 
+const activityTone: Record<string, 'default' | 'success' | 'warning'> = {
+  FILE_CREATED: 'success',
+  FILE_DELETED: 'warning',
+  MATERIAL_UPLOADED: 'success',
+  TASK_COMPLETED: 'success',
+  TASK_DELETED: 'warning',
+  COMMENT_DELETED: 'warning',
+  MEMBER_INVITED: 'success',
+  MEMBER_REMOVED: 'warning',
+  FOLDER_CREATED: 'success',
+  FOLDER_DELETED: 'warning',
+  APPLICATION_INTERNAL_APPROVED: 'success',
+  APPLICATION_SUBMITTED: 'success',
+  APPLICATION_APPROVED: 'success',
+  APPLICATION_REJECTED: 'warning',
+};
+
 function formatActivityLog(log: any): FileActivityItem {
-  const actor = log.actor?.displayName || log.actor?.email || `User #${log.actorId}`;
-  let label = '';
-  let tone: 'default' | 'success' | 'warning' = 'default';
-
-  switch (log.action) {
-    case 'FILE_CREATED':
-      label = 'created the file';
-      tone = 'success';
-      break;
-    case 'FILE_DELETED':
-      label = 'deleted the file';
-      tone = 'warning';
-      break;
-    case 'MATERIAL_UPLOADED':
-      label = 'uploaded a new preview / material';
-      tone = 'success';
-      break;
-    case 'MATERIAL_RESTORED':
-      label = 'restored a material';
-      tone = 'default';
-      break;
-    case 'TASK_CREATED':
-      label = `created task "${log.metadata?.title || 'Unknown Task'}"`;
-      tone = 'default';
-      break;
-    case 'TASK_ASSIGNED':
-      label = `assigned task "${log.metadata?.title || 'Unknown Task'}"`;
-      tone = 'default';
-      break;
-    case 'TASK_UPDATED':
-      label = `updated task "${log.metadata?.title || 'Unknown Task'}"`;
-      tone = 'default';
-      break;
-    case 'TASK_COMPLETED':
-      label = `completed task "${log.metadata?.title || 'Unknown Task'}"`;
-      tone = 'success';
-      break;
-    case 'TASK_DELETED':
-      label = `deleted a task`;
-      tone = 'warning';
-      break;
-    case 'COMMENT_CREATED':
-      label = 'added a comment';
-      tone = 'default';
-      break;
-    case 'COMMENT_DELETED':
-      label = 'deleted a comment';
-      tone = 'warning';
-      break;
-    case 'MEMBER_INVITED':
-      label = 'invited a new member';
-      tone = 'success';
-      break;
-    case 'MEMBER_REMOVED':
-      label = 'removed a member';
-      tone = 'warning';
-      break;
-    case 'ROLE_CHANGED':
-      label = 'changed member role';
-      tone = 'default';
-      break;
-    case 'FOLDER_CREATED':
-      label = 'created a folder';
-      tone = 'success';
-      break;
-    case 'FOLDER_MOVED':
-      label = 'moved a folder';
-      tone = 'default';
-      break;
-    case 'FOLDER_DELETED':
-      label = 'deleted a folder';
-      tone = 'warning';
-      break;
-    case 'APPLICATION_CREATED':
-      label = 'created review application';
-      tone = 'default';
-      break;
-    case 'APPLICATION_INTERNAL_APPROVED':
-      label = 'internally approved the application';
-      tone = 'success';
-      break;
-    case 'APPLICATION_SUBMITTED':
-      label = 'submitted the application';
-      tone = 'success';
-      break;
-    case 'APPLICATION_APPROVED':
-      label = 'approved the application';
-      tone = 'success';
-      break;
-    case 'APPLICATION_REJECTED':
-      label = 'rejected the application';
-      tone = 'warning';
-      break;
-    default:
-      label = String(log.action).toLowerCase().replace(/_/g, ' ');
-      tone = 'default';
-  }
-
   return {
     id: String(log.id),
-    actor,
-    label,
+    actor: getActorLabel(log.actor, log.actorId),
+    label: getActivityVerbPhrase(log),
     time: formatRelativeTime(log.createdAt),
-    tone,
+    tone: activityTone[log.action] ?? 'default',
   };
 }
 
