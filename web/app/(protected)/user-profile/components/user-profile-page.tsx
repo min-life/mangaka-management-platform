@@ -33,7 +33,6 @@ import { Separator } from '@/components/ui/separator';
 import { useRealtimeNotifications } from '@/hooks/use-realtime-notifications';
 import { clearAccessToken, getAccessToken } from '@/lib/auth-storage';
 import { cn } from '@/lib/utils';
-import { AUTH_LOGOUT_EVENT } from '@/types/auth';
 import {
   getCurrentUserContextActivities,
   getCurrentUserProfile,
@@ -380,18 +379,6 @@ export function UserProfilePage() {
   useEffect(() => {
     void loadProfileData();
   }, []);
-
-  useEffect(() => {
-    const handleLogout = () => {
-      router.replace('/login');
-    };
-
-    window.addEventListener(AUTH_LOGOUT_EVENT, handleLogout);
-
-    return () => {
-      window.removeEventListener(AUTH_LOGOUT_EVENT, handleLogout);
-    };
-  }, [router]);
 
   useEffect(() => {
     window.localStorage.setItem(USER_PROFILE_THEME_KEY, theme);
