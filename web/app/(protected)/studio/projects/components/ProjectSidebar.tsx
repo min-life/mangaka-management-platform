@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  BarChart3,
   ClipboardList,
   FileCheck2,
   FolderOpen,
@@ -23,7 +24,7 @@ export function ProjectSidebar({ projectId }: ProjectSidebarProps) {
     { href: `${baseHref}/applications`, icon: FileCheck2, label: 'Applications' },
     { href: `${baseHref}/files`, icon: FolderOpen, label: 'Files' },
     { href: `${baseHref}/tasks`, icon: ClipboardList, label: 'Tasks' },
-    { href: `${baseHref}/settings`, icon: Settings, label: 'Settings' },
+    { href: `${baseHref}/statistics`, icon: BarChart3, label: 'Statistics' },
   ];
 
   return (

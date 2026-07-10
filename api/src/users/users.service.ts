@@ -1110,6 +1110,33 @@ export class UsersService {
     };
   }
 
+  async getGoogleLinkUrl(userId: number) {
+    const user = await this.ensureUser(userId);
+    const clientId = requireEnv('GOOGLE_CLIENT_ID');
+    const redirectUri =
+      process.env.GOOGLE_LINK_CALLBACK_URL ??
+      requireEnv('GOOGLE_CALLBACK_URL').replace(/\/auth\/google\/callback$/, '/users/me/link-account/callback');
+
+    const state = this.jwtService.sign(
+      { userId },
+      {
+        secret: requireEnv('ACCESS_TOKEN_SECRET'),
+        expiresIn: '10m',
+      },
+    );
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: 'email profile',
+      state: state,
+      login_hint: user.email,
+    });
+
+    return { data: { url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}` } };
+  }
+
   private handleError(error: unknown, logMessage: string, clientMessage: string): never {
     this.logger.error(logMessage, error instanceof Error ? error.stack : String(error));
     if (error instanceof HttpException) {

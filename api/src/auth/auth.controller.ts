@@ -71,12 +71,11 @@ export class AuthController {
   }
 
   @Public()
-  @ApiOperation({ summary: 'Initiate Google OAuth' })
-  @ApiOkResponse({ description: 'Redirects to Google OAuth' })
+  @ApiOperation({ summary: 'Get Google OAuth URL for Login' })
+  @ApiOkResponse({ description: 'Returns Google OAuth URL' })
   @Get('google')
-  @UseGuards(AuthGuard('google'))
   googleAuth() {
-    return;
+    return this.authService.getGoogleAuthUrl();
   }
 
   @Public()

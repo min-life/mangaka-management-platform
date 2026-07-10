@@ -2,7 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Settings, Save, Unlink } from 'lucide-react';
+import { Settings, Save, Unlink, Loader2 } from 'lucide-react';
 import { toast } from '@/lib/toast';
 
 import { Button } from '@/components/ui/button';
@@ -82,7 +82,7 @@ export default function ProjectSettingsPage() {
   if (isLoading) {
     return (
       <div className="flex h-full w-full items-center justify-center p-8">
-        <LoadingState className="text-[#FFD369]" message="Loading settings..." />
+        <LoadingState message="Loading settings..." />
       </div>
     );
   }
@@ -143,7 +143,7 @@ export default function ProjectSettingsPage() {
               >
                 {isSaving ? (
                   <span className="flex items-center gap-2">
-                    <LoadingState className="h-3 w-3" /> Saving...
+                    <Loader2 className="h-3 w-3 animate-spin" /> Saving...
                   </span>
                 ) : (
                   <span className="flex items-center gap-2">

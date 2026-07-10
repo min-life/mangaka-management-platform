@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Activity, Check, MessageSquare, Plus, Upload, Circle, Pencil } from 'lucide-react';
 
+import { getActivityVerbPhrase, getActorLabel } from '@/lib/activity-message';
 import { getFileActivityLogs } from '@/services/file.service';
 import { useRealtimeProjectActivity } from '@/hooks/use-realtime-activity';
 import { type FileActivityItem } from '../file-ui';
@@ -75,6 +76,23 @@ function formatDateGrouping(dateString: string) {
     year: 'numeric',
   });
 }
+
+const activityTone: Record<string, 'default' | 'success' | 'warning'> = {
+  FILE_CREATED: 'success',
+  FILE_DELETED: 'warning',
+  MATERIAL_UPLOADED: 'success',
+  TASK_COMPLETED: 'success',
+  TASK_DELETED: 'warning',
+  COMMENT_DELETED: 'warning',
+  MEMBER_INVITED: 'success',
+  MEMBER_REMOVED: 'warning',
+  FOLDER_CREATED: 'success',
+  FOLDER_DELETED: 'warning',
+  APPLICATION_INTERNAL_APPROVED: 'success',
+  APPLICATION_SUBMITTED: 'success',
+  APPLICATION_APPROVED: 'success',
+  APPLICATION_REJECTED: 'warning',
+};
 
 function formatActivityLog(log: any): FileActivityItem {
   const actor = log.actor?.displayName || log.actor?.email || `User #${log.actorId}`;
@@ -199,8 +217,8 @@ function formatActivityLog(log: any): FileActivityItem {
 
   return {
     id: String(log.id),
-    actor,
-    label,
+    actor: getActorLabel(log.actor, log.actorId),
+    label: getActivityVerbPhrase(log),
     time: formatRelativeTime(log.createdAt),
     rawDate: log.createdAt,
     type,

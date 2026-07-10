@@ -47,3 +47,11 @@ export async function resetPassword(payload: ResetPasswordPayload) {
 export async function verifyEmail(token: string) {
   return await api.post('/auth/verify-email', { token });
 }
+
+export async function getGoogleAuthUrl() {
+  const response = await api.get<{ data: { url: string } }, { data: { url: string } }>(
+    '/auth/google',
+  );
+
+  return response.data.url;
+}

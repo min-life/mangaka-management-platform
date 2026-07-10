@@ -123,7 +123,7 @@ export function FileCommentsPanel({
                     className="grid size-6 place-items-center rounded-[3px] text-[#8b94a1] opacity-0 transition-opacity hover:bg-[#303842] hover:text-white group-hover:opacity-100"
                     onClick={(e) => {
                       e.stopPropagation();
-                      startEditing(item.id, item.content);
+                      startEditing(item);
                     }}
                     type="button"
                   >
@@ -196,7 +196,7 @@ export function FileCommentsPanel({
                   <button
                     aria-label="Edit comment"
                     className="grid size-6 place-items-center rounded-[3px] text-[#8b94a1] opacity-0 transition-opacity hover:bg-[#303842] hover:text-white group-hover:opacity-100"
-                    onClick={() => startEditing(comment.id, comment.content)}
+                    onClick={() => startEditing(comment)}
                     type="button"
                   >
                     <Pencil className="size-3.5" />
