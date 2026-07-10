@@ -718,7 +718,16 @@ export function UserProfilePage() {
                   icon={Link2}
                   label={currentUser?.googleLinked ? text.googleAccountLinked : text.linkGoogleAccount}
                   onClick={() => {
-                    window.location.href = getGoogleLinkAccountUrl();
+                    void (async () => {
+                      try {
+                        const url = await getGoogleLinkAccountUrl();
+                        window.location.href = url;
+                      } catch (linkError) {
+                        toast.error(
+                          getApiErrorMessage(linkError, 'Unable to start Google account linking.'),
+                        );
+                      }
+                    })();
                   }}
                 />
                 <SettingsButton
