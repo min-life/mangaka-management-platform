@@ -101,12 +101,11 @@ export class UsersController {
     return { data: { accessToken: result.accessToken } };
   }
 
-  @ApiOperation({ summary: 'Initiate Google account linking' })
-  @ApiOkResponse({ description: 'Redirects to Google OAuth' })
+  @ApiOperation({ summary: 'Get Google OAuth URL for Account Linking' })
+  @ApiOkResponse({ description: 'Returns Google OAuth URL' })
   @Get('me/link-account')
-  @UseGuards(GoogleLinkGuard)
-  linkGoogleAccount() {
-    return;
+  getGoogleLinkUrl(@CurrentUser() currentUser: JwtPayload) {
+    return this.usersService.getGoogleLinkUrl(currentUser.userId);
   }
 
   @Public()
@@ -134,9 +133,13 @@ export class UsersController {
   @ApiOperation({ summary: 'Get all users (admin only)' })
   @ApiOkResponse({ description: 'Users retrieved successfully', type: UsersResponseDto })
   @Get()
-  findAll(@Query() query: QueryUsersReqDto) {
+  findAll(
+    @CurrentUser() currentUser: JwtPayload,
+    @Query() query: QueryUsersReqDto,
+  ) {
     const { search, isActive, field, order, page, limit } = query;
     return this.usersService.findAll(
+      currentUser.userId,
       { search, isActive },
       { field, order },
       { page: page ?? 1, limit: limit ?? 10 },

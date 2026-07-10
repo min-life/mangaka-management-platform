@@ -95,9 +95,9 @@ export function ArcGrid({
                 </div>
                 <div className="p-4">
                   <p className="truncate text-lg font-black leading-6 text-white">{normalizeArcTitle(arc.title)}</p>
-                  {getArcSubtitle(arc.title, index) && (
+                  {(arc.description || getArcSubtitle(arc.title, index)) && (
                     <p className="mt-1 truncate text-xs font-bold text-[#aeb7c2]">
-                      {getArcSubtitle(arc.title, index)}
+                      {arc.description || getArcSubtitle(arc.title, index)}
                     </p>
                   )}
                   <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-xs font-bold text-[#dce7f3]">
@@ -106,8 +106,13 @@ export function ArcGrid({
                   </div>
                 </div>
                 <div className="flex h-11 items-center justify-between border-t border-[#303842] bg-[#121a24] px-4 text-xs font-black text-[#FFD369]">
-                  <span>Open arc</span>
-                  <ChevronRight className="size-4 transition-transform group-hover:translate-x-1" />
+                  <span className="text-[#aeb7c2] font-medium text-[11px] truncate max-w-[150px]">
+                    {arc.createdByUser?.displayName ? `By ${arc.createdByUser.displayName}` : ''}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <span>Open arc</span>
+                    <ChevronRight className="size-4 transition-transform group-hover:translate-x-1" />
+                  </div>
                 </div>
               </button>
             );
@@ -115,7 +120,7 @@ export function ArcGrid({
         </div>
       ) : (
         <div className="mt-5 rounded-[5px] border border-[#303842] bg-[#151c25] px-4 py-6 text-xs font-bold text-[#8b94a1]">
-          No story arcs found. Create a root folder such as Arc 1, Arc 2, or One Shot.
+          No story arcs yet. Submit an Arc application to get started.
         </div>
       )}
 
@@ -243,8 +248,7 @@ export function ChapterGrid({
               </p>
             )}
             <p className="mt-2 max-w-xl text-xs font-medium leading-5 text-[#aeb7c2]">
-              Opening production workspace for this story arc. Review the chapters and choose the
-              next chapter to continue manga production.
+              {selectedArc.description || 'Opening production workspace for this story arc. Review the chapters and choose the next chapter to continue manga production.'}
             </p>
             <div className="mt-3 flex flex-wrap gap-4 text-xs font-bold text-[#dce7f3]">
               <MetricLine icon={<BookOpen className="size-3.5" />} label={`${chapters.length} chapters`} />
@@ -294,18 +298,22 @@ export function ChapterGrid({
           </div>
         </div>
 
-        {chapterViewMode === 'grid' ? (
+        {chapters.length === 0 ? (
+          <div className="mt-5 rounded-[5px] border border-[#303842] bg-[#151c25] px-4 py-6 text-xs font-bold text-[#8b94a1]">
+            No chapters yet. Submit a Chapter application to add the first chapter.
+          </div>
+        ) : chapterViewMode === 'grid' ? (
           <div className="mt-5 grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-4">
             {chapters.map((chapter) => {
               const coverUrl = getFolderCover(chapter, folderCovers, getChapterCover(chapter.id));
               return (
                 <button
-                  className="group min-h-[220px] overflow-hidden rounded-[5px] border border-[#303842] bg-[#151c25] text-left shadow-[0_14px_40px_rgba(0,0,0,0.2)] transition-colors hover:border-[#FFD369]/70 hover:bg-[#17202b]"
+                  className="group min-h-[220px] overflow-hidden rounded-[5px] border border-[#303842] bg-[#151c25] text-left shadow-[0_14px_40px_rgba(0,0,0,0.2)] transition-colors hover:border-[#FFD369]/70 hover:bg-[#17202b] flex flex-col"
                   key={chapter.id}
                   onClick={() => onSelectChapter(chapter.id)}
                   type="button"
                 >
-                  <div className="relative h-32 overflow-hidden bg-[#0d151e]">
+                  <div className="relative h-32 w-full overflow-hidden bg-[#0d151e] shrink-0">
                     {coverUrl ? (
                       <img
                         alt=""
@@ -322,17 +330,24 @@ export function ChapterGrid({
                       <BookOpen className="size-4" />
                     </div>
                   </div>
-                  <div className="p-4">
-                    <span className="block truncate text-base font-black text-white">
-                      {normalizeChapterTitle(chapter.title)}
-                    </span>
-                    {getChapterSubtitle(chapter.title, chapter.id) && (
-                      <span className="mt-1 block truncate text-xs font-bold text-[#aeb7c2]">
-                        {getChapterSubtitle(chapter.title, chapter.id)}
+                  <div className="p-4 flex-1 flex flex-col justify-between min-w-0 w-full">
+                    <div>
+                      <span className="block truncate text-base font-black text-white">
+                        {normalizeChapterTitle(chapter.title)}
                       </span>
-                    )}
-                    <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs font-bold text-[#dce7f3]">
+                      {(chapter.description || getChapterSubtitle(chapter.title, chapter.id)) && (
+                        <span className="mt-1 block truncate text-xs font-bold text-[#aeb7c2]">
+                          {chapter.description || getChapterSubtitle(chapter.title, chapter.id)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-3 flex items-center justify-between text-xs font-bold text-[#dce7f3]">
                       <span>{fileCounts[chapter.id] ?? 0} Files</span>
+                      {chapter.createdByUser?.displayName && (
+                        <span className="text-[#aeb7c2] font-medium text-[10px] truncate max-w-[120px]">
+                          By {chapter.createdByUser.displayName}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </button>
@@ -373,9 +388,14 @@ export function ChapterGrid({
                       <span className="block truncate text-sm font-black text-white">
                         {normalizeChapterTitle(chapter.title)}
                       </span>
-                      {getChapterSubtitle(chapter.title, chapter.id) && (
+                      {(chapter.description || getChapterSubtitle(chapter.title, chapter.id)) && (
                         <span className="mt-1 block truncate text-xs font-bold text-[#8b94a1]">
-                          {getChapterSubtitle(chapter.title, chapter.id)}
+                          {chapter.description || getChapterSubtitle(chapter.title, chapter.id)}
+                        </span>
+                      )}
+                      {chapter.createdByUser?.displayName && (
+                        <span className="mt-0.5 block text-[10px] font-medium text-[#FFD369]/80">
+                          Created by {chapter.createdByUser.displayName}
                         </span>
                       )}
                     </span>
@@ -434,7 +454,7 @@ export function ChapterWorkspaceHeader({
             </p>
           )}
           <p className="mt-2 max-w-2xl text-xs font-medium leading-5 text-[#aeb7c2]">
-            Compact production view for chapter files, tasks, references, and review handoff.
+            {selectedChapter.description || 'Compact production view for chapter files, tasks, references, and review handoff.'}
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-4">
             <span className="text-xs font-bold text-[#dce7f3]">{fileCount} Files</span>

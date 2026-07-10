@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ActivityLogResDto } from '../../activity-logs/dto';
+import { ActivityLogResDto, PaginationResDto } from '../../activity-logs/dto';
 
 export class NotificationResDto {
   @ApiProperty({ example: 1 })
@@ -32,4 +32,7 @@ export class NotificationResponseDto {
 export class NotificationsResponseDto {
   @ApiProperty({ type: [NotificationResDto] })
   data!: NotificationResDto[];
+
+  @ApiProperty({ type: PaginationResDto })
+  pagination!: PaginationResDto;
 }

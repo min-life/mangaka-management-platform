@@ -5,6 +5,7 @@ import {
   InternalServerErrorException,
   Logger,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PROGRESS_STATUS, Prisma, ACTIVITY_ACTION, ENTITY_TYPE } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -12,6 +13,7 @@ import { ACTIVITY_EVENT_NAME, ActivityEventPayload } from '../share/events/activ
 import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
 import type { Pagination } from '../share/interfaces';
+import { UsersService } from '../users/users.service';
 import { CacheService } from '../redis/cache.service';
 import { UseCache, InvalidateCache } from '../share/decorators/cache.decorator';
 import { MATERIAL_LIST_SELECT } from '../files/files.service';
@@ -71,6 +73,7 @@ export class TasksService {
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
     private readonly cacheService: CacheService,
+    private readonly usersService: UsersService,
   ) {}
 
   @UseCache((args) => `task:${args[0]}`)
@@ -104,6 +107,21 @@ export class TasksService {
   ) {
     try {
       const task = await this.ensureTask(id);
+
+      const permissions = await this.usersService.getUserPermissions(data.userId, 'TASK', id);
+      const isProjectOwner = permissions.includes('project:owner') || permissions.includes('admin');
+
+      if (data.status && data.status !== task.status && !isProjectOwner) {
+        if (data.status === PROGRESS_STATUS.DONE) {
+          if (data.userId !== task.createdBy) {
+            throw new ForbiddenException('Chỉ người tạo task hoặc Project Owner mới có quyền chuyển trạng thái thành DONE');
+          }
+        } else {
+          if (data.userId !== task.createdBy && data.userId !== task.assignedBy) {
+            throw new ForbiddenException('Chỉ người tạo, người được giao task hoặc Project Owner mới có quyền cập nhật trạng thái');
+          }
+        }
+      }
 
       // Subtask dependency validation:
       // A subtask cannot change status from PENDING until parent task is DONE

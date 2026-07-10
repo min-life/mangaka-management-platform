@@ -25,6 +25,15 @@ export class AwsS3Service {
   }
 
   /**
+   * Check if a URL is an S3 URL
+   */
+  isS3Url(url: string): boolean {
+    if (typeof url !== 'string') return false;
+    const baseUrl = `https://${this.bucketName}.s3.${this.region}.amazonaws.com/`;
+    return url.startsWith(baseUrl);
+  }
+
+  /**
    * Generate a pre-signed URL for downloading/viewing an object
    * @param keyOrUrl The S3 object key or full S3 url
    * @param expiresIn Validity duration in seconds (default: 3600 = 1 hour)

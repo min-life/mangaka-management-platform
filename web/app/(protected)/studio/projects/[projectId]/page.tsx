@@ -28,6 +28,7 @@ import {
 } from '@/services/project.service';
 import { getFileTasks } from '@/services/file.service';
 import { getProjectApplications } from '@/services/application.service';
+import { useRealtimeProjectActivity } from '@/hooks/use-realtime-activity';
 
 function formatUpdatedAt(dateStr: string) {
   try {
@@ -49,6 +50,8 @@ export default function ProjectDashboardPage() {
   const router = useRouter();
   const params = useParams();
   const projectId = params.projectId ? String(params.projectId) : '';
+
+  const { activities } = useRealtimeProjectActivity(projectId);
 
   const [project, setProject] = useState<ProjectResponse | null>(null);
   const [membersCount, setMembersCount] = useState(0);
@@ -98,7 +101,7 @@ export default function ProjectDashboardPage() {
                 ...t,
                 fileName: file.title,
                 folderName: folder.title,
-              }))
+              })),
             );
           }
         }
@@ -120,10 +123,10 @@ export default function ProjectDashboardPage() {
     return () => {
       isMounted = false;
     };
-  }, [projectId]);
+  }, [projectId, activities.length]);
 
   if (isLoading) {
-    return <LoadingState message="Loading project workspace..." minHeight="75vh" />;
+    return <LoadingState message="Loading project workspace..." minHeight="70vh" />;
   }
 
   if (!project) {
@@ -142,15 +145,21 @@ export default function ProjectDashboardPage() {
 
   const statCards = [
     { label: 'Active Applications', value: String(applicationsCount), meta: 'Review pipeline' },
-    { label: 'Open Tasks', value: String(tasks.filter((t) => t.status !== 'DONE').length), meta: 'In production' },
+    {
+      label: 'Open Tasks',
+      value: String(tasks.filter((t) => t.status !== 'DONE').length),
+      meta: 'In production',
+    },
     { label: 'Active Members', value: String(membersCount), meta: 'Contributors' },
-    { label: 'Publishing Requests', value: String(publishingRequestsCount), meta: 'Ready for review' },
+    {
+      label: 'Publishing Requests',
+      value: String(publishingRequestsCount),
+      meta: 'Ready for review',
+    },
   ];
 
   // Map tasks to "deadlines" card lists or show empty state
-  const openTasks = tasks
-    .filter((t) => t.status !== 'DONE')
-    .slice(0, 3);
+  const openTasks = tasks.filter((t) => t.status !== 'DONE').slice(0, 3);
 
   // Map recent activities using tasks list or mock entries if empty
   const recentActivities = tasks
@@ -208,7 +217,10 @@ export default function ProjectDashboardPage() {
 
       <div className="mt-5 grid grid-cols-4 gap-4">
         {statCards.map((stat) => (
-          <article className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-4" key={stat.label}>
+          <article
+            className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-4"
+            key={stat.label}
+          >
             <p className="text-[11px] font-black uppercase tracking-[0.04em] text-[#aeb7c2]">
               {stat.label}
             </p>
@@ -237,16 +249,45 @@ export default function ProjectDashboardPage() {
           ) : (
             <div className="grid gap-3">
               {[
-                { label: 'Done', count: tasks.filter((t) => t.status === 'DONE').length, color: '#9df2c7', bg: '#14291f', border: '#315846' },
-                { label: 'In Review', count: tasks.filter((t) => t.status === 'REVIEW').length, color: '#ffd35b', bg: '#30270d', border: '#6c5516' },
-                { label: 'In Progress', count: tasks.filter((t) => t.status === 'INPROGRESS').length, color: '#9ddde8', bg: '#2a454a', border: '#4f6e73' },
-                { label: 'Pending', count: tasks.filter((t) => t.status === 'PENDING').length, color: '#dce7f3', bg: '#20282b', border: '#4a4f55' },
+                {
+                  label: 'Done',
+                  count: tasks.filter((t) => t.status === 'DONE').length,
+                  color: '#9df2c7',
+                  bg: '#14291f',
+                  border: '#315846',
+                },
+                {
+                  label: 'In Review',
+                  count: tasks.filter((t) => t.status === 'REVIEW').length,
+                  color: '#ffd35b',
+                  bg: '#30270d',
+                  border: '#6c5516',
+                },
+                {
+                  label: 'In Progress',
+                  count: tasks.filter((t) => t.status === 'INPROGRESS').length,
+                  color: '#9ddde8',
+                  bg: '#2a454a',
+                  border: '#4f6e73',
+                },
+                {
+                  label: 'Pending',
+                  count: tasks.filter((t) => t.status === 'PENDING').length,
+                  color: '#dce7f3',
+                  bg: '#20282b',
+                  border: '#4a4f55',
+                },
               ].map(({ label, count, color, bg, border }) => {
                 const pct = tasks.length > 0 ? Math.round((count / tasks.length) * 100) : 0;
                 return (
                   <div className="flex items-center gap-3" key={label}>
-                    <span className="w-24 shrink-0 text-[11px] font-bold text-[#aeb7c2]">{label}</span>
-                    <div className="flex-1 overflow-hidden rounded-full bg-[#303842]" style={{ height: 8 }}>
+                    <span className="w-24 shrink-0 text-[11px] font-bold text-[#aeb7c2]">
+                      {label}
+                    </span>
+                    <div
+                      className="flex-1 overflow-hidden rounded-full bg-[#303842]"
+                      style={{ height: 8 }}
+                    >
                       <div
                         className="h-full rounded-full transition-all duration-500"
                         style={{ width: `${pct}%`, backgroundColor: color }}
@@ -287,17 +328,30 @@ export default function ProjectDashboardPage() {
                   onClick={() => router.push(`/studio/projects/${projectId}/tasks`)}
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <p className="text-xs font-black leading-5 text-white truncate max-w-[170px]" title={task.title}>
+                    <p
+                      className="text-xs font-black leading-5 text-white truncate max-w-[170px]"
+                      title={task.title}
+                    >
                       {task.title}
                     </p>
-                    <span className="text-[10px] font-black text-[#FFD369] shrink-0 uppercase tracking-wider">{task.status}</span>
+                    <span className="text-[10px] font-black text-[#FFD369] shrink-0 uppercase tracking-wider">
+                      {task.status}
+                    </span>
                   </div>
                   <p className="mt-1 text-[10px] font-bold text-[#aeb7c2]">
                     File: {task.fileName || 'General'}
                   </p>
                   <Progress
                     className="mt-3 h-1.5 rounded-none bg-[#39424f] [&_[data-slot=progress-indicator]]:bg-[#FFD369]"
-                    value={task.status === 'DONE' ? 100 : task.status === 'REVIEW' ? 75 : task.status === 'INPROGRESS' ? 40 : 10}
+                    value={
+                      task.status === 'DONE'
+                        ? 100
+                        : task.status === 'REVIEW'
+                          ? 75
+                          : task.status === 'INPROGRESS'
+                            ? 40
+                            : 10
+                    }
                   />
                 </article>
               ))
@@ -320,7 +374,9 @@ export default function ProjectDashboardPage() {
           </div>
           <div className="grid gap-5">
             {recentActivities.length === 0 ? (
-              <p className="text-xs font-bold text-[#8b94a1] py-4 text-center">No recent activities found.</p>
+              <p className="text-xs font-bold text-[#8b94a1] py-4 text-center">
+                No recent activities found.
+              </p>
             ) : (
               recentActivities.map((act, index) => (
                 <div className="flex gap-4" key={act.id}>
@@ -328,7 +384,9 @@ export default function ProjectDashboardPage() {
                     <Upload className="size-4" />
                   </span>
                   <div>
-                    <p className="text-xs font-black text-white">Task: &ldquo;{act.title}&rdquo; updated</p>
+                    <p className="text-xs font-black text-white">
+                      Task: &ldquo;{act.title}&rdquo; updated
+                    </p>
                     <p className="mt-1 text-[11px] font-bold leading-5 text-[#aeb7c2]">
                       Chapter folder: {act.folderName} &bull; File: {act.fileName}
                     </p>

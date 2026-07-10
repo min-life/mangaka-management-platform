@@ -14,6 +14,7 @@ import { Prisma, SCOPE } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
 import { ERROR } from '../share/constants/message-error';
 import {
   requireDurationEnv,
@@ -45,15 +46,22 @@ export class UsersService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly cacheService: CacheService,
+    private readonly mailService: MailService,
   ) {}
 
   @UseCache((args) => `user:list`)
   async findAll(
+    currentUserId: number,
     filter?: { search?: string; isActive?: boolean },
     sort?: { field?: 'createdAt' | 'displayName' | 'email'; order?: 'asc' | 'desc' },
     pagination?: Pagination,
   ) {
     try {
+      const currentUserPermissions = await this.getGlobalPermission(currentUserId);
+      const isAdminOrStaff = currentUserPermissions.some(
+        (p) => p === 'admin' || p === 'staff',
+      );
+
       const where: Prisma.UserWhereInput = {
         ...(filter?.search && {
           OR: [
@@ -62,6 +70,23 @@ export class UsersService {
           ],
         }),
         ...(filter?.isActive !== undefined && { isActive: filter.isActive }),
+        ...(!isAdminOrStaff && {
+          NOT: {
+            userRoles: {
+              some: {
+                role: {
+                  rolePermissions: {
+                    some: {
+                      permission: {
+                        name: { in: ['admin', 'staff'] },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        }),
       };
 
       const field = sort?.field || 'createdAt';
@@ -347,7 +372,7 @@ export class UsersService {
   @InvalidateCache((args) => [`user:${args[0]}`, `user:me:${args[0]}`])
   async forceResetPassword(userId: number) {
     try {
-      await this.ensureUser(userId);
+      const user = await this.ensureUser(userId);
 
       const newPassword = randomUUID().slice(0, 10);
       const hashedPassword = await bcrypt.hash(newPassword, BCRYPT_SALT_ROUNDS);
@@ -363,7 +388,9 @@ export class UsersService {
         this.prisma.refreshToken.deleteMany({ where: { userId } }),
       ]);
 
-      return { data: { newPassword } };
+      await this.mailService.sendForceResetPasswordEmail(user.email, newPassword);
+
+      return { data: { success: true } };
     } catch (error) {
       this.handleError(error, 'Force reset password fail', ERROR.SVUPDATEUSER);
     }
@@ -1081,6 +1108,31 @@ export class UsersService {
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
+  }
+
+  getGoogleLinkUrl(userId: number) {
+    const clientId = requireEnv('GOOGLE_CLIENT_ID');
+    const redirectUri =
+      process.env.GOOGLE_LINK_CALLBACK_URL ??
+      requireEnv('GOOGLE_CALLBACK_URL').replace(/\/auth\/google\/callback$/, '/users/me/link-account/callback');
+
+    const state = this.jwtService.sign(
+      { userId },
+      {
+        secret: requireEnv('ACCESS_TOKEN_SECRET'),
+        expiresIn: '10m',
+      },
+    );
+
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: 'email profile',
+      state: state,
+    });
+
+    return { data: { url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}` } };
   }
 
   private handleError(error: unknown, logMessage: string, clientMessage: string): never {

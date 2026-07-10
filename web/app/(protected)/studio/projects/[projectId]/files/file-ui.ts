@@ -30,6 +30,7 @@ export type FileMaterialItem = {
 export type FileTaskItem = {
   assignedTo: string;
   assignedToUserId?: number | null;
+  assignedByUserId?: number | null;
   description: string;
   dueDate?: string;
   id: string;
@@ -83,6 +84,7 @@ export type FileVersionItem = {
   note: string;
   previewUrl?: string;
   version: number;
+  taskId?: number | null;
 };
 
 export const fileStatusLabels: Record<FileStatus, string> = {

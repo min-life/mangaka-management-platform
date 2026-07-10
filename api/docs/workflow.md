@@ -18,15 +18,15 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 2. **Đặt lại pass (`/reset-password`)**: Nhận token từ URL, nhập pass mới -> Gọi `POST /api/auth/reset`. Đổi thành công sẽ tự động đăng xuất các thiết bị khác.
 
 ### 1.4 Luồng Đăng nhập Google
-1. **Điều hướng**: Từ `/login`, bấm nút Google -> Redirect Location sang `GET /api/auth/google`.
-2. **Callback**: Google trả về backend -> Backend redirect ngược về Frontend (`/auth/oauth-success`) kèm Access Token trong URL parameter (`?access_token=...`).
+1. **Điều hướng**: Từ `/login`, bấm nút Google -> Frontend gọi `GET /api/auth/google`. API trả về JSON chứa URL của Google (`{ data: { url: '...' } }`). Frontend lấy URL này và chủ động chuyển hướng (ví dụ: `window.location.href = url`).
+2. **Callback**: Google trả về backend -> Backend xử lý đăng nhập hoặc tự động tạo tài khoản mới nếu chưa tồn tại. Sau đó backend redirect ngược về Frontend (`/auth/oauth-success` hoặc `oauth-error`).
 
 ## 2. Luồng Quản lý Người dùng (Users Flow)
 
 ### 2.1 Cá nhân (Profile)
 1. **Xem & Sửa Profile**: Vào `/profile`, gọi `GET /api/users/me`. Khi cập nhật thông tin gọi `PATCH /api/users/me`.
 2. **Đổi mật khẩu**: Gọi `PATCH /api/users/me/password`. Thành công, backend trả về cặp token mới -> Frontend lưu lại ngầm mà không làm văng user.
-3. **Liên kết Google**: Bấm nút -> Chuyển hướng `GET /api/users/me/link-account`. Khi quay lại sẽ hiện Toast thành công/thất bại.
+3. **Liên kết Google**: Bấm nút -> Frontend gọi `GET /api/users/me/link-account` kèm Bearer Token. API trả về JSON chứa URL của Google (`{ data: { url: '...' } }`). Frontend chuyển hướng đến URL này. Khi quay lại sẽ hiện Toast thành công/thất bại dựa trên tham số trả về ở URL.
 
 ### 2.2 Quản trị viên (Admin)
 1. **Dashboard Users (`/admin/users`)**: Gọi `GET /api/users/stats` để vẽ chart, gọi `GET /api/users` đổ data vào Table.
@@ -233,7 +233,7 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 **GET** `/api/auth/google`
 
 #### Responses
-- **200**: Redirects to Google OAuth
+- **200**: Returns Google OAuth URL (`{ data: { url: '...' } }`)
 
 ---
 
@@ -339,7 +339,7 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 **GET** `/api/users/me/link-account`
 
 #### Responses
-- **200**: Redirects to Google OAuth
+- **200**: Returns Google OAuth URL (`{ data: { url: '...' } }`)
 
 ---
 
@@ -1826,6 +1826,36 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 
 ---
 
+### Upload folder image
+**PATCH** `/api/folders/{id}/image`
+
+#### Chức năng
+Upload ảnh bìa cho folder. Ảnh sẽ được đẩy lên AWS S3 và hệ thống sẽ lưu lại URL vào `imageUrl` của folder.
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Folder id |
+
+#### Request Body (multipart/form-data)
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `image` | `file` | `Yes` | File ảnh cần upload |
+
+#### Responses
+- **200**: Folder image updated successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `object` | Thông tin Folder đã được cập nhật `imageUrl` |
+
+#### Ràng buộc
+- Yêu cầu permission `project:folder.update` hoặc `project:owner`.
+- `image` là trường bắt buộc và phải là định dạng file hợp lệ.
+
+---
+
 ### Delete folder 
 **DELETE** `/api/folders/{id}`
 
@@ -2390,6 +2420,8 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
   | `data` | `string` |  |
 
 #### Ràng buộc
+- **Trạng thái `DONE`**: Yêu cầu user đang thao tác phải là người tạo task hoặc Project Owner.
+- **Trạng thái khác (`REVIEW`, `INPROGRESS`...)**: Yêu cầu user đang thao tác phải là người tạo, người được phân công (assignee), hoặc Project Owner.
 - Yêu cầu xác thực JWT. Người dùng phải có quyền `project:owner`.
 
 ---

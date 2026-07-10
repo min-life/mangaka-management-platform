@@ -42,6 +42,7 @@ import {
   getEditorBoardProjects,
   type EditorBoardProject,
 } from '../services/editor-board-projects-service';
+import { Pagination } from '../../../../components/Pagination';
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('en', {
@@ -53,7 +54,7 @@ function formatDate(value: string) {
 
 function ProjectCover({ project }: { project: EditorBoardProject }) {
   return (
-    <div className="h-16 w-12 shrink-0 overflow-hidden rounded-[4px] border border-[#50555D] bg-[#2f353e]">
+    <div className="h-16 w-12 shrink-0 overflow-hidden rounded-[4px] border border-[#39424f] bg-[#2f353e]">
       {project.imageUrl ? (
         <img
           alt={`${project.name} thumbnail`}
@@ -61,7 +62,7 @@ function ProjectCover({ project }: { project: EditorBoardProject }) {
           src={project.imageUrl}
         />
       ) : (
-        <div className="grid h-full w-full place-items-center text-[10px] font-bold text-[#C8C8C8]">
+        <div className="grid h-full w-full place-items-center text-[10px] font-black text-[#FFD369]">
           {project.name.slice(0, 2).toUpperCase()}
         </div>
       )}
@@ -176,6 +177,12 @@ export function EditorBoardProjectsPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'ALPHA' | 'UPDATED'>('UPDATED');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm]);
 
   useEffect(() => {
     let isMounted = true;
@@ -229,73 +236,81 @@ export function EditorBoardProjectsPage() {
         return new Date(second.updatedAt).getTime() - new Date(first.updatedAt).getTime();
       });
   }, [projects, searchTerm, sortBy]);
+
+  const paginatedProjects = useMemo(() => {
+    const startIndex = (page - 1) * limit;
+    return visibleProjects.slice(startIndex, startIndex + limit);
+  }, [visibleProjects, page, limit]);
+
+  const totalPages = Math.ceil(visibleProjects.length / limit);
   return (
     <>
-      <main className="p-6">
-          <section className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
-            <div>
-              <h1 className="text-[32px] font-bold leading-10 text-white">Project Dashboard</h1>
-              <p className="mt-1 text-sm leading-5 text-[#C8C8C8]">
-                Overseeing {projects.length} active manga productions in this editor board.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-end gap-2">
-              <div className="relative w-[320px] max-w-full">
-                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#8b94a1]" />
-                <Input
-                  className="h-9 rounded-[4px] border-[#50555D] bg-[#161c25] pl-10 text-xs text-[#dde3ef] placeholder:text-[#8b94a1] focus-visible:border-[#FFD369] focus-visible:ring-[#FFD369]/20"
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Search projects..."
-                  value={searchTerm}
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                  Sort
-                </span>
-                <Select value={sortBy} onValueChange={(value) => setSortBy(value as typeof sortBy)}>
-                  <SelectTrigger className="h-9 w-[152px] rounded-[4px] border-[#50555D] bg-[#161c25] text-xs text-[#dde3ef]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="border-[#50555D] bg-[#1a2029] text-white">
-                    <SelectItem value="UPDATED">Last Updated</SelectItem>
-                    <SelectItem value="ALPHA">Alphabetical</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button
-                asChild
-                className="h-10 rounded-[4px] bg-white px-6 text-[13px] font-medium text-[#2f3131] hover:bg-[#c6c6c7]"
-              >
-                <Link href="/studio">
-                  <Plus className="size-[18px]" />
-                  Add Project
-                </Link>
-              </Button>
-            </div>
-          </section>
-
-          {error ? (
-            <p className="mb-6 rounded-[6px] border border-red-400/30 bg-red-950/20 px-4 py-3 text-xs font-bold text-red-300">
-              {error}
+      <main className="px-5 py-6">
+        <section className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+          <div>
+            <h1 className="text-[24px] font-black leading-8 text-white">Project Dashboard</h1>
+            <p className="mt-1 text-sm font-medium text-[#aeb7c2]">
+              Overseeing {projects.length} active manga productions in this editor board.
             </p>
-          ) : null}
+          </div>
 
-          <section className="overflow-hidden rounded-[8px] border border-[#50555D] bg-[#1a2029]">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="relative w-[320px] max-w-full">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#8b94a1]" />
+              <Input
+                className="h-9 rounded-[4px] border-[#39424f] bg-[#151c25] pl-10 text-xs font-medium text-white placeholder:text-[#8b94a1] focus-visible:border-[#FFD369] focus-visible:ring-[#FFD369]/20"
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Search projects..."
+                value={searchTerm}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
+                Sort
+              </span>
+              <Select value={sortBy} onValueChange={(value) => setSortBy(value as typeof sortBy)}>
+                <SelectTrigger className="h-9 w-[152px] rounded-[4px] border-[#39424f] bg-[#151c25] text-xs font-medium text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="border-[#39424f] bg-[#151c25] text-white">
+                  <SelectItem value="UPDATED">Last Updated</SelectItem>
+                  <SelectItem value="ALPHA">Alphabetical</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              asChild
+              className="h-9 rounded-[4px] bg-[#FFD369] px-4 text-xs font-black text-[#101820] hover:bg-[#eac04f]"
+            >
+              <Link href="/studio">
+                <Plus className="size-4" />
+                Add Project
+              </Link>
+            </Button>
+          </div>
+        </section>
+
+        {error ? (
+          <p className="mb-6 rounded-[6px] border border-red-400/30 bg-red-950/20 px-4 py-3 text-xs font-bold text-red-300">
+            {error}
+          </p>
+        ) : null}
+
+        <section>
+          <div className="overflow-hidden rounded-[5px] border border-[#39424f] bg-[#101820]">
             <Table>
-              <TableHeader className="bg-[#242a33]">
-                <TableRow className="border-[#50555D] hover:bg-transparent">
-                  <TableHead className="h-12 px-4 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
+              <TableHeader>
+                <TableRow className="h-[40px] border-[#39424f] bg-[#222a34] hover:bg-[#222a34]">
+                  <TableHead className="w-[32%] px-5 text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
                     Project Name
                   </TableHead>
-                  <TableHead className="h-12 px-4 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
+                  <TableHead className="w-[20%] text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
                     Members
                   </TableHead>
-                  <TableHead className="h-12 px-4 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
+                  <TableHead className="w-[16%] text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
                     Created At
                   </TableHead>
-                  <TableHead className="h-12 px-4 text-right text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
+                  <TableHead className="w-[72px] pr-5 text-right text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
                     Actions
                   </TableHead>
                 </TableRow>
@@ -303,7 +318,10 @@ export function EditorBoardProjectsPage() {
               <TableBody>
                 {isLoading ? (
                   Array.from({ length: 3 }).map((_, index) => (
-                    <TableRow className="border-[#50555D]" key={index}>
+                    <TableRow
+                      className="h-[72px] border-l-4 border-l-transparent border-r-0 border-t-0 border-b-[#303842] bg-[#101820]"
+                      key={index}
+                    >
                       {Array.from({ length: 4 }).map((__, cellIndex) => (
                         <TableCell className="px-4 py-4" key={cellIndex}>
                           <Skeleton className="h-8 rounded-[4px] bg-[#2f353e]" />
@@ -312,23 +330,23 @@ export function EditorBoardProjectsPage() {
                     </TableRow>
                   ))
                 ) : visibleProjects.length ? (
-                  visibleProjects.map((project) => {
+                  paginatedProjects.map((project) => {
                     return (
                       <TableRow
-                        className="cursor-pointer border-[#50555D] transition-colors hover:bg-[#50555D]/20"
+                        className="h-[72px] cursor-pointer border-l-4 border-l-transparent border-r-0 border-t-0 border-b-[#303842] bg-[#101820] transition-all hover:border-l-[#FFD369] hover:bg-[#17202b]"
                         key={project.id}
                         onClick={() => setSelectedProject(project)}
                       >
-                        <TableCell className="px-4 py-4">
+                        <TableCell className="px-5">
                           <div className="flex items-center gap-4">
                             <ProjectCover project={project} />
                             <div>
-                              <p className="text-[13px] font-medium text-white">{project.name}</p>
-                              <p className="mt-1 text-xs text-[#C8C8C8]">{project.imprintName}</p>
+                              <p className="text-sm font-black leading-5 text-white">{project.name}</p>
+                              <p className="mt-1 text-[11px] font-bold text-[#aeb7c2]">{project.imprintName}</p>
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="px-4 py-4">
+                        <TableCell>
                           <Link
                             aria-label={`View members for ${project.name}`}
                             className="inline-flex rounded-[4px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD369]"
@@ -338,10 +356,10 @@ export function EditorBoardProjectsPage() {
                             <MemberStack members={project.members} />
                           </Link>
                         </TableCell>
-                        <TableCell className="px-4 py-4 text-sm font-medium text-[#dde3ef]">
+                        <TableCell className="text-xs font-bold text-[#dce7f3]">
                           {formatDate(project.createdAt)}
                         </TableCell>
-                        <TableCell className="px-4 py-4 text-right">
+                        <TableCell className="pr-5 text-right">
                           <button
                             aria-label={`Open actions for ${project.name}`}
                             className="text-[#C8C8C8] hover:text-white"
@@ -358,9 +376,9 @@ export function EditorBoardProjectsPage() {
                     );
                   })
                 ) : (
-                  <TableRow className="border-[#50555D]">
+                  <TableRow className="border-[#303842] bg-[#101820]">
                     <TableCell
-                      className="px-4 py-10 text-center text-sm text-[#C8C8C8]"
+                      className="px-5 py-10 text-center text-xs font-bold text-[#aeb7c2]"
                       colSpan={4}
                     >
                       No editor board projects found.
@@ -369,7 +387,19 @@ export function EditorBoardProjectsPage() {
                 )}
               </TableBody>
             </Table>
-          </section>
+            <Pagination
+              page={page}
+              limit={limit}
+              total={visibleProjects.length}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              onLimitChange={(newLimit) => {
+                setLimit(newLimit);
+                setPage(1);
+              }}
+            />
+          </div>
+        </section>
       </main>
       <ProjectDrawer
         open={Boolean(selectedProject)}
