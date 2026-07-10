@@ -18,7 +18,6 @@ import { CreateStaffDialog } from './UserDialogs';
 import { UserFilters } from './UserFilters';
 import { UsersTable } from './UsersTable';
 
-// Codex #admin-ui start
 export default function AdminUsersClient() {
   const pathname = usePathname();
   const router = useRouter();
@@ -223,4 +222,3 @@ export default function AdminUsersClient() {
     </>
   );
 }
-// Codex #admin-ui end

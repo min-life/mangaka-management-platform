@@ -9,7 +9,6 @@ type MetricCardProps = {
   icon: LucideIcon;
 };
 
-// Codex #admin-ui start
 export function MetricCard({ label, value, change, icon: Icon }: MetricCardProps) {
   return (
     <Card className="border-[var(--admin-border)] bg-[var(--admin-surface)] shadow-sm">
@@ -28,4 +27,3 @@ export function MetricCard({ label, value, change, icon: Icon }: MetricCardProps
     </Card>
   );
 }
-// Codex #admin-ui end

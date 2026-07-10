@@ -8,7 +8,6 @@ type AdminLayoutProps = {
   children: ReactNode;
 };
 
-// Codex #admin-ui start
 export default function AdminLayout({ children }: AdminLayoutProps) {
   return (
     <AdminAuthWrapper>
@@ -18,4 +17,3 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     </AdminAuthWrapper>
   );
 }
-// Codex #admin-ui end

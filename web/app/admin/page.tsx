@@ -181,7 +181,6 @@ function UserGrowthLineChart({ points }: { points: ChartPoint[] }) {
   );
 }
 
-// Codex #admin-ui start
 export default function AdminDashboardPage() {
   const [totalUsers, setTotalUsers] = useState(0);
   const [activeUsers, setActiveUsers] = useState(0);
@@ -298,4 +297,3 @@ export default function AdminDashboardPage() {
     </>
   );
 }
-// Codex #admin-ui end

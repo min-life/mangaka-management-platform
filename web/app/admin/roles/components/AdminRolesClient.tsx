@@ -27,7 +27,6 @@ import { PageHeader } from '../../components/PageHeader';
 import { RolesTable } from './RolesTable';
 import { getPermissionId, sortRolesByApiFields, type RoleFormPayload } from './role-utils';
 
-// Codex #admin-ui start
 export default function AdminRolesClient() {
   const [roles, setRoles] = useState<AdminRoleResponse[]>([]);
   const [permissions, setPermissions] = useState<AdminPermissionResponse[]>([]);
@@ -294,4 +293,3 @@ export default function AdminRolesClient() {
     </>
   );
 }
-// Codex #admin-ui end

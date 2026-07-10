@@ -32,7 +32,6 @@ type AdminShellProps = {
   children: ReactNode;
 };
 
-// Codex #admin-ui start
 export function AdminShell({ children }: AdminShellProps) {
   return (
     <div className="flex min-h-screen bg-[#222831] text-[#eeeeee]">
@@ -46,4 +45,3 @@ export function AdminShell({ children }: AdminShellProps) {
     </div>
   );
 }
-// Codex #admin-ui end
