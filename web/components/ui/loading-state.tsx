@@ -28,58 +28,75 @@ function WorkspaceSkeleton({ message }: { message: string }) {
 
 function DetailSkeleton({ message }: { message: string }) {
   return (
-    <div className="space-y-6 animate-in fade-in duration-200">
-      <div className="flex flex-col gap-2 border-b border-[#26303b] pb-4">
-        <div className="flex items-center gap-2 text-xs font-bold text-[#8b94a1]">
-          <span className="inline-flex items-center gap-1 hover:text-white transition-colors cursor-default">
-            <ChevronLeft className="size-3.5" /> Back to Files
-          </span>
-          <span>·</span>
-          <span>Studio</span>
-          <span>/</span>
-          <span>Projects</span>
-          <span>/</span>
-          <span className="text-[#FFD369]">Workspace</span>
+    <div className="flex h-screen flex-col overflow-hidden bg-[#101820] animate-in fade-in duration-300">
+      {/* Header skeleton */}
+      <div className="flex shrink-0 items-center justify-between border-b border-[#26303b] bg-[#0d151e] px-5 py-3 lg:px-8">
+        <div className="flex flex-col gap-1.5">
+          <div className="h-3 w-40 animate-pulse rounded-[3px] bg-[#1f2937]" />
+          <div className="h-5 w-64 animate-pulse rounded-[3px] bg-[#26303b]" />
+          <div className="h-2.5 w-48 animate-pulse rounded-[3px] bg-[#1f2937] mt-0.5" />
         </div>
-        <div className="flex items-center justify-between gap-4 mt-1">
-          <div>
-            <h1 className="text-xl font-black text-white tracking-wide">Loading File...</h1>
-            <p className="text-xs font-bold text-[#8b94a1] mt-1">Preparing drawing canvas and syncing workspace details</p>
-          </div>
-          <div className="flex gap-2">
-            <div className="h-8 w-24 rounded bg-[#1f2937]/50 border border-[#303842] flex items-center justify-center text-[10px] text-[#8b94a1] font-bold">
-              History
-            </div>
-            <div className="h-8 w-24 rounded bg-[#FFD369]/10 border border-[#FFD369]/20 flex items-center justify-center text-[10px] text-[#FFD369] font-black uppercase">
-              Current Version
-            </div>
-          </div>
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-24 animate-pulse rounded-[4px] bg-[#1f2937]" />
+          <div className="h-8 w-32 animate-pulse rounded-[4px] bg-[#FFD369]/10 border border-[#FFD369]/20" />
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-[8px] border border-[#26303b] bg-[#0c1219]/60 backdrop-blur-sm">
-        <div className="flex h-11 items-center justify-between border-b border-[#26303b] bg-[#151c25]/30 px-4">
-          <div className="flex items-center gap-2 text-xs font-bold text-[#8b94a1]">
-            <span>Canvas View</span>
-          </div>
-        </div>
-        <div className="p-8 flex flex-col items-center justify-center min-h-[420px] relative">
-          <div className="flex flex-col items-center gap-4 text-center z-10">
-            <div className="relative">
-              <div className="size-12 rounded-full border-2 border-[#FFD369]/20 border-t-[#FFD369] animate-spin" />
-              <Loader2 className="size-5 text-[#FFD369] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
+      {/* Body */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Main canvas area */}
+        <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          {/* Canvas */}
+          <div className="flex-1 relative bg-[#091018] flex items-center justify-center overflow-hidden">
+            {/* Dot grid background */}
+            <div className="absolute inset-0 bg-[radial-gradient(#1f293740_1px,transparent_1px)] [background-size:20px_20px]" />
+
+            {/* Centered loader */}
+            <div className="relative z-10 flex flex-col items-center gap-5 text-center">
+              <div className="relative">
+                <div className="size-14 rounded-full border-2 border-[#FFD369]/15 border-t-[#FFD369] animate-spin" />
+                <div className="absolute inset-0 size-14 rounded-full border-2 border-[#FFD369]/5 border-b-[#FFD369]/40 animate-spin [animation-duration:1.5s] [animation-direction:reverse]" />
+                <Loader2 className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-5 text-[#FFD369]/70 animate-pulse" />
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-[11px] font-black uppercase tracking-[0.12em] text-white/80">
+                  {message}
+                </p>
+                <p className="text-[10px] font-bold text-[#8b94a1]">
+                  Synchronizing file version &amp; layers...
+                </p>
+              </div>
             </div>
-            <div className="space-y-1">
-              <p className="text-xs font-black uppercase tracking-[0.1em] text-white animate-pulse">
-                {message}
-              </p>
-              <p className="text-[10px] font-bold text-[#8b94a1]">
-                Synchronizing file version & layers...
-              </p>
+          </div>
+
+          {/* Bottom tabs skeleton */}
+          <div className="shrink-0 border-t border-[#26303b] bg-[#0d151e]">
+            <div className="flex h-11 items-center gap-1 px-5 lg:px-8">
+              {['Overview', 'Discussion', 'Versions', 'Activity'].map((tab) => (
+                <div key={tab} className="h-5 w-16 animate-pulse rounded-[3px] bg-[#1f2937] mx-2" />
+              ))}
             </div>
           </div>
-          <div className="absolute inset-0 bg-[radial-gradient(#1f2937_1px,transparent_1px)] [background-size:16px_16px] opacity-25" />
-        </div>
+        </main>
+
+        {/* Right sidebar skeleton */}
+        <aside className="hidden lg:flex w-[320px] shrink-0 flex-col border-l border-[#26303b] bg-[#0d151e]">
+          <div className="border-b border-[#26303b] px-4 py-3">
+            <div className="h-4 w-28 animate-pulse rounded-[3px] bg-[#26303b]" />
+          </div>
+          <div className="flex-1 overflow-hidden p-4 space-y-3">
+            {/* Task cards */}
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="rounded-[6px] border border-[#26303b] bg-[#151c25] p-3 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="h-3 w-3/4 animate-pulse rounded-[3px] bg-[#26303b]" />
+                  <div className="h-4 w-12 animate-pulse rounded-full bg-[#1f2937] shrink-0" />
+                </div>
+                <div className="h-2.5 w-1/2 animate-pulse rounded-[3px] bg-[#1f2937]" />
+              </div>
+            ))}
+          </div>
+        </aside>
       </div>
     </div>
   );
@@ -104,7 +121,7 @@ export function LoadingState({
   }
 
   return (
-    <div className="w-full px-0 py-1" style={{ minHeight }}>
+    <div className="w-full" style={{ minHeight: variant === 'detail' ? undefined : minHeight }}>
       {variant === 'detail' ? (
         <DetailSkeleton message={message} />
       ) : (

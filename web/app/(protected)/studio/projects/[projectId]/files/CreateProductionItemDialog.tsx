@@ -14,17 +14,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { readUploadFile } from '@/lib/image-upload';
 import type { ProjectFolderResponse } from '@/services/project.service';
 
 type CreateProductionItemDialogProps = {
   folders: ProjectFolderResponse[];
   isSubmitting: boolean;
   onCreateFile: (input: {
-    assetFile?: File;
     description?: string;
     folderId: number;
-    previewUrl?: string;
+    imageFile?: File;
+    textFile?: File;
+    sourceFile?: File;
     title: string;
   }) => Promise<void>;
   selectedFolderId: number | null;
@@ -50,6 +50,81 @@ function getFolderPath(folder: ProjectFolderResponse, folders: ProjectFolderResp
   return parents.length ? `${parents.join(' / ')} / ${folder.title}` : folder.title;
 }
 
+type FileSlot = {
+  file: File | undefined;
+  previewUrl: string;
+};
+
+function FileUploadSlot({
+  accept,
+  description,
+  disabled,
+  inputId,
+  label,
+  slot,
+  onChange,
+  onClear,
+}: {
+  accept: string;
+  description: string;
+  disabled: boolean;
+  inputId: string;
+  label: string;
+  slot: FileSlot;
+  onChange: (file: File) => void;
+  onClear: () => void;
+}) {
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = event.target.files?.[0];
+    if (picked) onChange(picked);
+    event.target.value = '';
+  };
+
+  return (
+    <div>
+      <span className={labelClassName}>{label}</span>
+      <p className="mt-0.5 text-[11px] font-bold leading-4 text-[#8b94a1]">{description}</p>
+      <label
+        className={`mt-2 flex min-h-[72px] cursor-pointer items-center gap-3 overflow-hidden rounded-[5px] border border-dashed px-3 py-3 text-left transition-colors ${
+          disabled ? 'cursor-not-allowed opacity-50' : 'hover:border-[#FFD369]/70'
+        } ${slot.file ? 'border-[#FFD369]/40 bg-[#2a2414]' : 'border-[#4b535f] bg-[#151c25]'}`}
+        htmlFor={disabled ? undefined : inputId}
+      >
+        {slot.file ? (
+          <>
+            {slot.previewUrl ? (
+              <img alt="" className="size-10 shrink-0 rounded-[3px] object-cover" src={slot.previewUrl} />
+            ) : (
+              <FileText className="size-7 shrink-0 text-[#FFD369]" />
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[11px] font-black text-white">{slot.file.name}</p>
+              <p className="mt-0.5 text-[10px] font-bold text-[#8b94a1]">
+                {(slot.file.size / 1024).toFixed(1)} KB
+              </p>
+            </div>
+            <button
+              className="shrink-0 text-red-300 hover:text-red-200"
+              onClick={(e) => { e.preventDefault(); onClear(); }}
+              type="button"
+            >
+              <Trash2 className="size-4" />
+            </button>
+          </>
+        ) : (
+          <span className="flex flex-1 items-center gap-3">
+            <UploadCloud className="size-5 shrink-0 text-[#8b94a1]" />
+            <span className="text-[11px] font-black text-[#8b94a1]">Click to upload</span>
+          </span>
+        )}
+        <input accept={accept} className="hidden" disabled={disabled} id={inputId} onChange={handleChange} type="file" />
+      </label>
+    </div>
+  );
+}
+
+const emptySlot = (): FileSlot => ({ file: undefined, previewUrl: '' });
+
 export function CreateProductionItemDialog({
   folders,
   isSubmitting,
@@ -60,11 +135,12 @@ export function CreateProductionItemDialog({
   const [fileTitle, setFileTitle] = useState('');
   const [fileDescription, setFileDescription] = useState('');
   const [fileFolderId, setFileFolderId] = useState(selectedFolderId ? String(selectedFolderId) : '');
-  const [filePreviewUrl, setFilePreviewUrl] = useState('');
-  const [fileUploadName, setFileUploadName] = useState('');
-  const [fileUploadMeta, setFileUploadMeta] = useState('');
-  const [assetFile, setAssetFile] = useState<File | undefined>();
   const [folderSearch, setFolderSearch] = useState('');
+
+  // 3 file slots matching API fields: image, text, source
+  const [imageSlot, setImageSlot] = useState<FileSlot>(emptySlot());
+  const [textSlot, setTextSlot] = useState<FileSlot>(emptySlot());
+  const [sourceSlot, setSourceSlot] = useState<FileSlot>(emptySlot());
 
   useEffect(() => {
     if (!open) return;
@@ -73,60 +149,46 @@ export function CreateProductionItemDialog({
 
   const filteredFolders = useMemo(() => {
     const query = folderSearch.trim().toLowerCase();
-
     return folders.filter((folder) => {
       if (!query) return true;
       return getFolderPath(folder, folders).toLowerCase().includes(query);
     });
   }, [folderSearch, folders]);
 
-  const selectedFolder = useMemo(
-    () => folders.find((folder) => String(folder.id) === fileFolderId),
-    [fileFolderId, folders],
-  );
-
   const reset = () => {
     setFileTitle('');
     setFileDescription('');
     setFileFolderId(selectedFolderId ? String(selectedFolderId) : '');
-    setFilePreviewUrl('');
-    setFileUploadName('');
-    setFileUploadMeta('');
-    setAssetFile(undefined);
     setFolderSearch('');
+    setImageSlot(emptySlot());
+    setTextSlot(emptySlot());
+    setSourceSlot(emptySlot());
   };
 
   const handleOpenChange = (nextOpen: boolean) => {
     setOpen(nextOpen);
-
-    if (!nextOpen) {
-      reset();
-    }
+    if (!nextOpen) reset();
   };
 
-  const handleFileUploadChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-
-    if (!file) return;
-
-    const { dataUrl, meta, name } = await readUploadFile(file);
-    setAssetFile(file);
-    setFilePreviewUrl(dataUrl ?? '');
-    setFileUploadName(name);
-    setFileUploadMeta(meta);
-    setFileTitle((current) => current || name.replace(/\.[^/.]+$/, ''));
-    event.target.value = '';
+  const makeSlotSetter = (
+    setter: React.Dispatch<React.SetStateAction<FileSlot>>,
+    isImage: boolean,
+  ) => (file: File) => {
+    const previewUrl = isImage && file.type.startsWith('image/') ? URL.createObjectURL(file) : '';
+    setter({ file, previewUrl });
+    // Auto-fill title from first uploaded file if title is still empty
+    setFileTitle((current) => current || file.name.replace(/\.[^/.]+$/, ''));
   };
 
   const handleCreate = async () => {
     await onCreateFile({
-      assetFile,
       description: fileDescription.trim() || undefined,
       folderId: Number(fileFolderId),
-      previewUrl: filePreviewUrl || undefined,
+      imageFile: imageSlot.file,
+      textFile: textSlot.file,
+      sourceFile: sourceSlot.file,
       title: fileTitle.trim(),
     });
-
     setOpen(false);
     reset();
   };
@@ -142,7 +204,7 @@ export function CreateProductionItemDialog({
         </Button>
       </DialogTrigger>
       <DialogContent
-        className="w-[calc(100vw-2rem)] max-h-[86dvh] max-w-[820px] gap-0 overflow-hidden rounded-[7px] border border-[#39424f] bg-[#101820] p-0 text-white sm:max-w-[820px]"
+        className="w-[calc(100vw-2rem)] max-h-[88dvh] max-w-[860px] gap-0 overflow-hidden rounded-[7px] border border-[#39424f] bg-[#101820] p-0 text-white sm:max-w-[860px]"
         showCloseButton
       >
         <DialogHeader className="border-b border-[#39424f] px-6 py-5">
@@ -156,7 +218,8 @@ export function CreateProductionItemDialog({
         </DialogHeader>
 
         <div className="min-h-0 overflow-y-auto px-6 py-5">
-          <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_250px]">
+          <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_320px]">
+            {/* Left: metadata */}
             <div className="space-y-4">
               <label className="block">
                 <span className={labelClassName}>File Name</span>
@@ -184,13 +247,10 @@ export function CreateProductionItemDialog({
                     {filteredFolders.length ? (
                       filteredFolders.map((folder) => {
                         const isSelected = String(folder.id) === fileFolderId;
-
                         return (
                           <button
                             className={`flex w-full items-center gap-3 rounded-[4px] px-3 py-2.5 text-left ${
-                              isSelected
-                                ? 'bg-[#2a2414] text-[#FFD369]'
-                                : 'text-white hover:bg-[#202832]'
+                              isSelected ? 'bg-[#2a2414] text-[#FFD369]' : 'text-white hover:bg-[#202832]'
                             }`}
                             key={folder.id}
                             onClick={() => setFileFolderId(String(folder.id))}
@@ -198,9 +258,7 @@ export function CreateProductionItemDialog({
                           >
                             <FolderOpen className="size-4 shrink-0" />
                             <span className="min-w-0">
-                              <span className="block truncate text-xs font-black">
-                                {folder.title}
-                              </span>
+                              <span className="block truncate text-xs font-black">{folder.title}</span>
                               <span className="block truncate text-[11px] font-bold text-[#8b94a1]">
                                 {getFolderPath(folder, folders)}
                               </span>
@@ -228,62 +286,47 @@ export function CreateProductionItemDialog({
               </label>
             </div>
 
-            <div>
-              <span className={labelClassName}>Initial Material</span>
-              <p className="mt-1 text-[11px] font-bold leading-5 text-[#8b94a1]">
-                Optional. If attached, it becomes the first file material/version.
-              </p>
-              <label
-                className="mt-2 grid min-h-[208px] cursor-pointer place-items-center overflow-hidden rounded-[5px] border border-dashed border-[#4b535f] bg-[#151c25] text-center hover:border-[#FFD369]/70"
-                htmlFor="file_asset_upload"
-              >
-                {filePreviewUrl ? (
-                  <img alt="" className="h-full w-full object-cover" src={filePreviewUrl} />
-                ) : (
-                  <span className="px-4">
-                    <UploadCloud className="mx-auto size-8 text-[#8b94a1]" />
-                    <span className="mt-3 block text-xs font-black text-white">
-                      Upload from computer
-                    </span>
-                    <span className="mt-1 block text-[11px] font-bold text-[#8b94a1]">
-                      PNG, JPG, PDF, PSD, CLIP, or text
-                    </span>
-                  </span>
-                )}
-                <input
-                  accept="image/*,.psd,.clip,.pdf,.txt,.doc,.docx"
-                  className="hidden"
-                  id="file_asset_upload"
-                  onChange={handleFileUploadChange}
-                  type="file"
-                />
-              </label>
-              {fileUploadName ? (
-                <div className="mt-2 rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    <FileText className="size-4 shrink-0 text-[#FFD369]" />
-                    <p className="min-w-0 flex-1 truncate text-[11px] font-black text-white">
-                      {fileUploadName}
-                    </p>
-                    <button
-                      className="text-red-300 hover:text-red-200"
-                      onClick={() => {
-                        setAssetFile(undefined);
-                        setFilePreviewUrl('');
-                        setFileUploadMeta('');
-                        setFileUploadName('');
-                      }}
-                      type="button"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  </div>
-                  <p className="mt-1 text-[11px] font-bold text-[#8b94a1]">
-                    {fileUploadMeta}
-                    {selectedFolder ? ` - ${selectedFolder.title}` : ''}
-                  </p>
-                </div>
-              ) : null}
+            {/* Right: 3 file upload slots matching API fields */}
+            <div className="space-y-4">
+              <div>
+                <span className={labelClassName}>Initial Material</span>
+                <p className="mt-1 text-[11px] font-bold leading-5 text-[#8b94a1]">
+                  Optional. Upload up to 3 file types — they become the first material version.
+                </p>
+              </div>
+
+              <FileUploadSlot
+                accept="image/*,.pdf"
+                description="PNG, JPG, GIF, PDF"
+                disabled={isSubmitting}
+                inputId="upload_image"
+                label="Image"
+                slot={imageSlot}
+                onChange={makeSlotSetter(setImageSlot, true)}
+                onClear={() => setImageSlot(emptySlot())}
+              />
+
+              <FileUploadSlot
+                accept=".txt,.doc,.docx,text/*"
+                description="TXT, DOC, DOCX"
+                disabled={isSubmitting}
+                inputId="upload_text"
+                label="Text / Document"
+                slot={textSlot}
+                onChange={makeSlotSetter(setTextSlot, false)}
+                onClear={() => setTextSlot(emptySlot())}
+              />
+
+              <FileUploadSlot
+                accept=".psd,.clip,.zip,.ai,.csp"
+                description="PSD, CLIP, ZIP, AI, CSP"
+                disabled={isSubmitting}
+                inputId="upload_source"
+                label="Source File"
+                slot={sourceSlot}
+                onChange={makeSlotSetter(setSourceSlot, false)}
+                onClear={() => setSourceSlot(emptySlot())}
+              />
             </div>
           </div>
         </div>

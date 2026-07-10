@@ -62,6 +62,7 @@ export type SubmissionFrameComment = {
   id: string;
   materialId?: string;
   materialVersion?: string;
+  materialName?: string;
   region: FileTaskRegion;
   taskId?: string;
   time: string;
@@ -72,6 +73,14 @@ export type FileActivityItem = {
   id: string;
   label: string;
   time: string;
+  rawDate: string;
+  type: 'create' | 'comment' | 'upload' | 'complete' | 'edit' | 'default';
+  metadata?: {
+    taskId?: string;
+    taskName?: string;
+    materialId?: string;
+    materialName?: string;
+  };
   tone: 'default' | 'success' | 'warning';
 };
 

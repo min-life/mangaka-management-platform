@@ -93,13 +93,13 @@ export type ProjectMemberResponse = {
 type ProjectMemberApiResponse =
   | ProjectMemberResponse
   | {
-      createdAt: string;
-      numberOfTasks?: number;
-      role: ProjectMemberRoleResponse;
-      taskOverview?: ProjectMemberResponse['taskOverview'];
-      updatedAt: string;
-      user: UserSummaryResponse;
-    };
+    createdAt: string;
+    numberOfTasks?: number;
+    role: ProjectMemberRoleResponse;
+    taskOverview?: ProjectMemberResponse['taskOverview'];
+    updatedAt: string;
+    user: UserSummaryResponse;
+  };
 
 export type ProjectApplicationResponse = {
   createdAt: string;
@@ -244,6 +244,18 @@ export async function getProjects(params?: {
     pagination: response.pagination,
     projects: response.data ?? [],
   };
+}
+
+export async function linkProjectEditorBoard(projectId: number | string, editorBoardId: number) {
+  const response = await api.post<{ data: any }, { data: any }>(`/projects/${projectId}/editor-boards`, {
+    editorBoardId,
+  });
+  return response.data;
+}
+
+export async function unlinkProjectEditorBoard(projectId: number | string) {
+  const response = await api.delete<{ data: any }, { data: any }>(`/projects/${projectId}/editor-boards`);
+  return response.data;
 }
 
 export async function getProjectById(projectId: number) {

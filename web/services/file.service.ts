@@ -145,6 +145,35 @@ export async function createFileTask(
   return response.data;
 }
 
+export async function createFileFrame(
+  fileId: number | string,
+  payload: {
+    endX: number;
+    endY: number;
+    startX: number;
+    startY: number;
+    name?: string;
+  }
+) {
+  const response = await api.post<any, any>(`/files/${fileId}/frames`, {
+    name: payload.name || 'File Frame',
+    startX: payload.startX,
+    startY: payload.startY,
+    endX: payload.endX,
+    endY: payload.endY,
+  });
+
+  const frame = response.data ?? response;
+  return {
+    id: frame.id,
+    fileId: Number(fileId),
+    startX: Number(frame.startX),
+    startY: Number(frame.startY),
+    endX: Number(frame.endX),
+    endY: Number(frame.endY),
+  };
+}
+
 export async function getFileComments(fileId: number | string) {
   const response = await api.get<{ data: unknown[] }, { data: unknown[] }>(`/files/${fileId}/comments`);
   return response.data ?? [];
