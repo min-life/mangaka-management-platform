@@ -14,6 +14,8 @@ import {
 import { getRoles, type RoleResponse } from '@/services/role.service';
 import { toast } from '@/lib/toast';
 
+import { LoadingState } from '@/components/ui/loading-state';
+
 import { AddMemberDialog } from './AddMemberDialog';
 import { ChangeMemberRoleDialog } from './ChangeMemberRoleDialog';
 import { DirectoryMembersTable } from './DirectoryMembersTable';
@@ -171,6 +173,10 @@ export function ProjectMembersClient({ projectId }: ProjectMembersClientProps) {
       setIsSubmittingMemberAction(false);
     }
   };
+
+  if (isLoading) {
+    return <LoadingState message="Loading project members..." minHeight="70vh" />;
+  }
 
   return (
     <section className="px-5 py-6">

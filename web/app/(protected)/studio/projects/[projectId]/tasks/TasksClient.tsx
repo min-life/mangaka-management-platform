@@ -196,7 +196,7 @@ export function TasksClient({ projectId }: TasksClientProps) {
   // Sync localTasks when API data refreshes
   useEffect(() => {
     setLocalTasks(tasks);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
   useEffect(() => {
@@ -292,10 +292,15 @@ export function TasksClient({ projectId }: TasksClientProps) {
       if (comment?.trim()) {
         await createTaskComment(taskId, `[Revision requested] ${comment.trim()}`);
       }
-    } catch {
+    } catch (err: any) {
       // 3. Rollback on failure
       setLocalTasks(prevTasks);
-      toast.error('Failed to update task status. Please try again.');
+      const errorMessage = err?.response?.data?.message;
+      if (errorMessage === 'EVLSUBTASKDEP' || err?.response?.data?.code === 'EVLSUBTASKDEP') {
+        toast.error('Cannot start task: Parent task is not completed yet.');
+      } else {
+        toast.error('Failed to update task status. Please try again.');
+      }
     }
   };
 
