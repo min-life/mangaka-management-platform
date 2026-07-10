@@ -7,23 +7,40 @@ export class NotificationsService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async getNotifications(userId: number) {
+  async getNotifications(userId: number, query?: { page?: number; limit?: number }) {
+    const page = query?.page || 1;
+    const limit = query?.limit || 20;
+    const skip = (page - 1) * limit;
+
     try {
-      const notifications = await this.prisma.notification.findMany({
-        where: { userId },
-        include: {
-          activityLog: {
-            include: {
-              actor: {
-                select: { id: true, displayName: true, email: true, avatarUrl: true },
+      const [total, data] = await Promise.all([
+        this.prisma.notification.count({ where: { userId } }),
+        this.prisma.notification.findMany({
+          where: { userId },
+          include: {
+            activityLog: {
+              include: {
+                actor: {
+                  select: { id: true, displayName: true, email: true, avatarUrl: true },
+                },
               },
             },
           },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit,
+        }),
+      ]);
 
-      return { data: notifications };
+      return {
+        data,
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
     } catch (error) {
       this.logger.error('Get notifications fail', error);
       throw new InternalServerErrorException('Get notifications fail');

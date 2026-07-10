@@ -12,24 +12,79 @@
   --admin-table-header: #1d242d;
   --admin-table-hover: #202832;
   --admin-sidebar-active: #393e46;
+  --admin-chart-bar: #ffd369;
   background: var(--admin-background);
   color: var(--admin-text);
+  scrollbar-color: var(--admin-border) var(--admin-table);
+  scrollbar-width: thin;
+}
+
+.admin-theme *,
+.admin-theme *::before,
+.admin-theme *::after {
+  scrollbar-color: var(--admin-border) transparent;
+  scrollbar-width: thin;
+}
+
+.admin-theme ::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+
+.admin-theme ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.admin-theme ::-webkit-scrollbar-thumb {
+  background: var(--admin-border);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 999px;
+}
+
+.admin-theme ::-webkit-scrollbar-thumb:hover {
+  background: var(--admin-accent);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+.admin-theme .admin-modal-scroll {
+  scrollbar-color: #111827 transparent;
+}
+
+.admin-theme .admin-modal-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.admin-theme .admin-modal-scroll::-webkit-scrollbar-thumb {
+  background: #111827;
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 999px;
+}
+
+.admin-theme .admin-modal-scroll::-webkit-scrollbar-thumb:hover {
+  background: #000000;
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 999px;
 }
 
 .admin-theme[data-admin-theme='light'] {
   --admin-background: #eeeeee;
   --admin-surface: #ffffff;
   --admin-surface-focus: #f6f8fb;
-  --admin-border: #c8ced7;
+  --admin-border: #a8b0bd;
   --admin-accent: #ffd369;
-  --admin-text: #222831;
-  --admin-text-muted: #66717f;
-  --admin-text-secondary: #4a5260;
+  --admin-text: #111827;
+  --admin-text-muted: #374151;
+  --admin-text-secondary: #1f2937;
   --admin-table: #ffffff;
   --admin-table-row: #f8fafc;
   --admin-table-header: #393e46;
   --admin-table-hover: #eef2f6;
   --admin-sidebar-active: #393e46;
+  --admin-chart-bar: #d49a00;
 }
 
 .admin-theme-shell {

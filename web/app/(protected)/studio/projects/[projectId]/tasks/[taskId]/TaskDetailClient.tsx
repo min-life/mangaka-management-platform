@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { toast } from '@/lib/toast';
 import Link from 'next/link';
 import {
@@ -10,19 +11,33 @@ import {
   Check,
   Clock3,
   Crosshair,
+  Edit3,
   ExternalLink,
   FileText,
   MessageSquare,
   Send,
+  Trash2,
   UserRound,
   X,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { getTaskById, getTaskFrames, updateTask } from '@/services/task.service';
+import { getTaskById, getTaskFrames, updateTask, deleteTask, getTaskMaterials } from '@/services/task.service';
 import { createMaterial, getFileMaterialVersions } from '@/services/file.service';
+import { getProjectMembers } from '@/services/project.service';
 import { LoadingState } from '@/components/ui/loading-state';
+import { useAsyncResource } from '@/hooks/useAsyncResource';
+import { RefreshingIndicator } from '@/components/ui/refreshing-indicator';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 import {
   taskPriorityClassName,
@@ -63,134 +78,216 @@ const initialComments: CommentItem[] = [
 ];
 
 export function TaskDetailClient({ projectId, taskId }: TaskDetailClientProps) {
-  const [task, setTask] = useState<TaskWorkspaceItem | null>(null);
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<DetailTab>('DISCUSSION');
   const [comments, setComments] = useState(initialComments);
   const [comment, setComment] = useState('');
   const [reviewNote, setReviewNote] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
 
-  const loadTask = async (cancelled = false) => {
-    if (!/^\d+$/.test(taskId)) {
-      setError('Task was not found in the current project workspace.');
-      setIsLoading(false);
-      return;
-    }
+  // States for Edit/Delete Task
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editAssigneeId, setEditAssigneeId] = useState('');
+  const [editStatus, setEditStatus] = useState<string>('PENDING');
+  const [editDueDate, setEditDueDate] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
+  const { data, error, isInitialLoading, isRefreshing, reload } = useAsyncResource(async () => {
+    let apiMembers: { id: number; name: string }[] = [];
     try {
-      const result = await getTaskById(taskId);
-      if (cancelled) return;
-
-      // Fetch task frames
-      let frameRegion: any = undefined;
-      try {
-        const frames = await getTaskFrames(taskId);
-        if (frames && frames.length > 0) {
-          frameRegion = {
-            startX: Number(frames[0].startX),
-            startY: Number(frames[0].startY),
-            endX: Number(frames[0].endX),
-            endY: Number(frames[0].endY),
-          };
-        }
-      } catch (err) {
-        console.error('Failed to load task frames:', err);
-      }
-
-      // Fetch preview url from material versions
-      let previewUrl = '';
-      try {
-        const versionsRes = await getFileMaterialVersions(result.fileId);
-        const rawArray = (versionsRes.versions || []) as any[];
-        const latestVersion = rawArray.find((v: any) => v.isCurrent) || rawArray[0];
-        if (latestVersion && latestVersion.materials?.length > 0) {
-          const thumbnailMaterial =
-            latestVersion.materials.find((m: any) => m.isThumbnail) || latestVersion.materials[0];
-          previewUrl = thumbnailMaterial?.downloadUrl || thumbnailMaterial?.url || '';
-        }
-      } catch (err) {
-        console.error('Failed to load file material versions for preview:', err);
-      }
-
-      // Parse submissions from description
-      const parsedSubmissions: TaskSubmission[] = [];
-      const lines = (result.description || '').split('\n');
-      lines.forEach((line: string, lineIndex: number) => {
-        const noteMatch = line.match(/\[Note:\s*([^\]]+)\]/);
-        const versionMatch = line.match(/\[version:\s*([^\]]+)\]/);
-        const reviewerMatch = line.match(/\[Reviewer:\s*([^\]]+)\]/);
-        const resultMatch = line.match(/\[Result:\s*([^\]]+)\]/);
-
-        if (noteMatch) {
-          const ver = versionMatch ? versionMatch[1] : 'v1';
-          const isLastLine = lineIndex === lines.length - 1;
-          let submissionStatus: any = 'APPROVED';
-          if (resultMatch) {
-            submissionStatus = resultMatch[1].trim();
-          } else if (result.status === 'REVIEW' && isLastLine) {
-            submissionStatus = 'PENDING_REVIEW';
-          }
-
-          parsedSubmissions.push({
-            id: `sub-parsed-${lineIndex}`,
-            assetName: `submission-${ver}.png`,
-            note: noteMatch[1].trim() + (reviewerMatch ? `\nReviewer: ${reviewerMatch[1].trim()}` : ''),
-            status: submissionStatus,
-            submittedAt: 'Date not parsed',
-            submittedBy: result.assignedByUser?.displayName || 'Assignee',
-          });
-        }
-      });
-
-      const cleanDesc = result.description ? result.description.replace(/\s*\[version:v\d+\]/g, '') : '';
-
-      setTask({
-        assignee: result.assignedByUser?.displayName || result.assignedByUser?.email || 'Unassigned',
-        description: cleanDesc,
-        dueDate: result.deadline ? new Date(result.deadline).toLocaleDateString() : 'No due date',
-        fileId: result.fileId,
-        fileTitle: result.file?.title || `File #${result.fileId}`,
-        id: String(result.id),
-        isMine: /current|sarah/i.test(result.assignedByUser?.displayName || result.assignedByUser?.email || ''),
-        previewUrl,
-        priority: 'MEDIUM',
-        region: frameRegion,
-        status: result.status,
-        submissions: parsedSubmissions,
-        title: result.title,
-        updatedAt: new Date(result.updatedAt).toLocaleDateString('en-US'),
-        parent: result.parent ? {
-          id: String(result.parent.id),
-          title: result.parent.title,
-          description: result.parent.description ?? null,
-          status: result.parent.status,
-        } : null,
-      });
-    } catch {
-      if (!cancelled) {
-        setError('Unable to load this task.');
-      }
-    } finally {
-      if (!cancelled) {
-        setIsLoading(false);
-      }
+      const res = await getProjectMembers(projectId);
+      apiMembers = (res.members || []).map((m) => ({
+        id: m.id,
+        name: m.displayName || m.email,
+      }));
+    } catch (err) {
+      console.error('Failed to load project members:', err);
     }
-  };
 
-  useEffect(() => {
-    let cancelled = false;
-    void loadTask(cancelled);
-    return () => {
-      cancelled = true;
+    if (!/^\d+$/.test(taskId)) {
+      throw new Error('Task was not found in the current project workspace.');
+    }
+
+    const result = await getTaskById(taskId);
+
+    // Fetch task frames
+    let frameRegion: any = undefined;
+    try {
+      const frames = await getTaskFrames(taskId);
+      if (frames && frames.length > 0) {
+        frameRegion = {
+          startX: Number(frames[0].startX),
+          startY: Number(frames[0].startY),
+          endX: Number(frames[0].endX),
+          endY: Number(frames[0].endY),
+        };
+      }
+    } catch (err) {
+      console.error('Failed to load task frames:', err);
+    }
+
+    // Fetch preview url from material versions
+    let previewUrl = '';
+    try {
+      const versionsRes = await getFileMaterialVersions(result.fileId);
+      const rawArray = (versionsRes.data || versionsRes.versions || []) as any[];
+      const latestVersion = rawArray.find((v: any) => v.isCurrent) || rawArray[0];
+      if (latestVersion && latestVersion.materials?.length > 0) {
+        const thumbnailMaterial =
+          latestVersion.materials.find((m: any) => m.isThumbnail) || latestVersion.materials[0];
+        previewUrl = thumbnailMaterial?.downloadUrl || thumbnailMaterial?.url || '';
+      }
+    } catch (err) {
+      console.error('Failed to load file material versions for preview:', err);
+    }
+
+    // Parse submissions from description
+    const parsedSubmissions: TaskSubmission[] = [];
+    const lines = (result.description || '').split('\n');
+    lines.forEach((line: string, lineIndex: number) => {
+      const noteMatch = line.match(/\[Note:\s*([^\]]+)\]/);
+      const versionMatch = line.match(/\[version:\s*([^\]]+)\]/);
+      const reviewerMatch = line.match(/\[Reviewer:\s*([^\]]+)\]/);
+      const resultMatch = line.match(/\[Result:\s*([^\]]+)\]/);
+
+      if (noteMatch) {
+        const ver = versionMatch ? versionMatch[1] : 'v1';
+        const isLastLine = lineIndex === lines.length - 1;
+        let submissionStatus: any = 'APPROVED';
+        if (resultMatch) {
+          submissionStatus = resultMatch[1].trim();
+        } else if (result.status === 'REVIEW' && isLastLine) {
+          submissionStatus = 'PENDING_REVIEW';
+        }
+
+        parsedSubmissions.push({
+          id: `sub-parsed-${lineIndex}`,
+          assetName: `submission-${ver}.png`,
+          note: noteMatch[1].trim() + (reviewerMatch ? `\nReviewer: ${reviewerMatch[1].trim()}` : ''),
+          status: submissionStatus,
+          submittedAt: 'Date not parsed',
+          submittedBy: result.assignedByUser?.displayName || 'Assignee',
+        });
+      }
+    });
+
+    const cleanDesc = result.description ? result.description.replace(/\s*\[version:v\d+\]/g, '') : '';
+
+    const apiTask = {
+      assignee: result.assignedByUser?.displayName || result.assignedByUser?.email || 'Unassigned',
+      assigneeId: result.assignedByUser?.id || undefined,
+      description: cleanDesc,
+      dueDate: result.deadline ? new Date(result.deadline).toLocaleDateString() : 'No due date',
+      fileId: result.fileId,
+      fileTitle: result.file?.title || `File #${result.fileId}`,
+      id: String(result.id),
+      isMine: /current|sarah/i.test(result.assignedByUser?.displayName || result.assignedByUser?.email || ''),
+      previewUrl,
+      priority: 'MEDIUM' as const,
+      region: frameRegion,
+      status: result.status,
+      submissions: parsedSubmissions,
+      title: result.title,
+      updatedAt: new Date(result.updatedAt).toLocaleDateString('en-US'),
+      parent: result.parent ? {
+        id: String(result.parent.id),
+        title: result.parent.title,
+        description: result.parent.description ?? null,
+        status: result.parent.status,
+      } : null,
     };
-  }, [taskId]);
+
+    return {
+      members: apiMembers,
+      task: apiTask,
+    };
+  }, [projectId, taskId]);
+
+  const task = data?.task ?? null;
+  const members = data?.members ?? [];
+  const isLoading = isInitialLoading;
+
+  const loadTask = useCallback(async () => {
+    await reload();
+  }, [reload]);
 
   const pendingSubmission = useMemo(
     () => task?.submissions.find((submission) => submission.status === 'PENDING_REVIEW'),
     [task],
   );
+
+  const handleOpenEdit = () => {
+    if (!task) return;
+    setEditTitle(task.title);
+    setEditDescription(task.description);
+    setEditAssigneeId(task.assigneeId ? String(task.assigneeId) : '');
+    setEditStatus(task.status);
+
+    if (task.dueDate && task.dueDate !== 'No due date') {
+      const parsedDate = new Date(task.dueDate);
+      if (!isNaN(parsedDate.getTime())) {
+        const year = parsedDate.getFullYear();
+        const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
+        const day = String(parsedDate.getDate()).padStart(2, '0');
+        setEditDueDate(`${year}-${month}-${day}`);
+      } else {
+        setEditDueDate('');
+      }
+    } else {
+      setEditDueDate('');
+    }
+
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdateTaskSubmit = async () => {
+    if (!task) return;
+    setIsSavingEdit(true);
+    try {
+      let deadline: string | undefined = undefined;
+      if (editDueDate) {
+        const dateObj = new Date(editDueDate);
+        if (!isNaN(dateObj.getTime())) {
+          deadline = dateObj.toISOString();
+        }
+      }
+
+      await updateTask(task.id, {
+        title: editTitle.trim(),
+        description: editDescription.trim(),
+        status: editStatus as any,
+        assignedBy: editAssigneeId ? Number(editAssigneeId) : undefined,
+        deadline,
+      });
+
+      setIsEditDialogOpen(false);
+      await loadTask();
+      toast.success('Task updated successfully.');
+    } catch (err) {
+      console.error('Failed to update task:', err);
+      toast.error('Failed to update task. Please try again.');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleDeleteTaskSubmit = async () => {
+    if (!task) return;
+    if (!window.confirm('Are you sure you want to delete this task?')) return;
+    setIsDeleting(true);
+    try {
+      await deleteTask(task.id);
+      toast.success('Task deleted successfully.');
+      router.push(`/studio/projects/${projectId}/tasks`);
+    } catch (err) {
+      console.error('Failed to delete task:', err);
+      toast.error('Failed to delete task. Please try again.');
+      setIsDeleting(false);
+    }
+  };
 
   const handleSubmit = async (input: {
     image?: File;
@@ -207,10 +304,8 @@ export function TaskDetailClient({ projectId, taskId }: TaskDetailClientProps) {
       formData.append('taskId', String(task.id));
       await createMaterial(task.fileId, formData);
 
-      const versionsRes = await getFileMaterialVersions(task.fileId);
-      const rawArray = (versionsRes.versions || []) as any[];
-      const currentVersion = rawArray.find((version: any) => version.isCurrent) || rawArray[0];
-      const targetVersionTag = `v${currentVersion?.version ?? rawArray.length}`;
+      const taskMaterials = await getTaskMaterials(task.id);
+      const targetVersionTag = `v${(taskMaterials || []).length || 1}`;
 
       await updateTask(task.id, {
         status: 'REVIEW',
@@ -293,17 +388,37 @@ export function TaskDetailClient({ projectId, taskId }: TaskDetailClientProps) {
 
   return (
     <section className="min-h-full bg-[#091018]">
-      <header className="flex min-h-12 flex-wrap items-center gap-2 border-b border-[#26303b] bg-[#151c25] px-5 py-2 text-xs font-bold text-[#8b94a1]">
-        <Link className="flex items-center gap-2 text-[#dce7f3] hover:text-white" href={`/studio/projects/${projectId}/tasks`}>
-          <ArrowLeft className="size-4" /> Tasks
-        </Link>
-        <span>/</span>
-        <span>{task.fileTitle}</span>
-        <span>/</span>
-        <span className="min-w-0 truncate text-[#FFD369]">{task.title}</span>
+      <header className="flex min-h-12 flex-wrap items-center justify-between gap-2 border-b border-[#26303b] bg-[#151c25] px-5 py-2 text-xs font-bold text-[#8b94a1]">
+        <div className="flex flex-wrap items-center gap-2">
+          <Link className="flex items-center gap-2 text-[#dce7f3] hover:text-white" href={`/studio/projects/${projectId}/tasks`}>
+            <ArrowLeft className="size-4" /> Tasks
+          </Link>
+          <span>/</span>
+          <span>{task.fileTitle}</span>
+          <span>/</span>
+          <span className="min-w-0 truncate text-[#FFD369]">{task.title}</span>
+          <RefreshingIndicator isRefreshing={isRefreshing} />
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={handleOpenEdit}
+            className="h-8 rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 text-[10px] font-black text-white hover:bg-[#303842] hover:text-white"
+            variant="outline"
+          >
+            <Edit3 className="size-3.5 mr-1" /> Edit Task *
+          </Button>
+          <Button
+            onClick={handleDeleteTaskSubmit}
+            disabled={isDeleting}
+            className="h-8 rounded-[4px] border border-[#6b2637] bg-[#371522] px-3 text-[10px] font-black text-[#ff9ab3] hover:bg-[#4a1d2c] hover:text-[#ff9ab3]"
+            variant="outline"
+          >
+            <Trash2 className="size-3.5 mr-1" /> {isDeleting ? 'Deleting...' : 'Delete Task *'}
+          </Button>
+        </div>
       </header>
 
-      <div className="grid xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div className={`grid xl:grid-cols-[minmax(0,1fr)_340px] transition-opacity duration-200 ${isRefreshing ? 'opacity-50 pointer-events-none' : ''}`}>
         <main className="min-w-0">
           <div className="p-5 lg:p-7">
             <div className="mx-auto max-w-6xl">
@@ -453,6 +568,99 @@ export function TaskDetailClient({ projectId, taskId }: TaskDetailClientProps) {
           </section>
         </aside>
       </div>
+
+      <Dialog onOpenChange={setIsEditDialogOpen} open={isEditDialogOpen}>
+        <DialogContent
+          className="flex max-h-[88vh] max-w-2xl flex-col gap-0 overflow-hidden rounded-[7px] border border-[#39424f] bg-[#101820] p-0 text-white"
+          showCloseButton={false}
+        >
+          <DialogHeader className="shrink-0 border-b border-[#39424f] px-6 py-5">
+            <DialogTitle className="text-xl font-black text-white">Edit Task Details</DialogTitle>
+            <DialogDescription className="text-sm text-[#aeb7c2]">
+              Update this task's information, assignee, status or deadline.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
+            <label className="block">
+              <span className="text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">Title</span>
+              <input
+                className="mt-2 h-10 w-full rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 text-sm font-bold text-white outline-none placeholder:text-[#8b94a1] disabled:opacity-50"
+                disabled={isSavingEdit}
+                onChange={(event) => setEditTitle(event.target.value)}
+                placeholder="Finalize inking for Chapter 01"
+                value={editTitle}
+              />
+            </label>
+            <label className="block">
+              <span className="text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">Description</span>
+              <textarea
+                className="mt-2 h-24 w-full resize-none rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 py-3 text-sm font-bold text-white outline-none placeholder:text-[#8b94a1] disabled:opacity-50"
+                disabled={isSavingEdit}
+                onChange={(event) => setEditDescription(event.target.value)}
+                placeholder="Describe the expected production result"
+                value={editDescription}
+              />
+            </label>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label>
+                <span className="text-[10px] font-black uppercase text-[#dce7f3]">Assignee</span>
+                <select
+                  className="mt-2 h-10 w-full rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 text-xs font-bold text-white disabled:opacity-50"
+                  disabled={isSavingEdit}
+                  onChange={(event) => setEditAssigneeId(event.target.value)}
+                  value={editAssigneeId}
+                >
+                  <option value="">Unassigned</option>
+                  {members.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {member.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span className="text-[10px] font-black uppercase text-[#dce7f3]">Status</span>
+                <select
+                  className="mt-2 h-10 w-full rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 text-xs font-bold text-white disabled:opacity-50"
+                  disabled={isSavingEdit}
+                  onChange={(event) => setEditStatus(event.target.value)}
+                  value={editStatus}
+                >
+                  {(['PENDING', 'INPROGRESS', 'REVIEW', 'DONE'] as const).map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="sm:col-span-2">
+                <span className="text-[10px] font-black uppercase text-[#dce7f3]">Due Date</span>
+                <input
+                  className="mt-2 h-10 w-full rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 text-sm font-bold text-white disabled:opacity-50"
+                  disabled={isSavingEdit}
+                  onChange={(event) => setEditDueDate(event.target.value)}
+                  type="date"
+                  value={editDueDate}
+                />
+              </label>
+            </div>
+          </div>
+          <DialogFooter className="mx-0 mb-0 shrink-0 rounded-none border-[#39424f] bg-[#151c25] px-6 py-4">
+            <DialogClose asChild>
+              <Button variant="outline" disabled={isSavingEdit}>
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button
+              className="bg-[#FFD369] text-[#222831] hover:bg-[#eac04f]"
+              disabled={!editTitle.trim() || isSavingEdit}
+              onClick={handleUpdateTaskSubmit}
+            >
+              {isSavingEdit ? 'Saving...' : 'Save Changes *'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

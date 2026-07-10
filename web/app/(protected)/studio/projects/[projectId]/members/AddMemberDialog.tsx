@@ -66,13 +66,13 @@ export function AddMemberDialog({ onAdded, projectId, roles }: AddMemberDialogPr
     const normalizedQuery = searchQuery.trim().toLowerCase();
     const selectedIds = new Set(selectedUsers.map((user) => user.id));
 
+    if (!normalizedQuery) {
+      return [];
+    }
+
     return users
       .filter((user) => !selectedIds.has(user.id))
       .filter((user) => {
-        if (!normalizedQuery) {
-          return true;
-        }
-
         return [user.email, user.displayName ?? ''].some((value) =>
           value.toLowerCase().includes(normalizedQuery),
         );
@@ -201,6 +201,10 @@ export function AddMemberDialog({ onAdded, projectId, roles }: AddMemberDialogPr
                         </div>
                       ))}
                     </div>
+                  ) : !searchQuery.trim() ? (
+                    <p className="px-3 py-3 text-xs font-bold text-[#8b94a1]">
+                      Type name or email to search...
+                    </p>
                   ) : filteredUsers.length ? (
                     filteredUsers.map((user) => (
                       <button

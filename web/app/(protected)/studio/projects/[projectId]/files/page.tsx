@@ -11,9 +11,5 @@ type ProjectFilesPageProps = {
 export default async function ProjectFilesPage({ params }: ProjectFilesPageProps) {
   const { projectId } = await params;
 
-  return (
-    <Suspense fallback={<LoadingState message="Loading file workspace..." />}>
-      <FilesClient projectId={Number(projectId)} />
-    </Suspense>
-  );
+  return <FilesClient projectId={Number(projectId)} />;
 }

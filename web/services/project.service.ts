@@ -1,5 +1,7 @@
 import api from '@/lib/api';
 import type { EditorBoardResponse, UserSummaryResponse } from './editor-board.service';
+import type { ApplicationStatus, ApplicationType } from './application.service';
+
 
 export type CreateProjectPayload = {
   description?: string;
@@ -109,9 +111,9 @@ export type ProjectApplicationResponse = {
     imageUrl?: string | null;
     name: string;
   };
-  status: 'APPROVE' | 'CANCELLED' | 'PENDING' | 'REJECT';
+  status: ApplicationStatus;
   title: string;
-  type: 'MANUSCRIPT_REVIEW' | 'PUBLISH_REQUEST';
+  type: ApplicationType;
   updatedAt: string;
 };
 
@@ -228,8 +230,15 @@ export async function createProject(payload: CreateProjectPayload) {
   return response.data ?? (response as ProjectResponse);
 }
 
-export async function getProjects() {
-  const response = await api.get<ProjectsResponse, ProjectsResponse>('/projects');
+export async function getProjects(params?: {
+  name?: string;
+  page?: number;
+  limit?: number;
+  me?: boolean;
+  field?: 'createdAt' | 'updatedAt' | 'name';
+  order?: 'asc' | 'desc';
+}) {
+  const response = await api.get<ProjectsResponse, ProjectsResponse>('/projects', { params });
 
   return {
     pagination: response.pagination,

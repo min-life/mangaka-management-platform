@@ -1,22 +1,25 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import {
   BarChart3,
+  LogOut,
   Menu,
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
-  Settings,
   ShieldCheck,
   Sun,
   Users,
 } from 'lucide-react';
 
+import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -26,6 +29,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
+import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { useAdminTheme } from '../hooks/use-admin-theme';
 
@@ -35,8 +39,18 @@ const ADMIN_NAV_ICONS = {
   Dashboard: BarChart3,
   Users,
   Roles: ShieldCheck,
-  Settings,
 } as const;
+
+function getInitials(value: string) {
+  return (
+    value
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part.charAt(0).toUpperCase())
+      .join('') || 'A'
+  );
+}
 
 type AdminShellProps = {
   children: ReactNode;
@@ -46,12 +60,96 @@ type AdminShellProps = {
 export function AdminShell({ children }: AdminShellProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { theme, toggleTheme } = useAdminTheme();
+  const { user } = useAuth();
+  const displayName = user?.displayName || user?.email || 'Admin';
+  const email = user?.email ?? 'Admin Console';
+  const initials = getInitials(displayName);
 
   return (
     <div className="min-h-screen bg-[var(--admin-bg-primary)] text-[var(--admin-text-primary)] transition-colors duration-200">
+      <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-[var(--admin-border)] bg-[#222831]/95 px-4 backdrop-blur md:px-8">
+        <div className="flex items-center gap-3">
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Open admin navigation"
+                className="border-[var(--admin-border)] bg-[var(--admin-bg-secondary)] text-[var(--admin-text-primary)] hover:border-[var(--admin-accent)] hover:bg-[var(--admin-bg-secondary-hover)] lg:hidden"
+              >
+                <Menu className="size-4" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent
+              side="left"
+              className="w-72 border-[var(--admin-border)] bg-[var(--admin-bg-primary)] p-0 text-[var(--admin-text-primary)]"
+            >
+              <SheetHeader className="sr-only">
+                <SheetTitle>Admin Navigation</SheetTitle>
+                <SheetDescription>Navigation for the Inkly admin area.</SheetDescription>
+              </SheetHeader>
+              <SidebarContent isCollapsed={false} />
+            </SheetContent>
+          </Sheet>
+          <div className="flex items-center gap-4">
+            <Image
+              alt="Inkly"
+              className="h-[46px] w-auto object-contain"
+              height={46}
+              src="/brand/1.png"
+              width={128}
+            />
+            <div className="hidden h-7 w-px bg-[#434A55] sm:block" />
+            <div className="hidden leading-tight sm:block">
+              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8B93A5]">
+                Admin
+              </p>
+              <h1 className="text-[15px] font-semibold text-white">Admin Console</h1>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <NotificationBell
+            dotClassName="-right-0.5 -top-1 size-2 border-0"
+            triggerClassName="rounded-lg p-2 text-[#B8BEC8] hover:bg-[#2F3742] hover:text-white"
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleTheme}
+            className="rounded-lg text-[#B8BEC8] hover:bg-[#2F3742] hover:text-white"
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {theme === 'dark' ? <Sun className="size-5" /> : <Moon className="size-5" />}
+          </Button>
+
+          <div className="mx-2 hidden h-8 w-px bg-[#434A55] sm:block" />
+
+          <Link
+            className="flex items-center gap-3 rounded-xl px-2 py-1.5 transition hover:bg-[#2F3742]"
+            href="/user-profile"
+            title="Open admin profile"
+          >
+            <Avatar className="size-9 border border-[#FFD369]" size="lg">
+              {user?.avatarUrl ? <AvatarImage alt={displayName} src={user.avatarUrl} /> : null}
+              <AvatarFallback className="bg-[#101820] text-xs font-black text-white">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            <div className="hidden max-w-44 text-left md:block">
+              <p className="truncate text-sm font-semibold leading-none text-white">
+                {displayName}
+              </p>
+              <p className="mt-1 truncate text-[11px] font-medium text-[#8B93A5]">{email}</p>
+            </div>
+          </Link>
+        </div>
+      </header>
+
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 hidden flex-col bg-[var(--admin-bg-primary)] text-[var(--admin-text-primary)] transition-all duration-200 lg:flex z-40 border-r border-[var(--admin-border)]',
+          'fixed bottom-0 left-0 top-16 z-40 hidden flex-col border-r border-[var(--admin-border)] bg-[var(--admin-bg-primary)] text-[var(--admin-text-primary)] transition-all duration-200 lg:flex',
           isSidebarCollapsed ? 'w-20' : 'w-64',
         )}
       >
@@ -67,42 +165,6 @@ export function AdminShell({ children }: AdminShellProps) {
           isSidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64',
         )}
       >
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[var(--admin-border)] bg-[var(--admin-bg-primary)]/95 px-4 backdrop-blur md:px-8">
-          <div className="flex items-center gap-3">
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label="Open admin navigation"
-                  className="lg:hidden border-[var(--admin-border)] bg-[var(--admin-bg-secondary)] text-[var(--admin-text-primary)] hover:border-[var(--admin-accent)] hover:bg-[var(--admin-bg-secondary-hover)]"
-                >
-                  <Menu className="size-4" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-72 border-[var(--admin-border)] bg-[var(--admin-bg-primary)] p-0 text-[var(--admin-text-primary)]">
-                <SheetHeader className="sr-only">
-                  <SheetTitle>Admin Navigation</SheetTitle>
-                  <SheetDescription>Navigation for the Inkly admin area.</SheetDescription>
-                </SheetHeader>
-                <SidebarContent isCollapsed={false} />
-              </SheetContent>
-            </Sheet>
-            <div className="hidden lg:block">
-              <h1 className="text-base font-semibold text-[var(--admin-text-primary)]">Admin Console</h1>
-            </div>
-          </div>
-          
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleTheme}
-            className="text-[var(--admin-text-primary)] hover:bg-[var(--admin-bg-secondary)]"
-            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            {theme === 'dark' ? <Sun className="size-5" /> : <Moon className="size-5" />}
-          </Button>
-        </header>
         <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
           {children}
         </main>
@@ -120,26 +182,17 @@ type SidebarContentProps = {
 // Codex #admin-ui start
 function SidebarContent({ isCollapsed, onToggleCollapsed }: SidebarContentProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { logout } = useAuth();
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/login');
+  };
 
   return (
     <div className={cn('flex h-full flex-col p-4', isCollapsed && 'items-center px-3')}>
-      <div
-        className={cn(
-          'w-full border-b border-[var(--admin-border)] pb-5',
-          isCollapsed ? 'px-0' : 'px-2',
-        )}
-      >
-        <div className={cn('flex items-center gap-3', isCollapsed && 'justify-center')}>
-          <img
-            src="/brand/1.png"
-            alt="Inkly"
-            className="h-10 w-auto object-contain shrink-0"
-          />
-          <div className={cn(isCollapsed && 'hidden', 'min-w-0')}>
-            <p className="text-sm font-semibold truncate">Inkly</p>
-            <p className="text-xs text-[#aeb7c2] truncate">Admin Console</p>
-          </div>
-        </div>
+      <div className={cn('w-full pb-2', isCollapsed ? 'px-0' : 'px-2')}>
         {onToggleCollapsed ? (
           <Button
             aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -164,7 +217,7 @@ function SidebarContent({ isCollapsed, onToggleCollapsed }: SidebarContentProps)
         ) : null}
       </div>
 
-      <nav className={cn('mt-5 flex flex-1 flex-col gap-1', isCollapsed && 'w-full items-center')}>
+      <nav className={cn('mt-3 flex flex-1 flex-col gap-1', isCollapsed && 'w-full items-center')}>
         {ADMIN_NAV_ITEMS.map((item) => {
           const Icon = ADMIN_NAV_ICONS[item.label as keyof typeof ADMIN_NAV_ICONS];
           const isActive =
@@ -177,7 +230,8 @@ function SidebarContent({ isCollapsed, onToggleCollapsed }: SidebarContentProps)
               variant="ghost"
               className={cn(
                 'h-10 justify-start gap-3 rounded-lg px-3 text-[#aeb7c2] hover:bg-[var(--admin-bg-secondary)] hover:text-[var(--admin-text-primary)]',
-                isActive && 'bg-[var(--admin-accent)] text-[#222831] hover:bg-[var(--admin-accent)] hover:text-[#222831]',
+                isActive &&
+                  'bg-[var(--admin-accent)] text-[#222831] hover:bg-[var(--admin-accent)] hover:text-[#222831]',
                 isCollapsed && 'w-10 justify-center px-0',
               )}
             >
@@ -190,15 +244,19 @@ function SidebarContent({ isCollapsed, onToggleCollapsed }: SidebarContentProps)
         })}
       </nav>
 
-      <div
+      <Button
         className={cn(
-          'rounded-lg border border-[var(--admin-border)] bg-[var(--admin-bg-secondary)] p-3 text-xs text-[#aeb7c2]',
-          isCollapsed && 'hidden',
+          'mb-3 h-10 justify-start gap-3 rounded-lg px-3 text-[#aeb7c2] hover:bg-[var(--admin-bg-secondary)] hover:text-[var(--admin-text-primary)]',
+          isCollapsed && 'w-10 justify-center px-0',
         )}
+        onClick={() => void handleLogout()}
+        title="Logout"
+        type="button"
+        variant="ghost"
       >
-        <p className="font-medium text-[var(--admin-text-primary)]">Admin workspace</p>
-        <p className="mt-1 leading-5">Team access, roles, and platform controls.</p>
-      </div>
+        <LogOut className="size-4" />
+        <span className={cn(isCollapsed && 'sr-only')}>Logout</span>
+      </Button>
     </div>
   );
 }
