@@ -6,34 +6,20 @@ import Link from 'next/link';
 import {
   Check,
   CheckCheck,
-  ChevronDown,
   ChevronRight,
   FilePenLine,
-  Languages,
   Link2,
-  LogOut,
   Palette,
   Pencil,
-  Settings,
   ShieldCheck,
-  User,
   UserPlus,
   X,
 } from 'lucide-react';
 import { toast } from '@/lib/toast';
 
-import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { WorkspaceHeader } from '@/app/(protected)/studio/components/WorkspaceHeader';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
   Dialog,
   DialogContent,
@@ -44,8 +30,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { usePlatformLanguage, type PlatformLanguage } from '@/contexts/language-context';
-import { useAuth } from '@/hooks/useAuth';
 import { useRealtimeNotifications } from '@/hooks/use-realtime-notifications';
 import { clearAccessToken, getAccessToken } from '@/lib/auth-storage';
 import { cn } from '@/lib/utils';
@@ -90,66 +74,27 @@ function isSessionExpiredError(error: unknown) {
   );
 }
 
-const copy: Record<
-  PlatformLanguage,
-  {
-    accountSettings: string;
-    activityLoading: string;
-    activitySummary: string;
-    appearance: (isDark: boolean) => string;
-    assignedEditorBoards: string;
-    assignedProjects: string;
-    googleAccountLinked: string;
-    language: string;
-    linkGoogleAccount: string;
-    noActivities: string;
-    noBoards: string;
-    noProjects: string;
-    retry: string;
-    securityPassword: string;
-    viewAll: string;
-  }
-> = {
-  en: {
-    accountSettings: 'Account Settings',
-    activityLoading: 'Loading activity...',
-    activitySummary: 'Activity Summary',
-    appearance: (isDark) => `Appearance (State ${isDark ? 'Dark' : 'Light'})`,
-    assignedEditorBoards: 'Assigned Editor Boards',
-    assignedProjects: 'Assigned Projects',
-    googleAccountLinked: 'Google Account Linked',
-    language: 'Language (English/VI)',
-    linkGoogleAccount: 'Link Google Account',
-    noActivities: 'No recent activity found.',
-    noBoards: 'No assigned editor boards found.',
-    noProjects: 'No assigned projects found.',
-    retry: 'Retry',
-    securityPassword: 'Security & Password',
-    viewAll: 'View All',
-  },
-  vi: {
-    accountSettings: 'Cài đặt tài khoản',
-    activityLoading: 'Đang tải hoạt động...',
-    activitySummary: 'Tóm tắt hoạt động',
-    appearance: (isDark) => `Giao diện (${isDark ? 'Tối' : 'Sáng'})`,
-    assignedEditorBoards: 'Bảng biên tập được giao',
-    assignedProjects: 'Dự án được giao',
-    googleAccountLinked: 'Đã liên kết Google',
-    language: 'Ngôn ngữ (Tiếng Việt/EN)',
-    linkGoogleAccount: 'Liên kết tài khoản Google',
-    noActivities: 'Chưa có hoạt động gần đây.',
-    noBoards: 'Chưa có bảng biên tập được giao.',
-    noProjects: 'Chưa có dự án được giao.',
-    retry: 'Thử lại',
-    securityPassword: 'Bảo mật & mật khẩu',
-    viewAll: 'Xem tất cả',
-  },
+const text = {
+  accountSettings: 'Account Settings',
+  activityLoading: 'Loading activity...',
+  activitySummary: 'Activity Summary',
+  appearance: (isDark: boolean) => `Appearance (State ${isDark ? 'Dark' : 'Light'})`,
+  assignedEditorBoards: 'Assigned Editor Boards',
+  assignedProjects: 'Assigned Projects',
+  googleAccountLinked: 'Google Account Linked',
+  linkGoogleAccount: 'Link Google Account',
+  noActivities: 'No recent activity found.',
+  noBoards: 'No assigned editor boards found.',
+  noProjects: 'No assigned projects found.',
+  retry: 'Retry',
+  securityPassword: 'Security & Password',
+  viewAll: 'View All',
 };
 
 const themeTokens: Record<ProfileTheme, React.CSSProperties> = {
   dark: {
-    '--profile-bg': '#0e141c',
-    '--profile-header': '#080f17',
+    '--profile-bg': '#222831',
+    '--profile-header': '#222831',
     '--profile-surface': '#1a2029',
     '--profile-surface-high': '#242a33',
     '--profile-surface-highest': '#2f353e',
@@ -221,28 +166,43 @@ function ActivityTimeline({ activities }: { activities: UserActivity[] }) {
                   <Icon className="size-[14px]" />
                 </div>
               </div>
-              <div className="flex-1">
-                <div className="mb-1 flex items-start justify-between gap-3">
-                  <p className="text-[13px] font-medium leading-4 tracking-[0.02em] text-[var(--profile-title)]">
-                    {activity.title}
-                  </p>
-                  <span className="shrink-0 text-[12px] leading-[18px] text-[var(--profile-muted)]">
-                    {activity.timeLabel}
-                  </span>
-                </div>
-                <p className="text-[12px] leading-[18px] text-[var(--profile-muted)]">
-                  {activity.projectName}
-                </p>
-                {isFirst ? (
-                  <div className="mt-2 rounded border border-[var(--profile-border)]/50 bg-[var(--profile-surface-highest)] p-2 text-[12px] italic leading-[18px] text-[var(--profile-text)]">
-                    &quot;{activity.description}&quot;
-                  </div>
+              {(() => {
+                const details = (
+                  <>
+                    <div className="mb-1 flex items-start justify-between gap-3">
+                      <p className="text-[13px] font-medium leading-4 tracking-[0.02em] text-[var(--profile-title)]">
+                        {activity.title}
+                      </p>
+                      <span className="shrink-0 text-[12px] leading-[18px] text-[var(--profile-muted)]">
+                        {activity.timeLabel}
+                      </span>
+                    </div>
+                    <p className="text-[12px] leading-[18px] text-[var(--profile-muted)]">
+                      {activity.projectName}
+                    </p>
+                    {isFirst ? (
+                      <div className="mt-2 rounded border border-[var(--profile-border)]/50 bg-[var(--profile-surface-highest)] p-2 text-[12px] italic leading-[18px] text-[var(--profile-text)]">
+                        &quot;{activity.description}&quot;
+                      </div>
+                    ) : (
+                      <p className="text-[12px] leading-[18px] text-[var(--profile-muted)]">
+                        {activity.description}
+                      </p>
+                    )}
+                  </>
+                );
+
+                return activity.href ? (
+                  <Link
+                    className="flex-1 rounded-md transition-opacity hover:opacity-80"
+                    href={activity.href}
+                  >
+                    {details}
+                  </Link>
                 ) : (
-                  <p className="text-[12px] leading-[18px] text-[var(--profile-muted)]">
-                    {activity.description}
-                  </p>
-                )}
-              </div>
+                  <div className="flex-1">{details}</div>
+                );
+              })()}
             </div>
           );
         })}
@@ -393,8 +353,6 @@ function ChangePasswordDialog({
 
 export function UserProfilePage() {
   const router = useRouter();
-  const { logout } = useAuth();
-  const { language, toggleLanguage } = usePlatformLanguage();
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const { notifications } = useRealtimeNotifications(Boolean(currentUser));
   const [allActivities, setAllActivities] = useState<UserActivity[]>([]);
@@ -460,7 +418,6 @@ export function UserProfilePage() {
   }, [notifications]);
 
   const themeStyle = useMemo(() => themeTokens[theme], [theme]);
-  const text = copy[language];
   const displayName = currentUser?.displayName ?? 'Unnamed User';
   const avatarUrl = currentUser?.avatarUrl ?? '';
   const roleName = getPrimaryRole(currentUser);
@@ -630,108 +587,7 @@ export function UserProfilePage() {
         onSubmit={handleUpdatePassword}
       />
 
-      <header className="flex h-16 items-center justify-between border-b border-[#393E46] bg-[#222831] px-6">
-        {/* LEFT */}
-        <div className="flex items-center gap-4">
-          <img alt="Inkly" className="h-[50px] w-auto object-contain" src="/brand/1.png" />
-
-          <div className="h-7 w-px bg-[#434A55]" />
-
-          <div className="leading-tight">
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8B93A5]">
-              Workspace
-            </p>
-            <h1 className="text-[15px] font-semibold text-white">Profile</h1>
-          </div>
-        </div>
-
-        {/* RIGHT */}
-        <div className="flex items-center gap-2">
-          <NotificationBell />
-
-          <button
-            className="rounded-lg p-2 text-[#B8BEC8] transition hover:bg-[#2F3742] hover:text-white"
-            type="button"
-          >
-            <Settings className="size-5" />
-          </button>
-
-          <div className="mx-2 h-8 w-px bg-[#434A55]" />
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                className="flex items-center gap-4 rounded-xl px-2 py-1.5 transition hover:bg-[#2F3742]"
-                type="button"
-              >
-                {avatarUrl ? (
-                  <img
-                    alt={displayName}
-                    className="h-9 w-9 rounded-full border border-[#FFD369] object-cover"
-                    src={avatarUrl}
-                  />
-                ) : (
-                  <span className="grid h-9 w-9 place-items-center rounded-full border border-[#FFD369] bg-[#101820] text-xs font-black text-white">
-                    {initials}
-                  </span>
-                )}
-
-                <div className="hidden text-left md:block">
-                  <p className="text-sm font-semibold leading-none text-white">{displayName}</p>
-                  <p className="mt-1 text-[11px] font-medium text-[#8B93A5]">{roleName}</p>
-                </div>
-
-                <ChevronDown className="size-4 text-[#8B93A5]" />
-              </button>
-            </DropdownMenuTrigger>
-
-            <DropdownMenuContent align="end" className="w-72 border-[#393E46] bg-[#222831] text-white">
-              <DropdownMenuLabel className="py-3">
-                <div className="flex items-center gap-4">
-                  {avatarUrl ? (
-                    <img
-                      alt={displayName}
-                      className="h-10 w-10 rounded-full object-cover"
-                      src={avatarUrl}
-                    />
-                  ) : (
-                    <span className="grid h-10 w-10 place-items-center rounded-full border border-[#FFD369] bg-[#101820] text-xs font-black text-white">
-                      {initials}
-                    </span>
-                  )}
-
-                  <div>
-                    <p className="font-semibold">{displayName}</p>
-                    <p className="text-xs text-[#8B93A5]">{currentUser?.email ?? 'No email'}</p>
-                    <p className="text-[11px] font-bold text-[#FFD369]">{roleName}</p>
-                  </div>
-                </div>
-              </DropdownMenuLabel>
-
-              <DropdownMenuSeparator className="bg-[#393E46]" />
-
-              <DropdownMenuGroup>
-                <DropdownMenuItem asChild className="cursor-pointer focus:bg-[#2F3742]">
-                  <Link href="/user-profile">
-                    <User className="mr-2 size-4" />
-                    My Profile
-                  </Link>
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
-
-              <DropdownMenuSeparator className="bg-[#393E46]" />
-
-              <DropdownMenuItem
-                className="cursor-pointer text-red-400 focus:bg-[#2F3742] focus:text-red-400"
-                onClick={logout}
-              >
-                <LogOut className="mr-2 size-4" />
-                Logout
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </header>
+      <WorkspaceHeader title="Profile" />
 
       <main className="mx-auto max-w-7xl p-6 lg:p-8">
         <section className="relative mb-6 flex flex-col gap-6 overflow-hidden rounded-xl border border-[var(--profile-border)] bg-[var(--profile-surface)] p-6 md:flex-row md:items-end">
@@ -883,7 +739,6 @@ export function UserProfilePage() {
                   label={text.securityPassword}
                   onClick={() => setIsPasswordOpen(true)}
                 />
-                <SettingsButton icon={Languages} label={text.language} onClick={toggleLanguage} />
                 <SettingsButton
                   icon={Palette}
                   label={text.appearance(isDarkTheme)}

@@ -16,7 +16,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-export function WorkspaceHeader() {
+type WorkspaceHeaderProps = {
+  eyebrow?: string;
+  title?: string;
+};
+
+export function WorkspaceHeader({
+  eyebrow = 'Workspace',
+  title = 'Production Workspace',
+}: WorkspaceHeaderProps = {}) {
   const { logout, user } = useAuth();
   const displayName = user?.displayName || user?.email || 'Current user';
   const email = user?.email ?? 'No email';
@@ -42,11 +50,11 @@ export function WorkspaceHeader() {
 
         <div className="leading-tight">
           <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8B93A5]">
-            Workspace
+            {eyebrow}
           </p>
 
           <h1 className="text-[15px] font-semibold text-white">
-            Production Workspace
+            {title}
           </h1>
         </div>
       </div>
