@@ -40,7 +40,7 @@ export default function ResourcesScreen({ navigation, route }: ResourcesScreenPr
         const folders = await fetchProjectRootFolders(route.params.projectId);
         setRootFolders(folders);
       } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : 'Không thể tải resources.');
+        setErrorMessage(error instanceof Error ? error.message : 'Unable to load resources.');
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);

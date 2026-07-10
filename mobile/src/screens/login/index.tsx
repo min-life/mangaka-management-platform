@@ -26,12 +26,12 @@ export default function LoginScreen() {
 
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail || !password) {
-      setErrorMessage('Vui lòng nhập email và mật khẩu.');
+      setErrorMessage('Please enter your email and password.');
       return;
     }
 
     if (password.length < 6) {
-      setErrorMessage('Mật khẩu phải có ít nhất 6 ký tự.');
+      setErrorMessage('Password must be at least 6 characters.');
       return;
     }
 
@@ -55,7 +55,7 @@ export default function LoginScreen() {
       setIsLoading(false);
       setLoginSuccess(false);
       setErrorMessage(
-        error instanceof Error ? error.message : 'Không thể đăng nhập. Vui lòng thử lại.',
+        error instanceof Error ? error.message : 'Unable to sign in. Please try again.',
       );
     }
   };
@@ -80,9 +80,7 @@ export default function LoginScreen() {
       setIsGoogleLoading(false);
       setLoginSuccess(false);
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : 'Không thể đăng nhập bằng Google. Vui lòng thử lại.',
+        error instanceof Error ? error.message : 'Unable to sign in with Google. Please try again.',
       );
     }
   };

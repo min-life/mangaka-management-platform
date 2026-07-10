@@ -406,14 +406,18 @@ export function mapTaskCard(task: ApiTask): Task {
   const assignees = [task.assignedByUser?.avatarUrl, creatorUser(task)?.avatarUrl].filter(
     (uri): uri is string => Boolean(uri?.trim()),
   );
+  const fileId = String(task.fileId ?? task.file?.id ?? '');
+  const projectId = String(task.file?.folder?.projectId ?? task.file?.folder?.project?.id ?? '');
 
   return {
     assignees,
     dueLabel: task.deadline ? relativeDate(task.deadline) : 'No due date',
+    fileId,
     id: String(task.id),
     priority: task.status === 'REVIEW' ? 'HIGH' : task.status === 'INPROGRESS' ? 'MEDIUM' : 'LOW',
-    project: task.file?.folder?.title ?? 'Project',
-    projectId: String(task.file?.folder?.id ?? ''),
+    project:
+      task.file?.folder?.project?.name ?? task.file?.folder?.title ?? task.file?.title ?? 'Project',
+    projectId,
     status: mapTaskStatus(task.status),
     title: task.title,
   };
@@ -564,7 +568,15 @@ export function mapActivityLogTarget(
 
   if (entityType === 'PROJECT' && entityId) return { projectId: entityId, type: 'project' };
   if (entityType === 'EDITOR_BOARD' && entityId) return { boardId: entityId, type: 'board' };
-  if (entityType === 'TASK' && entityId) return { taskId: entityId, type: 'task' };
+  if (entityType === 'TASK' && entityId) {
+    return {
+      fileId,
+      initialTab: 'Tasks',
+      projectId,
+      taskId: entityId,
+      type: 'task',
+    };
+  }
   if (entityType === 'APPLICATION' && entityId) {
     return { applicationId: entityId, projectId, type: 'application' };
   }

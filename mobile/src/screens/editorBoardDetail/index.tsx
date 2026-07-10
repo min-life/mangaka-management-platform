@@ -106,7 +106,7 @@ export default function EditorBoardDetailScreen({
       setBoardProjects(bundle.projects);
       setPublishRequests(bundle.applications);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải editor board.');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load editor board.');
     } finally {
       setIsLoading(false);
     }
@@ -154,7 +154,7 @@ export default function EditorBoardDetailScreen({
     } catch (error) {
       Alert.alert(
         'Cannot leave board',
-        error instanceof Error ? error.message : 'Không thể rời editor board.',
+        error instanceof Error ? error.message : 'Unable to leave editor board.',
       );
     } finally {
       setIsLeavingBoard(false);

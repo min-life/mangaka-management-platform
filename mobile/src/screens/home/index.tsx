@@ -35,7 +35,7 @@ export default function HomeScreen() {
       setWorkItems(result.workItems);
       setActivities(result.activities);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải Home.');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load Home.');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);

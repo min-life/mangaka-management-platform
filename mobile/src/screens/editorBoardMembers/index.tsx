@@ -34,7 +34,7 @@ export default function EditorBoardMembersScreen({
       setBoard(bundle.board);
       setMembers(bundle.members);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải members.');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load members.');
     } finally {
       setIsLoading(false);
     }
@@ -69,8 +69,8 @@ export default function EditorBoardMembersScreen({
       ) : (
         <ApiStateView
           type="empty"
-          title="Không có member"
-          message="Editor board này chưa có member nào."
+          title="No members"
+          message="This editor board does not have any members yet."
         />
       )}
 

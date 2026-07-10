@@ -608,7 +608,7 @@ export function DiscussionPanel({
           style={{ backgroundColor: C.surface, borderWidth: 1, borderColor: C.border }}
         >
           <Text className="text-center text-[14px] font-semibold" style={{ color: C.text }}>
-            Không thể tải bình luận
+            Unable to load comments
           </Text>
           <Text className="mt-2 text-center text-[12px] leading-5" style={{ color: C.textMuted }}>
             {commentsErrorMessage}
@@ -620,7 +620,7 @@ export function DiscussionPanel({
             style={{ backgroundColor: C.surfaceHighest }}
           >
             <Text className="text-[12px] font-bold" style={{ color: C.text }}>
-              Thử lại
+              Try again
             </Text>
           </TouchableOpacity>
         </View>
@@ -660,8 +660,8 @@ export function DiscussionPanel({
                 }}
               >
                 <Text className="text-[12px] font-semibold" style={{ color: C.textMuted }}>
-                  Kéo lên hoặc chạm để xem {Math.min(hiddenCommentCount, COMMENT_BATCH_COUNT)} bình
-                  luận cũ
+                  Pull up or tap to view {Math.min(hiddenCommentCount, COMMENT_BATCH_COUNT)} older
+                  comments
                 </Text>
               </TouchableOpacity>
             ) : null}
@@ -705,10 +705,10 @@ export function DiscussionComposer({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const inputPlaceholder =
     activeScope === 'file'
-      ? 'Trao đổi với team về file này...'
+      ? 'Discuss this file with the team...'
       : activeScope === 'task'
-        ? 'Trao đổi với team về task này...'
-        : 'Nhận xét về frame này...';
+        ? 'Discuss this task with the team...'
+        : 'Comment on this frame...';
 
   const handleSubmit = async () => {
     if (isSubmitting || !comment.trim()) return;
@@ -720,7 +720,7 @@ export function DiscussionComposer({
       await onCreateComment(comment);
       setComment('');
     } catch (error) {
-      setSubmitErrorMessage(error instanceof Error ? error.message : 'Không thể gửi bình luận.');
+      setSubmitErrorMessage(error instanceof Error ? error.message : 'Unable to send comment.');
     } finally {
       setIsSubmitting(false);
     }
@@ -915,7 +915,7 @@ function TaskDiscussion({
       });
       setComment('');
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể gửi bình luận.');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to send comment.');
     } finally {
       setIsSubmitting(false);
     }
@@ -974,7 +974,7 @@ function TaskDiscussion({
                 }}
               >
                 <Text className="text-[12px] font-semibold" style={{ color: C.textMuted }}>
-                  Xem {Math.min(hiddenCommentCount, COMMENT_BATCH_COUNT)} bình luận cũ
+                  View {Math.min(hiddenCommentCount, COMMENT_BATCH_COUNT)} older comments
                 </Text>
               </TouchableOpacity>
             ) : null}
@@ -1004,8 +1004,8 @@ function TaskDiscussion({
               onChangeText={setComment}
               placeholder={
                 selectedFrame
-                  ? `Nhận xét về "${selectedFrame.name}"...`
-                  : 'Trao đổi với team về task này...'
+                  ? `Comment on "${selectedFrame.name}"...`
+                  : 'Discuss this task with the team...'
               }
               placeholderTextColor={C.textFaint}
               className="flex-1 py-2 text-sm"

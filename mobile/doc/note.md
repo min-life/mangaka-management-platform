@@ -100,16 +100,18 @@ Member
 
 ---
 
--Discussion : - Task không cho lướt lên
 -Material: thêm filter task
 -Project detail: 3 chấm hiển thị 3 cái edit, delete project if(project owner), else leave project
 -Contribute: đổi sọt rác thành dấu 3 chấm để thêm tính năng thay đổi role
 
--Profile: Link account gg
+Sửa các thông báo thành tiếng anh
+Inbox : - Unread sẽ nằm ngoài
+Sửa navigate
 
 ---
 
-Inbox : - Unread sẽ nằm ngoài
+-Profile: Link account gg
+-Discussion : - Task không cho lướt lên
 
 Task -> Task detail chưa cùng trang với file.
 
@@ -119,9 +121,6 @@ Up avatar thiếu env
 
 File Detail -> Overview -> thêm ngày tạo
 
-Sửa các thông báo thành tiếng anh
-
-Sửa navigate
 
 Project -> Application -> bỏ thống kê
 

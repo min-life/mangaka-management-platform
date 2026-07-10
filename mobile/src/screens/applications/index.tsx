@@ -79,7 +79,7 @@ export default function ApplicationsScreen({ navigation, route }: ApplicationsSc
         setApplications(applicationsResult.applications);
         setProjectName(projectResult?.project.name ?? null);
       } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : 'Không thể tải applications.');
+        setErrorMessage(error instanceof Error ? error.message : 'Unable to load applications.');
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);

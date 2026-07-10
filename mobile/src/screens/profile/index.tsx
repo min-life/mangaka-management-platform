@@ -58,9 +58,7 @@ export default function ProfileScreen() {
   const [activityErrorMessage, setActivityErrorMessage] = useState('');
   const [activityFilterType, setActivityFilterType] = useState<ActivityLogFilterType | null>(null);
   const [activityFilterId, setActivityFilterId] = useState<string | null>(null);
-  const [activityFilterOptions, setActivityFilterOptions] = useState(
-    EMPTY_ACTIVITY_FILTER_OPTIONS,
-  );
+  const [activityFilterOptions, setActivityFilterOptions] = useState(EMPTY_ACTIVITY_FILTER_OPTIONS);
   const [isActivityFilterLoading, setIsActivityFilterLoading] = useState(false);
   const [isActivityLoading, setIsActivityLoading] = useState(true);
   const [activeForm, setActiveForm] = useState<ActiveProfileForm>(null);
@@ -244,7 +242,7 @@ export default function ProfileScreen() {
 
       mergeUser(nextUser);
       setActiveForm(null);
-      Alert.alert('Đã cập nhật', 'Tên hiển thị đã được thay đổi.');
+      Alert.alert('Updated', 'Display name has been changed.');
       void loadActivityLogs();
     } catch (error) {
       setFormErrorMessage(
@@ -279,7 +277,7 @@ export default function ProfileScreen() {
       const avatarUrl = await uploadAvatarToCloudinary(result.assets[0]);
       const nextUser = await updateMe({ avatarUrl });
       mergeUser(nextUser);
-      Alert.alert('Đã cập nhật', 'Ảnh đại diện đã được thay đổi.');
+      Alert.alert('Updated', 'Profile photo has been changed.');
       void loadActivityLogs();
     } catch (error) {
       Alert.alert(
@@ -321,9 +319,7 @@ export default function ProfileScreen() {
       Alert.alert('Updated', 'Password has been changed.');
       void loadActivityLogs();
     } catch (error) {
-      setFormErrorMessage(
-        error instanceof Error ? error.message : 'Unable to update password.',
-      );
+      setFormErrorMessage(error instanceof Error ? error.message : 'Unable to update password.');
     } finally {
       setIsSubmittingForm(false);
     }
@@ -338,10 +334,7 @@ export default function ProfileScreen() {
       const accessToken = await getAccessToken();
       await logout(accessToken);
     } catch (error) {
-      console.warn(
-        '[ProfileScreen] Server logout failed; clearing local session.',
-        error,
-      );
+      console.warn('[ProfileScreen] Server logout failed; clearing local session.', error);
     } finally {
       disconnectRealtime();
       await clearAccessToken();
@@ -421,8 +414,8 @@ export default function ProfileScreen() {
         onClose={closeForm}
         onSubmit={handleSubmitDisplayName}
         submitLabel="Save"
-        subtitle="Cập nhật tên hiển thị trên hồ sơ của bạn."
-        title="Đổi tên"
+        subtitle="Update the display name on your profile."
+        title="Change name"
         visible={activeForm === 'displayName'}
       />
 

@@ -3,7 +3,6 @@ import { Image, Text, View } from 'react-native';
 
 import { Colors } from '@/src/constants/colors';
 
-import { LOGO_URI } from './loginConstants';
 import { BRANDING } from '@/src/constants/branding';
 
 export default function LoginBrandHeader() {
@@ -28,7 +27,7 @@ export default function LoginBrandHeader() {
       </View>
 
       <Text className="mt-4 text-center text-[24px] font-bold" style={{ color: Colors.text }}>
-        Chương Chó
+        {BRANDING.appName}
       </Text>
       <Text className="mt-2 text-center text-[14px]" style={{ color: Colors.textMuted }}>
         Sign in to continue

@@ -21,7 +21,7 @@ import LoginTextField from '@/src/screens/login/components/LoginTextField';
 type ForgotPasswordScreenProps = NativeStackScreenProps<RootStackParamList, 'ForgotPassword'>;
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const FORGOT_SUCCESS_MESSAGE = 'Nếu email tồn tại, hướng dẫn đặt lại mật khẩu đã được gửi.';
+const FORGOT_SUCCESS_MESSAGE = 'If the email exists, reset instructions have been sent.';
 
 export default function ForgotPasswordScreen({ navigation, route }: ForgotPasswordScreenProps) {
   const [email, setEmail] = useState(route.params?.email ?? '');
@@ -43,13 +43,13 @@ export default function ForgotPasswordScreen({ navigation, route }: ForgotPasswo
 
     if (!normalizedEmail) {
       setSuccessMessage('');
-      setErrorMessage('Vui lòng nhập email để đặt lại mật khẩu.');
+      setErrorMessage('Please enter your email to reset your password.');
       return;
     }
 
     if (!EMAIL_PATTERN.test(normalizedEmail)) {
       setSuccessMessage('');
-      setErrorMessage('Email không hợp lệ.');
+      setErrorMessage('Invalid email address.');
       return;
     }
 
@@ -63,8 +63,8 @@ export default function ForgotPasswordScreen({ navigation, route }: ForgotPasswo
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
       if (
-        message === 'Không thể kết nối tới API. Vui lòng kiểm tra server hoặc cấu hình URL.' ||
-        message === 'Máy chủ đang gặp sự cố. Vui lòng thử lại sau.'
+        message === 'Unable to connect to the API. Please check the server or URL config.' ||
+        message === 'The server is having an issue. Please try again later.'
       ) {
         setErrorMessage(message);
       } else {

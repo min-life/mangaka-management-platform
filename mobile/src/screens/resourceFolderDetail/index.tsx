@@ -43,7 +43,7 @@ export default function ResourceFolderDetailScreen({
       setFolder(bundle.folder);
       setFolderItems(bundle.items);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải folder.');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load folder.');
     } finally {
       setIsLoading(false);
     }

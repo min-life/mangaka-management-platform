@@ -123,7 +123,12 @@ export interface ApiFile {
   createByUser?: ApiUserSummary | null;
   createdByUser?: ApiUserSummary | null;
   description?: string | null;
-  folder?: { id: number; title: string } | null;
+  folder?: {
+    id: number;
+    project?: { id: number; imageUrl?: string | null; name: string } | null;
+    projectId?: number;
+    title: string;
+  } | null;
   folderId?: number;
   id: number;
   title: string;

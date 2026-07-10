@@ -50,15 +50,7 @@ function ReportMetric({
   );
 }
 
-function StatusRow({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: number;
-  color: string;
-}) {
+function StatusRow({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <View className="flex-row items-center py-3">
       <View className="h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
@@ -72,22 +64,16 @@ function StatusRow({
   );
 }
 
-const APPLICATION_STATUSES: ApplicationStatus[] = [
-  'PENDING',
-  'APPROVE',
-  'REJECT',
-  'CANCELLED',
-];
+const APPLICATION_STATUSES: ApplicationStatus[] = ['PENDING', 'APPROVE', 'REJECT', 'CANCELLED'];
 
 const APPLICATION_TYPES: ApplicationType[] = ['MANUSCRIPT_REVIEW', 'PUBLISH_REQUEST'];
 
-export default function ProjectReportScreen({
-  navigation,
-  route,
-}: ProjectReportScreenProps) {
+export default function ProjectReportScreen({ navigation, route }: ProjectReportScreenProps) {
   const [project, setProject] = useState<ProjectItem | null>(null);
   const [projectApplications, setProjectApplications] = useState<
-    Awaited<ReturnType<typeof import('@/src/services/applicationApi').fetchApplications>>['applications']
+    Awaited<
+      ReturnType<typeof import('@/src/services/applicationApi').fetchApplications>
+    >['applications']
   >([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
@@ -107,7 +93,7 @@ export default function ProjectReportScreen({
       setProject(bundle.project);
       setProjectApplications(applications.applications);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải report.');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load report.');
     } finally {
       setIsLoading(false);
     }
@@ -140,10 +126,7 @@ export default function ProjectReportScreen({
   }
 
   const totalTasks =
-    project.tasks.pending +
-    project.tasks.inProgress +
-    project.tasks.review +
-    project.tasks.done;
+    project.tasks.pending + project.tasks.inProgress + project.tasks.review + project.tasks.done;
   const doneTaskRate = totalTasks > 0 ? Math.round((project.tasks.done / totalTasks) * 100) : 0;
 
   return (

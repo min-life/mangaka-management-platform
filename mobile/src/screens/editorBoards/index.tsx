@@ -39,7 +39,7 @@ export default function EditorBoardsScreen({ navigation }: EditorBoardsScreenPro
       const result = await fetchEditorBoards({ name: search.trim() || undefined });
       setBoards(result.boards);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải editor boards.');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load editor boards.');
     } finally {
       setIsLoading(false);
     }

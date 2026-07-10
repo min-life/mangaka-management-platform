@@ -1,4 +1,4 @@
 export const BRANDING = {
-  appName: 'CHÓ CHƯƠNG ĂN CỨT',
-  subtitle: 'Tuất chương',
+  appName: 'Inkly',
+  subtitle: 'Production workspace',
 } as const;

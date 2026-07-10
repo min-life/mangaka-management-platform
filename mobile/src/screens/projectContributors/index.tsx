@@ -119,7 +119,7 @@ export default function ProjectContributorsScreen({
       setMembers(memberResult.members);
       setOwnerUserId(projectBundle?.project.createdBy || null);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải thành viên.');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load members.');
     } finally {
       setIsLoading(false);
     }
@@ -150,7 +150,7 @@ export default function ProjectContributorsScreen({
             } catch (error) {
               Alert.alert(
                 'Error',
-                error instanceof Error ? error.message : 'Không thể xóa thành viên.',
+                error instanceof Error ? error.message : 'Unable to remove member.',
               );
             } finally {
               setIsLoading(false);
@@ -207,8 +207,8 @@ export default function ProjectContributorsScreen({
         ) : (
           <ApiStateView
             type="empty"
-            title="Không có thành viên"
-            message="Project này chưa có thành viên phù hợp."
+            title="No members"
+            message="This project does not have matching members."
           />
         )}
       </ScrollView>

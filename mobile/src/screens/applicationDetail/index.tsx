@@ -201,7 +201,7 @@ function ApplicationDiscussion({
         style={{ backgroundColor: C.surface, borderWidth: 1, borderColor: C.border }}
       >
         <Text className="text-center text-[14px] font-semibold" style={{ color: C.text }}>
-          Không thể tải bình luận
+          Unable to load comments
         </Text>
         <Text className="mt-2 text-center text-[12px] leading-5" style={{ color: C.textMuted }}>
           {errorMessage}
@@ -213,7 +213,7 @@ function ApplicationDiscussion({
           style={{ backgroundColor: C.surfaceHighest }}
         >
           <Text className="text-[12px] font-bold" style={{ color: C.text }}>
-            Thử lại
+            Try again
           </Text>
         </TouchableOpacity>
       </View>
@@ -274,8 +274,8 @@ function ApplicationDiscussion({
                 }}
               >
                 <Text className="text-[12px] font-semibold" style={{ color: C.textMuted }}>
-                  Kéo lên hoặc chạm để xem {Math.min(hiddenCommentCount, COMMENT_BATCH_COUNT)} bình
-                  luận cũ
+                  Pull up or tap to view {Math.min(hiddenCommentCount, COMMENT_BATCH_COUNT)} older
+                  comments
                 </Text>
               </TouchableOpacity>
             ) : null}
@@ -331,7 +331,7 @@ function ApplicationDiscussionComposer({
       await onCreateComment(comment);
       setComment('');
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể gửi bình luận.');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to send comment.');
     } finally {
       setIsSubmitting(false);
     }
@@ -358,7 +358,7 @@ function ApplicationDiscussionComposer({
         <TextInput
           value={comment}
           onChangeText={setComment}
-          placeholder="Trao đổi với team về application này..."
+          placeholder="Discuss this application with the team..."
           placeholderTextColor={C.textFaint}
           className="flex-1 py-2 text-sm"
           editable={!isSubmitting}
@@ -417,7 +417,7 @@ export default function ApplicationDetailScreen({
       const result = await fetchApplication(route.params.applicationId);
       setApplication(result);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải application.');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load application.');
     } finally {
       setIsLoading(false);
     }
@@ -449,7 +449,7 @@ export default function ApplicationDetailScreen({
     } catch (error) {
       setComments([]);
       setCommentsErrorMessage(
-        error instanceof Error ? error.message : 'Không thể tải application comments.',
+        error instanceof Error ? error.message : 'Unable to load application comments.',
       );
     } finally {
       setIsCommentsLoading(false);

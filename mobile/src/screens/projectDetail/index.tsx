@@ -213,7 +213,7 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
     } catch (error) {
       Alert.alert(
         'Cannot delete project',
-        error instanceof Error ? error.message : 'Không thể xoá project.',
+        error instanceof Error ? error.message : 'Unable to delete project.',
       );
     } finally {
       setActiveProjectAction(null);
@@ -230,7 +230,7 @@ export default function ProjectDetailScreen({ navigation, route }: ProjectDetail
     } catch (error) {
       Alert.alert(
         'Cannot leave project',
-        error instanceof Error ? error.message : 'Không thể rời project.',
+        error instanceof Error ? error.message : 'Unable to leave project.',
       );
     } finally {
       setActiveProjectAction(null);

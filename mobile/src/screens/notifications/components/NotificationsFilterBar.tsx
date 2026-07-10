@@ -5,9 +5,10 @@ import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
 import { NotifFilter } from '@/src/types/notifications';
 
-const NOTIF_FILTERS: NotifFilter[] = [
+type NotificationCategoryFilter = Exclude<NotifFilter, 'Unread'>;
+
+const NOTIF_FILTERS: NotificationCategoryFilter[] = [
   'All',
-  'Unread',
   'Tasks',
   'Reviews',
   'Projects',
@@ -15,18 +16,24 @@ const NOTIF_FILTERS: NotifFilter[] = [
 ];
 
 interface NotificationsFilterBarProps {
-  activeFilter: NotifFilter;
-  onFilterChange: (filter: NotifFilter) => void;
+  activeFilter: NotificationCategoryFilter;
+  unreadCount: number;
+  unreadOnly: boolean;
+  onFilterChange: (filter: NotificationCategoryFilter) => void;
+  onUnreadOnlyChange: (active: boolean) => void;
 }
 
 export default function NotificationsFilterBar({
   activeFilter,
+  unreadCount,
+  unreadOnly,
   onFilterChange,
+  onUnreadOnlyChange,
 }: NotificationsFilterBarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const hasActiveFilter = activeFilter !== 'All';
 
-  const handleSelectFilter = (filter: NotifFilter) => {
+  const handleSelectFilter = (filter: NotificationCategoryFilter) => {
     onFilterChange(filter);
     setIsOpen(false);
   };
@@ -41,7 +48,7 @@ export default function NotificationsFilterBar({
         zIndex: isOpen ? 30 : 5,
       }}
     >
-      <View className="flex-row items-center justify-between">
+      <View className="flex-row items-center gap-2">
         <TouchableOpacity
           activeOpacity={0.76}
           accessibilityRole="button"
@@ -72,6 +79,54 @@ export default function NotificationsFilterBar({
             color={Colors.textMuted}
             size={18}
           />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={0.76}
+          accessibilityRole="button"
+          accessibilityLabel="Show unread notifications"
+          accessibilityState={{ selected: unreadOnly }}
+          className="h-10 flex-row items-center rounded-full px-3"
+          onPress={() => onUnreadOnlyChange(!unreadOnly)}
+          style={{
+            backgroundColor: unreadOnly ? Colors.surfaceContainer : Colors.surface,
+            borderColor: unreadOnly ? 'rgba(255,211,105,0.42)' : Colors.borderFaint,
+            borderWidth: 1,
+          }}
+        >
+          <MaterialIcon
+            name="mail"
+            color={unreadOnly ? Colors.accent : Colors.textMuted}
+            size={18}
+          />
+          <Text
+            className="ml-2 text-[13px] font-bold"
+            numberOfLines={1}
+            style={{ color: unreadOnly ? Colors.accent : Colors.text }}
+          >
+            Unread
+          </Text>
+          {unreadCount > 0 ? (
+            <View
+              className="ml-2 items-center justify-center rounded-full px-1.5"
+              style={{
+                backgroundColor: unreadOnly ? Colors.accent : Colors.surfaceContainer,
+                minWidth: 20,
+                height: 20,
+              }}
+            >
+              <Text
+                className="text-[10px] font-bold"
+                numberOfLines={1}
+                style={{
+                  color: unreadOnly ? Colors.bg : Colors.textMuted,
+                  fontVariant: ['tabular-nums'],
+                }}
+              >
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </Text>
+            </View>
+          ) : null}
         </TouchableOpacity>
       </View>
 
