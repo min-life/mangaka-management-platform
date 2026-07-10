@@ -59,14 +59,11 @@ export function DirectoryMembersTable({
       <Table>
         <TableHeader>
           <TableRow className="h-[40px] border-[#39424f] bg-[#222a34] hover:bg-[#222a34]">
-            <TableHead className="w-[30%] px-5 text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
+            <TableHead className="w-[35%] px-5 text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
               Member
             </TableHead>
-            <TableHead className="w-[20%] text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
+            <TableHead className="w-[25%] text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
               Project Role
-            </TableHead>
-            <TableHead className="w-[10%] pl-6 text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3] text-left">
-              Tasks
             </TableHead>
             <TableHead className="w-[18%] text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
               Joined
@@ -97,9 +94,6 @@ export function DirectoryMembersTable({
                 </TableCell>
                 <TableCell>
                   <div className="h-6 w-28 animate-pulse rounded-[3px] bg-[#1f2937]" />
-                </TableCell>
-                <TableCell className="pl-6">
-                  <div className="h-4 w-10 animate-pulse rounded-[4px] bg-[#1f2937]" />
                 </TableCell>
                 <TableCell>
                   <div className="h-4 w-24 animate-pulse rounded-[4px] bg-[#1f2937]" />
@@ -150,9 +144,6 @@ export function DirectoryMembersTable({
                   >
                     {member.role.name}
                   </Badge>
-                </TableCell>
-                <TableCell className="pl-6 text-left text-xs font-black text-[#FFD369]">
-                  {member.numberOfTasks ?? 0}
                 </TableCell>
                 <TableCell className="text-xs font-bold text-[#dce7f3]">
                   {formatOptionalDate(member.createdAt)}

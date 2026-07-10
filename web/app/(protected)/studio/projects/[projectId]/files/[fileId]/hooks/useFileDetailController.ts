@@ -468,7 +468,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
       taskComments: filteredTaskComments,
       file: mappedFile,
     };
-  }, [fileId, projectId, selectedTaskId]);
+  }, [fileId, projectId], [selectedTaskId]);
 
 
   const file = data?.file ?? null;
@@ -489,6 +489,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
   const taskComments = data?.taskComments ?? [];
   const members = data?.members ?? [];
   const isLoading = isInitialLoading || isRefreshing;
+  const isTaskContextLoading = isRefreshing;
   // Expose separately so consumers can distinguish
   // first-load (block everything) from background refresh (only overlay canvas)
 
@@ -783,6 +784,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     handleUpdateDiscussionComment,
     isLoading,
     isInitialLoading,
+    isTaskContextLoading,
     isRefreshing,
     isPanning,
     isSavingComment,

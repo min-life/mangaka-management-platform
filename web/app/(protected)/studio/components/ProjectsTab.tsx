@@ -183,8 +183,14 @@ export function ProjectsTab({
             <TableHead className="w-[220px] text-[10px] font-black uppercase tracking-[0.08em] text-[#eef6ff]">
               Editor Board
             </TableHead>
-            <TableHead className="w-[120px] text-center text-[10px] font-black uppercase tracking-[0.08em] text-[#eef6ff]">
-              Team
+            <TableHead 
+              className="w-[140px] text-[10px] font-black uppercase tracking-[0.08em] text-[#eef6ff] cursor-pointer select-none hover:text-white"
+              onClick={() => onSort('createdAt')}
+            >
+              <div className="flex items-center gap-1.5">
+                Created At
+                <SortIcon activeField={sortField} activeOrder={sortOrder} field="createdAt" />
+              </div>
             </TableHead>
             <TableHead 
               className="w-[180px] text-[10px] font-black uppercase tracking-[0.08em] text-[#eef6ff] cursor-pointer select-none hover:text-white"
@@ -262,8 +268,8 @@ export function ProjectsTab({
                 <TableCell className="text-xs font-bold text-white">
                   {project.editorBoard}
                 </TableCell>
-                <TableCell className="text-center text-xs font-bold text-white">
-                  {project.memberCount} {project.memberCount === 1 ? 'member' : 'members'}
+                <TableCell className="text-xs font-bold text-white">
+                  {project.created}
                 </TableCell>
                 <TableCell className="text-xs font-bold text-white">
                   {project.updated}

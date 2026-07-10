@@ -24,6 +24,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Table,
   TableBody,
   TableCell,
@@ -159,7 +166,7 @@ export function WorkspaceDashboard() {
   const [projectsSortField, setProjectsSortField] = useState<'name' | 'updatedAt' | 'createdAt' | undefined>(undefined);
   const [projectsSortOrder, setProjectsSortOrder] = useState<'asc' | 'desc' | undefined>(undefined);
 
-  const [boardsSortField, setBoardsSortField] = useState<'name' | 'createdAt' | undefined>(undefined);
+  const [boardsSortField, setBoardsSortField] = useState<'name' | 'updatedAt' | 'createdAt' | undefined>(undefined);
   const [boardsSortOrder, setBoardsSortOrder] = useState<'asc' | 'desc' | undefined>(undefined);
 
   const projectsResource = useAsyncResource(async () => {
@@ -268,7 +275,7 @@ export function WorkspaceDashboard() {
     setProjectsPage(1);
   };
 
-  const handleBoardsSort = (field: 'name' | 'createdAt') => {
+  const handleBoardsSort = (field: 'name' | 'updatedAt' | 'createdAt') => {
     if (boardsSortField === field) {
       if (boardsSortOrder === 'asc') {
         setBoardsSortOrder('desc');
@@ -299,6 +306,7 @@ export function WorkspaceDashboard() {
         createdBy: formatUserName(project.createdByUser),
         createdByUser: project.createdByUser,
         status: 'PENDING',
+        created: formatUpdatedAt(project.createdAt),
         updated: formatUpdatedAt(project.updatedAt),
       }))
       .filter((project) => {
@@ -323,6 +331,7 @@ export function WorkspaceDashboard() {
         image: board.imageUrl,
         projectCount: board.numberOfProjects ?? board._count?.projects ?? 0,
         createdBy: formatUserName(board.createdByUser),
+        created: formatUpdatedAt(board.createdAt),
         updated: formatUpdatedAt(board.updatedAt),
       }))
       .filter((board) => {
@@ -343,6 +352,8 @@ export function WorkspaceDashboard() {
         return {
           id: t.id,
           title: t.title,
+          projectId: t.file?.projectId,
+          fileId: t.fileId,
           file: t.file?.title || `File #${t.fileId}`,
           project: t.file?.project?.name || 'Project',
           assignee: {
@@ -556,32 +567,25 @@ export function WorkspaceDashboard() {
           </div>
 
           {activeTab === 'projects' && (
-            <div className="flex h-9 overflow-hidden rounded-[4px] border border-[#4b535f] bg-[#393E46] p-1 text-xs">
-              <button
-                className={`px-3 py-1 font-black rounded-[3px] transition ${
-                  projectsFilter === 'all' ? 'bg-[#FFD369] text-[#222831]' : 'text-[#aeb7c2] hover:bg-[#4b535f] hover:text-white'
-                }`}
-                onClick={() => {
-                  setProjectsFilter('all');
-                  setProjectsPage(1);
-                }}
-                type="button"
-              >
-                All Projects
-              </button>
-              <button
-                className={`px-3 py-1 font-black rounded-[3px] transition ${
-                  projectsFilter === 'me' ? 'bg-[#FFD369] text-[#222831]' : 'text-[#aeb7c2] hover:bg-[#4b535f] hover:text-white'
-                }`}
-                onClick={() => {
-                  setProjectsFilter('me');
-                  setProjectsPage(1);
-                }}
-                type="button"
-              >
-                Created by Me
-              </button>
-            </div>
+            <Select
+              value={projectsFilter}
+              onValueChange={(val: 'all' | 'me') => {
+                setProjectsFilter(val);
+                setProjectsPage(1);
+              }}
+            >
+              <SelectTrigger className="h-9 w-40 rounded-[4px] border-[#4b535f] bg-[#101820] text-xs font-bold text-white focus:ring-0">
+                <SelectValue placeholder="Filter..." />
+              </SelectTrigger>
+              <SelectContent className="border-[#39424f] bg-[#151c25] text-white">
+                <SelectItem value="all" className="text-xs font-bold focus:bg-[#303842] focus:text-white">
+                  All Projects
+                </SelectItem>
+                <SelectItem value="me" className="text-xs font-bold focus:bg-[#303842] focus:text-white">
+                  Created by Me
+                </SelectItem>
+              </SelectContent>
+            </Select>
           )}
 
           {activeTab === 'editorBoards' && (

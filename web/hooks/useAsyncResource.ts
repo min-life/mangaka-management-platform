@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 
-export function useAsyncResource<T>(fetcher: () => Promise<T>, deps: any[] = []) {
+export function useAsyncResource<T>(fetcher: () => Promise<T>, deps: any[] = [], softRefreshDeps: any[] = []) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -73,6 +73,14 @@ export function useAsyncResource<T>(fetcher: () => Promise<T>, deps: any[] = [])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
+  // Soft refresh cho các dependency phụ (không gây trắng trang)
+  useEffect(() => {
+    if (hasLoadedRef.current) {
+      void load(true).catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, softRefreshDeps);
+
   return {
     data,
     setData,
@@ -80,6 +88,6 @@ export function useAsyncResource<T>(fetcher: () => Promise<T>, deps: any[] = [])
     setError,
     isInitialLoading,
     isRefreshing,
-    reload: () => load(true)
+    reload: useCallback(() => load(true), [load]),
   };
 }

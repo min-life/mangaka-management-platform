@@ -51,9 +51,9 @@ type EditorBoardsTabProps = {
   totalPages: number;
   onPageChange: (page: number) => void;
   onLimitChange: (limit: number) => void;
-  sortField?: 'name' | 'createdAt';
+  sortField?: 'name' | 'updatedAt' | 'createdAt';
   sortOrder?: 'asc' | 'desc';
-  onSort: (field: 'name' | 'createdAt') => void;
+  onSort: (field: 'name' | 'updatedAt' | 'createdAt') => void;
 };
 
 export function EditorBoardsTab({
@@ -78,7 +78,7 @@ export function EditorBoardsTab({
         <TableHeader>
           <TableRow className="h-[40px] border-[#393E46] bg-[#252e38] hover:bg-[#252e38]">
             <TableHead 
-              className="w-[45%] px-5 text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3] cursor-pointer select-none hover:text-white"
+              className="w-[35%] px-5 text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3] cursor-pointer select-none hover:text-white"
               onClick={() => onSort('name')}
             >
               <div className="flex items-center gap-1.5">
@@ -97,8 +97,17 @@ export function EditorBoardsTab({
               onClick={() => onSort('createdAt')}
             >
               <div className="flex items-center gap-1.5">
-                Last Updated
+                Created At
                 <SortIcon activeField={sortField} activeOrder={sortOrder} field="createdAt" />
+              </div>
+            </TableHead>
+            <TableHead 
+              className="w-[180px] text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3] cursor-pointer select-none hover:text-white"
+              onClick={() => onSort('updatedAt')}
+            >
+              <div className="flex items-center gap-1.5">
+                Last Updated
+                <SortIcon activeField={sortField} activeOrder={sortOrder} field="updatedAt" />
               </div>
             </TableHead>
             <TableHead className="w-[90px] pr-5 text-right text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
@@ -109,7 +118,7 @@ export function EditorBoardsTab({
         <TableBody>
           {isLoadingBoards ? (
             <TableRow>
-              <TableCell colSpan={5} className="h-40 text-center">
+              <TableCell colSpan={6} className="h-40 text-center">
                 <div className="flex flex-col items-center justify-center space-y-3">
                   <Loader2 className="size-6 animate-spin text-[#FFD369]" />
                   <span className="text-xs font-bold text-[#8b94a1]">Loading editor boards...</span>
@@ -118,7 +127,7 @@ export function EditorBoardsTab({
             </TableRow>
           ) : boardRows.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={5} className="h-40 text-center text-xs font-bold text-[#8b94a1]">
+              <TableCell colSpan={6} className="h-40 text-center text-xs font-bold text-[#8b94a1]">
                 No editor boards found.
               </TableCell>
             </TableRow>
@@ -159,6 +168,9 @@ export function EditorBoardsTab({
                 </TableCell>
                 <TableCell className="text-xs font-bold text-white">
                   {board.projectCount} {board.projectCount === 1 ? 'project' : 'projects'}
+                </TableCell>
+                <TableCell className="text-xs font-bold text-white">
+                  {board.created}
                 </TableCell>
                 <TableCell className="text-xs font-bold text-white">
                   {board.updated}

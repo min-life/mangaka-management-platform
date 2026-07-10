@@ -67,6 +67,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
     handleMarkReadyForReview,
     handleUpdateDiscussionComment,
     isLoading,
+    isTaskContextLoading,
     isPanning,
     isSavingComment,
     isSubmittingReview,
@@ -178,6 +179,15 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
 
 
               <FileCanvas controller={controller} />
+              
+              {isTaskContextLoading && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#091018]/60 backdrop-blur-[2px]">
+                  <div className="flex flex-col items-center">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#39424f] border-t-[#FFD369]"></div>
+                    <span className="mt-3 text-xs font-black text-[#aeb7c2]">Loading context...</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

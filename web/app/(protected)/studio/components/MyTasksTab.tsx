@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -10,6 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { getFileById } from '@/services/file.service';
+import { toast } from '@/lib/toast';
 
 const taskStatusClassName: Record<string, string> = {
   DONE: 'border-[#315846] bg-[#14291f] text-[#9df2c7]',
@@ -55,6 +58,8 @@ export function MyTasksTab({
   onPageChange,
   onLimitChange,
 }: MyTasksTabProps) {
+  const router = useRouter();
+
   return (
     <section className="mt-5 overflow-hidden rounded-[7px] border border-[#393E46] bg-[#0c1219]">
       <Table>
@@ -99,8 +104,25 @@ export function MyTasksTab({
           ) : (
             mappedTasks.map((task) => (
               <TableRow
-                className="h-[72px] border-l-4 border-l-transparent border-r-0 border-t-0 border-b-[#393E46] bg-[#0b1118] hover:border-l-[#FFD369] hover:bg-[#202832]"
+                className="h-[72px] cursor-pointer border-l-4 border-l-transparent border-r-0 border-t-0 border-b-[#393E46] bg-[#0b1118] hover:border-l-[#FFD369] hover:bg-[#202832]"
                 key={task.id}
+                onClick={async () => {
+                  try {
+                    let projectId = task.projectId;
+                    if (!projectId && task.fileId) {
+                      const file = await getFileById(task.fileId);
+                      projectId = (file as any).folder?.project?.id;
+                    }
+                    if (projectId) {
+                      router.push(`/studio/projects/${projectId}/files/${task.fileId}?taskId=${task.id}&from=tasks`);
+                    } else {
+                      toast.error('Could not find project for this task.');
+                    }
+                  } catch (err) {
+                    console.error('Failed to navigate to task', err);
+                    toast.error('Failed to load task details.');
+                  }
+                }}
               >
                 <TableCell className="px-5">
                   <div>

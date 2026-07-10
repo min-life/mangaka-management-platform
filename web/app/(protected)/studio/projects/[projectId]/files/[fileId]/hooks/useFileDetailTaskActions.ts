@@ -87,7 +87,7 @@ export function useFileDetailTaskActions({
         deadline: deadline,
         assignedBy: options?.assignedBy,
         parentId: options?.parentId,
-        cloneBaseMaterial: !!task.region,
+        cloneBaseMaterial: true,
       });
 
       const newTaskId = createdTaskRes?.id;

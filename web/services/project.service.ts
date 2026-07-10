@@ -207,7 +207,7 @@ function normalizeProjectMember(member: ProjectMemberApiResponse): ProjectMember
   if ('user' in member) {
     return {
       avatarUrl: member.user.avatarUrl ?? null,
-      createdAt: member.createdAt,
+      createdAt: member.user.createdAt ?? member.createdAt,
       displayName: member.user.displayName ?? null,
       email: member.user.email ?? '',
       id: member.user.id,

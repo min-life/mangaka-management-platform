@@ -318,12 +318,13 @@ export function FileCanvas({ controller }: FileCanvasProps) {
                 src={displayedPreviewUrl}
                 className="hidden"
                 onLoad={() => setLoadedImageUrl(displayedPreviewUrl)}
+                onError={() => setLoadedImageUrl(displayedPreviewUrl)}
                 alt="preload"
               />
               
               <div
                 className={`w-full h-full absolute inset-0 transition-all duration-300 ${
-                  loadedImageUrl !== displayedPreviewUrl || isLoading || isRefreshing
+                  loadedImageUrl !== displayedPreviewUrl || isLoading
                     ? 'opacity-30 blur-[2px] grayscale-[0.5]'
                     : 'opacity-100'
                 }`}
@@ -335,7 +336,7 @@ export function FileCanvas({ controller }: FileCanvasProps) {
                 }}
               />
               
-              {(loadedImageUrl !== displayedPreviewUrl || isLoading || isRefreshing) && (
+              {(loadedImageUrl !== displayedPreviewUrl || isLoading) && (
                 <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
                   <div className="flex flex-col items-center gap-3 bg-[#0d151e]/80 p-4 rounded-lg shadow-2xl backdrop-blur-sm border border-[#39424f]">
                     <Loader2 className="size-8 animate-spin text-[#FFD369]" />
