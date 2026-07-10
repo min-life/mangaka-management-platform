@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -8,7 +9,10 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -16,6 +20,7 @@ import {
   ApiOperation,
   ApiParam,
   ApiTags,
+  ApiConsumes,
 } from '@nestjs/swagger';
 import { CurrentUser, Permissions } from '../share/decorators';
 import type { JwtPayload } from '../auth/interfaces';
@@ -77,6 +82,29 @@ export class FoldersController {
     return {
       data: folder,
     };
+  }
+
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['project:folder.update', 'project:owner'],
+    resource: 'FOLDER',
+  })
+  @ApiOperation({ summary: 'Upload folder image' })
+  @ApiParam({ name: 'id', type: Number, description: 'Folder id' })
+  @ApiConsumes('multipart/form-data')
+  @ApiOkResponse({ description: 'Folder image updated successfully', type: FolderResponseDto })
+  @Patch(':id/image')
+  @UseInterceptors(FileInterceptor('image'))
+  async uploadFolderImage(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() currentUser: JwtPayload,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Image file is required');
+    }
+    const folder = await this.foldersService.uploadFolderImage(id, file, currentUser.userId);
+    return { data: folder };
   }
 
   @Permissions({

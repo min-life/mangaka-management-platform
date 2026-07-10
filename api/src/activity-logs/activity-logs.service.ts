@@ -226,7 +226,7 @@ export class ActivityLogsService {
 
       return {
         data,
-        meta: {
+        pagination: {
           total,
           page,
           limit,

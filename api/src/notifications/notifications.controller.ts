@@ -1,9 +1,9 @@
-import { Controller, Get, Patch, Param, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Patch, Param, ParseIntPipe, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../share/decorators';
 import type { JwtPayload } from '../auth/interfaces';
 import { NotificationsService } from './notifications.service';
-import { NotificationsResponseDto, NotificationResponseDto } from './dto';
+import { NotificationsResponseDto, NotificationResponseDto, QueryNotificationsReqDto } from './dto';
 import { SuccessResponseDto } from '../projects/dto/project.res.dto';
 
 @ApiTags('Notifications')
@@ -15,8 +15,11 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Get current user notifications' })
   @ApiOkResponse({ description: 'Return list of notifications', type: NotificationsResponseDto })
   @Get()
-  async getNotifications(@CurrentUser() currentUser: JwtPayload) {
-    return this.notificationsService.getNotifications(currentUser.userId);
+  async getNotifications(
+    @CurrentUser() currentUser: JwtPayload,
+    @Query() query: QueryNotificationsReqDto,
+  ) {
+    return this.notificationsService.getNotifications(currentUser.userId, query);
   }
 
   @ApiOperation({ summary: 'Get unread notification count' })

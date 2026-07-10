@@ -25,6 +25,9 @@ import { ActivityLogsModule } from './activity-logs/activity-logs.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { RedisModule } from './redis/redis.module';
+import { AwsS3Module } from './share/services/aws-s3.module';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { PresignUrlInterceptor } from './share/interceptors/presign-url.interceptor';
 
 @Module({
   imports: [
@@ -51,6 +54,7 @@ import { RedisModule } from './redis/redis.module';
     NotificationsModule,
     RealtimeModule,
     RedisModule,
+    AwsS3Module,
   ],
   controllers: [AppController],
   providers: [
@@ -62,6 +66,10 @@ import { RedisModule } from './redis/redis.module';
     {
       provide: APP_GUARD,
       useClass: PermissionGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: PresignUrlInterceptor,
     },
     AccessTokenStrategy,
     RefreshTokenStrategy,

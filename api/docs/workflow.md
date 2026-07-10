@@ -1826,6 +1826,36 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 
 ---
 
+### Upload folder image
+**PATCH** `/api/folders/{id}/image`
+
+#### Chức năng
+Upload ảnh bìa cho folder. Ảnh sẽ được đẩy lên AWS S3 và hệ thống sẽ lưu lại URL vào `imageUrl` của folder.
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Folder id |
+
+#### Request Body (multipart/form-data)
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `image` | `file` | `Yes` | File ảnh cần upload |
+
+#### Responses
+- **200**: Folder image updated successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `object` | Thông tin Folder đã được cập nhật `imageUrl` |
+
+#### Ràng buộc
+- Yêu cầu permission `project:folder.update` hoặc `project:owner`.
+- `image` là trường bắt buộc và phải là định dạng file hợp lệ.
+
+---
+
 ### Delete folder 
 **DELETE** `/api/folders/{id}`
 
@@ -2390,6 +2420,8 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
   | `data` | `string` |  |
 
 #### Ràng buộc
+- **Trạng thái `DONE`**: Yêu cầu user đang thao tác phải là người tạo task hoặc Project Owner.
+- **Trạng thái khác (`REVIEW`, `INPROGRESS`...)**: Yêu cầu user đang thao tác phải là người tạo, người được phân công (assignee), hoặc Project Owner.
 - Yêu cầu xác thực JWT. Người dùng phải có quyền `project:owner`.
 
 ---
