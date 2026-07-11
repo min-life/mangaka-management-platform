@@ -62,6 +62,7 @@ export interface ResourceFileTask {
 export interface ResourceFileMaterialVersion {
   id: string;
   fileId: string;
+  hasDetail?: boolean;
   materials: {
     title: string;
     note?: string;
@@ -70,6 +71,9 @@ export interface ResourceFileMaterialVersion {
     pages?: Array<{ index: number; url: string }>;
     editorState?: Record<string, unknown>;
   };
+  sourceCount?: number;
+  taskId?: string;
+  taskTitle?: string;
   createdBy?: string;
   createdByName?: string;
   updatedBy?: string;

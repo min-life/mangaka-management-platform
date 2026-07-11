@@ -192,23 +192,33 @@ export function mapProjectMember(member: ApiProjectMember): ProjectMemberItem {
   };
 }
 
-export function mapEditorBoard(board: ApiEditorBoard): EditorBoardItem {
+export function mapEditorBoard(
+  board: ApiEditorBoard,
+  extras: { currentUserRole?: EditorBoardItem['currentUserRole'] } = {},
+): EditorBoardItem {
   if (!board) {
     throw new Error('Editor board response is missing.');
   }
 
+  const creator = displayName(creatorUser(board));
+  const imageUrl = board.imageUrl ?? board.image_url ?? undefined;
+  const projectCount = board.numberOfProjects ?? board._count?.projects ?? 0;
+  const updatedByName = board.updatedByUser ? displayName(board.updatedByUser) : creator;
+
   return {
     createdBy: creatorId(board),
-    currentUserRole: 'Member',
+    createdByName: creator,
+    createdAtLabel: absoluteDate(board.createdAt),
+    currentUserRole: extras.currentUserRole ?? 'Member',
     description: board.description ?? 'Editor board workspace.',
     id: String(board.id),
+    imageUrl,
     leadMemberId: creatorId(board),
     memberIds: Array.from({ length: board._count?.members ?? 0 }, (_, index) => `member-${index}`),
     name: board.name,
-    projectIds: Array.from(
-      { length: board._count?.projects ?? 0 },
-      (_, index) => `project-${index}`,
-    ),
+    projectCount,
+    projectIds: Array.from({ length: projectCount }, (_, index) => `project-${index}`),
+    updatedByName,
     updatedAtLabel: `Updated ${relativeDate(board.updatedAt)}`,
   };
 }
@@ -216,6 +226,7 @@ export function mapEditorBoard(board: ApiEditorBoard): EditorBoardItem {
 export function mapBoardMember(item: {
   user?: ApiUserSummary;
   isLead?: boolean;
+  joinedAt?: string;
 }): EditorBoardMember {
   const user = item.user;
   const name = displayName(user);
@@ -224,7 +235,9 @@ export function mapBoardMember(item: {
     email: user?.email ?? '',
     id: String(user?.id ?? name),
     initials: initials(name),
-    joinedAtLabel: item.isLead ? 'Lead member' : 'Board member',
+    joinedAtLabel: item.joinedAt
+      ? `Joined ${absoluteDate(item.joinedAt)}`
+      : 'Joined date unavailable',
     name,
     role: item.isLead ? 'Lead' : 'Member',
   };
@@ -265,6 +278,8 @@ export function mapApplication(application: ApiApplication): ApplicationItem {
       application.projectId ??
         (application.project && 'id' in application.project ? application.project.id : ''),
     ),
+    projectName:
+      application.project && 'name' in application.project ? application.project.name : undefined,
     status: normalizeApplicationStatus(application.status),
     title: application.title,
     type: application.type,
@@ -333,12 +348,15 @@ export function materialImage(material?: Record<string, unknown> | Array<Record<
 
 export function mapMaterialVersion(material: ApiMaterial): ResourceFileMaterialVersion {
   const raw = material.materials ?? {};
+  const rawSources = Array.isArray(raw) ? raw : [];
+  const taskId = material.taskId ?? material.task?.id;
 
   return {
     createdAt: material.createdAt,
     createdBy: creatorId(material),
     createdByName: displayName(creatorUser(material)),
     fileId: String(material.fileId ?? material.file?.id ?? ''),
+    hasDetail: material.materials !== undefined,
     id: String(material.id),
     materials: {
       editorState:
@@ -356,6 +374,9 @@ export function mapMaterialVersion(material: ApiMaterial): ResourceFileMaterialV
         material.name ??
         (isRecord(raw) && typeof raw.title === 'string' ? raw.title : `Material ${material.id}`),
     },
+    sourceCount: rawSources.length || undefined,
+    taskId: taskId === undefined || taskId === null ? undefined : String(taskId),
+    taskTitle: material.task?.title ?? undefined,
     updatedAt: material.updatedAt,
     updatedBy: String(material.updatedBy ?? material.updatedByUser?.id ?? ''),
     updatedByName: displayName(material.updatedByUser),

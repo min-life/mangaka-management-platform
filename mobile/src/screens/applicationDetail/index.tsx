@@ -21,6 +21,7 @@ import {
   createApplicationComment,
   fetchApplication,
   fetchApplicationComments,
+  fetchLeadApplicationVoteCount,
 } from '@/src/services/applicationApi';
 import { mapComment } from '@/src/services/mappers';
 import { subscribeToComments } from '@/src/services/realtimeClient';
@@ -54,7 +55,19 @@ function visibleCountForHighlight(comments: ResourceTaskComment[], highlightedCo
   return Math.max(INITIAL_COMMENT_COUNT, comments.length - highlightedIndex);
 }
 
-function ApplicationOverview({ application }: { application: ApplicationItem }) {
+function ApplicationOverview({
+  application,
+  isVoteCountLoading,
+  voteCount,
+  voteCountErrorMessage,
+}: {
+  application: ApplicationItem;
+  isVoteCountLoading: boolean;
+  voteCount: number | null;
+  voteCountErrorMessage: string;
+}) {
+  const shouldShowVoteCount = Boolean(voteCount !== null || voteCountErrorMessage);
+
   return (
     <View
       className="mt-6 rounded-2xl p-5"
@@ -92,6 +105,52 @@ function ApplicationOverview({ application }: { application: ApplicationItem }) 
           </Text>
         </View>
       </View>
+
+      {shouldShowVoteCount ? (
+        <View
+          className="mt-5 flex-row items-center justify-between rounded-xl px-4 py-3"
+          style={{
+            backgroundColor: Colors.surfaceContainer,
+            borderWidth: 1,
+            borderColor: Colors.borderSubtle,
+          }}
+        >
+          <View className="flex-row items-center gap-3">
+            <View
+              className="h-9 w-9 items-center justify-center rounded-lg"
+              style={{ backgroundColor: Colors.iconBg }}
+            >
+              <MaterialIcon name="how_to_vote" color={Colors.accent} size={18} />
+            </View>
+            <View>
+              <Text
+                className="text-[11px] font-bold uppercase"
+                style={{ color: Colors.textFaint }}
+              >
+                Votes
+              </Text>
+              <Text className="mt-0.5 text-[13px] font-semibold" style={{ color: Colors.text }}>
+                Board lead view
+              </Text>
+            </View>
+          </View>
+
+          {isVoteCountLoading ? (
+            <ActivityIndicator color={Colors.accent} size="small" />
+          ) : voteCountErrorMessage ? (
+            <Text
+              className="text-right text-[12px] font-semibold"
+              style={{ color: Colors.textMuted }}
+            >
+              Unavailable
+            </Text>
+          ) : (
+            <Text className="text-[22px] font-black" style={{ color: Colors.text }}>
+              {voteCount}
+            </Text>
+          )}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -403,6 +462,9 @@ export default function ApplicationDetailScreen({
   const [isCommentsLoading, setIsCommentsLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
+  const [voteCount, setVoteCount] = useState<number | null>(null);
+  const [isVoteCountLoading, setIsVoteCountLoading] = useState(false);
+  const [voteCountErrorMessage, setVoteCountErrorMessage] = useState('');
   const scrollViewRef = useRef<ScrollView | null>(null);
   const didScrollToInitialCommentRef = useRef(false);
   const didScrollToLatestDiscussionRef = useRef(false);
@@ -426,6 +488,42 @@ export default function ApplicationDetailScreen({
   useEffect(() => {
     void loadApplication();
   }, [loadApplication]);
+
+  useEffect(() => {
+    if (!application?.id || !application.projectId) {
+      setVoteCount(null);
+      setVoteCountErrorMessage('');
+      setIsVoteCountLoading(false);
+      return undefined;
+    }
+
+    let isActive = true;
+    setVoteCount(null);
+    setVoteCountErrorMessage('');
+    setIsVoteCountLoading(true);
+
+    void fetchLeadApplicationVoteCount({
+      applicationId: application.id,
+      projectId: application.projectId,
+    })
+      .then((result) => {
+        if (!isActive) return;
+        setVoteCount(result.canViewVotes ? result.voteCount : null);
+        setVoteCountErrorMessage('');
+      })
+      .catch((error) => {
+        if (!isActive) return;
+        setVoteCount(null);
+        setVoteCountErrorMessage(error instanceof Error ? error.message : 'Unable to load votes.');
+      })
+      .finally(() => {
+        if (isActive) setIsVoteCountLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [application?.id, application?.projectId]);
 
   const addDiscussionComment = useCallback((comment: ApiComment) => {
     const nextComment = mapComment(comment);
@@ -557,7 +655,14 @@ export default function ApplicationDetailScreen({
             tabs={APPLICATION_DETAIL_TABS}
           />
 
-          {activeTab === 'Overview' ? <ApplicationOverview application={application} /> : null}
+          {activeTab === 'Overview' ? (
+            <ApplicationOverview
+              application={application}
+              isVoteCountLoading={isVoteCountLoading}
+              voteCount={voteCount}
+              voteCountErrorMessage={voteCountErrorMessage}
+            />
+          ) : null}
 
           {activeTab === 'Discussion' ? (
             <ApplicationDiscussion

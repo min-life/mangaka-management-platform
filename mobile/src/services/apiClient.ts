@@ -112,6 +112,10 @@ function getErrorMessage(status: number, body?: ApiErrorBody) {
   return 'Unable to load data. Please try again.';
 }
 
+function isMissingCurrentUserError(status: number, body?: ApiErrorBody) {
+  return (status === 401 || status === 404) && getErrorMessage(status, body) === 'User is not exist';
+}
+
 async function performApiFetch(
   path: string,
   options: RequestOptions = {},
@@ -208,6 +212,7 @@ async function requestWithAuth<T>(
   accessTokenOverride?: string | null,
 ): Promise<T> {
   const { body, response } = await performApiFetch(path, options, accessTokenOverride);
+  const errorBody = body as ApiErrorBody | undefined;
 
   if (response.ok) {
     if (
@@ -220,6 +225,11 @@ async function requestWithAuth<T>(
     return body as T;
   }
 
+  if (isMissingCurrentUserError(response.status, errorBody)) {
+    await handleSessionExpired();
+    throw new ApiClientError(getErrorMessage(response.status, errorBody), response.status);
+  }
+
   if (isPostEndpoint(path, options, AUTH_REFRESH_PATH)) {
     await handleSessionExpired();
   }
@@ -230,7 +240,7 @@ async function requestWithAuth<T>(
       return requestWithAuth<T>(path, options, true, refreshedAccessToken);
     } catch {
       await handleSessionExpired();
-      throw new ApiClientError(getErrorMessage(response.status, body as ApiErrorBody), response.status);
+      throw new ApiClientError(getErrorMessage(response.status, errorBody), response.status);
     }
   }
 
@@ -238,7 +248,7 @@ async function requestWithAuth<T>(
     await handleSessionExpired();
   }
 
-  throw new ApiClientError(getErrorMessage(response.status, body as ApiErrorBody), response.status);
+  throw new ApiClientError(getErrorMessage(response.status, errorBody), response.status);
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {

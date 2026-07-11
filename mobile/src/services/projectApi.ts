@@ -173,6 +173,18 @@ export async function removeProjectMember(projectId: string, userId: string) {
   });
 }
 
+export async function updateProjectMemberRole(projectId: string, userId: string, roleId: number) {
+  const response = await apiRequest<ApiDataResponse<ApiProjectMember>>(
+    `/projects/${projectId}/members/${userId}`,
+    {
+      body: { roleId },
+      method: 'PATCH',
+    },
+  );
+
+  return response.data ? mapProjectMember(response.data) : null;
+}
+
 export async function fetchDefaultProjectRoleId(): Promise<number> {
   const projectRoles = await fetchProjectRoles();
   const defaultRole = projectRoles.find((role) => role.isDefault === true) ?? projectRoles[0];

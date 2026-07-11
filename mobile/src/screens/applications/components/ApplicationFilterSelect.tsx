@@ -27,20 +27,17 @@ export default function ApplicationFilterSelect<TStatus extends string, TType ex
   onStatusChange,
   onTypeChange,
 }: ApplicationFilterSelectProps<TStatus, TType>) {
-  const [isOpen, setIsOpen] = React.useState(false);
+  const [openFilter, setOpenFilter] = React.useState<'status' | 'type' | null>(null);
   const activeStatus = statusOptions.find((option) => option.value === statusValue);
   const activeType = typeOptions.find((option) => option.value === typeValue);
   const isStatusFiltered = statusValue !== statusOptions[0]?.value;
   const isTypeFiltered = typeValue !== typeOptions[0]?.value;
-  const isFiltered = isStatusFiltered || isTypeFiltered;
-  const activeLabel =
-    isStatusFiltered && isTypeFiltered
-      ? '2 filters'
-      : isStatusFiltered
-        ? (activeStatus?.shortLabel ?? activeStatus?.label ?? 'Status')
-        : isTypeFiltered
-          ? (activeType?.shortLabel ?? activeType?.label ?? 'Type')
-          : 'All';
+  const statusLabel = isStatusFiltered
+    ? (activeStatus?.shortLabel ?? activeStatus?.label ?? 'Status')
+    : 'Status';
+  const typeLabel = isTypeFiltered
+    ? (activeType?.shortLabel ?? activeType?.label ?? 'Type')
+    : 'Type';
 
   const renderOption = <T extends string>(
     group: string,
@@ -56,7 +53,7 @@ export default function ApplicationFilterSelect<TStatus extends string, TType ex
         activeOpacity={0.72}
         onPress={() => {
           onChange(option.value);
-          setIsOpen(false);
+          setOpenFilter(null);
         }}
         accessibilityRole="button"
         accessibilityState={{ selected: isActive }}
@@ -74,77 +71,103 @@ export default function ApplicationFilterSelect<TStatus extends string, TType ex
     );
   };
 
-  return (
-    <View className="relative" style={{ zIndex: isOpen ? 30 : 1 }}>
-      <TouchableOpacity
-        activeOpacity={0.76}
-        onPress={() => setIsOpen((current) => !current)}
-        accessibilityRole="button"
-        accessibilityLabel="Select application filter"
-        accessibilityValue={{ text: activeLabel }}
-        className="h-11 flex-row items-center justify-center rounded-lg px-3"
-        style={{
-          backgroundColor: Colors.surface,
-          borderWidth: 1,
-          borderColor: isFiltered ? Colors.accent : Colors.borderFaint,
-          minWidth: 118,
-        }}
+  const renderFilterButton = ({
+    isFiltered,
+    isOpen,
+    label,
+    type,
+  }: {
+    isFiltered: boolean;
+    isOpen: boolean;
+    label: string;
+    type: 'status' | 'type';
+  }) => (
+    <TouchableOpacity
+      activeOpacity={0.76}
+      onPress={() => setOpenFilter((current) => (current === type ? null : type))}
+      accessibilityRole="button"
+      accessibilityLabel={`Select application ${type} filter`}
+      accessibilityState={{ expanded: isOpen, selected: isFiltered }}
+      accessibilityValue={{ text: label }}
+      className="h-10 flex-row items-center rounded-full px-3"
+      style={{
+        backgroundColor: isOpen || isFiltered ? Colors.surfaceContainer : Colors.surface,
+        borderWidth: 1,
+        borderColor: isFiltered ? 'rgba(255,211,105,0.42)' : Colors.borderFaint,
+      }}
+    >
+      <MaterialIcon
+        name="filter_list"
+        color={isFiltered ? Colors.accent : Colors.textMuted}
+        size={19}
+      />
+      <Text
+        className="ml-2 text-[13px] font-bold"
+        numberOfLines={1}
+        style={{ color: isFiltered ? Colors.accent : Colors.text }}
       >
-        <MaterialIcon
-          name="filter"
-          color={isFiltered ? Colors.accent : Colors.textMuted}
-          size={18}
-        />
-        <Text
-          className="ml-2 max-w-[72px] text-[12px] font-bold"
-          numberOfLines={1}
-          style={{ color: Colors.text }}
-        >
-          {activeLabel}
-        </Text>
-        <MaterialIcon
-          name={isOpen ? 'expand_less' : 'expand_more'}
-          color={Colors.textMuted}
-          size={18}
-        />
-      </TouchableOpacity>
+        {label}
+      </Text>
+      <MaterialIcon
+        name={isOpen ? 'expand_less' : 'expand_more'}
+        color={Colors.textMuted}
+        size={18}
+      />
+    </TouchableOpacity>
+  );
 
-      {isOpen && (
-        <View
-          className="absolute right-0 top-12 overflow-hidden rounded-xl"
-          style={{
-            backgroundColor: Colors.surface,
-            borderWidth: 1,
-            borderColor: Colors.borderFaint,
-            minWidth: 220,
-          }}
-        >
-          <View className="px-3 pt-3">
-            <Text
-              className="text-[10px] font-bold uppercase"
-              style={{ color: Colors.textFaint, letterSpacing: 1 }}
-            >
-              Status
-            </Text>
-          </View>
-          {statusOptions.map((option) =>
-            renderOption('status', option, statusValue, onStatusChange),
-          )}
-
+  return (
+    <View
+      className="relative flex-row gap-2 py-1"
+      style={{
+        borderBottomColor: Colors.borderSubtle,
+        borderBottomWidth: 1,
+        zIndex: openFilter ? 30 : 1,
+      }}
+    >
+      <View className="relative">
+        {renderFilterButton({
+          isFiltered: isStatusFiltered,
+          isOpen: openFilter === 'status',
+          label: statusLabel,
+          type: 'status',
+        })}
+        {openFilter === 'status' ? (
           <View
-            className="px-3 pt-3"
-            style={{ borderTopWidth: 1, borderTopColor: Colors.borderFaint }}
+            className="absolute left-0 top-12 w-52 overflow-hidden rounded-2xl"
+            style={{
+              backgroundColor: Colors.surface,
+              borderWidth: 1,
+              borderColor: Colors.borderFaint,
+            }}
           >
-            <Text
-              className="text-[10px] font-bold uppercase"
-              style={{ color: Colors.textFaint, letterSpacing: 1 }}
-            >
-              Type
-            </Text>
+            {statusOptions.map((option) =>
+              renderOption('status', option, statusValue, onStatusChange),
+            )}
           </View>
-          {typeOptions.map((option) => renderOption('type', option, typeValue, onTypeChange))}
-        </View>
-      )}
+        ) : null}
+      </View>
+
+      <View className="relative">
+        {renderFilterButton({
+          isFiltered: isTypeFiltered,
+          isOpen: openFilter === 'type',
+          label: typeLabel,
+          type: 'type',
+        })}
+        {openFilter === 'type' ? (
+          <View
+            className="absolute left-0 top-12 w-56 overflow-hidden rounded-2xl"
+            style={{
+              backgroundColor: Colors.surface,
+              borderWidth: 1,
+              borderColor: Colors.borderFaint,
+            }}
+          >
+            {typeOptions.map((option) => renderOption('type', option, typeValue, onTypeChange))}
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 }

@@ -67,9 +67,11 @@ export default function ProjectsScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View className="px-4 pb-4">
-          <View className="relative z-20 mt-4 flex-row items-center gap-3">
+        <View className="px-4">
+          <View className="mt-4">
             <ProjectsSearchBar search={search} onSearchChange={setSearch} />
+          </View>
+          <View className="relative z-20 mt-3">
             <ProjectFilterSelect
               isOwnerFilterActive={isOwnerFilterActive}
               onOwnerFilterChange={setIsOwnerFilterActive}
@@ -90,7 +92,7 @@ export default function ProjectsScreen() {
             }
             style={
               viewMode === 'list'
-                ? { borderTopWidth: 1, borderTopColor: Colors.borderFaint }
+                ? { borderTopWidth: 0, borderTopColor: Colors.borderFaint }
                 : undefined
             }
           >

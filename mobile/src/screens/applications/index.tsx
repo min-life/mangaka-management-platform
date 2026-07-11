@@ -33,7 +33,7 @@ const APPLICATION_STATUS_FILTERS: StatusFilter[] = [
   'CANCELLED',
 ];
 
-const APPLICATION_TYPE_FILTERS: TypeFilter[] = ['ALL', 'MANUSCRIPT_REVIEW', 'PUBLISH_REQUEST'];
+const APPLICATION_TYPE_FILTERS: TypeFilter[] = ['ALL', 'CREATE_ARC', 'CREATE_CHAPTER'];
 
 const statusOptions = APPLICATION_STATUS_FILTERS.map((status) => ({
   label: status === 'ALL' ? 'All status' : getApplicationStatusLabel(status),
@@ -43,7 +43,7 @@ const statusOptions = APPLICATION_STATUS_FILTERS.map((status) => ({
 
 const typeOptions = APPLICATION_TYPE_FILTERS.map((type) => ({
   label: type === 'ALL' ? 'All type' : getApplicationTypeLabel(type),
-  shortLabel: type === 'ALL' ? 'All' : type === 'MANUSCRIPT_REVIEW' ? 'Review' : 'Publish',
+  shortLabel: type === 'ALL' ? 'All' : type === 'CREATE_ARC' ? 'Arc' : 'Chapter',
   value: type,
 }));
 
@@ -117,8 +117,10 @@ export default function ApplicationsScreen({ navigation, route }: ApplicationsSc
         showsVerticalScrollIndicator={false}
       >
         <View className="px-4 pt-4" style={{ zIndex: 20 }}>
-          <View className="relative z-20 flex-row items-center gap-3">
+          <View>
             <ApplicationSearchBar search={search} onSearchChange={setSearch} />
+          </View>
+          <View className="relative z-20 mt-3">
             <ApplicationFilterSelect
               statusValue={statusFilter}
               typeValue={typeFilter}
@@ -130,19 +132,7 @@ export default function ApplicationsScreen({ navigation, route }: ApplicationsSc
           </View>
         </View>
 
-        <View className="px-4 pt-4" style={{ zIndex: 0 }}>
-          <View className="mb-3 flex-row items-center justify-between">
-            <Text
-              className="text-[12px] font-bold uppercase"
-              style={{ color: Colors.textMuted, letterSpacing: 1 }}
-            >
-              {isProjectScoped ? 'Project applications' : 'My project applications'}
-            </Text>
-            <Text className="text-[12px]" style={{ color: Colors.textFaint }}>
-              {applications.length} shown
-            </Text>
-          </View>
-
+        <View className="px-4 pt-3" style={{ zIndex: 0 }}>
           {isLoading ? (
             <ApiStateView type="loading" />
           ) : errorMessage ? (
@@ -154,7 +144,7 @@ export default function ApplicationsScreen({ navigation, route }: ApplicationsSc
                   <ApplicationCard
                     key={application.id}
                     application={application}
-                    contextLabel={isProjectScoped ? undefined : `Project ${application.projectId}`}
+                    contextLabel={isProjectScoped ? undefined : application.projectName}
                     onPress={() =>
                       navigation.navigate('ApplicationDetail', {
                         applicationId: application.id,

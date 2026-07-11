@@ -88,8 +88,10 @@ export interface ApiEditorBoard {
   createdByUser?: ApiUserSummary | null;
   description?: string | null;
   id: number;
+  image_url?: string | null;
   imageUrl?: string | null;
   name: string;
+  numberOfProjects?: number;
   updatedAt: string;
   updatedBy?: number | null;
   updatedByUser?: ApiUserSummary | null;
@@ -221,13 +223,18 @@ export interface ApiMaterial {
   id: number;
   materials?: Record<string, unknown> | Array<Record<string, unknown>>;
   name?: string | null;
+  task?: {
+    description?: string | null;
+    id: number;
+    title: string;
+  } | null;
   taskId?: number | null;
   updatedAt: string;
   updatedBy?: number | null;
   updatedByUser?: ApiUserSummary | null;
 }
 
-export type ApiApplicationType = 'MANUSCRIPT_REVIEW' | 'PUBLISH_REQUEST';
+export type ApiApplicationType = 'CREATE_ARC' | 'CREATE_CHAPTER';
 export type ApiApplicationStatus =
   'APPROVE' | 'CANCELLED' | 'INTERNAL_APPROVED' | 'PENDING' | 'REJECT' | 'SUBMITTED';
 
@@ -246,6 +253,18 @@ export interface ApiApplication {
   updatedAt: string;
   updatedByUser?: ApiUserSummary | null;
   verifiedByUser?: ApiUserSummary | null;
+}
+
+export type ApiApplicationVoteDecision = 'ABSTAIN' | 'APPROVE' | 'REJECT';
+
+export interface ApiApplicationVote {
+  applicationId: number;
+  comment?: string | null;
+  createdAt: string;
+  decision: ApiApplicationVoteDecision;
+  updatedAt: string;
+  user?: ApiUserSummary | null;
+  userId: number;
 }
 
 export interface ApiNotification {

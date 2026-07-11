@@ -66,7 +66,7 @@ function StatusRow({ label, value, color }: { label: string; value: number; colo
 
 const APPLICATION_STATUSES: ApplicationStatus[] = ['PENDING', 'APPROVE', 'REJECT', 'CANCELLED'];
 
-const APPLICATION_TYPES: ApplicationType[] = ['MANUSCRIPT_REVIEW', 'PUBLISH_REQUEST'];
+const APPLICATION_TYPES: ApplicationType[] = ['CREATE_ARC', 'CREATE_CHAPTER'];
 
 export default function ProjectReportScreen({ navigation, route }: ProjectReportScreenProps) {
   const [project, setProject] = useState<ProjectItem | null>(null);

@@ -113,8 +113,10 @@ export default function TasksScreen({ navigation, route }: TasksScreenProps) {
         // }
         showsVerticalScrollIndicator={false}
       >
-        <View className="relative z-20 mt-4 flex-row items-center gap-3">
+        <View className="mt-4">
           <TasksSearchBar search={search} onSearchChange={setSearch} />
+        </View>
+        <View className="relative z-20 mt-3">
           <TaskFilterSelect activeFilter={activeFilter} onFilterChange={setActiveFilter} />
         </View>
         {isLoading ? (

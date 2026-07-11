@@ -1,6 +1,19 @@
-import { ApiApplication, ApiComment, ApiDataResponse, ApiListResponse } from './apiTypes';
+import {
+  ApiApplication,
+  ApiApplicationVote,
+  ApiComment,
+  ApiDataResponse,
+  ApiEditorBoard,
+  ApiListResponse,
+} from './apiTypes';
 import { apiRequest } from './apiClient';
 import { mapApplication, mapComment, uniqueById } from './mappers';
+
+type PermissionsResponse = ApiDataResponse<string[]> | string[];
+
+function permissionList(response: PermissionsResponse) {
+  return Array.isArray(response) ? response : response.data ?? [];
+}
 
 export async function fetchApplications(
   params: {
@@ -36,6 +49,43 @@ export async function fetchApplication(applicationId: string) {
   );
   if (!response.data) throw new Error('Application not found');
   return mapApplication(response.data);
+}
+
+export async function fetchLeadApplicationVoteCount(params: {
+  applicationId: string;
+  projectId: string;
+}) {
+  const boardResponse = await apiRequest<ApiDataResponse<ApiEditorBoard | null>>(
+    `/projects/${params.projectId}/editor-boards`,
+  ).catch(() => ({ data: null }));
+  const boardId = boardResponse.data?.id;
+
+  if (!boardId) {
+    return { canViewVotes: false, voteCount: null };
+  }
+
+  const permissionsResponse = await apiRequest<PermissionsResponse>(
+    `/permissions/me/boards/${boardId}`,
+  ).catch(() => null);
+  if (!permissionsResponse) {
+    return { canViewVotes: false, voteCount: null };
+  }
+
+  const permissions = permissionList(permissionsResponse);
+  const canViewVotes = permissions.includes('board:leader') || permissions.includes('board:owner');
+
+  if (!canViewVotes) {
+    return { canViewVotes: false, voteCount: null };
+  }
+
+  const votesResponse = await apiRequest<ApiListResponse<ApiApplicationVote>>(
+    `/applications/${params.applicationId}/votes`,
+  );
+
+  return {
+    canViewVotes: true,
+    voteCount: votesResponse.data?.length ?? votesResponse.pagination?.total ?? 0,
+  };
 }
 
 export async function fetchApplicationComments(applicationId: string) {

@@ -25,18 +25,26 @@ export default function EditorBoardRoleFilter({
 }: EditorBoardRoleFilterProps) {
   const [isOpen, setIsOpen] = useState(false);
   const hasActiveFilter = activeRole !== 'All';
+  const activeLabel = activeRole === 'All' ? 'All' : activeRole;
 
   return (
-    <View style={{ position: 'relative', zIndex: isOpen ? 40 : 1 }}>
+    <View
+      className="relative py-1"
+      style={{
+        borderBottomColor: Colors.borderSubtle,
+        borderBottomWidth: 1,
+        zIndex: isOpen ? 40 : 1,
+      }}
+    >
       <TouchableOpacity
         activeOpacity={0.76}
         onPress={() => setIsOpen((value) => !value)}
         accessibilityRole="button"
         accessibilityLabel="Filter editor boards"
         accessibilityState={{ expanded: isOpen, selected: hasActiveFilter }}
-        className="h-12 w-12 items-center justify-center rounded-xl"
+        className="h-10 flex-row items-center self-start rounded-full px-3"
         style={{
-          backgroundColor: hasActiveFilter ? 'rgba(255,211,105,0.14)' : Colors.surface,
+          backgroundColor: isOpen || hasActiveFilter ? Colors.surfaceContainer : Colors.surface,
           borderWidth: 1,
           borderColor: hasActiveFilter ? 'rgba(255,211,105,0.42)' : Colors.borderSubtle,
         }}
@@ -44,25 +52,29 @@ export default function EditorBoardRoleFilter({
         <MaterialIcon
           name="filter_list"
           color={hasActiveFilter ? Colors.accent : Colors.textMuted}
-          size={22}
+          size={19}
         />
-        {hasActiveFilter ? (
-          <View
-            className="absolute right-2 top-2 h-2 w-2 rounded-full"
-            style={{ backgroundColor: Colors.accent }}
-          />
-        ) : null}
+        <Text
+          className="ml-2 text-[13px] font-bold"
+          numberOfLines={1}
+          style={{ color: hasActiveFilter ? Colors.accent : Colors.text }}
+        >
+          {activeLabel}
+        </Text>
+        <MaterialIcon
+          name={isOpen ? 'expand_less' : 'expand_more'}
+          color={Colors.textMuted}
+          size={18}
+        />
       </TouchableOpacity>
 
       {isOpen ? (
         <View
-          className="absolute right-0 rounded-xl p-2"
+          className="absolute left-0 top-12 w-44 overflow-hidden rounded-2xl"
           style={{
             backgroundColor: Colors.surface,
             borderWidth: 1,
             borderColor: Colors.borderSubtle,
-            top: 56,
-            width: 172,
             zIndex: 50,
           }}
         >
@@ -79,9 +91,9 @@ export default function EditorBoardRoleFilter({
                 }}
                 accessibilityRole="button"
                 accessibilityState={{ selected: isActive }}
-                className="flex-row items-center rounded-lg px-3 py-2.5"
+                className="flex-row items-center px-3 py-3"
                 style={{
-                  backgroundColor: isActive ? 'rgba(255,211,105,0.12)' : 'transparent',
+                  backgroundColor: isActive ? Colors.surfaceContainer : Colors.surface,
                   borderTopWidth: index === 0 ? 0 : 1,
                   borderTopColor: Colors.borderFaint,
                 }}

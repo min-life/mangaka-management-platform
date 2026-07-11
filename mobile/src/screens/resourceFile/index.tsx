@@ -68,6 +68,11 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  const [materialDetailsById, setMaterialDetailsById] = useState<
+    Record<string, ResourceFileMaterialVersion>
+  >({});
+  const [isMaterialDetailLoading, setIsMaterialDetailLoading] = useState(false);
+  const [materialDetailError, setMaterialDetailError] = useState('');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedFrame, setSelectedFrame] = useState<ResourceTaskFrame | null>(null);
   const [discussionScope, setDiscussionScope] = useState<DiscussionScope>('file');
@@ -100,6 +105,8 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
         ? await fetchFolderBundle(parentFolderId).catch(() => null)
         : null;
       setFile(nextFile);
+      setMaterialDetailsById({});
+      setMaterialDetailError('');
       setFileDiscussionCommentCount(nextFile.comments?.length ?? 0);
       setParentName(parentBundle?.folder.name ?? 'Resource');
       const initialTask = route.params.initialTaskId
@@ -156,9 +163,44 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
     [discussionFrames],
   );
 
-  const selectedVersion =
+  const selectedVersionSummary =
     versions.find((version) => version.id === selectedVersionId) ?? versions[0];
+  const selectedVersionDetail = selectedVersionSummary
+    ? materialDetailsById[selectedVersionSummary.id]
+    : undefined;
+  const selectedVersion = selectedVersionDetail ?? selectedVersionSummary;
   const previewImageUri = selectedVersion?.materials.imageUri ?? file?.previewImageUri;
+
+  useEffect(() => {
+    const versionId = selectedVersionSummary?.id;
+    if (!versionId || selectedVersionDetail?.hasDetail) {
+      setIsMaterialDetailLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    setIsMaterialDetailLoading(true);
+    setMaterialDetailError('');
+
+    fetchMaterialVersion(versionId)
+      .then((detail) => {
+        if (!isMounted) return;
+        setMaterialDetailsById((prev) => ({ ...prev, [detail.id]: detail }));
+      })
+      .catch((error) => {
+        if (!isMounted) return;
+        setMaterialDetailError(
+          error instanceof Error ? error.message : 'Unable to load material detail.',
+        );
+      })
+      .finally(() => {
+        if (isMounted) setIsMaterialDetailLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedVersionDetail?.hasDetail, selectedVersionSummary?.id]);
 
   const handleSelectFrame = (frame: ResourceTaskFrame) => {
     setSelectedFrame((prev) => (prev?.id === frame.id ? null : frame));
@@ -576,6 +618,9 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
 
         {activeTab === 'Materials' && (
           <MaterialsPanel
+            detailError={materialDetailError}
+            isSelectedVersionLoading={isMaterialDetailLoading}
+            selectedVersion={selectedVersion ?? null}
             selectedVersionId={selectedVersion?.id ?? null}
             versions={versions}
             onSelectVersion={handleSelectVersion}

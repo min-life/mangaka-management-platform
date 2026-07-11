@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
+  Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Pressable,
   ScrollView,
   Text,
   TextInput,
@@ -73,6 +76,54 @@ function StatusBadge({ status }: { status: ResourceTaskStatus }) {
   );
 }
 
+function OverviewStatCard({ icon, label, value }: { icon: string; label: string; value: string }) {
+  return (
+    <View
+      className="flex-1 rounded-xl px-3 py-3"
+      style={{ backgroundColor: Colors.surfaceContainer, minWidth: '30%' }}
+    >
+      <View className="mb-2 flex-row items-center gap-1.5">
+        <MaterialIcon name={icon} color={C.accent} size={15} />
+        <Text
+          className="text-[10px] font-bold uppercase"
+          numberOfLines={1}
+          style={{ color: C.textMuted, letterSpacing: 0.6 }}
+        >
+          {label}
+        </Text>
+      </View>
+      <Text className="text-[18px] font-black" numberOfLines={1} style={{ color: C.text }}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function OverviewInfoRow({ icon, label, value }: { icon: string; label: string; value: string }) {
+  return (
+    <View className="flex-row items-center">
+      <View
+        className="h-9 w-9 items-center justify-center rounded-xl"
+        style={{ backgroundColor: Colors.iconBg }}
+      >
+        <MaterialIcon name={icon} color={C.accent} size={18} />
+      </View>
+      <View className="ml-3 flex-1">
+        <Text className="text-[10px] font-bold uppercase" style={{ color: C.textMuted }}>
+          {label}
+        </Text>
+        <Text
+          className="mt-0.5 text-[14px] font-semibold"
+          style={{ color: C.text }}
+          numberOfLines={1}
+        >
+          {value}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 function EmptyState({ title }: { title: string }) {
   return (
     <View
@@ -127,71 +178,106 @@ export function OverviewPanel({
   fileContent,
 }: {
   description: string;
-  file?: Pick<ResourceFileNode, 'createdByName' | 'updatedAt'>;
+  file?: ResourceFileNode;
   fileContent: string;
 }) {
   const creatorName = file?.createdByName?.trim() || 'Unknown creator';
+  const createdAtLabel = formatDate(file?.createdAt);
   const updatedAtLabel = formatDate(file?.updatedAt);
+  const materialCount = file?.materialVersions?.length ?? 0;
+  const taskCount = file?.tasks?.length ?? 0;
+  const commentCount = file?.comments?.length ?? 0;
+  const statusCounts = (file?.tasks ?? []).reduce<Record<ResourceTaskStatus, number>>(
+    (counts, task) => {
+      counts[task.status] += 1;
+      return counts;
+    },
+    { DONE: 0, INPROGRESS: 0, PENDING: 0, REVIEW: 0 },
+  );
+  const hasTaskSummary = taskCount > 0;
 
   return (
     <View className="mt-6 gap-4">
       <View
-        className="rounded-xl p-5"
+        className="overflow-hidden rounded-xl"
         style={{ backgroundColor: C.surface, borderWidth: 1, borderColor: C.border }}
       >
-        <Text
-          className="mb-3 text-[10px] font-bold uppercase"
-          style={{ color: C.textMuted, letterSpacing: 1 }}
-        >
-          Overview
-        </Text>
-        <Text className="text-[15px] leading-6" style={{ color: C.text }}>
-          {description}
-        </Text>
+        <View className="p-5">
+          <View className="flex-row items-start justify-between gap-3">
+            <View className="min-w-0 flex-1">
+              <Text
+                className="text-[10px] font-bold uppercase"
+                style={{ color: C.textMuted, letterSpacing: 1 }}
+              >
+                Overview
+              </Text>
+              <Text
+                className="mt-1 text-[21px] font-black"
+                numberOfLines={2}
+                style={{ color: C.text }}
+              >
+                {file?.name ?? 'Resource file'}
+              </Text>
+            </View>
+            <View
+              className="rounded-full px-3 py-1"
+              style={{ backgroundColor: 'rgba(255,211,105,0.13)' }}
+            >
+              <Text className="text-[11px] font-bold" style={{ color: C.accent }}>
+                {file?.language ?? 'File'}
+              </Text>
+            </View>
+          </View>
+
+          <Text className="mt-4 text-[15px] leading-6" style={{ color: C.text }}>
+            {description}
+          </Text>
+
+          <View className="mt-5 flex-row gap-2">
+            <OverviewStatCard icon="article" label="Versions" value={String(materialCount)} />
+            <OverviewStatCard icon="checklist" label="Tasks" value={String(taskCount)} />
+            <OverviewStatCard icon="comment" label="Comments" value={String(commentCount)} />
+          </View>
+        </View>
 
         {file ? (
-          <View className="mt-5 gap-3 border-t pt-4" style={{ borderTopColor: C.borderFaint }}>
-            <View className="flex-row items-center">
-              <View
-                className="h-9 w-9 items-center justify-center rounded-xl"
-                style={{ backgroundColor: Colors.iconBg }}
-              >
-                <MaterialIcon name="person" color={C.accent} size={18} />
-              </View>
-              <View className="ml-3 flex-1">
-                <Text className="text-[10px] font-bold uppercase" style={{ color: C.textMuted }}>
-                  Created by
-                </Text>
-                <Text
-                  className="mt-0.5 text-[14px] font-semibold"
-                  style={{ color: C.text }}
-                  numberOfLines={1}
-                >
-                  {creatorName}
-                </Text>
-              </View>
-            </View>
+          <View className="gap-4 border-t p-5" style={{ borderTopColor: C.borderFaint }}>
+            <OverviewInfoRow icon="person" label="Created by" value={creatorName} />
+            <OverviewInfoRow icon="calendar_today" label="Created" value={createdAtLabel} />
+            <OverviewInfoRow icon="edit" label="Last edited" value={updatedAtLabel} />
 
-            <View className="flex-row items-center">
-              <View
-                className="h-9 w-9 items-center justify-center rounded-xl"
-                style={{ backgroundColor: Colors.iconBg }}
-              >
-                <MaterialIcon name="edit" color={C.accent} size={18} />
-              </View>
-              <View className="ml-3 flex-1">
-                <Text className="text-[10px] font-bold uppercase" style={{ color: C.textMuted }}>
-                  Last edited
-                </Text>
+            {hasTaskSummary ? (
+              <View className="border-t pt-4" style={{ borderTopColor: C.borderFaint }}>
                 <Text
-                  className="mt-0.5 text-[14px] font-semibold"
-                  style={{ color: C.text }}
-                  numberOfLines={1}
+                  className="mb-3 text-[10px] font-bold uppercase"
+                  style={{ color: C.textMuted, letterSpacing: 1 }}
                 >
-                  {updatedAtLabel}
+                  Task status
                 </Text>
+                <View className="flex-row flex-wrap gap-2">
+                  {(Object.keys(STATUS_META) as ResourceTaskStatus[]).map((status) => {
+                    const meta = STATUS_META[status];
+                    const count = statusCounts[status];
+
+                    return (
+                      <View
+                        key={status}
+                        className="flex-row items-center rounded-full px-2.5 py-1.5"
+                        style={{ backgroundColor: `${meta.color}1F` }}
+                      >
+                        <View
+                          className="mr-1.5 h-2 w-2 rounded-full"
+                          style={{ backgroundColor: meta.color }}
+                        />
+                        <Text className="text-[11px] font-bold" style={{ color: meta.color }}>
+                          {meta.label} {count}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
               </View>
-            </View>
+            ) : null}
           </View>
         ) : null}
       </View>
@@ -325,66 +411,117 @@ function CommentComboBox({
         <MaterialIcon name={isOpen ? 'expand_less' : 'expand_more'} color={C.textMuted} size={16} />
       </TouchableOpacity>
 
-      {isOpen ? (
+      <Modal
+        animationType="fade"
+        onRequestClose={() => onOpenChange(false)}
+        transparent
+        visible={isOpen}
+      >
         <View
-          className="absolute left-0 right-0 top-12 overflow-hidden rounded-xl"
-          style={{
-            backgroundColor: C.surface,
-            borderWidth: 1,
-            borderColor: C.borderFaint,
-          }}
+          className="flex-1 justify-end px-4"
+          style={{ backgroundColor: 'rgba(0,0,0,0.34)', paddingBottom: 92 }}
         >
-          {options.length === 0 ? (
-            <View className="px-3 py-3">
-              <Text className="text-[12px]" style={{ color: C.textMuted }}>
-                {emptyLabel}
-              </Text>
-            </View>
-          ) : (
-            options.map((option, index) => {
-              const isSelected = option.id === selectedId;
-
-              return (
-                <TouchableOpacity
-                  key={option.id}
-                  activeOpacity={0.72}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: isSelected }}
-                  className="flex-row items-center gap-2 px-3 py-3"
-                  onPress={() => {
-                    onSelect(option);
-                    onOpenChange(false);
-                  }}
-                  style={{
-                    borderBottomWidth: index === options.length - 1 ? 0 : 1,
-                    borderBottomColor: C.borderFaint,
-                  }}
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => onOpenChange(false)}
+            style={{ bottom: 0, left: 0, position: 'absolute', right: 0, top: 0 }}
+          />
+          <View
+            className="overflow-hidden rounded-2xl"
+            style={{
+              backgroundColor: C.surface,
+              borderWidth: 1,
+              borderColor: C.border,
+              elevation: 16,
+              maxHeight: 420,
+            }}
+          >
+            <View
+              className="flex-row items-center justify-between px-4 py-3"
+              style={{ borderBottomWidth: 1, borderBottomColor: C.borderFaint }}
+            >
+              <View className="min-w-0 flex-1 flex-row items-center gap-2">
+                <MaterialIcon name={icon} color={C.accent} size={18} />
+                <Text
+                  className="min-w-0 flex-1 text-[14px] font-bold"
+                  numberOfLines={1}
+                  style={{ color: C.text }}
                 >
-                  <View className="flex-1">
-                    <Text
-                      className="text-[12px] font-semibold"
-                      numberOfLines={1}
-                      style={{ color: isSelected ? C.accent : C.text }}
+                  {label}
+                </Text>
+              </View>
+              <TouchableOpacity
+                activeOpacity={0.72}
+                className="h-8 w-8 items-center justify-center rounded-full"
+                onPress={() => onOpenChange(false)}
+                style={{ backgroundColor: Colors.iconBg }}
+              >
+                <MaterialIcon name="close" color={C.textMuted} size={18} />
+              </TouchableOpacity>
+            </View>
+
+            {options.length === 0 ? (
+              <View className="px-4 py-5">
+                <Text className="text-[13px]" style={{ color: C.textMuted }}>
+                  {emptyLabel}
+                </Text>
+              </View>
+            ) : (
+              <ScrollView
+                bounces={false}
+                keyboardShouldPersistTaps="handled"
+                nestedScrollEnabled
+                persistentScrollbar
+                showsVerticalScrollIndicator
+                style={{ maxHeight: 360 }}
+              >
+                {options.map((option, index) => {
+                  const isSelected = option.id === selectedId;
+
+                  return (
+                    <TouchableOpacity
+                      key={option.id}
+                      activeOpacity={0.72}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: isSelected }}
+                      className="flex-row items-center gap-3 px-4 py-3.5"
+                      onPress={() => {
+                        onSelect(option);
+                        onOpenChange(false);
+                      }}
+                      style={{
+                        backgroundColor: isSelected ? 'rgba(255,211,105,0.1)' : 'transparent',
+                        borderBottomWidth: index === options.length - 1 ? 0 : 1,
+                        borderBottomColor: C.borderFaint,
+                      }}
                     >
-                      {option.label}
-                    </Text>
-                    {option.description ? (
-                      <Text
-                        className="mt-0.5 text-[10px]"
-                        numberOfLines={1}
-                        style={{ color: C.textMuted }}
-                      >
-                        {option.description}
-                      </Text>
-                    ) : null}
-                  </View>
-                  {isSelected ? <MaterialIcon name="check" color={C.accent} size={16} /> : null}
-                </TouchableOpacity>
-              );
-            })
-          )}
+                      <View className="flex-1">
+                        <Text
+                          className="text-[13px] font-semibold"
+                          numberOfLines={1}
+                          style={{ color: isSelected ? C.accent : C.text }}
+                        >
+                          {option.label}
+                        </Text>
+                        {option.description ? (
+                          <Text
+                            className="mt-1 text-[11px]"
+                            numberOfLines={1}
+                            style={{ color: C.textMuted }}
+                          >
+                            {option.description}
+                          </Text>
+                        ) : null}
+                      </View>
+                      {isSelected ? <MaterialIcon name="check" color={C.accent} size={18} /> : null}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </View>
         </View>
-      ) : null}
+      </Modal>
     </View>
   );
 }
@@ -1290,6 +1427,146 @@ export function TasksPanel({
   );
 }
 
+function MaterialInfoPill({ icon, label }: { icon: string; label: string }) {
+  return (
+    <View
+      className="flex-row items-center rounded-full px-2.5 py-1.5"
+      style={{ backgroundColor: Colors.surfaceContainer }}
+    >
+      <MaterialIcon name={icon} color={C.textMuted} size={14} />
+      <Text className="ml-1.5 text-[11px] font-semibold" style={{ color: C.textMuted }}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function SelectedMaterialCard({
+  detailError,
+  isLoading,
+  version,
+}: {
+  detailError?: string;
+  isLoading: boolean;
+  version: ResourceFileMaterialVersion | null;
+}) {
+  if (!version) return <EmptyState title="No material selected" />;
+
+  const sourceCount = version.sourceCount ?? 0;
+  const pageCount = version.materials.pages?.length ?? 0;
+  const imageUri = version.materials.imageUri;
+
+  return (
+    <View
+      className="overflow-hidden rounded-xl"
+      style={{ backgroundColor: C.surface, borderWidth: 1, borderColor: C.border }}
+    >
+      <View className="p-4">
+        <View className="flex-row items-start justify-between gap-3">
+          <View className="min-w-0 flex-1">
+            <Text
+              className="text-[10px] font-bold uppercase"
+              style={{ color: C.textMuted, letterSpacing: 1 }}
+            >
+              Selected material
+            </Text>
+            <Text
+              className="mt-1 text-[20px] font-black"
+              numberOfLines={2}
+              style={{ color: C.text }}
+            >
+              {version.materials.title}
+            </Text>
+          </View>
+          {isLoading ? <ActivityIndicator color={C.accent} size="small" /> : null}
+        </View>
+
+        <View
+          className="mt-4 h-44 overflow-hidden rounded-xl"
+          style={{ backgroundColor: Colors.surfaceContainer }}
+        >
+          {imageUri ? (
+            <Image source={{ uri: imageUri }} className="h-full w-full" resizeMode="cover" />
+          ) : (
+            <View className="h-full items-center justify-center gap-2">
+              <MaterialIcon name="image_not_supported" color={C.textMuted} size={28} />
+              <Text className="text-[13px] font-semibold" style={{ color: C.textMuted }}>
+                No preview image
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {detailError ? (
+          <View
+            className="mt-3 flex-row items-center rounded-xl px-3 py-2"
+            style={{ backgroundColor: 'rgba(245,158,11,0.12)' }}
+          >
+            <MaterialIcon name="warning" color={Colors.statusReview} size={15} />
+            <Text className="ml-2 flex-1 text-[12px]" style={{ color: Colors.statusReview }}>
+              {detailError}
+            </Text>
+          </View>
+        ) : null}
+
+        <View className="mt-4 flex-row flex-wrap gap-2">
+          <MaterialInfoPill icon="inventory_2" label={`${sourceCount} source files`} />
+          <MaterialInfoPill icon="article" label={`${pageCount} pages`} />
+          <MaterialInfoPill icon="person" label={version.createdByName ?? 'Unknown creator'} />
+          <MaterialInfoPill icon="calendar_today" label={formatDate(version.createdAt)} />
+        </View>
+
+        {version.taskTitle ? (
+          <View
+            className="mt-4 flex-row items-center rounded-xl px-3 py-3"
+            style={{ backgroundColor: Colors.surfaceContainer }}
+          >
+            <MaterialIcon name="checklist" color={C.accent} size={18} />
+            <View className="ml-3 min-w-0 flex-1">
+              <Text className="text-[10px] font-bold uppercase" style={{ color: C.textMuted }}>
+                Linked task
+              </Text>
+              <Text
+                className="mt-0.5 text-[13px] font-bold"
+                numberOfLines={1}
+                style={{ color: C.text }}
+              >
+                {version.taskTitle}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
+        <View
+          className="mt-4 flex-row gap-3 border-t pt-4"
+          style={{ borderTopColor: C.borderFaint }}
+        >
+          <View className="flex-1">
+            <Text className="text-[10px] font-bold uppercase" style={{ color: C.textMuted }}>
+              Updated
+            </Text>
+            <Text className="mt-1 text-[13px] font-semibold" style={{ color: C.text }}>
+              {formatDate(version.updatedAt)}
+            </Text>
+          </View>
+          <View className="flex-1">
+            <Text className="text-[10px] font-bold uppercase" style={{ color: C.textMuted }}>
+              Updated by
+            </Text>
+            <Text
+              className="mt-1 text-[13px] font-semibold"
+              numberOfLines={1}
+              style={{ color: C.text }}
+            >
+              {version.updatedByName ?? 'Unknown user'}
+            </Text>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 function MaterialVersionRow({
   isSelected,
   onPress,
@@ -1303,88 +1580,88 @@ function MaterialVersionRow({
     <TouchableOpacity
       activeOpacity={0.78}
       onPress={onPress}
-      className="rounded-xl p-4"
+      className="rounded-xl px-3.5 py-3"
       style={{
-        backgroundColor: isSelected ? 'rgba(93,211,158,0.12)' : C.surface,
+        backgroundColor: isSelected ? 'rgba(255,211,105,0.12)' : C.surface,
         borderWidth: 1,
-        borderColor: isSelected ? Colors.statusDone : C.border,
+        borderColor: isSelected ? C.accent : C.border,
       }}
     >
-      <View className="flex-row items-start gap-3">
+      <View className="flex-row items-center gap-3">
         <View
-          className="h-11 w-11 items-center justify-center rounded-lg"
-          style={{ backgroundColor: isSelected ? 'rgba(93,211,158,0.18)' : Colors.iconBg }}
+          className="h-10 w-10 items-center justify-center rounded-lg"
+          style={{ backgroundColor: isSelected ? 'rgba(255,211,105,0.16)' : Colors.iconBg }}
         >
-          <MaterialIcon
-            name="image"
-            color={isSelected ? Colors.statusDone : Colors.textMuted}
-            size={22}
-          />
+          <MaterialIcon name="inventory_2" color={isSelected ? C.accent : C.textMuted} size={20} />
         </View>
 
-        <View className="flex-1 gap-2">
-          <View className="flex-row items-start justify-between gap-3">
-            <Text className="flex-1 text-[15px] font-bold" style={{ color: C.text }}>
-              {version.materials.title}
-            </Text>
-            {isSelected ? (
-              <MaterialIcon name="check_circle" color={Colors.statusDone} size={20} />
-            ) : null}
-          </View>
-
-          {version.materials.note ? (
-            <Text className="text-[13px] leading-5" style={{ color: C.textMuted }}>
-              {version.materials.note}
-            </Text>
-          ) : null}
-
-          <View className="flex-row flex-wrap gap-x-4 gap-y-2">
-            <Text className="text-[12px]" style={{ color: C.textMuted }}>
-              {version.createdByName ?? 'Unknown creator'}
-            </Text>
-            <Text className="text-[12px]" style={{ color: C.textMuted }}>
-              {formatDate(version.createdAt)}
-            </Text>
-            <Text className="text-[12px]" style={{ color: C.textMuted }}>
-              {(version.materials.layers ?? []).length} layers
-            </Text>
-          </View>
+        <View className="min-w-0 flex-1">
+          <Text className="text-[14px] font-bold" numberOfLines={1} style={{ color: C.text }}>
+            {version.materials.title}
+          </Text>
+          <Text className="mt-1 text-[12px]" numberOfLines={1} style={{ color: C.textMuted }}>
+            {version.createdByName ?? 'Unknown creator'} - {formatDate(version.createdAt)}
+          </Text>
         </View>
+
+        {isSelected ? <MaterialIcon name="check_circle" color={C.accent} size={20} /> : null}
       </View>
+      {version.taskTitle ? (
+        <View className="mt-3 flex-row items-center">
+          <MaterialIcon name="checklist" color={C.textMuted} size={14} />
+          <Text
+            className="ml-1.5 text-[11px] font-semibold"
+            numberOfLines={1}
+            style={{ color: C.textMuted }}
+          >
+            {version.taskTitle}
+          </Text>
+        </View>
+      ) : null}
     </TouchableOpacity>
   );
 }
 
 export function MaterialsPanel({
+  detailError,
+  isSelectedVersionLoading = false,
+  selectedVersion,
   selectedVersionId,
   versions,
   onSelectVersion,
 }: {
+  detailError?: string;
+  isSelectedVersionLoading?: boolean;
+  selectedVersion?: ResourceFileMaterialVersion | null;
   selectedVersionId: string | null;
   versions: ResourceFileMaterialVersion[];
   onSelectVersion: (version: ResourceFileMaterialVersion) => void;
 }) {
-  return (
-    <View className="mt-6 gap-3">
-      <Text
-        className="text-[11px] font-bold uppercase"
-        style={{ color: C.textMuted, letterSpacing: 1.1 }}
-      >
-        Previous Versions
-      </Text>
+  const resolvedSelectedVersion =
+    selectedVersion ?? versions.find((version) => version.id === selectedVersionId) ?? null;
 
-      {versions.length === 0 ? (
-        <EmptyState title="No material versions" />
-      ) : (
-        versions.map((version) => (
-          <MaterialVersionRow
-            key={version.id}
-            isSelected={version.id === selectedVersionId}
-            version={version}
-            onPress={() => onSelectVersion(version)}
-          />
-        ))
-      )}
+  return (
+    <View className="mt-6 gap-4">
+      <SelectedMaterialCard
+        detailError={detailError}
+        isLoading={isSelectedVersionLoading}
+        version={resolvedSelectedVersion}
+      />
+
+      <View className="gap-3">
+        {versions.length === 0 ? (
+          <EmptyState title="No material versions" />
+        ) : (
+          versions.map((version) => (
+            <MaterialVersionRow
+              key={version.id}
+              isSelected={version.id === selectedVersionId}
+              version={version}
+              onPress={() => onSelectVersion(version)}
+            />
+          ))
+        )}
+      </View>
     </View>
   );
 }

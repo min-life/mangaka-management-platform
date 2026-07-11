@@ -15,9 +15,14 @@ export interface EditorBoardItem {
   description: string;
   currentUserRole: EditorBoardRole;
   createdBy: string;
+  createdByName: string;
+  createdAtLabel: string;
+  imageUrl?: string | null;
   leadMemberId: string;
   projectIds: string[];
+  projectCount: number;
   memberIds: string[];
+  updatedByName: string;
   updatedAtLabel: string;
 }
 

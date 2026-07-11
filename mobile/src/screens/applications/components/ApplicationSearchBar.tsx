@@ -14,7 +14,7 @@ export default function ApplicationSearchBar({
   onSearchChange,
 }: ApplicationSearchBarProps) {
   return (
-    <View className="relative flex-1">
+    <View className="relative w-full">
       <View className="absolute bottom-0 left-3 top-0 z-10 justify-center">
         <MaterialIcon name="search" color="rgba(237,241,251,0.5)" size={18} />
       </View>

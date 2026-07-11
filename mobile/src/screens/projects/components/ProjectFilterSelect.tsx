@@ -31,29 +31,34 @@ export default function ProjectFilterSelect({
   );
 
   return (
-    <View className="relative">
+    <View
+      className="relative py-1"
+      style={{
+        borderBottomColor: Colors.borderSubtle,
+        borderBottomWidth: 1,
+      }}
+    >
       <TouchableOpacity
         activeOpacity={0.76}
         accessibilityLabel="Select project filter"
         accessibilityRole="button"
-        className="h-11 flex-row items-center justify-center rounded-lg px-3"
+        className="h-10 flex-row items-center self-start rounded-full px-3"
         onPress={() => setIsOpen((current) => !current)}
         style={{
-          backgroundColor: Colors.surface,
-          borderColor: isOwnerFilterActive ? Colors.accent : Colors.borderFaint,
+          backgroundColor: isOpen || isOwnerFilterActive ? Colors.surfaceContainer : Colors.surface,
+          borderColor: isOwnerFilterActive ? 'rgba(255,211,105,0.42)' : Colors.borderFaint,
           borderWidth: 1,
-          minWidth: 118,
         }}
       >
         <MaterialIcon
-          name="filter"
+          name="filter_list"
           color={isOwnerFilterActive ? Colors.accent : Colors.textMuted}
-          size={18}
+          size={19}
         />
         <Text
-          className="ml-2 max-w-[72px] text-[12px] font-bold"
+          className="ml-2 text-[13px] font-bold"
           numberOfLines={1}
-          style={{ color: Colors.text }}
+          style={{ color: isOwnerFilterActive ? Colors.accent : Colors.text }}
         >
           {activeLabel}
         </Text>
@@ -66,12 +71,11 @@ export default function ProjectFilterSelect({
 
       {isOpen ? (
         <View
-          className="absolute right-0 top-12 z-30 overflow-hidden rounded-xl"
+          className="absolute left-0 top-12 z-30 w-44 overflow-hidden rounded-2xl"
           style={{
             backgroundColor: Colors.surface,
             borderColor: Colors.borderFaint,
             borderWidth: 1,
-            minWidth: 142,
           }}
         >
           {PROJECT_FILTER_OPTIONS.map((option, index) => {

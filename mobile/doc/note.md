@@ -107,34 +107,41 @@ Member
 Sửa các thông báo thành tiếng anh
 Inbox : - Unread sẽ nằm ngoài
 Sửa navigate
-
----
-
--Profile: Link account gg
--Discussion : - Task không cho lướt lên
-
 Task -> Task detail chưa cùng trang với file.
-
 Up avatar thiếu env
-
 Đưa filter xuống dưới ô search - Projects
-
-File Detail -> Overview -> thêm ngày tạo
-
-
 Project -> Application -> bỏ thống kê
-
-Contribute -> thêm edit
-
 Application -> tách 2 filter
 -> type application chỉ còn 2 cái CREATE_ARC và CREATE_CHAPTER
-
-Editor Boards -> thêm các thông tin ở card
--> out đang call api bị sai
+-Discussion : - Task không cho lướt lên
 
 Member bỏ sao
 cho edit role
 thêm join ngày nào
 bỏ role tag
+Contribute -> thêm edit
+---
+
+-Profile: Link account gg **\_\_**CHưa được đang chờ BE
+
+Editor Boards -> thêm các thông tin ở card
+-> out đang call api bị sai
+-> đang không lấy được avatar
 
 Application -> nếu là lead thì cho xem được bao nhiêu lượt vote
+
+Profile-> mangaka workspace
+
+Project Detail -> sửa ảnh thành giữ nguyên kích thước khung đổi ảnh cho thành display content 
+
+File ->
+->Overview -> bỏ thống kê 
+->Task -> bỏ frame
+-> Material _> xóa  selected material
++ 1 combo box để filter theo task
+
+editor board detail -> chưa handle được đâu là owner
++ thêm check owner để thêm tính năng edit + xóa
+
+
+aplication detail -> material : đang sai dữ liệu

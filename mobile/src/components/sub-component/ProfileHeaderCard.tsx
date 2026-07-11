@@ -29,12 +29,13 @@ export default function ProfileHeaderCard({
 }: ProfileHeaderCardProps) {
   const displayName = name || 'Current user';
   const displayEmail = email || 'No email';
-  const initials = displayName
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join('') || 'U';
+  const initials =
+    displayName
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join('') || 'U';
 
   return (
     <View
@@ -57,11 +58,7 @@ export default function ProfileHeaderCard({
         >
           <View className="h-full w-full overflow-hidden rounded-full items-center justify-center">
             {avatarUri ? (
-              <Image
-                source={{ uri: avatarUri }}
-                className="h-full w-full"
-                resizeMode="cover"
-              />
+              <Image source={{ uri: avatarUri }} className="h-full w-full" resizeMode="cover" />
             ) : (
               <Text className="text-[20px] font-bold" style={{ color: Colors.accent }}>
                 {initials}

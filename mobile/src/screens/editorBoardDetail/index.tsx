@@ -1,5 +1,13 @@
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -27,18 +35,22 @@ function getBoardInitials(name: string) {
 
 function EditorBoardDetailHero({
   description,
+  imageUrl,
   leadName,
   name,
   role,
   updatedAtLabel,
 }: {
   description: string;
+  imageUrl?: string | null;
   leadName?: string;
   name: string;
   role: string;
   updatedAtLabel: string;
 }) {
+  const [hasImageError, setHasImageError] = useState(false);
   const subtitle = leadName ? `${role} - Lead: ${leadName}` : role;
+  const shouldShowImage = Boolean(imageUrl && !hasImageError);
 
   return (
     <View className="pb-6">
@@ -46,19 +58,30 @@ function EditorBoardDetailHero({
         className="h-[260px] items-center justify-center overflow-hidden"
         style={{ backgroundColor: Colors.iconBg }}
       >
-        <View
-          className="h-28 w-28 items-center justify-center rounded-3xl"
-          style={{
-            backgroundColor: Colors.overlayLight,
-            borderWidth: 1,
-            borderColor: Colors.borderFaint,
-          }}
-        >
-          <MaterialIcon name="groups" color={Colors.accent} size={54} />
-        </View>
-        <Text className="mt-4 text-[22px] font-black" style={{ color: Colors.text }}>
-          {getBoardInitials(name)}
-        </Text>
+        {shouldShowImage ? (
+          <Image
+            source={{ uri: imageUrl! }}
+            className="h-full w-full"
+            onError={() => setHasImageError(true)}
+            resizeMode="cover"
+          />
+        ) : (
+          <>
+            <View
+              className="h-28 w-28 items-center justify-center rounded-3xl"
+              style={{
+                backgroundColor: Colors.overlayLight,
+                borderWidth: 1,
+                borderColor: Colors.borderFaint,
+              }}
+            >
+              <MaterialIcon name="groups" color={Colors.accent} size={54} />
+            </View>
+            <Text className="mt-4 text-[22px] font-black" style={{ color: Colors.text }}>
+              {getBoardInitials(name)}
+            </Text>
+          </>
+        )}
       </View>
 
       <View className="px-4">
@@ -243,6 +266,7 @@ export default function EditorBoardDetailScreen({
       >
         <EditorBoardDetailHero
           description={board.description}
+          imageUrl={board.imageUrl}
           leadName={lead?.name}
           name={board.name}
           role={board.currentUserRole}

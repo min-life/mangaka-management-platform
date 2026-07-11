@@ -1,4 +1,4 @@
-export type ApplicationType = 'MANUSCRIPT_REVIEW' | 'PUBLISH_REQUEST';
+export type ApplicationType = 'CREATE_ARC' | 'CREATE_CHAPTER';
 export type ApplicationStatus = 'PENDING' | 'APPROVE' | 'REJECT' | 'CANCELLED';
 
 export interface ApplicationMaterialPage {
@@ -11,6 +11,7 @@ export interface ApplicationMaterialPage {
 export interface ApplicationItem {
   id: string;
   projectId: string;
+  projectName?: string;
   title: string;
   description: string;
   type: ApplicationType;
@@ -24,4 +25,3 @@ export interface ApplicationItem {
     note: string;
   };
 }
-
