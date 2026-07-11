@@ -216,7 +216,7 @@ model UserProject {
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   role    Role    @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
-  @@id([userId, projectId, roleId])
+  @@id([userId, projectId])
   @@index([userId])
   @@index([projectId])
   @@index([roleId])
