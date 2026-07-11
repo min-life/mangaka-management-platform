@@ -7,14 +7,12 @@ import { ChevronRight, CircleGauge, FileCheck2, Users } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import api from '@/lib/api';
 import { formatActionTitle, formatActivityLogText } from '@/lib/activity-message';
 import { resolveActivityRoute } from '@/lib/activity-route';
 import {
-  getEditorBoardById,
-  getEditorBoardMembers,
-  getEditorBoardProjects,
+  getEditorBoardDashboard,
   type BoardMemberResponse,
+  type EditorBoardDashboardStats,
   type EditorBoardResponse,
 } from '@/services/editor-board.service';
 import {
@@ -38,6 +36,13 @@ type PageProps = {
   params: Promise<{ editorBoardId: string }>;
 };
 
+const EMPTY_DASHBOARD_STATS: EditorBoardDashboardStats = {
+  activeMembers: 0,
+  approvedThisMonth: 0,
+  pendingApprovals: 0,
+  totalProjects: 0,
+};
+
 // PhucTD #editor-board start
 export default function EditorBoardDashboardPage({ params }: PageProps) {
   const { editorBoardId } = use(params);
@@ -47,6 +52,8 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
   const [members, setMembers] = useState<BoardMemberResponse[]>([]);
   const [projects, setProjects] = useState<ProjectResponse[]>([]);
   const [applications, setApplications] = useState<ApplicationResponse[]>([]);
+  const [dashboardStats, setDashboardStats] =
+    useState<EditorBoardDashboardStats>(EMPTY_DASHBOARD_STATS);
   const [activities, setActivities] = useState<ActivityLogResponse[]>([]);
   const [activityError, setActivityError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -65,23 +72,16 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
 
     const fetchData = async () => {
       try {
-        const boardData = await getEditorBoardById(Number(editorBoardId));
-        setBoard(boardData);
-
-        const membersData = await getEditorBoardMembers(editorBoardId, { limit: 5 });
-        setMembers(membersData.members);
-
-        const projectsData = await getEditorBoardProjects(editorBoardId);
-        setProjects(projectsData.projects.slice(0, 5));
-
-        const [appsRes, activityResult] = await Promise.all([
-          api.get<{ data?: ApplicationResponse[] }, { data?: ApplicationResponse[] }>(
-            `/editor-boards/${editorBoardId}/applications`,
-          ),
+        const [dashboardData, activityResult] = await Promise.all([
+          getEditorBoardDashboard<ApplicationResponse>(editorBoardId),
           loadActivityLogs().catch(() => null),
         ]);
 
-        setApplications(appsRes.data ?? []);
+        setBoard(dashboardData.board);
+        setMembers(dashboardData.members);
+        setProjects(dashboardData.projects);
+        setApplications(dashboardData.applications);
+        setDashboardStats(dashboardData.stats);
         if (!activityResult) {
           setActivities([]);
           setActivityError('Unable to load recent activity.');
@@ -90,8 +90,9 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
             void loadActivityLogs().catch(() => undefined);
           }, 800);
         }
-      } catch (error) {
-        // Ignore error
+      } catch {
+        setBoard(null);
+        setDashboardStats(EMPTY_DASHBOARD_STATS);
       } finally {
         setIsLoading(false);
       }
@@ -108,20 +109,15 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
     return <div className="p-8 text-center text-red-400">Failed to load board details.</div>;
   }
 
-  const activeMembersCount = members.length;
-  const totalProjects = board._count?.projects || projects.length;
-  const pendingApprovals = applications.filter((app) => app.status === 'PENDING').length;
-
-  const currentMonth = new Date().getMonth();
-  const approvedThisMonth = applications.filter(
-    (app) => app.status === 'APPROVE' && new Date(app.createdAt).getMonth() === currentMonth,
-  ).length;
-
   const statCards = [
-    { label: 'Total Projects', meta: 'In this board', value: totalProjects },
-    { label: 'Active Members', meta: 'Editors & Reviewers', value: activeMembersCount },
-    { label: 'Pending Approvals', meta: 'Needs Review', value: pendingApprovals },
-    { label: 'Approved This Month', meta: 'Publish Requests', value: approvedThisMonth },
+    { label: 'Total Projects', meta: 'In this board', value: dashboardStats.totalProjects },
+    { label: 'Active Members', meta: 'Editors & Reviewers', value: dashboardStats.activeMembers },
+    { label: 'Pending Approvals', meta: 'Needs Review', value: dashboardStats.pendingApprovals },
+    {
+      label: 'Approved This Month',
+      meta: 'Applications',
+      value: dashboardStats.approvedThisMonth,
+    },
   ];
 
   const formatActivityDate = (value: string) => {
@@ -137,6 +133,20 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
       minute: '2-digit',
       month: 'short',
     }).format(date);
+  };
+
+  const formatApplicationDate = (value?: string) => {
+    if (!value) {
+      return 'Unknown date';
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return 'Unknown date';
+    }
+
+    return date.toLocaleDateString();
   };
 
   return (
@@ -204,55 +214,106 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
         ))}
       </div>
 
-      <div className="mt-5 grid grid-cols-[minmax(0,1fr)_360px] gap-5">
+      <div className="mt-5 grid grid-cols-[minmax(0,1fr)_420px] gap-5">
         <section className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-5">
           <div className="mb-5 flex items-center justify-between">
-            <h2 className="text-sm font-black text-white">Recent Publish Requests</h2>
-            <Link
-              className="text-xs font-black text-[#FFD369]"
-              href={`/studio/editor-boards/${editorBoardId}/applications`}
-            >
-              View All
-            </Link>
+            <h2 className="text-sm font-black text-white">Recent Activity</h2>
           </div>
           <div className="grid gap-3">
-            {applications.slice(0, 5).map((app) => (
+            {activities.map((activity) => (
               <article
-                className="flex items-center gap-3 rounded-[5px] border border-[#303842] bg-[#202832] p-3"
-                key={app.id}
+                className="rounded-[5px] border border-[#303842] bg-[#202832] p-3"
+                key={activity.id}
               >
-                <span className="grid size-10 place-items-center rounded-[4px] bg-[#0f151d] text-[#dce7f3]">
-                  <FileCheck2 className="size-5" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-black text-white">{app.title}</p>
-                  <p className="mt-1 truncate text-[11px] font-bold text-[#aeb7c2]">
-                    {app.project?.name} • By {app.createdByUser?.displayName || 'Unknown'} •{' '}
-                    {new Date(app.createdAt).toLocaleDateString()}
-                  </p>
+                <div className="flex items-start gap-3">
+                  <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-[4px] bg-[#101820] text-[#FFD369]">
+                    <CircleGauge className="size-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-black text-white">
+                      {formatActionTitle(activity.action)}
+                    </p>
+                    <p className="mt-1 text-[11px] leading-5 text-[#aeb7c2]">
+                      {formatActivityLogText(activity)}
+                    </p>
+                    <p className="mt-2 text-[10px] font-black uppercase tracking-[0.08em] text-[#8b94a1]">
+                      By{' '}
+                      {activity.actor?.displayName ??
+                        activity.actor?.email ??
+                        `User #${activity.actorId}`}{' '}
+                      / {formatActivityDate(activity.createdAt)}
+                    </p>
+                  </div>
                 </div>
-                <Badge
-                  className={`h-6 rounded-[3px] px-2 text-[9px] font-black ${getStatusStyle(app.status)}`}
-                >
-                  {getStatusLabel(app.status)}
-                </Badge>
-                <Link
-                  className="text-[#aeb7c2] hover:text-white"
-                  href={`/studio/editor-boards/${editorBoardId}/applications`}
-                >
-                  <ChevronRight className="size-4" />
-                </Link>
               </article>
             ))}
-            {applications.length === 0 ? (
-              <p className="py-4 text-center text-xs text-[#aeb7c2]">
-                No recent publish requests found.
-              </p>
+            {activityError ? (
+              <p className="text-center text-xs text-red-300">{activityError}</p>
+            ) : null}
+            {!activityError && activities.length === 0 ? (
+              <p className="text-center text-xs text-[#aeb7c2]">No recent activity found.</p>
             ) : null}
           </div>
         </section>
 
         <div className="flex flex-col gap-5">
+          <aside className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-black text-white">Recent Applications</h2>
+              <Link
+                className="text-xs font-black text-[#FFD369]"
+                href={`/studio/editor-boards/${editorBoardId}/applications`}
+              >
+                View All
+              </Link>
+            </div>
+            <div className="grid gap-3">
+              {applications.slice(0, 5).map((app) => (
+                <article
+                  className="rounded-[5px] border border-[#303842] bg-[#202832] p-3"
+                  key={app.id}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="grid size-10 shrink-0 place-items-center rounded-[4px] bg-[#0f151d] text-[#dce7f3]">
+                      <FileCheck2 className="size-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="line-clamp-2 min-w-0 text-xs font-black leading-5 text-white">
+                          {app.title || 'Untitled application'}
+                        </p>
+                        <Badge
+                          className={`h-6 shrink-0 rounded-[3px] px-2 text-[9px] font-black ${getStatusStyle(
+                            app.status,
+                          )}`}
+                        >
+                          {getStatusLabel(app.status)}
+                        </Badge>
+                      </div>
+                      <p className="mt-2 line-clamp-2 text-[11px] font-bold leading-4 text-[#aeb7c2]">
+                        {app.project?.name || 'No project'} / By{' '}
+                        {app.createdByUser?.displayName || app.createdByUser?.email || 'Unknown'} /{' '}
+                        {formatApplicationDate(app.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+                  <Link
+                    className="mt-3 inline-flex items-center gap-1 text-[11px] font-black text-[#FFD369] hover:text-white"
+                    href={`/studio/editor-boards/${editorBoardId}/applications`}
+                  >
+                    Open
+                    <ChevronRight className="size-3.5" />
+                  </Link>
+                </article>
+              ))}
+              {applications.length === 0 ? (
+                <p className="py-4 text-center text-xs text-[#aeb7c2]">
+                  No recent applications found.
+                </p>
+              ) : null}
+            </div>
+          </aside>
+
           <aside className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-5">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-sm font-black text-white">Board Projects</h2>
@@ -336,42 +397,43 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
                 const route = resolveActivityRoute(activity);
 
                 return (
-                <article
-                  className={`rounded-[5px] border border-[#303842] bg-[#202832] p-3 ${
-                    route ? 'cursor-pointer transition-colors hover:border-[#FFD369]/50 hover:bg-[#242e3a]' : ''
-                  }`}
-                  key={activity.id}
-                  onClick={route ? () => router.push(route) : undefined}
-                >
-                  <div className="flex items-start gap-3">
-                    <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-[4px] bg-[#101820] text-[#FFD369]">
-                      <CircleGauge className="size-4" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-xs font-black text-white">
-                        {formatActionTitle(activity.action)}
-                      </p>
-                      <p className="mt-1 text-[11px] leading-5 text-[#aeb7c2]">
-                        {formatActivityLogText(activity)}
-                      </p>
-                      <p className="mt-2 text-[10px] font-black uppercase tracking-[0.08em] text-[#8b94a1]">
-                        By {activity.actor?.displayName ??
-                          activity.actor?.email ??
-                          `User #${activity.actorId}`}{' '}
-                        / {formatActivityDate(activity.createdAt)}
-                      </p>
+                  <article
+                    className={`rounded-[5px] border border-[#303842] bg-[#202832] p-3 ${
+                      route
+                        ? 'cursor-pointer transition-colors hover:border-[#FFD369]/50 hover:bg-[#242e3a]'
+                        : ''
+                    }`}
+                    key={activity.id}
+                    onClick={route ? () => router.push(route) : undefined}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-[4px] bg-[#101820] text-[#FFD369]">
+                        <CircleGauge className="size-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-black text-white">
+                          {formatActionTitle(activity.action)}
+                        </p>
+                        <p className="mt-1 text-[11px] leading-5 text-[#aeb7c2]">
+                          {formatActivityLogText(activity)}
+                        </p>
+                        <p className="mt-2 text-[10px] font-black uppercase tracking-[0.08em] text-[#8b94a1]">
+                          By{' '}
+                          {activity.actor?.displayName ??
+                            activity.actor?.email ??
+                            `User #${activity.actorId}`}{' '}
+                          / {formatActivityDate(activity.createdAt)}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                </article>
+                  </article>
                 );
               })}
               {activityError ? (
                 <p className="text-center text-xs text-red-300">{activityError}</p>
               ) : null}
               {!activityError && activities.length === 0 ? (
-                <p className="text-center text-xs text-[#aeb7c2]">
-                  No recent activity found.
-                </p>
+                <p className="text-center text-xs text-[#aeb7c2]">No recent activity found.</p>
               ) : null}
             </div>
           </aside>

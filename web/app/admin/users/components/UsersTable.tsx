@@ -20,11 +20,13 @@ import { ManageRolesDialog } from './UserDialogs';
 import { getInitials, getUserRoleNames } from './user-utils';
 
 type UsersTableProps = {
+  getCachedUserRoles: (userId: number) => AdminRoleResponse[] | undefined;
   handleForceResetPassword: (user: AdminUserResponse) => Promise<void>;
   handleReplaceRoles: (userId: number, roleIds: number[]) => Promise<void>;
   isLoading: boolean;
   isSubmitting: boolean;
   limit: number;
+  loadUserRoles: (userId: number) => Promise<AdminRoleResponse[]>;
   onLimitChange: (limit: number) => void;
   onPageChange: (page: number) => void;
   page: number;
@@ -35,11 +37,13 @@ type UsersTableProps = {
 };
 
 export function UsersTable({
+  getCachedUserRoles,
   handleForceResetPassword,
   handleReplaceRoles,
   isLoading,
   isSubmitting,
   limit,
+  loadUserRoles,
   onLimitChange,
   onPageChange,
   page,
@@ -51,7 +55,7 @@ export function UsersTable({
   return (
     <Card className="border-[#4A5260] bg-[#0c1219] shadow-sm">
       <CardHeader>
-        <CardTitle className="text-lg text-[#EEEEEE]">Staff Table</CardTitle>
+        <CardTitle className="text-lg text-[#EEEEEE]">Users Table</CardTitle>
       </CardHeader>
       <CardContent>
         <Table>
@@ -79,56 +83,64 @@ export function UsersTable({
                 </TableCell>
               </TableRow>
             ) : (
-              users.map((user) => (
-                <TableRow
-                  className="border-[#4b535f] bg-[#0b1118] hover:bg-[#202832]"
-                  key={user.id}
-                >
-                  <TableCell>
-                    <Avatar>
-                      {user.avatarUrl ? (
-                        <AvatarImage alt={user.displayName || user.email} src={user.avatarUrl} />
-                      ) : null}
-                      <AvatarFallback className="bg-[#393E46] text-[#EEEEEE]">
-                        {getInitials(user)}
-                      </AvatarFallback>
-                    </Avatar>
-                  </TableCell>
-                  <TableCell className="font-medium text-[#EEEEEE]">
-                    {user.displayName || 'Unknown'}
-                  </TableCell>
-                  <TableCell className="text-[#aeb7c2]">{user.email}</TableCell>
-                  <TableCell className="max-w-[220px] truncate text-[#aeb7c2]">
-                    {getUserRoleNames(user)}
-                  </TableCell>
-                  <TableCell className="text-[#aeb7c2]">
-                    {new Date(user.createdAt).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end">
-                      <div className="inline-flex flex-wrap justify-end gap-1 rounded-lg border border-[#4A5260] bg-[#101820] p-1">
-                        <ManageRolesDialog
-                          currentRoles={user.roles ?? []}
-                          isSubmitting={isSubmitting}
-                          onSubmit={(roleIds) => handleReplaceRoles(user.id, roleIds)}
-                          roles={roles}
-                          user={user}
-                        />
-                        <Button
-                          className="border-transparent bg-[#1d242d] text-[#dce7f3] hover:border-[#FFD369] hover:bg-[#303640]"
-                          disabled={isSubmitting}
-                          onClick={() => void handleForceResetPassword(user)}
-                          size="sm"
-                          variant="outline"
-                        >
-                          <KeyRound className="size-3.5" />
-                          Reset
-                        </Button>
+              users.map((user) => {
+                const cachedRoles = getCachedUserRoles(user.id);
+                const currentRoles = cachedRoles ?? user.roles ?? [];
+                const tableUser = cachedRoles ? { ...user, roles: cachedRoles } : user;
+
+                return (
+                  <TableRow
+                    className="border-[#4b535f] bg-[#0b1118] hover:bg-[#202832]"
+                    key={user.id}
+                  >
+                    <TableCell>
+                      <Avatar>
+                        {user.avatarUrl ? (
+                          <AvatarImage alt={user.displayName || user.email} src={user.avatarUrl} />
+                        ) : null}
+                        <AvatarFallback className="bg-[#393E46] text-[#EEEEEE]">
+                          {getInitials(user)}
+                        </AvatarFallback>
+                      </Avatar>
+                    </TableCell>
+                    <TableCell className="font-medium text-[#EEEEEE]">
+                      {user.displayName || 'Unknown'}
+                    </TableCell>
+                    <TableCell className="text-[#aeb7c2]">{user.email}</TableCell>
+                    <TableCell className="max-w-[220px] truncate text-[#aeb7c2]">
+                      {cachedRoles || user.roles ? getUserRoleNames(tableUser) : 'Open roles'}
+                    </TableCell>
+                    <TableCell className="text-[#aeb7c2]">
+                      {new Date(user.createdAt).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex justify-end">
+                        <div className="inline-flex flex-wrap justify-end gap-1 rounded-lg border border-[#4A5260] bg-[#101820] p-1">
+                          <ManageRolesDialog
+                            currentRoles={currentRoles}
+                            hasLoadedCurrentRoles={Boolean(cachedRoles || user.roles)}
+                            isSubmitting={isSubmitting}
+                            onLoadRoles={() => loadUserRoles(user.id)}
+                            onSubmit={(roleIds) => handleReplaceRoles(user.id, roleIds)}
+                            roles={roles}
+                            user={user}
+                          />
+                          <Button
+                            className="border-transparent bg-[#1d242d] text-[#dce7f3] hover:border-[#FFD369] hover:bg-[#303640] disabled:opacity-60"
+                            disabled={isSubmitting}
+                            onClick={() => void handleForceResetPassword(user)}
+                            size="sm"
+                            variant="outline"
+                          >
+                            <KeyRound className="size-3.5" />
+                            Reset
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>

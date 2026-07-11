@@ -1261,11 +1261,13 @@ export class ProjectsService {
           reviews: 0,
           rating: 0,
           _totalRatingScore: 0,
+          _hasData: false,
         });
       }
 
       for (const row of rawStats) {
         const item = monthMap.get(row.month)!;
+        item._hasData = true;
         item.views += row.views;
         item.sales += row.sales;
         item.revenue += row.revenue;
@@ -1285,6 +1287,10 @@ export class ProjectsService {
       const months: any[] = [];
       for (let i = 1; i <= 12; i++) {
         const item = monthMap.get(i)!;
+        if (!item._hasData) {
+          continue;
+        }
+
         if (item.reviews > 0) {
           item.rating = item._totalRatingScore / item.reviews;
         } else {
@@ -1299,6 +1305,7 @@ export class ProjectsService {
         summary._totalRatingScore += item._totalRatingScore;
 
         delete item._totalRatingScore;
+        delete item._hasData;
         months.push(item);
       }
 

@@ -33,6 +33,8 @@ export default function AdminRolesClient() {
   const [rolePermissions, setRolePermissions] = useState<Record<number, AdminPermissionResponse[]>>(
     {},
   );
+  const [loadedRolePermissionIds, setLoadedRolePermissionIds] = useState<number[]>([]);
+  const [loadingRolePermissionIds, setLoadingRolePermissionIds] = useState<number[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [scopeFilter, setScopeFilter] = useState('all');
   const [defaultFilter, setDefaultFilter] = useState('all');
@@ -55,29 +57,13 @@ export default function AdminRolesClient() {
         getAdminRoles(),
         getAdminPermissions(),
       ]);
-      const nextRolePermissions = await Promise.all(
-        nextRoles.map(async (role) => ({
-          permissions: await getAdminRolePermissions(role.id),
-          roleId: role.id,
-        })),
-      );
 
       setRoles(nextRoles);
       setPermissions(nextPermissions);
-      setRolePermissions(
-        nextRolePermissions.reduce<Record<number, AdminPermissionResponse[]>>(
-          (currentPermissions, item) => ({
-            ...currentPermissions,
-            [item.roleId]: item.permissions,
-          }),
-          {},
-        ),
-      );
     } catch {
       setError('Unable to load roles.');
       setRoles([]);
       setPermissions([]);
-      setRolePermissions({});
     } finally {
       setIsLoading(false);
     }
@@ -95,6 +81,41 @@ export default function AdminRolesClient() {
     await loadRoles();
   };
 
+  const loadVisibleRolePermissions = useCallback(
+    async (roleIds: number[]) => {
+      const missingRoleIds = roleIds.filter(
+        (roleId) =>
+          !loadedRolePermissionIds.includes(roleId) && !loadingRolePermissionIds.includes(roleId),
+      );
+
+      if (!missingRoleIds.length) {
+        return;
+      }
+
+      setLoadingRolePermissionIds((currentIds) =>
+        Array.from(new Set([...currentIds, ...missingRoleIds])),
+      );
+
+      for (const roleId of missingRoleIds) {
+        try {
+          const nextPermissions = await getAdminRolePermissions(roleId);
+          setRolePermissions((currentRolePermissions) => ({
+            ...currentRolePermissions,
+            [roleId]: nextPermissions,
+          }));
+          setLoadedRolePermissionIds((currentIds) => Array.from(new Set([...currentIds, roleId])));
+        } catch {
+          setError('Unable to load role permissions.');
+        } finally {
+          setLoadingRolePermissionIds((currentIds) =>
+            currentIds.filter((currentId) => currentId !== roleId),
+          );
+        }
+      }
+    },
+    [loadedRolePermissionIds, loadingRolePermissionIds],
+  );
+
   const handleCreateRole = async (payload: RoleFormPayload) => {
     setIsSubmitting(true);
     setError(null);
@@ -104,6 +125,13 @@ export default function AdminRolesClient() {
       if (payload.permissionIds?.length) {
         await replaceAdminRolePermissions(role.id, payload.permissionIds);
       }
+      setRolePermissions((currentRolePermissions) => ({
+        ...currentRolePermissions,
+        [role.id]: permissions.filter((permission) =>
+          payload.permissionIds?.includes(getPermissionId(permission)),
+        ),
+      }));
+      setLoadedRolePermissionIds((currentIds) => Array.from(new Set([...currentIds, role.id])));
       await refreshRoles('Role created successfully.');
     } catch {
       setError('Unable to create role.');
@@ -122,6 +150,7 @@ export default function AdminRolesClient() {
         ...currentRolePermissions,
         [role.id]: permissions.filter((item) => permissionIds.includes(getPermissionId(item))),
       }));
+      setLoadedRolePermissionIds((currentIds) => Array.from(new Set([...currentIds, role.id])));
       setMessage('Role permissions updated successfully.');
     } catch {
       setError('Unable to update role permissions.');
@@ -159,6 +188,20 @@ export default function AdminRolesClient() {
 
     try {
       await Promise.all(roleIds.map((roleId) => deleteAdminRole(roleId)));
+      setRolePermissions((currentRolePermissions) => {
+        const nextRolePermissions = { ...currentRolePermissions };
+        roleIds.forEach((roleId) => {
+          delete nextRolePermissions[roleId];
+        });
+
+        return nextRolePermissions;
+      });
+      setLoadedRolePermissionIds((currentIds) =>
+        currentIds.filter((currentId) => !roleIds.includes(currentId)),
+      );
+      setLoadingRolePermissionIds((currentIds) =>
+        currentIds.filter((currentId) => !roleIds.includes(currentId)),
+      );
       await refreshRoles('Selected roles deleted successfully.');
     } catch {
       setError('Unable to delete selected roles. One or more roles may still be assigned.');
@@ -200,6 +243,16 @@ export default function AdminRolesClient() {
   const totalPages = Math.max(1, Math.ceil(visibleRoles.length / limit));
   const safePage = Math.min(page, totalPages);
   const paginatedRoles = visibleRoles.slice((safePage - 1) * limit, safePage * limit);
+
+  useEffect(() => {
+    if (isLoading || paginatedRoles.length === 0) {
+      return;
+    }
+
+    queueMicrotask(() => {
+      void loadVisibleRolePermissions(paginatedRoles.map((role) => role.id));
+    });
+  }, [isLoading, loadVisibleRolePermissions, paginatedRoles]);
 
   const handleSearchChange = (value: string) => {
     setPage(1);
@@ -272,16 +325,19 @@ export default function AdminRolesClient() {
       </div>
 
       <RolesTable
+        allRoles={sortedRoles}
         isLoading={isLoading}
         isSubmitting={isSubmitting}
         limit={limit}
+        loadedRolePermissionIds={loadedRolePermissionIds}
+        loadingRolePermissionIds={loadingRolePermissionIds}
         onCreateRole={handleCreateRole}
         onDeleteSelectedRoles={() => void handleDeleteRoles(selectedRoleIds)}
         onLimitChange={handleLimitChange}
         onPageChange={setPage}
         onReplaceRolePermissions={handleReplaceRolePermissions}
         onSelectedRoleIdsChange={setSelectedRoleIds}
-        onToggleRoleDefault={(role, isDefault) => void handleToggleRoleDefault(role, isDefault)}
+        onToggleRoleDefault={handleToggleRoleDefault}
         page={safePage}
         permissions={permissions}
         rolePermissions={rolePermissions}
