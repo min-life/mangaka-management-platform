@@ -12,9 +12,9 @@ import {
   MobileTaskDrawer,
 } from './FileTaskSidebars';
 import { FileVersionsTab } from './FileVersionsTab';
-import { CreateAnnotatedTaskDialog } from './CreateAnnotatedTaskDialog';
+import { TaskFormDialog } from './TaskFormDialog';
 import { CreateFrameCommentDialog } from './CreateFrameCommentDialog';
-import { VersionHistoryDrawer } from './VersionHistoryDrawer';
+
 import { type FileVersionItem } from '../file-ui';
 import type { FileDetailController } from './hooks/useFileDetailController';
 import { useRealtimeProjectActivity, useRealtimeComments } from '@/hooks/use-realtime-activity';
@@ -61,9 +61,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
     handleReplyToFrame,
     handleCreateReview,
     handleDeleteDiscussionComment,
-    handleDeleteVersion,
     handleFocusedTaskChange,
-    handleRestoreVersion,
     handleSubmitTaskWork,
     handleMarkReadyForReview,
     handleUpdateDiscussionComment,
@@ -107,15 +105,14 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
     setSelectedVersion,
     setSelectedVersionForDetails,
     setTaskDialogOpen,
-    setVersionHistoryOpen,
-    setVersionTabMode,
+
+
     setZoom,
     setDiscussionContext,
     startTaskFrameSelection,
+
     taskDialogOpen,
     tasks,
-    versionHistoryOpen,
-    versionTabMode,
     versions,
     zoom,
   } = controller;
@@ -155,6 +152,9 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
         assignedToName={assignedToName}
         file={file}
         folderTitle={folder?.title}
+        project={controller.project}
+        folders={controller.folders}
+        folder={folder}
         isSubmittingReview={isSubmittingReview}
         onCreateReview={handleCreateReview}
         onOpenMobileTasks={() => setMobileTasksOpen(true)}
@@ -263,14 +263,11 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
                   setSelectedVersion={setSelectedVersion}
                   selectedVersionForDetails={selectedVersionForDetails}
                   setSelectedVersionForDetails={setSelectedVersionForDetails}
-                  versionTabMode={versionTabMode}
-                  setVersionTabMode={setVersionTabMode}
-                  setVersionHistoryOpen={setVersionHistoryOpen}
+
+
                   canvasRef={canvasRef}
                   setSelectedSubmissionId={setSelectedSubmissionId}
-                  handleRestoreVersion={handleRestoreVersion}
-                  handleDeleteVersion={handleDeleteVersion}
-                  deletingVersionId={deletingVersionId}
+
                   isLoading={isLoading}
                   isSubmittingReview={isSubmittingReview}
                   setIsSubmittingReview={setIsSubmittingReview}
@@ -278,8 +275,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
                   loadFile={loadFile}
                   file={file}
                   setError={setError}
-                  canRestore={canRestoreVersion}
-                  canDelete={canDeleteVersion}
+
                 />
               ) : resourceTab === 'activity' ? (
                 <FileActivityPanel fileId={file.id} projectId={projectId} />
@@ -375,14 +371,9 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
         />
       </div>
 
-      <VersionHistoryDrawer
-        onOpenChange={setVersionHistoryOpen}
-        onViewVersion={setSelectedVersion}
-        onRestoreVersion={handleRestoreVersion}
-        open={versionHistoryOpen}
-        versions={versions}
-      />
-      <CreateAnnotatedTaskDialog
+
+      <TaskFormDialog
+        mode="create"
         members={members}
         tasks={tasks}
         onCancel={() => {
@@ -391,7 +382,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
           setAnnotationMode(false);
           setTaskDialogOpen(false);
         }}
-        onCreate={handleCreateAnnotatedTask}
+        onSubmit={handleCreateAnnotatedTask}
         open={taskDialogOpen}
       />
       <CreateFrameCommentDialog

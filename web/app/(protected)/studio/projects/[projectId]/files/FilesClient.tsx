@@ -314,7 +314,7 @@ export function FilesClient({ projectId }: FilesClientProps) {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-[24px] font-black leading-8 text-white">Files</h1>
+            <h1 className="text-[24px] font-black leading-8 text-white">Resources</h1>
             <RefreshingIndicator isRefreshing={isRefreshing} />
           </div>
           <p className="mt-1 text-sm font-medium text-[#aeb7c2]">
@@ -332,18 +332,34 @@ export function FilesClient({ projectId }: FilesClientProps) {
       </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-2 text-xs font-bold text-[#8b94a1]">
-        <span>{projectName || `Project #${projectId}`}</span>
+        {isInitialLoading && !projectName ? (
+          <div className="h-4 w-24 animate-pulse rounded bg-[#26303b]" />
+        ) : (
+          <span>{projectName || `Project #${projectId}`}</span>
+        )}
         <ChevronRight className="size-3.5" />
-        <span className="text-white">Files</span>
+        {selectedArc || selectedChapter ? (
+          <button onClick={handleBackToArcs} className="text-[#aeb7c2] hover:text-white transition-colors">
+            Resources
+          </button>
+        ) : (
+          <span className="text-white">Resources</span>
+        )}
+        
         {selectedArc ? (
           <>
             <ChevronRight className="size-3.5" />
-            <span className={selectedChapter ? 'text-white' : 'text-[#FFD369]'}>
-              {selectedArc.title}
-            </span>
+            {selectedChapter && selectedChapter.id !== selectedArc.id ? (
+              <button onClick={handleBackToChapters} className="text-[#aeb7c2] hover:text-white transition-colors">
+                {selectedArc.title}
+              </button>
+            ) : (
+              <span className="text-[#FFD369]">{selectedArc.title}</span>
+            )}
           </>
         ) : null}
-        {selectedChapter ? (
+        
+        {selectedChapter && selectedChapter.id !== selectedArc?.id ? (
           <>
             <ChevronRight className="size-3.5" />
             <span className="text-[#FFD369]">{selectedChapter.title}</span>

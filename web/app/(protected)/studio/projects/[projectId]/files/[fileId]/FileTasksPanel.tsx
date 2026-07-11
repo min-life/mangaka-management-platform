@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Circle, CircleCheck, Crosshair, FileText, Plus } from 'lucide-react';
+import { Circle, CircleCheck, Crosshair, FileText, Plus, Edit3, Trash2 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,8 @@ type FileTasksPanelProps = {
   canCreateTask: boolean;
   onCreateTask: () => void;
   onSelectTask: (taskId: string | null) => void;
+  onEditTask?: (task: FileTaskItem) => void;
+  onDeleteTask?: (task: FileTaskItem) => void;
   selectedTaskId: string | null;
   tasks: FileTaskItem[];
 };
@@ -25,6 +27,8 @@ export function FileTasksPanel({
   canCreateTask,
   onCreateTask,
   onSelectTask,
+  onEditTask,
+  onDeleteTask,
   selectedTaskId,
   tasks,
 }: FileTasksPanelProps) {
@@ -107,6 +111,34 @@ export function FileTasksPanel({
                   <Badge className={`rounded-[3px] border text-[9px] ${fileStatusClassName[task.status]}`}>
                     {fileStatusLabels[task.status]}
                   </Badge>
+                  <div className="flex items-center gap-1">
+                    {onEditTask && (
+                      <button
+                        type="button"
+                        className="p-1 rounded text-[#8b94a1] hover:text-white hover:bg-[#202832] transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditTask(task);
+                        }}
+                        title="Edit Task"
+                      >
+                        <Edit3 className="size-3.5" />
+                      </button>
+                    )}
+                    {onDeleteTask && (
+                      <button
+                        type="button"
+                        className="p-1 rounded text-[#8b94a1] hover:text-red-400 hover:bg-[#451a1a] transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteTask(task);
+                        }}
+                        title="Delete Task"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </button>

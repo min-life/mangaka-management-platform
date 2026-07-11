@@ -298,36 +298,30 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
       let dbTaskComments: SubmissionFrameComment[] = [];
 
       try {
-        const fileCommentsRes = await getFileComments(fileId);
-        if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
-
-        dbComments = (fileCommentsRes || []).map((c: any) => ({
-          author: c.createdByUser?.displayName || c.createdByUser?.email || `User #${c.createdByUser?.id || c.createdBy || c.userId}`,
-          content: getCommentText(c.content),
-          id: String(c.id),
-          time: c.createdAt ? formatFileDate(c.createdAt) : '',
-        }));
-      } catch (err) {
-        console.error('Failed to load file comments:', err);
-      }
-
-      try {
         if (selectedTaskId) {
           const taskCommentsRes = await getTaskComments(selectedTaskId);
           if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
 
-          dbComments = dbComments.concat(
-            (taskCommentsRes || []).map((c: any) => ({
-              author: c.createdByUser?.displayName || c.createdByUser?.email || `User #${c.createdByUser?.id || c.createdBy || c.userId}`,
-              content: getCommentText(c.content),
-              id: String(c.id),
-              time: c.createdAt ? formatFileDate(c.createdAt) : '',
-              context: `task:${selectedTaskId}`,
-            }))
-          );
+          dbComments = (taskCommentsRes || []).map((c: any) => ({
+            author: c.createdByUser?.displayName || c.createdByUser?.email || `User #${c.createdByUser?.id || c.createdBy || c.userId}`,
+            content: getCommentText(c.content),
+            id: String(c.id),
+            time: c.createdAt ? formatFileDate(c.createdAt) : '',
+            context: `task:${selectedTaskId}`,
+          }));
+        } else {
+          const fileCommentsRes = await getFileComments(fileId);
+          if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
+
+          dbComments = (fileCommentsRes || []).map((c: any) => ({
+            author: c.createdByUser?.displayName || c.createdByUser?.email || `User #${c.createdByUser?.id || c.createdBy || c.userId}`,
+            content: getCommentText(c.content),
+            id: String(c.id),
+            time: c.createdAt ? formatFileDate(c.createdAt) : '',
+          }));
         }
       } catch (err) {
-        console.error('Failed to load task comments:', err);
+        console.error('Failed to load comments:', err);
       }
 
       try {
@@ -401,6 +395,7 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
           createdBy: createdByLabel,
           createdAt: response.createdAt ? formatFileDate(response.createdAt) : '',
           status: (response as any).status || 'DRAFT',
+          folderId: (response as any).folder?.id,
         } as unknown) as FileExplorerItem,
         versions: dbVersions,
         tasks: dbTasks,

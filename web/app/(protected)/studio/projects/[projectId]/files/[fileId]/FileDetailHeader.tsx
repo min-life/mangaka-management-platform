@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, FileText } from 'lucide-react';
+import { ArrowLeft, ChevronRight, FileText } from 'lucide-react';
 
 import { useSearchParams } from 'next/navigation';
 
@@ -19,6 +19,9 @@ type FileDetailHeaderProps = {
   onCreateReview: (data: { title: string; description?: string; type: ApplicationType }) => Promise<void>;
   onOpenMobileTasks: () => void;
   projectId: number;
+  project?: any;
+  folder?: any;
+  folders?: any[];
   taskCount: number;
   versions: FileVersionItem[];
 };
@@ -31,6 +34,9 @@ export function FileDetailHeader({
   onCreateReview,
   onOpenMobileTasks,
   projectId,
+  project,
+  folder,
+  folders,
   taskCount,
   versions,
 }: FileDetailHeaderProps) {
@@ -38,18 +44,45 @@ export function FileDetailHeader({
   const backParam = searchParams.get('back');
   const backHref = backParam ? decodeURIComponent(backParam) : `/studio/projects/${projectId}/files`;
 
+  const projectName = project?.name || `Project #${projectId}`;
+  const fullFolder = folder ? folders?.find(f => f.id === folder.id) : null;
+  const arc = fullFolder?.parentId ? folders?.find(f => f.id === fullFolder.parentId) : fullFolder;
+  const chapter = fullFolder?.parentId ? fullFolder : null;
+
   return (
     <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-[#26303b] bg-[#151c25] px-5 py-3">
-      <div className="flex items-center gap-3">
-        <Link
-          className="mr-2 flex items-center gap-1.5 rounded-[4px] border border-[#39424f] bg-[#0d151e]/50 px-2.5 py-1.5 text-xs font-black text-[#8b94a1] transition-colors hover:bg-[#303842] hover:text-white"
-          href={backHref}
-        >
-          <ArrowLeft className="size-3.5" />
-          <span>Back</span>
+      <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-[#8b94a1] overflow-hidden whitespace-nowrap">
+
+        
+        <span className="hidden md:inline">{projectName}</span>
+        <ChevronRight className="size-3.5 hidden md:inline" />
+        <Link href={`/studio/projects/${projectId}/files`} className="hidden md:inline hover:text-white transition-colors">
+          Resources
         </Link>
-        <FileText className="size-5 text-[#FFD369]" />
-        <h1 className="text-base font-black text-white">{file.title}</h1>
+
+        {arc ? (
+          <>
+            <ChevronRight className="size-3.5" />
+            <Link href={`/studio/projects/${projectId}/files?arcId=${arc.id}`} className="hover:text-white transition-colors">
+              {arc.title}
+            </Link>
+          </>
+        ) : null}
+
+        {chapter && chapter.id !== arc?.id ? (
+          <>
+            <ChevronRight className="size-3.5" />
+            <Link href={`/studio/projects/${projectId}/files?arcId=${arc?.id || ''}&chapterId=${chapter.id}`} className="hover:text-white transition-colors">
+              {chapter.title}
+            </Link>
+          </>
+        ) : null}
+
+        <ChevronRight className="size-3.5" />
+        <div className="flex items-center gap-1.5 text-white">
+          <FileText className="size-4 text-[#FFD369]" />
+          <span>{file.title}</span>
+        </div>
       </div>
 
       <div className="flex items-center gap-3">

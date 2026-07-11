@@ -300,15 +300,7 @@ export function FileActivityPanel({ fileId, projectId, onTaskClick }: FileActivi
 
   return (
     <section>
-      <div className="flex items-center justify-between gap-3 border-b border-[#26303b] pb-3">
-        <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.08em] text-white">
-          <Activity className="size-4 text-[#FFD369]" />
-          Activity
-        </div>
-        <span className="text-[9px] font-black uppercase tracking-[0.08em] text-[#8b94a1]">
-          File #{fileId}
-        </span>
-      </div>
+
 
       {isLoading ? (
         <ActivitySkeleton />

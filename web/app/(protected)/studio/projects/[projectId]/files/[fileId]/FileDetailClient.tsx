@@ -45,7 +45,7 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
             href={backHref}
           >
             <ArrowLeft className="size-4" />
-            Back to Files
+            Back to Resources
           </Link>
         </div>
       </div>

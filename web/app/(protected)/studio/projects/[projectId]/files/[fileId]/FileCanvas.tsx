@@ -89,25 +89,6 @@ export function FileCanvas({ controller }: FileCanvasProps) {
             Reviewing Submission
           </Badge>
         </div>
-      ) : selectedVersion && isViewingHistoricalVersion ? (
-        <div className="mb-3 flex items-center justify-between gap-3 rounded-[4px] border border-[#6c5516] bg-[#30270d] px-4 py-3">
-          <div>
-            <p className="text-xs font-black text-[#ffd35b]">
-              Viewing v{selectedVersion.version} · Read only *
-            </p>
-            <p className="mt-1 text-[10px] font-bold text-[#d9bd70]">{selectedVersion.note}</p>
-          </div>
-          <Button
-            className="h-8 rounded-[4px] border-[#806719] bg-[#101820] px-3 text-[10px] font-black text-white hover:bg-[#303842]"
-            onClick={() => {
-              setSelectedVersion(null);
-              setSelectedSubmissionId(null);
-            }}
-            variant="outline"
-          >
-            Back to Current
-          </Button>
-        </div>
       ) : null}
 
       {frameAnnotationMode ? (

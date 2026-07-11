@@ -60,94 +60,9 @@ export function FocusedTaskWorkspace({
   onRefresh,
 }: FocusedTaskWorkspaceProps) {
   const [reviewNote, setReviewNote] = useState('');
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editTitle, setEditTitle] = useState('');
-  const [editDescription, setEditDescription] = useState('');
-  const [editAssigneeId, setEditAssigneeId] = useState('');
-  const [editStatus, setEditStatus] = useState<string>('PENDING');
-  const [editDueDate, setEditDueDate] = useState('');
-  const [isSavingEdit, setIsSavingEdit] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] = useState(false);
+  
 
-  const handleOpenEdit = () => {
-    setEditTitle(task.title);
-    setEditDescription(task.description);
-    setEditAssigneeId(task.assigneeId ? String(task.assigneeId) : '');
-    setEditStatus(task.status);
-    
-    if (task.dueDate && task.dueDate !== 'No due date') {
-      const parsedDate = new Date(task.dueDate);
-      if (!isNaN(parsedDate.getTime())) {
-        const year = parsedDate.getFullYear();
-        const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
-        const day = String(parsedDate.getDate()).padStart(2, '0');
-        setEditDueDate(`${year}-${month}-${day}`);
-      } else {
-        setEditDueDate('');
-      }
-    } else {
-      setEditDueDate('');
-    }
-    
-    setIsEditDialogOpen(true);
-  };
 
-  const handleUpdateTaskSubmit = async () => {
-    setIsSavingEdit(true);
-    try {
-      let deadline: string | undefined = undefined;
-      if (editDueDate) {
-        const dateObj = new Date(editDueDate);
-        if (!isNaN(dateObj.getTime())) {
-          deadline = dateObj.toISOString();
-        }
-      }
-
-      await updateTask(task.id, {
-        title: editTitle.trim(),
-        description: editDescription.trim(),
-        status: editStatus as any,
-        assignedBy: editAssigneeId ? Number(editAssigneeId) : undefined,
-        deadline,
-      });
-
-      setIsEditDialogOpen(false);
-      if (onRefresh) {
-        await onRefresh();
-      }
-      toast.success('Task updated successfully.');
-    } catch (err) {
-      console.error('Failed to update task:', err);
-      toast.error('Failed to update task. Please try again.');
-    } finally {
-      setIsSavingEdit(false);
-    }
-  };
-
-  const handleDeleteClick = () => {
-    setIsConfirmDeleteDialogOpen(true);
-  };
-
-  const handleDeleteTaskConfirm = async () => {
-    setIsDeleting(true);
-    try {
-      await deleteTask(task.id);
-      toast.success('Task deleted successfully.');
-      setIsConfirmDeleteDialogOpen(false);
-      if (onClose) {
-        onClose();
-      }
-      if (onRefresh) {
-        await onRefresh();
-      }
-    } catch (err) {
-      console.error('Failed to delete task:', err);
-      toast.error('Failed to delete task. Please try again.');
-    } finally {
-      setIsDeleting(false);
-    }
-  };
 
   const selectedSubmission = task.submissions.find(
     (submission) => submission.id === selectedSubmissionId,
@@ -187,142 +102,7 @@ export function FocusedTaskWorkspace({
     setReviewNote('');
   };
 
-  const renderEditDialog = () => (
-    <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-      <DialogContent
-        className="border border-[#26303b] bg-[#0d151e] text-white sm:max-w-[425px]"
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onInteractOutside={(e) => e.preventDefault()}
-      >
-        <DialogHeader>
-          <DialogTitle className="text-sm font-black uppercase tracking-[0.08em] text-white">
-            Edit Task Details
-          </DialogTitle>
-          <DialogDescription className="text-[11px] text-[#8b94a1]">
-            Modify the task settings. Click save when you are done.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-4 text-xs">
-          <div className="flex flex-col gap-2">
-            <label htmlFor="edit-title" className="font-bold text-[#8b94a1]">Title</label>
-            <input
-              id="edit-title"
-              className="h-9 w-full border border-[#39424f] bg-[#101820] px-3 text-white outline-none placeholder:text-[#5b626d] focus:border-[#FFD369]"
-              placeholder="Task title"
-              value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <label htmlFor="edit-desc" className="font-bold text-[#8b94a1]">Description</label>
-            <textarea
-              id="edit-desc"
-              className="h-20 w-full resize-none border border-[#39424f] bg-[#101820] p-3 text-white outline-none placeholder:text-[#5b626d] focus:border-[#FFD369]"
-              placeholder="Description of work needed..."
-              value={editDescription}
-              onChange={(e) => setEditDescription(e.target.value)}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-2">
-              <label htmlFor="edit-status" className="font-bold text-[#8b94a1]">Status</label>
-              <select
-                id="edit-status"
-                className="h-9 border border-[#39424f] bg-[#101820] px-2 text-white outline-none focus:border-[#FFD369]"
-                value={editStatus}
-                onChange={(e) => setEditStatus(e.target.value)}
-              >
-                <option value="PENDING">Pending</option>
-                <option value="INPROGRESS">In Progress</option>
-                <option value="REVIEW">Review</option>
-                <option value="DONE">Done</option>
-              </select>
-            </div>
-            <div className="flex flex-col gap-2">
-              <label htmlFor="edit-due" className="font-bold text-[#8b94a1]">Due Date</label>
-              <input
-                id="edit-due"
-                type="date"
-                className="h-9 border border-[#39424f] bg-[#101820] px-2 text-white outline-none focus:border-[#FFD369] [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:cursor-pointer"
-                value={editDueDate}
-                onChange={(e) => setEditDueDate(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="flex flex-col gap-2">
-            <label htmlFor="edit-assignee" className="font-bold text-[#8b94a1]">Assignee</label>
-            <select
-              id="edit-assignee"
-              className="h-9 border border-[#39424f] bg-[#101820] px-2 text-white outline-none focus:border-[#FFD369]"
-              value={editAssigneeId}
-              onChange={(e) => setEditAssigneeId(e.target.value)}
-            >
-              <option value="">Unassigned</option>
-              {members.map((m) => (
-                <option key={m.id} value={String(m.id)}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <DialogFooter className="gap-2 sm:gap-0">
-          <DialogClose asChild>
-            <Button type="button" variant="ghost" className="h-9 text-xs font-bold text-[#8b94a1] hover:bg-[#222831] hover:text-white">
-              Cancel
-              </Button>
-          </DialogClose>
-          <Button
-            type="button"
-            className="h-9 bg-[#FFD369] px-4 text-xs font-black text-[#222831] hover:bg-[#eac04f]"
-            disabled={isSavingEdit || !editTitle.trim()}
-            onClick={handleUpdateTaskSubmit}
-          >
-            {isSavingEdit ? 'Saving...' : 'Save Changes'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
 
-  const renderDeleteConfirmDialog = () => (
-    <Dialog open={isConfirmDeleteDialogOpen} onOpenChange={setIsConfirmDeleteDialogOpen}>
-      <DialogContent
-        className="max-w-md gap-0 overflow-hidden rounded-[7px] border border-[#39424f] bg-[#101820] p-0 text-white"
-        showCloseButton={false}
-      >
-        <DialogHeader className="border-b border-[#39424f] px-6 py-5">
-          <div className="mb-3 grid size-10 place-items-center rounded-[4px] border border-[#6b2637] bg-[#371522] text-[#ff9ab3]">
-            <AlertTriangle className="size-5" />
-          </div>
-          <DialogTitle className="text-xl font-black text-white">Delete Task</DialogTitle>
-          <DialogDescription className="text-sm font-medium text-[#aeb7c2]">
-            Are you sure you want to delete this task? This action cannot be undone.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="mx-0 mb-0 rounded-none border-[#39424f] bg-[#151c25] px-6 py-4">
-          <DialogClose asChild>
-            <Button
-              className="h-9 rounded-[4px] border-[#4b535f] bg-[#101820] px-4 text-xs font-black text-white hover:bg-[#303842]"
-              type="button"
-              variant="outline"
-            >
-              Cancel
-            </Button>
-          </DialogClose>
-          <Button
-            className="h-9 rounded-[4px] border-[#6b2637] bg-[#371522] px-4 text-xs font-black text-[#ff9ab3] hover:bg-[#4a1d2c]"
-            disabled={isDeleting}
-            onClick={handleDeleteTaskConfirm}
-            type="button"
-            variant="outline"
-          >
-            {isDeleting ? 'Deleting...' : 'Delete Task'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
 
   if (selectedSubmission) {
     const canAct = canReview && task.status === 'REVIEW' && selectedSubmission.status === 'PENDING_REVIEW';
@@ -338,25 +118,6 @@ export function FocusedTaskWorkspace({
               <Badge className="rounded-[3px] border border-[#6c5516] bg-[#30270d] text-[9px] text-[#ffd35b]">
                 {selectedSubmission.status.replaceAll('_', ' ')}
               </Badge>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="size-6 text-[#8b94a1] hover:text-white"
-                onClick={handleOpenEdit}
-                title="Edit Task"
-              >
-                <Edit3 className="size-3.5" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="size-6 text-[#8b94a1] hover:text-red-400"
-                onClick={handleDeleteClick}
-                title="Delete Task"
-                disabled={isDeleting}
-              >
-                <Trash2 className="size-3.5" />
-              </Button>
               {onClose && (
                 <Button
                   size="icon"
@@ -430,8 +191,6 @@ export function FocusedTaskWorkspace({
           )
         ) : null}
       </section>
-      {renderEditDialog()}
-      {renderDeleteConfirmDialog()}
     </>
   );
 }
@@ -447,25 +206,7 @@ export function FocusedTaskWorkspace({
             <Badge className={`rounded-[3px] border text-[9px] ${taskStatusClassName[task.status]}`}>
               {taskStatusLabels[task.status]}
             </Badge>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="size-6 text-[#8b94a1] hover:text-white"
-              onClick={handleOpenEdit}
-              title="Edit Task"
-            >
-              <Edit3 className="size-3.5" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="size-6 text-[#8b94a1] hover:text-red-400"
-              onClick={handleDeleteClick}
-              title="Delete Task"
-              disabled={isDeleting}
-            >
-              <Trash2 className="size-3.5" />
-            </Button>
+
             {onClose && (
               <Button
                 size="icon"
@@ -534,8 +275,6 @@ export function FocusedTaskWorkspace({
         </div>
       ) : null}
       </section>
-      {renderEditDialog()}
-      {renderDeleteConfirmDialog()}
     </>
   );
 }

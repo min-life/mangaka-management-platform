@@ -46,13 +46,13 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const [resourceTab, setResourceTab] = useState<ResourceTab>('versions');
-  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
+
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
   const [isSavingComment, setIsSavingComment] = useState(false);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [replyingFrameId, setReplyingFrameId] = useState<string | null>(null);
-  const [versionTabMode, setVersionTabMode] = useState<'list' | 'detail'>('list');
+
   const [selectedVersionForDetails, setSelectedVersionForDetails] = useState<FileVersionItem | null>(null);
   const [deletingVersionId, setDeletingVersionId] = useState<string | null>(null);
   const [mobileTasksOpen, setMobileTasksOpen] = useState(false);
@@ -180,8 +180,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
 
   const {
     handleCreateReview,
-    handleRestoreVersion,
-    handleDeleteVersion,
+
   } = useFileDetailVersionActions({
     projectId,
     file,
@@ -196,7 +195,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     setSelectedSubmissionId,
     setDeletingVersionId,
     setSelectedVersionForDetails,
-    setVersionTabMode,
+
   });
 
   const setFileCustom = useCallback((update: any) => {
@@ -328,15 +327,23 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     ? frameComments.filter((comment) => comment.materialId === currentMaterialId)
     : [];
   const canvasFrameComments = currentMaterialFrameComments;
-  const discussionFrameComments = frameComments;
   const selectedSubmissionIndex = selectedSubmission
     ? focusedTask?.submissions.findIndex((submission) => submission.id === selectedSubmission.id) ?? -1
     : -1;
-  const discussionContextKey = selectedSubmission
-    ? `submission:${selectedSubmission.id}`
-    : focusedTask
-      ? `task:${focusedTask.id}`
-      : 'file';
+  const discussionContextKey = focusedTask
+    ? `task:${focusedTask.id}`
+    : 'file';
+
+  const discussionFrameComments = useMemo(() => {
+    if (discussionContextKey === 'file') {
+      return frameComments.filter((c) => !c.taskId);
+    }
+    if (discussionContextKey.startsWith('task:')) {
+      const taskId = discussionContextKey.replace('task:', '');
+      return frameComments.filter((c) => String(c.taskId) === taskId);
+    }
+    return frameComments;
+  }, [frameComments, discussionContextKey]);
   const discussionContextLabel = selectedSubmission
     ? `Review: Submission #${(focusedTask?.submissions.length ?? 0) - selectedSubmissionIndex}`
     : focusedTask
@@ -384,6 +391,8 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     fileComments,
     taskComments,
     folder,
+    folders,
+    project,
     focusFileTask,
     focusedTask,
     frameAnnotationMode,
@@ -396,9 +405,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     handleReplyToFrame,
     handleCreateReview,
     handleDeleteDiscussionComment,
-    handleDeleteVersion,
     handleFocusedTaskChange,
-    handleRestoreVersion,
     handleSubmitTaskWork,
     handleMarkReadyForReview: canSubmitTask ? handleMarkReadyForReview : undefined,
     handleUpdateDiscussionComment,
@@ -445,15 +452,15 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     setSelectedVersion,
     setSelectedVersionForDetails,
     setTaskDialogOpen,
-    setVersionHistoryOpen,
-    setVersionTabMode,
+
+
     setZoom,
     setDiscussionContext,
     startTaskFrameSelection,
     taskDialogOpen,
     tasks,
-    versionHistoryOpen,
-    versionTabMode,
+
+
     versions,
     zoom,
   };

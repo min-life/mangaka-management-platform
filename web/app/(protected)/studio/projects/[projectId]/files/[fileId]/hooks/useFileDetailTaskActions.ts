@@ -58,11 +58,11 @@ export function useFileDetailTaskActions({
   setVersions,
 }: TaskActionsProps) {
   const handleCreateAnnotatedTask = async (
-    task: FileTaskItem,
+    task: Partial<FileTaskItem>,
     options?: { assignedBy?: number; parentId?: number },
   ) => {
     try {
-      const statusValue = task.status;
+      const statusValue = task.status || 'PENDING';
       let deadline: string | undefined = undefined;
       if (task.dueDate) {
         const cleanedDate = task.dueDate.replace(/\s*\*$/, '');
@@ -78,10 +78,10 @@ export function useFileDetailTaskActions({
           ? `v${versions[0].version}`
           : 'v1';
 
-      const description = `${task.description.replace(/\s*\*$/, '')}\n[version:${targetVersionTag}]`;
+      const description = `${(task.description || '').replace(/\s*\*$/, '')}\n[version:${targetVersionTag}]`;
 
       const createdTaskRes = await createFileTask(fileId, {
-        title: task.title.replace(/\s*\*$/, ''),
+        title: (task.title || '').replace(/\s*\*$/, ''),
         description,
         status: statusValue,
         deadline: deadline,
