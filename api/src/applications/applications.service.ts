@@ -97,13 +97,14 @@ export class ApplicationsService {
     private readonly cacheService: CacheService,
   ) {}
 
-  @UseCache((args) => `application:list`)
+  @UseCache((args) => `application:list${args[0]?.userId ? `:${args[0].userId}` : ''}`)
   async getApplications(
     filter?: {
       projectId?: number;
       search?: string;
       type?: APPLICATION_TYPE;
       status?: APPLICATION_STATUS;
+      userId?: number;
     },
     sort?: { field: 'title' | 'createdAt'; order: 'asc' | 'desc' },
     pagination?: Pagination,
@@ -114,6 +115,7 @@ export class ApplicationsService {
         ...(filter?.search && { title: { contains: filter.search, mode: 'insensitive' } }),
         ...(filter?.type && { type: filter.type }),
         ...(filter?.status && { status: filter.status }),
+        ...(filter?.userId && { createdBy: filter.userId }),
       };
       const orderBy: Prisma.ApplicationOrderByWithRelationInput = sort
         ? { [sort.field]: sort.order }
