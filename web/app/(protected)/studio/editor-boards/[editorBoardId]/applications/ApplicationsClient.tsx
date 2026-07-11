@@ -12,6 +12,7 @@ import {
   updateApplicationStatus,
 } from '@/services/application.service';
 import { getEditorBoardApplications } from '@/services/editor-board.service';
+import { getMyBoardPermissions } from '@/services/permission.service';
 
 import { ApplicationReviewDrawer } from './ApplicationReviewDrawer';
 import {
@@ -27,7 +28,6 @@ type ApplicationsClientProps = {
 
 export type EditorBoardApplicationStatus =
   | ApplicationStatus
-  | 'INTERNAL_APPROVED'
   | 'SUBMITTED';
 
 export type EditorBoardApplicationType =
@@ -46,7 +46,6 @@ export type EditorBoardApplicationResponse = Omit<ApplicationResponse, 'status' 
 const STATUS_FILTERS = [
   'ALL',
   'SUBMITTED',
-  'INTERNAL_APPROVED',
   'APPROVE',
   'REJECT',
 ] as const;
@@ -73,6 +72,7 @@ async function getApplicationDetails(applicationId: number | string) {
 // PhucTD #editor-board start
 export function ApplicationsClient({ editorBoardId }: ApplicationsClientProps) {
   const [applications, setApplications] = useState<EditorBoardApplicationResponse[]>([]);
+  const [permissions, setPermissions] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [isLoading, setIsLoading] = useState(true);
@@ -81,14 +81,24 @@ export function ApplicationsClient({ editorBoardId }: ApplicationsClientProps) {
   const [selectedApplication, setSelectedApplication] =
     useState<EditorBoardApplicationResponse | null>(null);
 
+  // Derived permission flags
+  const canApprove =
+    permissions.includes('admin') ||
+    permissions.includes('board:owner') ||
+    permissions.includes('board:leader') ||
+    permissions.includes('board:application.approve');
+
   const loadApplications = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const response =
-        await getEditorBoardApplications<EditorBoardApplicationResponse>(editorBoardId);
+      const [response, permissionResult] = await Promise.all([
+        getEditorBoardApplications<EditorBoardApplicationResponse>(editorBoardId),
+        getMyBoardPermissions(editorBoardId),
+      ]);
       setApplications(response.applications);
+      setPermissions(permissionResult);
     } catch {
       setError('Unable to load applications.');
       setApplications([]);
@@ -293,6 +303,7 @@ export function ApplicationsClient({ editorBoardId }: ApplicationsClientProps) {
 
       <ApplicationReviewDrawer
         application={selectedApplication}
+        canApprove={canApprove}
         isSubmitting={isSubmitting}
         onOpenChange={(open) => {
           if (!open) {

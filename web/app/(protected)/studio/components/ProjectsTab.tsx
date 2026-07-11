@@ -3,9 +3,16 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { ImageIcon, Settings, Loader2, ChevronsUpDown, ChevronUp, ChevronDown } from 'lucide-react';
+import { ImageIcon, Settings, Loader2, ChevronsUpDown, ChevronUp, ChevronDown, MoreVertical, Pencil, Trash2, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Can } from '@/components/auth/Can';
+import { useAuth } from '@/hooks/useAuth';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Table,
   TableBody,
@@ -42,6 +49,8 @@ type ProjectsTabProps = {
   isLoadingProjects: boolean;
   viewMode: 'gallery' | 'table';
   onStartEdit: (project: ProjectResponse) => void;
+  onDeleteProject: (project: ProjectResponse) => void;
+  onLeaveProject: (project: ProjectResponse) => void;
   formatUserName: (user?: any) => string;
   page: number;
   limit: number;
@@ -61,6 +70,8 @@ export function ProjectsTab({
   isLoadingProjects,
   viewMode,
   onStartEdit,
+  onDeleteProject,
+  onLeaveProject,
   formatUserName,
   page,
   limit,
@@ -73,6 +84,7 @@ export function ProjectsTab({
   onSort,
 }: ProjectsTabProps) {
   const router = useRouter();
+  const { user: currentUser } = useAuth();
 
   if (viewMode === 'gallery') {
     if (isLoadingProjects) {
@@ -109,27 +121,57 @@ export function ProjectsTab({
                 <ProjectCoverImage imageUrl={project.image} />
                 <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#0c1219] to-transparent" />
               </Link>
-              <Can
-                any={['admin', 'project:owner', 'project:update']}
-                resource="PROJECT"
-                resourceId={project.projectId}
-              >
-                <Button
-                  className="absolute bottom-3 right-3 size-7 shrink-0 rounded-full bg-[#101820]/80 text-white hover:bg-[#393E46]"
-                  size="icon"
-                  variant="ghost"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const originalProject = projects.find((p) => p.id === project.projectId);
-                    if (originalProject) {
-                      onStartEdit(originalProject);
-                    }
-                  }}
-                >
-                  <Settings className="size-4" />
-                </Button>
-              </Can>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                  <Button
+                    className="absolute bottom-3 right-3 size-7 shrink-0 rounded-full bg-[#101820]/80 text-white hover:bg-[#393E46]"
+                    size="icon"
+                    variant="ghost"
+                  >
+                    <MoreVertical className="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48 border-[#39424f] bg-[#151c25] text-white">
+                  {currentUser?.id === project.createdByUser?.id ? (
+                    <>
+                      <DropdownMenuItem
+                        className="cursor-pointer font-bold focus:bg-[#303842] focus:text-white"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const originalProject = projects.find((p) => p.id === project.projectId);
+                          if (originalProject) onStartEdit(originalProject);
+                        }}
+                      >
+                        <Pencil className="mr-2 size-4 text-[#aeb7c2]" />
+                        Edit Project
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="cursor-pointer font-bold text-red-400 focus:bg-[#303842] focus:text-red-400"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const originalProject = projects.find((p) => p.id === project.projectId);
+                          if (originalProject) onDeleteProject(originalProject);
+                        }}
+                      >
+                        <Trash2 className="mr-2 size-4" />
+                        Delete Project
+                      </DropdownMenuItem>
+                    </>
+                  ) : (
+                    <DropdownMenuItem
+                      className="cursor-pointer font-bold text-red-400 focus:bg-[#303842] focus:text-red-400"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const originalProject = projects.find((p) => p.id === project.projectId);
+                        if (originalProject) onLeaveProject(originalProject);
+                      }}
+                    >
+                      <LogOut className="mr-2 size-4" />
+                      Leave Project
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
 
             <div className="p-3.5">
@@ -183,8 +225,14 @@ export function ProjectsTab({
             <TableHead className="w-[220px] text-[10px] font-black uppercase tracking-[0.08em] text-[#eef6ff]">
               Editor Board
             </TableHead>
-            <TableHead className="w-[120px] text-center text-[10px] font-black uppercase tracking-[0.08em] text-[#eef6ff]">
-              Team
+            <TableHead 
+              className="w-[140px] text-[10px] font-black uppercase tracking-[0.08em] text-[#eef6ff] cursor-pointer select-none hover:text-white"
+              onClick={() => onSort('createdAt')}
+            >
+              <div className="flex items-center gap-1.5">
+                Created At
+                <SortIcon activeField={sortField} activeOrder={sortOrder} field="createdAt" />
+              </div>
             </TableHead>
             <TableHead 
               className="w-[180px] text-[10px] font-black uppercase tracking-[0.08em] text-[#eef6ff] cursor-pointer select-none hover:text-white"
@@ -262,32 +310,64 @@ export function ProjectsTab({
                 <TableCell className="text-xs font-bold text-white">
                   {project.editorBoard}
                 </TableCell>
-                <TableCell className="text-center text-xs font-bold text-white">
-                  {project.memberCount} {project.memberCount === 1 ? 'member' : 'members'}
+                <TableCell className="text-xs font-bold text-white">
+                  {project.created}
                 </TableCell>
                 <TableCell className="text-xs font-bold text-white">
                   {project.updated}
                 </TableCell>
                 <TableCell className="pr-5 text-right" onClick={(e) => e.stopPropagation()}>
-                  <Can
-                    any={['admin', 'project:owner', 'project:update']}
-                    resource="PROJECT"
-                    resourceId={project.projectId}
-                  >
-                    <Button
-                      className="size-7 text-white hover:bg-[#393E46]"
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => {
-                        const originalProject = projects.find((p) => p.id === project.projectId);
-                        if (originalProject) {
-                          onStartEdit(originalProject);
-                        }
-                      }}
-                    >
-                      <Settings className="size-4" />
-                    </Button>
-                  </Can>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        className="size-7 text-white hover:bg-[#393E46]"
+                        size="icon"
+                        variant="ghost"
+                      >
+                        <MoreVertical className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48 border-[#39424f] bg-[#151c25] text-white">
+                      {currentUser?.id === project.createdByUser?.id ? (
+                        <>
+                          <DropdownMenuItem
+                            className="cursor-pointer font-bold focus:bg-[#303842] focus:text-white"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const originalProject = projects.find((p) => p.id === project.projectId);
+                              if (originalProject) onStartEdit(originalProject);
+                            }}
+                          >
+                            <Pencil className="mr-2 size-4 text-[#aeb7c2]" />
+                            Edit Project
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="cursor-pointer font-bold text-red-400 focus:bg-[#303842] focus:text-red-400"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const originalProject = projects.find((p) => p.id === project.projectId);
+                              if (originalProject) onDeleteProject(originalProject);
+                            }}
+                          >
+                            <Trash2 className="mr-2 size-4" />
+                            Delete Project
+                          </DropdownMenuItem>
+                        </>
+                      ) : (
+                        <DropdownMenuItem
+                          className="cursor-pointer font-bold text-red-400 focus:bg-[#303842] focus:text-red-400"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const originalProject = projects.find((p) => p.id === project.projectId);
+                            if (originalProject) onLeaveProject(originalProject);
+                          }}
+                        >
+                          <LogOut className="mr-2 size-4" />
+                          Leave Project
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
               </TableRow>
             ))

@@ -17,7 +17,6 @@ export const applicationTypeLabels: Record<ApplicationType, string> = {
 export const applicationStatusClassName: Record<ApplicationStatus, string> = {
   APPROVE: 'border-[#315846] bg-[#14291f] text-[#9df2c7]',
   CANCELLED: 'border-[#4a4f55] bg-[#20282b] text-[#dce7f3]',
-  INTERNAL_APPROVED: 'border-[#365984] bg-[#132236] text-[#9cc9ff]',
   PENDING: 'border-[#6c5516] bg-[#30270d] text-[#ffd35b]',
   REJECT: 'border-[#6b2637] bg-[#371522] text-[#ff9ab3]',
   SUBMITTED: 'border-[#725621] bg-[#2d220f] text-[#ffd369]',
@@ -48,10 +47,6 @@ export function formatStatus(status: ApplicationStatus) {
 
   if (status === 'CANCELLED') {
     return 'Cancelled';
-  }
-
-  if (status === 'INTERNAL_APPROVED') {
-    return 'Project Approved';
   }
 
   if (status === 'SUBMITTED') {

@@ -23,6 +23,7 @@ export type FileExplorerItem = {
 export type FileMaterialItem = {
   id: string;
   name: string;
+  originalName?: string;
   type: string;
   url?: string;
 };

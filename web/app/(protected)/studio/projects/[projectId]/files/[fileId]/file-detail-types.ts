@@ -46,7 +46,7 @@ export function buildStableMaterialVersions(rawVersions: FileMaterialVersionReco
       const materials = versionRecord.materials || [];
       const thumbnailMaterial =
         materials.find((material) => material.isThumbnail) ||
-        materials[0];
+        materials.find((material: any) => material.type === 'IMAGE' || material.originalName?.match(/\.(png|jpe?g)$/i) || material.name?.match(/\.(png|jpe?g)$/i));
 
       return {
         author:
@@ -55,11 +55,11 @@ export function buildStableMaterialVersions(rawVersions: FileMaterialVersionReco
           'Unknown',
         createdAt: formatFileDate(versionRecord.createdAt),
         id: String(versionRecord.id),
-        taskId: versionRecord.taskId != null ? Number(versionRecord.taskId) : null,
+        taskId: versionRecord.taskId != null ? Number(versionRecord.taskId) : (versionRecord as any).task?.id ? Number((versionRecord as any).task.id) : null,
         isCurrent: versionRecord.id === newestId,
         materials: materials,
         note: versionRecord.name || `Version ${versionNumber}`,
-        previewUrl: thumbnailMaterial?.url,
+        previewUrl: (thumbnailMaterial as any)?.downloadUrl || thumbnailMaterial?.url,
         version: versionNumber,
       } as FileVersionItem;
     })

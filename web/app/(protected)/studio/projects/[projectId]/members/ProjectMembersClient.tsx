@@ -21,12 +21,17 @@ import { ChangeMemberRoleDialog } from './ChangeMemberRoleDialog';
 import { DirectoryMembersTable } from './DirectoryMembersTable';
 import { MemberDetailDrawer } from './MemberDetailDrawer';
 import { RemoveMemberDialog } from './RemoveMemberDialog';
+import { usePermissions } from '@/hooks/use-permissions';
+import { useAuth } from '@/hooks/useAuth';
 
 type ProjectMembersClientProps = {
   projectId: number;
 };
 
 export function ProjectMembersClient({ projectId }: ProjectMembersClientProps) {
+  const { user: currentUser } = useAuth();
+  const { can: canProject } = usePermissions({ resource: 'PROJECT', resourceId: projectId });
+  
   const [members, setMembers] = useState<ProjectMemberResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -124,6 +129,11 @@ export function ProjectMembersClient({ projectId }: ProjectMembersClientProps) {
 
   const totalPages = Math.ceil(filteredMembers.length / limit);
 
+  const isProjectOwner = !!(project && (project.createdBy === currentUser?.id || project.createdByUser?.id === currentUser?.id));
+  const canAddMember = canProject('project:member.add') || canProject('admin') || canProject('project:owner') || isProjectOwner;
+  const canUpdateMember = canProject('project:member.update') || canProject('admin') || canProject('project:owner') || isProjectOwner;
+  const canRemoveMember = canProject('project:member.remove') || canProject('admin') || canProject('project:owner') || isProjectOwner;
+
   const subtitle = 'Manage project access and roles for this production workspace.';
 
   const handleOpenRoleDialog = (member: ProjectMemberResponse) => {
@@ -187,11 +197,13 @@ export function ProjectMembersClient({ projectId }: ProjectMembersClientProps) {
         </div>
 
         <div className="flex items-center gap-3">
-          <AddMemberDialog
-            onAdded={() => void loadMembers()}
-            projectId={projectId}
-            roles={projectRoles}
-          />
+          {canAddMember && (
+            <AddMemberDialog
+              onAdded={() => void loadMembers()}
+              projectId={projectId}
+              roles={projectRoles}
+            />
+          )}
         </div>
       </div>
 
@@ -216,6 +228,8 @@ export function ProjectMembersClient({ projectId }: ProjectMembersClientProps) {
         isLoading={isLoading}
         onChangeRole={handleOpenRoleDialog}
         onRemoveMember={handleOpenRemoveDialog}
+        canUpdateMember={canUpdateMember}
+        canRemoveMember={canRemoveMember}
         onViewMember={setSelectedMember}
         totalMembers={filteredMembers.length}
         page={page}
@@ -232,8 +246,10 @@ export function ProjectMembersClient({ projectId }: ProjectMembersClientProps) {
       <MemberDetailDrawer
         member={selectedMember}
         onChangeRole={handleOpenRoleDialog}
-        onClose={() => setSelectedMember(null)}
         onRemoveMember={handleOpenRemoveDialog}
+        canUpdateMember={canUpdateMember}
+        canRemoveMember={canRemoveMember}
+        onClose={() => setSelectedMember(null)}
         projectId={projectId}
         project={project}
       />

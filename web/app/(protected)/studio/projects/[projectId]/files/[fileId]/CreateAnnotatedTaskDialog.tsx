@@ -29,9 +29,7 @@ type CreateAnnotatedTaskDialogProps = {
     task: FileTaskItem,
     options?: { assignedBy?: number; parentId?: number },
   ) => Promise<void> | void;
-  onRequestFrame: () => void;
   open: boolean;
-  region: FileTaskRegion | null;
   tasks?: FileTaskItem[];
 };
 
@@ -40,9 +38,7 @@ export function CreateAnnotatedTaskDialog({
   members,
   onCancel,
   onCreate,
-  onRequestFrame,
   open,
-  region,
   tasks = [],
 }: CreateAnnotatedTaskDialogProps) {
   const [title, setTitle] = useState('');
@@ -51,8 +47,6 @@ export function CreateAnnotatedTaskDialog({
   const [dueDate, setDueDate] = useState('');
   const [parentId, setParentId] = useState('');
   const [status, setStatus] = useState<FileStatus>('PENDING');
-  const [includeFrame, setIncludeFrame] = useState(false);
-  const [framePreferenceTouched, setFramePreferenceTouched] = useState(false);
   const [isAssigneeDropdownOpen, setIsAssigneeDropdownOpen] = useState(false);
 
   const colors = [
@@ -73,7 +67,6 @@ export function CreateAnnotatedTaskDialog({
   };
 
   const effectiveAssigneeId = assigneeId || (members[0]?.id ? String(members[0].id) : '');
-  const shouldAttachFrame = framePreferenceTouched ? includeFrame : Boolean(region) || includeFrame;
 
   const resetForm = () => {
     setTitle('');
@@ -82,8 +75,6 @@ export function CreateAnnotatedTaskDialog({
     setDueDate('');
     setParentId('');
     setStatus('PENDING');
-    setIncludeFrame(false);
-    setFramePreferenceTouched(false);
     setIsAssigneeDropdownOpen(false);
   };
 
@@ -93,10 +84,6 @@ export function CreateAnnotatedTaskDialog({
   };
 
   const handleCreate = async () => {
-    if (shouldAttachFrame && !region) {
-      return;
-    }
-
     const selectedMember = members.find((member) => member.id === Number(effectiveAssigneeId));
     const assigneeName = selectedMember?.name || 'Unassigned';
 
@@ -107,7 +94,6 @@ export function CreateAnnotatedTaskDialog({
           description: description.trim() || 'No description.',
           dueDate: dueDate || undefined,
           id: `task-local-${Date.now()}`,
-          ...(shouldAttachFrame && region ? { region } : {}),
           status,
           title: title.trim(),
         },
@@ -287,62 +273,7 @@ export function CreateAnnotatedTaskDialog({
             </div>
           </div>
 
-          {/* Attach frame annotation */}
-          <div className="rounded-[6px] border border-[#212936] bg-[#0d151e]/60 p-4 flex items-center justify-between gap-4">
-            <label className="flex items-start gap-3 cursor-pointer select-none">
-              <input
-                checked={shouldAttachFrame}
-                className="mt-1 size-4 rounded border-[#212936] bg-[#0d151e] text-[#FFD369] accent-[#FFD369]"
-                disabled={isSubmitting}
-                onChange={(event) => {
-                  setFramePreferenceTouched(true);
-                  setIncludeFrame(event.target.checked);
-                }}
-                type="checkbox"
-              />
-              <div className="space-y-1">
-                <span className="block text-sm font-black text-white">Attach frame annotation</span>
-                <span className="block text-[10px] font-bold leading-relaxed text-[#8b94a1]">
-                  Optional. If enabled, the selected canvas frame will be saved through the task frame API.
-                </span>
-              </div>
-            </label>
 
-            {shouldAttachFrame ? (
-              region ? (
-                <div className="grid grid-cols-2 gap-x-3 gap-y-1 rounded-[6px] border border-[#212936] bg-[#0c1219] p-3 min-w-[120px] text-center">
-                  {[
-                    ['X1', region.startX],
-                    ['Y1', region.startY],
-                    ['X2', region.endX],
-                    ['Y2', region.endY],
-                  ].map(([label, value]) => (
-                    <div key={String(label)} className="flex items-center justify-between gap-2">
-                      <span className="text-[9px] font-black uppercase text-[#8b94a1]">{label}</span>
-                      <span className="text-[10px] font-black text-[#FFD369]">
-                        {Math.round(Number(value) * 100)}%
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <button
-                  className="inline-flex h-10 items-center gap-2 rounded-[6px] border border-dashed border-[#FFD369]/30 hover:border-[#FFD369]/60 bg-[#FFD369]/5 hover:bg-[#FFD369]/10 px-4 text-xs font-black text-[#FFD369] transition-all cursor-pointer"
-                  disabled={isSubmitting}
-                  onClick={onRequestFrame}
-                  type="button"
-                >
-                  <Crosshair className="size-4 animate-pulse" />
-                  Draw frame
-                </button>
-              )
-            ) : (
-              <div className="relative size-14 rounded-[6px] border border-dashed border-[#212936] bg-[#0c1219]/50 flex items-center justify-center">
-                <ImageIcon className="size-6 text-[#8b94a1]" />
-                <span className="absolute -bottom-1 -right-1 size-4 rounded-full bg-[#FFD369]/20 border border-[#FFD369]/30 text-[#FFD369] flex items-center justify-center text-[10px] font-black">+</span>
-              </div>
-            )}
-          </div>
         </div>
 
         <DialogFooter className="mx-0 mb-0 border-t border-[#212936] bg-[#0c1219] px-6 py-4 shrink-0">
@@ -357,7 +288,7 @@ export function CreateAnnotatedTaskDialog({
             </Button>
             <Button
               className="h-10 rounded-[6px] bg-[#FFD369] px-5 text-xs font-black text-[#222831] hover:bg-[#eac04f] disabled:opacity-50"
-              disabled={isSubmitting || !title.trim() || (shouldAttachFrame && !region)}
+              disabled={isSubmitting || !title.trim()}
               onClick={() => void handleCreate()}
               type="button"
             >

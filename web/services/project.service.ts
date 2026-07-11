@@ -2,7 +2,6 @@ import api from '@/lib/api';
 import type { EditorBoardResponse, UserSummaryResponse } from './editor-board.service';
 import type { ApplicationStatus, ApplicationType } from './application.service';
 
-
 export type CreateProjectPayload = {
   description?: string;
   editorBoardId?: number;
@@ -93,13 +92,13 @@ export type ProjectMemberResponse = {
 type ProjectMemberApiResponse =
   | ProjectMemberResponse
   | {
-    createdAt: string;
-    numberOfTasks?: number;
-    role: ProjectMemberRoleResponse;
-    taskOverview?: ProjectMemberResponse['taskOverview'];
-    updatedAt: string;
-    user: UserSummaryResponse;
-  };
+      createdAt: string;
+      numberOfTasks?: number;
+      role: ProjectMemberRoleResponse;
+      taskOverview?: ProjectMemberResponse['taskOverview'];
+      updatedAt: string;
+      user: UserSummaryResponse;
+    };
 
 export type ProjectApplicationResponse = {
   createdAt: string;
@@ -133,6 +132,7 @@ export type ProjectFolderResponse = {
   parentId?: number | null;
   projectId?: number;
   title: string;
+  type?: 'ARC' | 'CHAPTER' | 'VOLUME' | string;
   updatedAt: string;
   updatedBy?: number | null;
   updatedByUser?: UserSummaryResponse | null;
@@ -195,7 +195,7 @@ function normalizeProjectMember(member: ProjectMemberApiResponse): ProjectMember
   if ('user' in member) {
     return {
       avatarUrl: member.user.avatarUrl ?? null,
-      createdAt: member.createdAt,
+      createdAt: member.user.createdAt ?? member.createdAt,
       displayName: member.user.displayName ?? null,
       email: member.user.email ?? '',
       id: member.user.id,
@@ -235,14 +235,19 @@ export async function getProjects(params?: {
 }
 
 export async function linkProjectEditorBoard(projectId: number | string, editorBoardId: number) {
-  const response = await api.post<{ data: any }, { data: any }>(`/projects/${projectId}/editor-boards`, {
-    editorBoardId,
-  });
+  const response = await api.post<{ data: any }, { data: any }>(
+    `/projects/${projectId}/editor-boards`,
+    {
+      editorBoardId,
+    },
+  );
   return response.data;
 }
 
 export async function unlinkProjectEditorBoard(projectId: number | string) {
-  const response = await api.delete<{ data: any }, { data: any }>(`/projects/${projectId}/editor-boards`);
+  const response = await api.delete<{ data: any }, { data: any }>(
+    `/projects/${projectId}/editor-boards`,
+  );
   return response.data;
 }
 
@@ -293,9 +298,10 @@ export async function getProjectMembers(
 }
 
 export async function getProjectMember(projectId: number, userId: number) {
-  const response = await api.get<ApiResponse<ProjectMemberApiResponse>, ApiResponse<ProjectMemberApiResponse>>(
-    `/projects/${projectId}/members/${userId}`,
-  );
+  const response = await api.get<
+    ApiResponse<ProjectMemberApiResponse>,
+    ApiResponse<ProjectMemberApiResponse>
+  >(`/projects/${projectId}/members/${userId}`);
 
   return normalizeProjectMember(response.data ?? (response as ProjectMemberApiResponse));
 }
@@ -400,10 +406,10 @@ export async function createFolderFile(
     title: string;
   },
 ) {
-  const response = await api.post<ApiResponse<ProjectFileResponse>, ApiResponse<ProjectFileResponse>>(
-    `/folders/${folderId}/files`,
-    payload,
-  );
+  const response = await api.post<
+    ApiResponse<ProjectFileResponse>,
+    ApiResponse<ProjectFileResponse>
+  >(`/folders/${folderId}/files`, payload);
 
   return response.data ?? (response as ProjectFileResponse);
 }
@@ -421,9 +427,10 @@ export async function createProjectFolder(
 }
 
 export async function getFolderById(folderId: number | string) {
-  const response = await api.get<ApiResponse<ProjectFolderResponse>, ApiResponse<ProjectFolderResponse>>(
-    `/folders/${folderId}`,
-  );
+  const response = await api.get<
+    ApiResponse<ProjectFolderResponse>,
+    ApiResponse<ProjectFolderResponse>
+  >(`/folders/${folderId}`);
 
   return response.data ?? (response as ProjectFolderResponse);
 }

@@ -15,7 +15,11 @@ import {
 import { LoadingState } from '@/components/ui/loading-state';
 import { RefreshingIndicator } from '@/components/ui/refreshing-indicator';
 import { useAsyncResource } from '@/hooks/useAsyncResource';
-import { getFolderChildren, getProjectFolders, type ProjectFolderResponse } from '@/services/project.service';
+import {
+  getFolderChildren,
+  getProjectFolders,
+  type ProjectFolderResponse,
+} from '@/services/project.service';
 import {
   getProjectStats,
   type ProjectStatMonth,
@@ -29,8 +33,18 @@ type StatisticsClientProps = {
 };
 
 const MONTH_LABELS = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ];
 
 const ALL_SCOPE = 'all';
@@ -58,28 +72,14 @@ function chartData(months: ProjectStatMonth[], key: keyof ProjectStatMonth) {
   }));
 }
 
-function KpiCard({
-  icon,
-  label,
-  meta,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  meta: string;
-  value: string;
-}) {
+function KpiCard({ label, value }: { label: string; value: string }) {
   return (
     <article className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-4">
       <div className="flex items-center gap-2 text-[#8b94a1]">
-        {icon}
-        <p className="text-[11px] font-black uppercase tracking-[0.04em] text-[#aeb7c2]">
-          {label}
-        </p>
+        <p className="text-[11px] font-black uppercase tracking-[0.04em] text-[#aeb7c2]">{label}</p>
       </div>
       <div className="mt-2 flex items-baseline gap-2">
         <span className="text-2xl font-black text-white">{value}</span>
-        <span className="text-xs font-black text-[#FFD369]">{meta}</span>
       </div>
     </article>
   );
@@ -88,20 +88,17 @@ function KpiCard({
 function StatsLineChart({
   color,
   data,
-  icon,
   title,
-  valueFormatter,
 }: {
   color: string;
   data: { label: string; value: number }[];
   icon: React.ReactNode;
   title: string;
-  valueFormatter: (value: number) => string;
 }) {
   return (
     <div className="rounded-[5px] border border-[#39424f] bg-[#0e141c] p-4">
       <div className="flex items-center gap-2 text-[#8b94a1]">
-        {icon}
+        <TrendingUp className="size-4" />
         <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#aeb7c2]">
           {title}
         </p>
@@ -116,13 +113,13 @@ function StatsLineChart({
           <YAxis
             fontSize={11}
             stroke="#5b626d"
-            tickFormatter={(value) => valueFormatter(Number(value))}
+            tickFormatter={(value) => value.toLocaleString()}
             tickLine={false}
             width={56}
           />
           <ChartTooltip content={<ChartTooltipContent />} cursor={{ stroke: '#39424f' }} />
           <Line
-            dataKey="value"
+            dataKey={title}
             dot={{ r: 3, fill: color }}
             name={title}
             stroke={color}
@@ -177,7 +174,7 @@ export function StatisticsClient({ projectId }: StatisticsClientProps) {
 
   const arcs = folderData?.arcs ?? [];
   const chaptersByArc = folderData?.chaptersByArc ?? {};
-  const chapters = selectedArcId ? chaptersByArc[selectedArcId] ?? [] : [];
+  const chapters = selectedArcId ? (chaptersByArc[selectedArcId] ?? []) : [];
 
   const allChapterOptions: ChapterOption[] = useMemo(
     () =>
@@ -200,7 +197,7 @@ export function StatisticsClient({ projectId }: StatisticsClientProps) {
   } = useAsyncResource(
     () =>
       getProjectStats(projectId, {
-        arcId: selectedChapterId ? undefined : selectedArcId ?? undefined,
+        arcId: selectedChapterId ? undefined : (selectedArcId ?? undefined),
         chapterId: selectedChapterId ?? undefined,
         year: selectedYear ?? undefined,
       }),

@@ -34,8 +34,8 @@ import {
   type ApplicationStatus,
   type ApplicationType,
 } from '@/services/application.service';
-import { getMyProjectPermissions } from '@/services/permission.service';
-import { getProjectFolders, type ProjectFolderResponse } from '@/services/project.service';
+import { getMyProjectPermissions, getMyBoardPermissions } from '@/services/permission.service';
+import { getProjectFolders, getProjectById, type ProjectFolderResponse } from '@/services/project.service';
 
 import { ApplicationReviewDrawer } from './ApplicationReviewDrawer';
 import { CreateApplicationDialog, type UploadedApplicationFile } from './CreateApplicationDialog';
@@ -57,7 +57,6 @@ const applicationStatusTabs: Array<{ label: string; value: ApplicationStatusFilt
   { label: 'All Requests', value: 'ALL' },
   { label: 'Pending Draft', value: 'PENDING' },
   { label: 'Submitted to Board', value: 'SUBMITTED' },
-  { label: 'Internal Approved', value: 'INTERNAL_APPROVED' },
   { label: 'Approved', value: 'APPROVE' },
   { label: 'Rejected', value: 'REJECT' },
   { label: 'Cancelled', value: 'CANCELLED' },
@@ -118,24 +117,44 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
     permissions.includes('project:owner') ||
     permissions.includes('project:application.create') ||
     permissions.includes('project:update');
-  const canApprove =
+  const canSubmit =
     permissions.includes('admin') ||
     permissions.includes('project:owner') ||
     permissions.includes('project:application.approve');
+  const canProjectApprove =
+    permissions.includes('admin') ||
+    permissions.includes('project:owner') ||
+    permissions.includes('project:application.approve');
+  const canBoardApprove =
+    permissions.includes('admin') ||
+    permissions.includes('board:owner') ||
+    permissions.includes('board:leader');
 
   const loadApplications = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const [applicationResult, permissionResult, folderResult] = await Promise.all([
+      const [applicationResult, permissionResult, folderResult, projectResult] = await Promise.all([
         getProjectApplications(projectId),
         getMyProjectPermissions(projectId),
         getProjectFolders(projectId, { type: 'ARC' }),
+        getProjectById(projectId),
       ]);
 
+      let allPermissions = permissionResult;
+      const boardId = projectResult?.editorBoard?.id;
+      if (boardId) {
+        try {
+          const boardPermissions = await getMyBoardPermissions(boardId);
+          allPermissions = [...allPermissions, ...boardPermissions];
+        } catch (e) {
+          // Ignore error if user doesn't have access to board
+        }
+      }
+
       setApplications(applicationResult.applications);
-      setPermissions(permissionResult);
+      setPermissions(allPermissions);
       setParentFolders(folderResult.folders);
     } catch {
       setError('Unable to load approvals.');
@@ -226,13 +245,13 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
         materials: isFolderRequest
           ? []
           : materialFiles.map((file) => ({
-              kind: 'SUPPORTING_FILE',
-              lastModified: file.lastModified,
-              mimeType: file.mimeType,
-              originalName: file.name,
-              size: file.sizeBytes,
-              uploadSource: 'LOCAL_MACHINE_METADATA_ONLY',
-            })),
+            kind: 'SUPPORTING_FILE',
+            lastModified: file.lastModified,
+            mimeType: file.mimeType,
+            originalName: file.name,
+            size: file.sizeBytes,
+            uploadSource: 'LOCAL_MACHINE_METADATA_ONLY',
+          })),
         parentFolderId: type === 'CREATE_CHAPTER' ? Number(parentFolderId) : undefined,
         source: isFolderRequest ? sourceFile : undefined,
         text: isFolderRequest ? textFile : undefined,
@@ -267,29 +286,22 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
   const handleUpdateStatus = async (
     application: ApplicationResponse,
     status: ApplicationStatus,
-    options?: { rejectionReason?: string },
+    options?: { rejectionReason?: string; voteDeadline?: string },
   ) => {
     setIsSubmitting(true);
+    setError(null);
 
     try {
-      const nextStatus =
-        status === 'APPROVE' &&
-        application.status === 'PENDING' &&
-        (application.type === 'CREATE_ARC' || application.type === 'CREATE_CHAPTER')
-          ? 'INTERNAL_APPROVED'
-          : status;
-
-      await updateApplicationStatus(application.id, nextStatus);
-      if (status === 'REJECT' && options?.rejectionReason) {
-        await createApplicationComment(application.id, {
-          kind: 'REJECTION_REASON',
-          text: options.rejectionReason,
-        });
-      }
-      setSelectedApplication((currentApplication) =>
-        currentApplication?.id === application.id
-          ? { ...currentApplication, status: nextStatus, updatedAt: new Date().toISOString() }
-          : currentApplication,
+      await updateApplicationStatus(
+        application.id,
+        status,
+        options?.voteDeadline,
+        options?.rejectionReason
+          ? JSON.stringify({
+            kind: 'REJECTION_REASON',
+            text: options.rejectionReason,
+          })
+          : undefined,
       );
       await refreshSelectedApplication(application.id);
       if (status === 'APPROVE') {
@@ -504,7 +516,7 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
             value={searchQuery}
           />
         </div>
-        
+
         <Select
           value={statusFilter}
           onValueChange={(val) => setStatusFilter(val as ApplicationStatusFilter)}
@@ -584,13 +596,14 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
 
       <ApplicationReviewDrawer
         application={selectedApplication}
-        canApprove={canApprove}
+        canSubmit={canSubmit}
+        canApprove={false}
         canCancel={
           selectedApplication
             ? selectedApplication.createdByUser?.id === user?.id ||
-              permissions.includes('admin') ||
-              permissions.includes('project:owner') ||
-              permissions.includes('project:application.approve')
+            permissions.includes('admin') ||
+            permissions.includes('project:owner') ||
+            permissions.includes('project:application.approve')
             : false
         }
         isSubmitting={isSubmitting}

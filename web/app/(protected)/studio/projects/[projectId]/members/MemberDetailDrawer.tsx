@@ -18,12 +18,15 @@ import {
 } from '@/services/project.service';
 
 import { formatOptionalDate, getInitials, getRoleClassName } from './member-ui';
+import { useAuth } from '@/hooks/useAuth';
 
 type MemberDetailDrawerProps = {
   member: ProjectMemberResponse | null;
   onChangeRole: (member: ProjectMemberResponse) => void;
   onClose: () => void;
   onRemoveMember: (member: ProjectMemberResponse) => void;
+  canUpdateMember?: boolean;
+  canRemoveMember?: boolean;
   projectId: number;
   project: any;
 };
@@ -66,12 +69,15 @@ export function MemberDetailDrawer({
   onChangeRole,
   onClose,
   onRemoveMember,
+  canUpdateMember,
+  canRemoveMember,
   projectId,
   project,
 }: MemberDetailDrawerProps) {
   const [detailMember, setDetailMember] = useState<ProjectMemberResponse | null>(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const { user } = useAuth();
 
   useEffect(() => {
     let isMounted = true;
@@ -133,17 +139,17 @@ export function MemberDetailDrawer({
       open={Boolean(member)}
     >
       <SheetContent
-        className="flex h-dvh w-[420px] max-w-[92vw] flex-col gap-0 border-[#39424f] bg-[#101820] p-0 text-white sm:max-w-[420px]"
+        className="flex w-[400px] flex-col border-l-[#39424f] bg-[#0c1219] p-0 sm:max-w-[400px]"
         showCloseButton={false}
         side="right"
       >
         {activeMember ? (
           <>
-            <SheetHeader className="border-b border-[#303842] px-5 pb-5 pt-6 text-left">
+            <SheetHeader className="shrink-0 border-b border-[#303842] bg-[#101820] px-5 py-6 text-left">
               <div className="flex items-start gap-4">
                 {activeMember.avatarUrl ? (
                   <img
-                    alt=""
+                    alt={activeMember.displayName ?? activeMember.email}
                     className="size-16 rounded-lg border border-[#39424f] object-cover"
                     src={activeMember.avatarUrl}
                   />
@@ -268,11 +274,7 @@ export function MemberDetailDrawer({
                   </h3>
                   <div className="mt-3 overflow-hidden rounded-lg border border-[#303842] bg-[#151c25]">
                     <div className="divide-y divide-[#303842]">
-                      <Can
-                        any={['project:member.update', 'project:owner']}
-                        resource="PROJECT"
-                        resourceId={projectId}
-                      >
+                      {canUpdateMember && (
                         <button
                           className="flex h-10 w-full items-center gap-3 px-4 text-left text-xs font-black text-[#dce7f3] transition-colors hover:bg-[#202832] hover:text-white"
                           onClick={() => onChangeRole(activeMember)}
@@ -281,23 +283,19 @@ export function MemberDetailDrawer({
                           <UserCog className="size-4 text-[#FFD369]" />
                           Change Role
                         </button>
-                      </Can>
+                      )}
                     </div>
                     <div className="border-t border-[#303842]">
-                      <Can
-                        any={['project:member.remove', 'project:owner']}
-                        resource="PROJECT"
-                        resourceId={projectId}
-                      >
+                      {(canRemoveMember || activeMember.id === user?.id) && (
                         <button
                           className="flex h-10 w-full items-center gap-3 px-4 text-left text-xs font-black text-red-300 transition-colors hover:bg-red-950/30 hover:text-red-200"
                           onClick={() => onRemoveMember(activeMember)}
                           type="button"
                         >
                           <Trash2 className="size-4" />
-                          Remove Member
+                          {activeMember.id === user?.id ? 'Leave Project' : 'Remove Member'}
                         </button>
-                      </Can>
+                      )}
                     </div>
                   </div>
                 </section>

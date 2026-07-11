@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { Loader2, MoreVertical, Pencil, Trash2, ChevronsUpDown, ChevronUp, ChevronDown } from 'lucide-react';
+import { Loader2, MoreVertical, Pencil, Trash2, LogOut, ChevronsUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Can } from '@/components/auth/Can';
+import { useAuth } from '@/hooks/useAuth';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,15 +45,19 @@ type EditorBoardsTabProps = {
   isLoadingBoards: boolean;
   onRenameBoard: (board: any) => void;
   onDeleteBoard: (board: any) => void;
+  onLeaveBoard: (board: any) => void;
+  apiBoards?: any[];
+  viewMode?: 'gallery' | 'table';
+  formatUserName?: (user?: any) => string;
   page: number;
   limit: number;
   total: number;
   totalPages: number;
   onPageChange: (page: number) => void;
   onLimitChange: (limit: number) => void;
-  sortField?: 'name' | 'createdAt';
+  sortField?: 'name' | 'updatedAt' | 'createdAt';
   sortOrder?: 'asc' | 'desc';
-  onSort: (field: 'name' | 'createdAt') => void;
+  onSort: (field: 'name' | 'updatedAt' | 'createdAt') => void;
 };
 
 export function EditorBoardsTab({
@@ -62,6 +66,7 @@ export function EditorBoardsTab({
   isLoadingBoards,
   onRenameBoard,
   onDeleteBoard,
+  onLeaveBoard,
   page,
   limit,
   total,
@@ -72,13 +77,15 @@ export function EditorBoardsTab({
   sortOrder,
   onSort,
 }: EditorBoardsTabProps) {
+  const { user: currentUser } = useAuth();
+
   return (
     <section className="mt-5 overflow-hidden rounded-[7px] border border-[#393E46] bg-[#0c1219]">
       <Table>
         <TableHeader>
           <TableRow className="h-[40px] border-[#393E46] bg-[#252e38] hover:bg-[#252e38]">
             <TableHead 
-              className="w-[45%] px-5 text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3] cursor-pointer select-none hover:text-white"
+              className="w-[35%] px-5 text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3] cursor-pointer select-none hover:text-white"
               onClick={() => onSort('name')}
             >
               <div className="flex items-center gap-1.5">
@@ -97,8 +104,17 @@ export function EditorBoardsTab({
               onClick={() => onSort('createdAt')}
             >
               <div className="flex items-center gap-1.5">
-                Last Updated
+                Created At
                 <SortIcon activeField={sortField} activeOrder={sortOrder} field="createdAt" />
+              </div>
+            </TableHead>
+            <TableHead 
+              className="w-[180px] text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3] cursor-pointer select-none hover:text-white"
+              onClick={() => onSort('updatedAt')}
+            >
+              <div className="flex items-center gap-1.5">
+                Last Updated
+                <SortIcon activeField={sortField} activeOrder={sortOrder} field="updatedAt" />
               </div>
             </TableHead>
             <TableHead className="w-[90px] pr-5 text-right text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
@@ -109,7 +125,7 @@ export function EditorBoardsTab({
         <TableBody>
           {isLoadingBoards ? (
             <TableRow>
-              <TableCell colSpan={5} className="h-40 text-center">
+              <TableCell colSpan={6} className="h-40 text-center">
                 <div className="flex flex-col items-center justify-center space-y-3">
                   <Loader2 className="size-6 animate-spin text-[#FFD369]" />
                   <span className="text-xs font-bold text-[#8b94a1]">Loading editor boards...</span>
@@ -118,7 +134,7 @@ export function EditorBoardsTab({
             </TableRow>
           ) : boardRows.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={5} className="h-40 text-center text-xs font-bold text-[#8b94a1]">
+              <TableCell colSpan={6} className="h-40 text-center text-xs font-bold text-[#8b94a1]">
                 No editor boards found.
               </TableCell>
             </TableRow>
@@ -161,45 +177,54 @@ export function EditorBoardsTab({
                   {board.projectCount} {board.projectCount === 1 ? 'project' : 'projects'}
                 </TableCell>
                 <TableCell className="text-xs font-bold text-white">
+                  {board.created}
+                </TableCell>
+                <TableCell className="text-xs font-bold text-white">
                   {board.updated}
                 </TableCell>
                 <TableCell className="pr-5 text-right">
-                  <Can
-                    any={['admin', 'board:owner']}
-                    resource="BOARD"
-                    resourceId={board.boardId}
-                  >
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          className="size-7 text-white hover:bg-[#393E46]"
-                          size="icon"
-                          variant="ghost"
-                        >
-                          <MoreVertical className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent
-                        align="end"
-                        className="min-w-36 rounded-[4px] border border-[#393E46] bg-[#101820] p-1 text-white"
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        className="size-7 text-white hover:bg-[#393E46]"
+                        size="icon"
+                        variant="ghost"
                       >
-                        <DropdownMenuItem
-                          className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold focus:bg-[#393E46] focus:text-white"
-                          onSelect={() => void onRenameBoard(board)}
-                        >
-                          <Pencil className="size-3.5" />
-                          Rename
-                        </DropdownMenuItem>
+                        <MoreVertical className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      className="min-w-36 rounded-[4px] border border-[#393E46] bg-[#101820] p-1 text-white"
+                    >
+                      {currentUser?.id === board.createdByUser?.id ? (
+                        <>
+                          <DropdownMenuItem
+                            className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold focus:bg-[#393E46] focus:text-white"
+                            onSelect={() => void onRenameBoard(board)}
+                          >
+                            <Pencil className="size-3.5" />
+                            Rename
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold text-red-300 focus:bg-red-950/30 focus:text-red-200"
+                            onSelect={() => void onDeleteBoard(board)}
+                          >
+                            <Trash2 className="size-3.5" />
+                            Delete
+                          </DropdownMenuItem>
+                        </>
+                      ) : (
                         <DropdownMenuItem
                           className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold text-red-300 focus:bg-red-950/30 focus:text-red-200"
-                          onSelect={() => void onDeleteBoard(board)}
+                          onSelect={() => void onLeaveBoard(board)}
                         >
-                          <Trash2 className="size-3.5" />
-                          Delete
+                          <LogOut className="size-3.5" />
+                          Leave Board
                         </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </Can>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
               </TableRow>
             ))
