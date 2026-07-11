@@ -1,5 +1,5 @@
 import api from '@/lib/api';
-import type { ApplicationResponse } from './application.service';
+import { getProjectApplications, type ApplicationResponse } from './application.service';
 import type { ProjectResponse } from './project.service';
 
 export type CreateEditorBoardPayload = {
@@ -74,11 +74,6 @@ type BoardProjectsResponse = {
 
 type BoardMembersResponse = {
   data?: BoardMemberApiResponse[];
-  pagination?: PaginationResponse;
-};
-
-type BoardApplicationsResponse<TApplication> = {
-  data?: Array<TApplication | { application: TApplication }>;
   pagination?: PaginationResponse;
 };
 
@@ -164,7 +159,7 @@ export async function createEditorBoard(payload: CreateEditorBoardPayload) {
 }
 
 export async function getEditorBoards(params?: {
-  field?: 'name' | 'createdAt';
+  field?: 'name' | 'updatedAt' | 'createdAt';
   limit?: number;
   me?: boolean;
   name?: string;
@@ -318,9 +313,9 @@ export async function addEditorBoardProjects(
   return response.data ?? (response as { count: number });
 }
 
-import { getProjectApplications } from './application.service';
-
-export async function getEditorBoardApplications<TApplication extends object = ApplicationResponse>(
+export async function getEditorBoardApplications<
+  TApplication extends ApplicationResponse = ApplicationResponse,
+>(
   boardId: number | string,
   params?: {
     field?: 'createdAt' | 'updatedAt' | 'title';
@@ -330,49 +325,54 @@ export async function getEditorBoardApplications<TApplication extends object = A
     search?: string;
   },
 ) {
-  // WORKAROUND: The GET /editor-boards/:id/applications endpoint crashes on the backend 
-  // due to an invalid Prisma enum (INTERNAL_APPROVED). 
-  // We compose the applications here on the frontend by fetching the board's projects
-  // and then accumulating the applications for each project.
-  
   const projectsResponse = await getEditorBoardProjects(boardId, { limit: 100 });
   const projects = projectsResponse.projects;
 
-  const allApplications: any[] = [];
-  
+  const allApplications: TApplication[] = [];
+  const visibleApplicationStatuses = new Set<string>([
+    'APPROVE',
+    'INTERNAL_APPROVED',
+    'REJECT',
+    'SUBMITTED',
+  ]);
+
   await Promise.all(
     projects.map(async (project) => {
-      // Use getProjectApplications to ensure we hit the exact same cached endpoint
-      // as the Project Applications view, guaranteeing data consistency.
       const response = await getProjectApplications(project.id);
-      const projectApps = response.applications || [];
+      const projectApps = (response.applications || []) as TApplication[];
       allApplications.push(...projectApps);
-    })
+    }),
   );
 
   let filteredApplications = allApplications.filter((app) => {
-    return (app.type === 'CREATE_ARC' || app.type === 'CREATE_CHAPTER') &&
-           (app.status === 'SUBMITTED' || app.status === 'APPROVE' || app.status === 'REJECT' || app.status === 'INTERNAL_APPROVED');
+    return (
+      (app.type === 'CREATE_ARC' || app.type === 'CREATE_CHAPTER') &&
+      visibleApplicationStatuses.has(app.status)
+    );
   });
 
   if (params?.search) {
     const searchLower = params.search.toLowerCase();
-    filteredApplications = filteredApplications.filter((app) => 
-      app.title?.toLowerCase().includes(searchLower)
+    filteredApplications = filteredApplications.filter((app) =>
+      app.title?.toLowerCase().includes(searchLower),
     );
   }
 
   const field = params?.field || 'createdAt';
   const order = params?.order || 'desc';
-  
-  filteredApplications.sort((a, b) => {
-    let valA = a[field];
-    let valB = b[field];
+
+  const getSortableValue = (application: TApplication) => {
     if (field === 'createdAt' || field === 'updatedAt') {
-      valA = new Date(valA || 0).getTime();
-      valB = new Date(valB || 0).getTime();
+      return new Date(application[field] || 0).getTime();
     }
-    
+
+    return application[field] ?? '';
+  };
+
+  filteredApplications.sort((a, b) => {
+    const valA = getSortableValue(a);
+    const valB = getSortableValue(b);
+
     if (valA < valB) return order === 'asc' ? -1 : 1;
     if (valA > valB) return order === 'asc' ? 1 : -1;
     return 0;
@@ -382,7 +382,7 @@ export async function getEditorBoardApplications<TApplication extends object = A
   const limit = params?.limit || 10;
   const startIndex = (page - 1) * limit;
   const endIndex = startIndex + limit;
-  
+
   const paginatedApplications = filteredApplications.slice(startIndex, endIndex);
 
   return {

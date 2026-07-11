@@ -2,16 +2,18 @@
 
 import Link from 'next/link';
 import {
+  ChevronDown,
+  ChevronUp,
+  ChevronsUpDown,
   Loader2,
+  LogOut,
   MoreVertical,
   Pencil,
   Trash2,
-  ChevronsUpDown,
-  ChevronUp,
-  ChevronDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
+import { Can } from '@/components/auth/Can';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,7 +33,9 @@ import { Pagination } from './Pagination';
 
 export type EditorBoardRow = {
   boardId: number;
+  created: string;
   createdBy: string;
+  createdByUser?: { id?: number | null } | null;
   description: string;
   id: string;
   image?: string | null;
@@ -63,6 +67,7 @@ type EditorBoardsTabProps = {
   isLoadingBoards: boolean;
   onRenameBoard: (board: EditorBoardRow) => void;
   onDeleteBoard: (board: EditorBoardRow) => void;
+  onLeaveBoard: (board: EditorBoardRow) => void;
   page: number;
   limit: number;
   total: number;
@@ -121,7 +126,7 @@ export function EditorBoardsTab({
                 <SortIcon activeField={sortField} activeOrder={sortOrder} field="createdAt" />
               </div>
             </TableHead>
-            <TableHead 
+            <TableHead
               className="w-[180px] text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3] cursor-pointer select-none hover:text-white"
               onClick={() => onSort('updatedAt')}
             >
@@ -187,22 +192,27 @@ export function EditorBoardsTab({
                 <TableCell className="text-xs font-bold text-white">
                   {board.projectCount} {board.projectCount === 1 ? 'project' : 'projects'}
                 </TableCell>
+                <TableCell className="text-xs font-bold text-white">{board.created}</TableCell>
                 <TableCell className="text-xs font-bold text-white">{board.updated}</TableCell>
                 <TableCell className="pr-5 text-right">
-                  <Can any={['admin', 'board:owner']} resource="BOARD" resourceId={board.boardId}>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          className="size-7 text-white hover:bg-[#393E46]"
-                          size="icon"
-                          variant="ghost"
-                        >
-                          <MoreVertical className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent
-                        align="end"
-                        className="min-w-36 rounded-[4px] border border-[#393E46] bg-[#101820] p-1 text-white"
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        className="size-7 text-white hover:bg-[#393E46]"
+                        size="icon"
+                        variant="ghost"
+                      >
+                        <MoreVertical className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      className="min-w-36 rounded-[4px] border border-[#393E46] bg-[#101820] p-1 text-white"
+                    >
+                      <Can
+                        any={['admin', 'board:owner']}
+                        resource="BOARD"
+                        resourceId={board.boardId}
                       >
                         <DropdownMenuItem
                           className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold focus:bg-[#393E46] focus:text-white"
@@ -218,9 +228,18 @@ export function EditorBoardsTab({
                           <Trash2 className="size-3.5" />
                           Delete
                         </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </Can>
+                      </Can>
+                      {currentUser?.id !== board.createdByUser?.id ? (
+                        <DropdownMenuItem
+                          className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold text-[#dce7f3] focus:bg-[#393E46] focus:text-white"
+                          onSelect={() => void onLeaveBoard(board)}
+                        >
+                          <LogOut className="size-3.5" />
+                          Leave
+                        </DropdownMenuItem>
+                      ) : null}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
               </TableRow>
             ))
