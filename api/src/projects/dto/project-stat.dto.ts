@@ -4,6 +4,7 @@ import { IsNumber, IsOptional } from 'class-validator';
 
 export class UploadProjectStatReqDto {
   @ApiProperty({ type: 'string', format: 'binary' })
+  @IsOptional()
   file: any;
 
   @ApiProperty({ description: 'The Chapter ID to link this stat to' })
