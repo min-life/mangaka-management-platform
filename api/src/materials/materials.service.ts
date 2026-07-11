@@ -67,6 +67,7 @@ export class MaterialsService {
       deleteImage?: boolean;
       deleteText?: boolean;
       deleteSource?: boolean;
+      name?: string;
       userId: number;
     },
   ) {
@@ -122,7 +123,7 @@ export class MaterialsService {
           materials: slots as Prisma.InputJsonArray,
           fileId: old.fileId,
           taskId: old.taskId,
-          name: old.name,
+          name: data.name ?? old.name,
           createdBy: data.userId,
           updatedBy: data.userId,
         },
