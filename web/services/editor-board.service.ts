@@ -82,6 +82,48 @@ type BoardApplicationsResponse<TApplication> = {
   pagination?: PaginationResponse;
 };
 
+export type EditorBoardDashboardStats = {
+  activeMembers: number;
+  approvedThisMonth: number;
+  pendingApprovals: number;
+  totalProjects: number;
+};
+
+type DashboardMemberResponse =
+  | BoardMemberResponse
+  | {
+      createdAt?: string;
+      isLead: boolean;
+      updatedAt?: string;
+      user: UserSummaryResponse;
+    };
+
+type DashboardProjectResponse = ProjectResponse | { project: ProjectResponse };
+
+type DashboardApplicationResponse<TApplication> = TApplication | { application: TApplication };
+
+export type EditorBoardDashboardResponse<TApplication extends object = ApplicationResponse> = {
+  applications: TApplication[];
+  board: EditorBoardResponse;
+  members: BoardMemberResponse[];
+  projects: ProjectResponse[];
+  stats: EditorBoardDashboardStats;
+};
+
+type EditorBoardDashboardApiResponse<TApplication> = {
+  data?: {
+    applications?: DashboardApplicationResponse<TApplication>[];
+    board: EditorBoardResponse;
+    members?: DashboardMemberResponse[];
+    projects?: DashboardProjectResponse[];
+    stats: EditorBoardDashboardStats;
+  };
+};
+
+type EditorBoardDashboardApiData<TApplication> = NonNullable<
+  EditorBoardDashboardApiResponse<TApplication>['data']
+>;
+
 export type AddBoardMembersPayload = {
   userIds: number[];
 };
@@ -91,6 +133,17 @@ export type AddBoardProjectsPayload = {
 };
 
 function normalizeBoardMember(member: BoardMemberApiResponse): BoardMemberResponse {
+  if ('user' in member) {
+    return {
+      ...member.user,
+      isLead: member.isLead,
+    };
+  }
+
+  return member;
+}
+
+function normalizeDashboardMember(member: DashboardMemberResponse): BoardMemberResponse {
   if ('user' in member) {
     return {
       ...member.user,
@@ -137,6 +190,34 @@ export async function getEditorBoardById(boardId: number) {
   return response.data ?? (response as EditorBoardResponse);
 }
 
+export async function getEditorBoardDashboard<TApplication extends object = ApplicationResponse>(
+  boardId: number | string,
+): Promise<EditorBoardDashboardResponse<TApplication>> {
+  const response = await api.get<
+    EditorBoardDashboardApiResponse<TApplication> | EditorBoardDashboardApiData<TApplication>,
+    EditorBoardDashboardApiResponse<TApplication> | EditorBoardDashboardApiData<TApplication>
+  >(`/editor-boards/${boardId}/dashboard`);
+  const data = 'board' in response ? response : response.data;
+
+  if (!data?.board) {
+    throw new Error('Editor board dashboard response did not include board data.');
+  }
+
+  return {
+    applications:
+      data?.applications?.map((item) => ('application' in item ? item.application : item)) ?? [],
+    board: data.board,
+    members: data?.members?.map(normalizeDashboardMember) ?? [],
+    projects: data?.projects?.map((item) => ('project' in item ? item.project : item)) ?? [],
+    stats: data?.stats ?? {
+      activeMembers: 0,
+      approvedThisMonth: 0,
+      pendingApprovals: 0,
+      totalProjects: 0,
+    },
+  };
+}
+
 export async function updateEditorBoard(boardId: number, payload: UpdateEditorBoardPayload) {
   const response = await api.patch<
     ApiResponse<EditorBoardResponse>,
@@ -167,8 +248,7 @@ export async function getEditorBoardProjects(
 
   return {
     pagination: response.pagination,
-    projects:
-      response.data?.map((item) => ('project' in item ? item.project : item)) ?? [],
+    projects: response.data?.map((item) => ('project' in item ? item.project : item)) ?? [],
   };
 }
 
@@ -205,17 +285,19 @@ export async function removeEditorBoardMember(boardId: number | string, userId: 
 }
 
 export async function setEditorBoardMemberLead(boardId: number | string, userId: number) {
-  const response = await api.patch<ApiResponse<BoardMemberApiResponse>, ApiResponse<BoardMemberApiResponse>>(
-    `/editor-boards/${boardId}/members/${userId}/lead`,
-  );
+  const response = await api.patch<
+    ApiResponse<BoardMemberApiResponse>,
+    ApiResponse<BoardMemberApiResponse>
+  >(`/editor-boards/${boardId}/members/${userId}/lead`);
 
   return normalizeBoardMember(response.data ?? (response as BoardMemberApiResponse));
 }
 
 export async function getEditorBoardMember(boardId: number | string, userId: number) {
-  const response = await api.get<ApiResponse<BoardMemberApiResponse>, ApiResponse<BoardMemberApiResponse>>(
-    `/editor-boards/${boardId}/members/${userId}`,
-  );
+  const response = await api.get<
+    ApiResponse<BoardMemberApiResponse>,
+    ApiResponse<BoardMemberApiResponse>
+  >(`/editor-boards/${boardId}/members/${userId}`);
 
   return normalizeBoardMember(response.data ?? (response as BoardMemberApiResponse));
 }
@@ -257,4 +339,3 @@ export async function getEditorBoardApplications<TApplication extends object = A
     pagination: response.pagination,
   };
 }
-

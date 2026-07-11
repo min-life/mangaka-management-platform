@@ -1,7 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { Loader2, MoreVertical, Pencil, Trash2, ChevronsUpDown, ChevronUp, ChevronDown } from 'lucide-react';
+import {
+  Loader2,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  ChevronsUpDown,
+  ChevronUp,
+  ChevronDown,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Can } from '@/components/auth/Can';
 import {
@@ -20,6 +28,17 @@ import {
 } from '@/components/ui/table';
 
 import { Pagination } from './Pagination';
+
+export type EditorBoardRow = {
+  boardId: number;
+  createdBy: string;
+  description: string;
+  id: string;
+  image?: string | null;
+  name: string;
+  projectCount: number;
+  updated: string;
+};
 
 function SortIcon({
   activeField,
@@ -40,11 +59,10 @@ function SortIcon({
 }
 
 type EditorBoardsTabProps = {
-  boardRows: any[];
-  boardTotal: number;
+  boardRows: EditorBoardRow[];
   isLoadingBoards: boolean;
-  onRenameBoard: (board: any) => void;
-  onDeleteBoard: (board: any) => void;
+  onRenameBoard: (board: EditorBoardRow) => void;
+  onDeleteBoard: (board: EditorBoardRow) => void;
   page: number;
   limit: number;
   total: number;
@@ -58,7 +76,6 @@ type EditorBoardsTabProps = {
 
 export function EditorBoardsTab({
   boardRows,
-  boardTotal,
   isLoadingBoards,
   onRenameBoard,
   onDeleteBoard,
@@ -77,7 +94,7 @@ export function EditorBoardsTab({
       <Table>
         <TableHeader>
           <TableRow className="h-[40px] border-[#393E46] bg-[#252e38] hover:bg-[#252e38]">
-            <TableHead 
+            <TableHead
               className="w-[45%] px-5 text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3] cursor-pointer select-none hover:text-white"
               onClick={() => onSort('name')}
             >
@@ -92,7 +109,7 @@ export function EditorBoardsTab({
             <TableHead className="w-[180px] text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
               Projects
             </TableHead>
-            <TableHead 
+            <TableHead
               className="w-[180px] text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3] cursor-pointer select-none hover:text-white"
               onClick={() => onSort('createdAt')}
             >
@@ -131,7 +148,7 @@ export function EditorBoardsTab({
                 <TableCell className="px-5">
                   <Link
                     className="flex items-center gap-4 rounded-[4px] outline-none transition-opacity hover:opacity-85 focus-visible:ring-2 focus-visible:ring-[#FFD369]"
-                    href={`/studio/editor-boards/${board.boardId}/projects`}
+                    href={`/studio/editor-boards/${board.boardId}`}
                   >
                     {board.image && board.image.trim() !== '' ? (
                       <img
@@ -154,21 +171,13 @@ export function EditorBoardsTab({
                     </div>
                   </Link>
                 </TableCell>
-                <TableCell className="text-xs font-bold text-white">
-                  {board.createdBy}
-                </TableCell>
+                <TableCell className="text-xs font-bold text-white">{board.createdBy}</TableCell>
                 <TableCell className="text-xs font-bold text-white">
                   {board.projectCount} {board.projectCount === 1 ? 'project' : 'projects'}
                 </TableCell>
-                <TableCell className="text-xs font-bold text-white">
-                  {board.updated}
-                </TableCell>
+                <TableCell className="text-xs font-bold text-white">{board.updated}</TableCell>
                 <TableCell className="pr-5 text-right">
-                  <Can
-                    any={['admin', 'board:owner']}
-                    resource="BOARD"
-                    resourceId={board.boardId}
-                  >
+                  <Can any={['admin', 'board:owner']} resource="BOARD" resourceId={board.boardId}>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button

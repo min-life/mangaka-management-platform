@@ -32,11 +32,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Can } from '@/components/auth/Can';
-import {
-  getProjects,
-  updateProject,
-  type ProjectResponse,
-} from '@/services/project.service';
+import { getProjects, updateProject, type ProjectResponse } from '@/services/project.service';
 import {
   Dialog,
   DialogClose,
@@ -128,7 +124,7 @@ export function WorkspaceDashboard() {
     }
   }, [searchParams]);
   const [activeActionId, setActiveActionId] = useState<string | null>(null);
-  
+
   // Edit Project States
   const [editingProject, setEditingProject] = useState<ProjectResponse | null>(null);
   const [editProjectName, setEditProjectName] = useState('');
@@ -156,10 +152,14 @@ export function WorkspaceDashboard() {
   const [projectsFilter, setProjectsFilter] = useState<'all' | 'me'>('all');
   const [boardsFilter, setBoardsFilter] = useState<'all' | 'me'>('all');
 
-  const [projectsSortField, setProjectsSortField] = useState<'name' | 'updatedAt' | 'createdAt' | undefined>(undefined);
+  const [projectsSortField, setProjectsSortField] = useState<
+    'name' | 'updatedAt' | 'createdAt' | undefined
+  >(undefined);
   const [projectsSortOrder, setProjectsSortOrder] = useState<'asc' | 'desc' | undefined>(undefined);
 
-  const [boardsSortField, setBoardsSortField] = useState<'name' | 'createdAt' | undefined>(undefined);
+  const [boardsSortField, setBoardsSortField] = useState<'name' | 'createdAt' | undefined>(
+    undefined,
+  );
   const [boardsSortOrder, setBoardsSortOrder] = useState<'asc' | 'desc' | undefined>(undefined);
 
   const projectsResource = useAsyncResource(async () => {
@@ -248,10 +248,18 @@ export function WorkspaceDashboard() {
   }, [tasksPage, tasksLimit]);
 
   useEffect(() => {
-    if (!projectsResource.isInitialLoading && !boardsResource.isInitialLoading && !tasksResource.isInitialLoading) {
+    if (
+      !projectsResource.isInitialLoading &&
+      !boardsResource.isInitialLoading &&
+      !tasksResource.isInitialLoading
+    ) {
       setHasLoadedOnce(true);
     }
-  }, [projectsResource.isInitialLoading, boardsResource.isInitialLoading, tasksResource.isInitialLoading]);
+  }, [
+    projectsResource.isInitialLoading,
+    boardsResource.isInitialLoading,
+    tasksResource.isInitialLoading,
+  ]);
 
   const handleProjectsSort = (field: 'name' | 'updatedAt' | 'createdAt') => {
     if (projectsSortField === field) {
@@ -303,12 +311,9 @@ export function WorkspaceDashboard() {
       }))
       .filter((project) => {
         if (!normalizedQuery || activeTab !== 'projects') return true;
-        return [
-          project.name,
-          project.editorBoard,
-          project.createdBy,
-          project.id,
-        ].some((v) => v.toLowerCase().includes(normalizedQuery));
+        return [project.name, project.editorBoard, project.createdBy, project.id].some((v) =>
+          v.toLowerCase().includes(normalizedQuery),
+        );
       });
   }, [apiProjects, searchQuery, activeTab]);
   const projectTotal = projectRows.length;
@@ -338,7 +343,8 @@ export function WorkspaceDashboard() {
     const normalizedQuery = searchQuery.trim().toLowerCase();
     return apiTasks
       .map((t) => {
-        const assigneeName = t.assignedByUser?.displayName || t.assignedByUser?.email || 'Unassigned';
+        const assigneeName =
+          t.assignedByUser?.displayName || t.assignedByUser?.email || 'Unassigned';
         const assigneeInitials = assigneeName.slice(0, 2).toUpperCase();
         return {
           id: t.id,
@@ -473,9 +479,7 @@ export function WorkspaceDashboard() {
                 {headerContent.meta}
               </span>
             </div>
-            <p className="mt-1 text-sm font-medium text-[#aeb7c2]">
-              {headerContent.subtitle}
-            </p>
+            <p className="mt-1 text-sm font-medium text-[#aeb7c2]">{headerContent.subtitle}</p>
           </div>
         </div>
 
@@ -559,7 +563,9 @@ export function WorkspaceDashboard() {
             <div className="flex h-9 overflow-hidden rounded-[4px] border border-[#4b535f] bg-[#393E46] p-1 text-xs">
               <button
                 className={`px-3 py-1 font-black rounded-[3px] transition ${
-                  projectsFilter === 'all' ? 'bg-[#FFD369] text-[#222831]' : 'text-[#aeb7c2] hover:bg-[#4b535f] hover:text-white'
+                  projectsFilter === 'all'
+                    ? 'bg-[#FFD369] text-[#222831]'
+                    : 'text-[#aeb7c2] hover:bg-[#4b535f] hover:text-white'
                 }`}
                 onClick={() => {
                   setProjectsFilter('all');
@@ -571,7 +577,9 @@ export function WorkspaceDashboard() {
               </button>
               <button
                 className={`px-3 py-1 font-black rounded-[3px] transition ${
-                  projectsFilter === 'me' ? 'bg-[#FFD369] text-[#222831]' : 'text-[#aeb7c2] hover:bg-[#4b535f] hover:text-white'
+                  projectsFilter === 'me'
+                    ? 'bg-[#FFD369] text-[#222831]'
+                    : 'text-[#aeb7c2] hover:bg-[#4b535f] hover:text-white'
                 }`}
                 onClick={() => {
                   setProjectsFilter('me');
@@ -588,7 +596,9 @@ export function WorkspaceDashboard() {
             <div className="flex h-9 overflow-hidden rounded-[4px] border border-[#4b535f] bg-[#393E46] p-1 text-xs">
               <button
                 className={`px-3 py-1 font-black rounded-[3px] transition ${
-                  boardsFilter === 'all' ? 'bg-[#FFD369] text-[#222831]' : 'text-[#aeb7c2] hover:bg-[#4b535f] hover:text-white'
+                  boardsFilter === 'all'
+                    ? 'bg-[#FFD369] text-[#222831]'
+                    : 'text-[#aeb7c2] hover:bg-[#4b535f] hover:text-white'
                 }`}
                 onClick={() => {
                   setBoardsFilter('all');
@@ -600,7 +610,9 @@ export function WorkspaceDashboard() {
               </button>
               <button
                 className={`px-3 py-1 font-black rounded-[3px] transition ${
-                  boardsFilter === 'me' ? 'bg-[#FFD369] text-[#222831]' : 'text-[#aeb7c2] hover:bg-[#4b535f] hover:text-white'
+                  boardsFilter === 'me'
+                    ? 'bg-[#FFD369] text-[#222831]'
+                    : 'text-[#aeb7c2] hover:bg-[#4b535f] hover:text-white'
                 }`}
                 onClick={() => {
                   setBoardsFilter('me');
@@ -658,7 +670,6 @@ export function WorkspaceDashboard() {
           </p>
         ) : null}
 
-
         {activeTab === 'editorBoards' && boardError ? (
           <p className="mt-4 rounded-[4px] border border-red-400/30 bg-red-950/20 px-4 py-3 text-xs font-bold text-red-300">
             {boardError}
@@ -690,7 +701,6 @@ export function WorkspaceDashboard() {
             ) : activeTab === 'editorBoards' ? (
               <EditorBoardsTab
                 boardRows={boardRows}
-                boardTotal={boardTotal}
                 isLoadingBoards={boardsResource.isInitialLoading}
                 onRenameBoard={handleRenameBoard}
                 onDeleteBoard={handleDeleteBoard}
