@@ -30,6 +30,8 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/hooks/useAuth';
 import { useRealtimeNotifications } from '@/hooks/use-realtime-notifications';
 import { clearAccessToken, getAccessToken } from '@/lib/auth-storage';
 import { cn } from '@/lib/utils';
@@ -75,7 +77,6 @@ function isSessionExpiredError(error: unknown) {
 
 const text = {
   accountSettings: 'Account Settings',
-  activityLoading: 'Loading activity...',
   activitySummary: 'Activity Summary',
   appearance: (isDark: boolean) => `Appearance (State ${isDark ? 'Dark' : 'Light'})`,
   assignedEditorBoards: 'Assigned Editor Boards',
@@ -218,6 +219,27 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
+function ActivitySkeleton() {
+  return (
+    <Card className="gap-0 rounded-xl border border-[var(--profile-border)] bg-[var(--profile-surface)] p-4 ring-0">
+      <div className="space-y-4">
+        {[0, 1, 2].map((index) => (
+          <div className="flex gap-4" key={index}>
+            <Skeleton className="size-6 shrink-0 rounded-full bg-[var(--profile-surface-highest)]" />
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <Skeleton className="h-3 w-1/3 bg-[var(--profile-surface-highest)]" />
+                <Skeleton className="h-3 w-12 bg-[var(--profile-surface-highest)]" />
+              </div>
+              <Skeleton className="h-3 w-2/3 bg-[var(--profile-surface-highest)]" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
 function SettingsButton({
   disabled,
   icon: Icon,
@@ -352,13 +374,15 @@ function ChangePasswordDialog({
 
 export function UserProfilePage() {
   const router = useRouter();
+  const { user: authUser, updateUser: updateAuthUser } = useAuth();
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const { notifications } = useRealtimeNotifications(Boolean(currentUser));
+  const { notifications } = useRealtimeNotifications(Boolean(authUser));
   const [allActivities, setAllActivities] = useState<UserActivity[]>([]);
   const [visibleActivityCount, setVisibleActivityCount] = useState(ACTIVITY_PAGE_SIZE);
   const activityScrollRef = useRef<HTMLDivElement | null>(null);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
+  const [isActivitiesLoading, setIsActivitiesLoading] = useState(true);
   const [error, setError] = useState('');
   const [isPasswordOpen, setIsPasswordOpen] = useState(false);
   const [isProfileSubmitting, setIsProfileSubmitting] = useState(false);
@@ -377,7 +401,15 @@ export function UserProfilePage() {
   }, []);
 
   useEffect(() => {
-    void loadProfileData();
+    if (!getAccessToken()) {
+      clearAccessToken();
+      router.replace('/login');
+      return;
+    }
+
+    void loadProfile();
+    void loadActivities();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -405,8 +437,8 @@ export function UserProfilePage() {
   }, [notifications]);
 
   const themeStyle = useMemo(() => themeTokens[theme], [theme]);
-  const displayName = currentUser?.displayName ?? 'Unnamed User';
-  const avatarUrl = currentUser?.avatarUrl ?? '';
+  const displayName = currentUser?.displayName ?? authUser?.displayName ?? 'Unnamed User';
+  const avatarUrl = currentUser?.avatarUrl ?? authUser?.avatarUrl ?? '';
   const roleName = getPrimaryRole(currentUser);
   const initials = getInitials(displayName);
   const isDarkTheme = theme === 'dark';
@@ -416,34 +448,56 @@ export function UserProfilePage() {
   );
   const hasMoreActivities = visibleActivityCount < allActivities.length;
 
-  async function loadProfileData() {
-    setIsLoading(true);
-    setError('');
-
-    if (!getAccessToken()) {
+  function handleSessionExpiry(loadError: unknown) {
+    if (isSessionExpiredError(loadError)) {
       clearAccessToken();
       router.replace('/login');
-      return;
+      return true;
     }
+
+    return false;
+  }
+
+  async function loadProfile() {
+    setIsProfileLoading(true);
 
     try {
       const profileData = await getCurrentUserProfile();
-      const activityData = await getCurrentUserContextActivities();
-
       setCurrentUser(profileData);
-      setAllActivities(activityData);
-      setVisibleActivityCount(ACTIVITY_PAGE_SIZE);
     } catch (loadError) {
-      if (isSessionExpiredError(loadError)) {
-        clearAccessToken();
-        router.replace('/login');
+      if (handleSessionExpiry(loadError)) {
         return;
       }
 
       setError(getApiErrorMessage(loadError, 'Unable to load profile data.'));
     } finally {
-      setIsLoading(false);
+      setIsProfileLoading(false);
     }
+  }
+
+  async function loadActivities() {
+    setIsActivitiesLoading(true);
+
+    try {
+      const activityData = await getCurrentUserContextActivities(authUser?.id);
+
+      setAllActivities(activityData);
+      setVisibleActivityCount(ACTIVITY_PAGE_SIZE);
+    } catch (loadError) {
+      if (handleSessionExpiry(loadError)) {
+        return;
+      }
+
+      setError(getApiErrorMessage(loadError, 'Unable to load activity data.'));
+    } finally {
+      setIsActivitiesLoading(false);
+    }
+  }
+
+  function retryLoad() {
+    setError('');
+    void loadProfile();
+    void loadActivities();
   }
 
   // Pagination happens entirely client-side (see getCurrentUserContextActivities):
@@ -490,9 +544,7 @@ export function UserProfilePage() {
     setIsProfileSubmitting(true);
 
     try {
-      const uploadResult = input.avatarFile
-        ? await uploadAvatarImage(input.avatarFile)
-        : null;
+      const uploadResult = input.avatarFile ? await uploadAvatarImage(input.avatarFile) : null;
       const updatedUser = await updateCurrentUserProfile({
         displayName: input.displayName ?? currentUser?.displayName ?? '',
         ...(uploadResult?.avatarUrl ? { avatarUrl: uploadResult.avatarUrl } : {}),
@@ -503,6 +555,7 @@ export function UserProfilePage() {
         ...updatedUser,
         roles: updatedUser.roles.length ? updatedUser.roles : (currentUser?.roles ?? []),
       }));
+      updateAuthUser({ avatarUrl: updatedUser.avatarUrl, displayName: updatedUser.displayName });
       toast.success('Profile updated successfully');
       return true;
     } catch (updateError) {
@@ -670,7 +723,9 @@ export function UserProfilePage() {
               </div>
             )}
             <div className="flex flex-wrap items-center gap-4 text-[var(--profile-muted)]">
-              <span className="text-[14px]">{currentUser?.email ?? 'Loading...'}</span>
+              <span className="text-[14px]">
+                {currentUser?.email ?? authUser?.email ?? 'Loading...'}
+              </span>
               <Separator className="h-4 bg-[var(--profile-border)]" orientation="vertical" />
               <span className="flex items-center gap-1 text-[14px]">
                 <ShieldCheck className="size-[18px]" />
@@ -684,7 +739,7 @@ export function UserProfilePage() {
           <Card className="mb-6 border-[#EF4444]/30 bg-[#EF4444]/10 p-6 text-[var(--profile-text)]">
             <div className="flex items-center justify-between gap-4">
               <p>{error}</p>
-              <Button variant="outline" onClick={() => void loadProfileData()}>
+              <Button variant="outline" onClick={retryLoad}>
                 {text.retry}
               </Button>
             </div>
@@ -696,8 +751,8 @@ export function UserProfilePage() {
             <h3 className="mb-4 text-[22px] font-semibold text-[var(--profile-title)]">
               {text.activitySummary}
             </h3>
-            {isLoading ? (
-              <EmptyState message={text.activityLoading} />
+            {isActivitiesLoading ? (
+              <ActivitySkeleton />
             ) : activities.length > 0 ? (
               <div className="max-h-[600px] overflow-y-auto pr-1" ref={activityScrollRef}>
                 <ActivityTimeline activities={activities} />
@@ -714,9 +769,11 @@ export function UserProfilePage() {
             <Card className="gap-0 rounded-xl border border-[var(--profile-border)] bg-[var(--profile-surface)] p-4 text-[var(--profile-text)] ring-0">
               <div className="space-y-2">
                 <SettingsButton
-                  disabled={currentUser?.googleLinked}
+                  disabled={isProfileLoading || currentUser?.googleLinked}
                   icon={Link2}
-                  label={currentUser?.googleLinked ? text.googleAccountLinked : text.linkGoogleAccount}
+                  label={
+                    currentUser?.googleLinked ? text.googleAccountLinked : text.linkGoogleAccount
+                  }
                   onClick={() => {
                     void (async () => {
                       try {
