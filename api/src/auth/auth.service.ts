@@ -11,6 +11,7 @@ import { JwtService } from '@nestjs/jwt';
 import { SCOPE } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
+import { OAuth2Client } from 'google-auth-library';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ERROR } from '../share/constants/message-error';
@@ -42,12 +43,15 @@ type GoogleCallbackResult = {
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
+  private readonly googleClient: OAuth2Client;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly mailService: MailService,
-  ) {}
+  ) {
+    this.googleClient = new OAuth2Client(requireEnv('GOOGLE_CLIENT_ID'));
+  }
 
   async register(body: RegisterDto) {
     try {
@@ -266,6 +270,37 @@ export class AuthService {
     }
   }
 
+  async verifyGoogleMobileLogin(idToken: string) {
+    try {
+      const ticket = await this.googleClient.verifyIdToken({
+        idToken,
+        audience: requireEnv('GOOGLE_CLIENT_ID'),
+      });
+      const payload = ticket.getPayload();
+      
+      if (!payload) {
+        throw new UnauthorizedException('Invalid Google token');
+      }
+
+      const googleUser: GoogleUser = {
+        googleId: payload.sub,
+        email: payload.email ?? '',
+        displayName: payload.name ?? null,
+        avatarUrl: payload.picture ?? null,
+      };
+
+      const { accessToken, refreshToken, refreshTokenExpiresAt } = await this.googleLogin(googleUser);
+
+      return {
+        accessToken,
+        refreshToken,
+        refreshTokenExpiresAt,
+      };
+    } catch (error) {
+      this.handleError(error, 'Google mobile login fail', ERROR.SVLOGIN);
+    }
+  }
+
   async login(body: LoginDto) {
     try {
       const email = body.email.trim().toLowerCase();
@@ -437,7 +472,7 @@ export class AuthService {
   getGoogleAuthUrl() {
     const clientId = requireEnv('GOOGLE_CLIENT_ID');
     const redirectUri = requireEnv('GOOGLE_CALLBACK_URL');
-    
+
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: redirectUri,

@@ -30,7 +30,7 @@ export class ApplicationResDto {
   @ApiPropertyOptional({ example: 'Please review before publishing.', nullable: true })
   description?: string | null;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     example: [
       {
         url: 'https://...',
@@ -41,9 +41,9 @@ export class ApplicationResDto {
         height: 1080,
         ratio: 1.77,
         isThumbnail: true,
-      }
-    ], 
-    nullable: true 
+      },
+    ],
+    nullable: true,
   })
   materials?: unknown | null;
 
@@ -53,7 +53,11 @@ export class ApplicationResDto {
   @ApiProperty({ enum: APPLICATION_STATUS, example: APPLICATION_STATUS.PENDING })
   status!: APPLICATION_STATUS;
 
-  @ApiPropertyOptional({ example: 1, description: 'Parent folder ID for CREATE_CHAPTER type', nullable: true })
+  @ApiPropertyOptional({
+    example: 1,
+    description: 'Parent folder ID for CREATE_CHAPTER type',
+    nullable: true,
+  })
   parentFolderId?: number | null;
 
   @ApiPropertyOptional({ type: UserResDto, nullable: true })

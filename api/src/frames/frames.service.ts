@@ -50,9 +50,9 @@ const COMMENT_SELECT = {
         select: {
           id: true,
           name: true,
-        }
-      }
-    }
+        },
+      },
+    },
   },
   createdByUser: USER_SELECT,
   createdAt: true,
@@ -225,7 +225,7 @@ export class FramesService {
         }),
       ]);
 
-      const mappedComments = comments.map(c => {
+      const mappedComments = comments.map((c) => {
         const material = c.frame?.material;
         const frame = c.frame ? { id: c.frame.id, name: c.frame.name } : null;
         return {

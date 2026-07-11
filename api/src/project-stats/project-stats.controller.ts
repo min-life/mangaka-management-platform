@@ -8,7 +8,7 @@ import { ProjectStatResponseDto, UpdateProjectStatReqDto } from './dto';
 @ApiBearerAuth()
 @Controller('project-stats')
 export class ProjectStatsController {
-  constructor(private readonly projectStatsService: ProjectStatsService) { }
+  constructor(private readonly projectStatsService: ProjectStatsService) {}
 
   @Permissions({
     mode: 'ANY',

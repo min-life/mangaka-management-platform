@@ -133,10 +133,7 @@ export class UsersController {
   @ApiOperation({ summary: 'Get all users (admin only)' })
   @ApiOkResponse({ description: 'Users retrieved successfully', type: UsersResponseDto })
   @Get()
-  findAll(
-    @CurrentUser() currentUser: JwtPayload,
-    @Query() query: QueryUsersReqDto,
-  ) {
+  findAll(@CurrentUser() currentUser: JwtPayload, @Query() query: QueryUsersReqDto) {
     const { search, isActive, field, order, page, limit } = query;
     return this.usersService.findAll(
       currentUser.userId,

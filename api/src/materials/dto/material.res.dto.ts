@@ -45,8 +45,8 @@ export class MaterialResDto {
         size: 4096,
         mimeType: 'application/zip',
         type: 'SOURCE',
-      }
-    ]
+      },
+    ],
   })
   materials!: unknown;
 

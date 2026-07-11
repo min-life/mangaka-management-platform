@@ -182,7 +182,7 @@ Tài liệu này mô tả cấu trúc cơ sở dữ liệu của dự án Mangak
   - `description` (String?): Nội dung chi tiết.
   - `materials` (Json): Tài liệu đính kèm theo đơn.
   - `type` (APPLICATION_TYPE): Loại đơn (`MANUSCRIPT_REVIEW`, `PUBLISH_REQUEST`).
-  - `status` (APPLICATION_STATUS): Trạng thái (`PENDING`, `INTERNAL_APPROVED`, `SUBMITTED`, `APPROVE`, `REJECT`, `CANCELLED`).
+  - `status` (APPLICATION_STATUS): Trạng thái (`PENDING`, `SUBMITTED`, `APPROVE`, `REJECT`, `CANCELLED`).
   - `verifyBy` (Int?): Người trực tiếp duyệt đơn.
   - `createdBy`, `updatedBy`, `createdAt`, `updatedAt`: Các trường Audit.
 

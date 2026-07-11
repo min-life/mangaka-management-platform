@@ -14,8 +14,8 @@ const ACTIVITY_INCLUDE = {
       displayName: true,
       avatarUrl: true,
       email: true,
-    }
-  }
+    },
+  },
 };
 
 @Injectable()
@@ -50,43 +50,78 @@ export class ActivityLogsService {
       });
 
       if (logWithRelations) {
-        this.realtimeGateway.broadcastActivity(payload.projectId ?? null, payload.editorBoardId ?? null, logWithRelations);
+        this.realtimeGateway.broadcastActivity(
+          payload.projectId ?? null,
+          payload.editorBoardId ?? null,
+          logWithRelations,
+        );
       }
 
       // Determine who to notify
       const usersToNotify = new Set<number>();
 
       // 1. Task Created / Assigned
-      if ((payload.action === ACTIVITY_ACTION.TASK_CREATED || payload.action === ACTIVITY_ACTION.TASK_ASSIGNED) && payload.metadata && typeof payload.metadata === 'object' && 'assignedTo' in payload.metadata) {
-        if (payload.metadata.assignedTo !== payload.actorId && payload.metadata.assignedTo !== null) {
+      if (
+        (payload.action === ACTIVITY_ACTION.TASK_CREATED ||
+          payload.action === ACTIVITY_ACTION.TASK_ASSIGNED) &&
+        payload.metadata &&
+        typeof payload.metadata === 'object' &&
+        'assignedTo' in payload.metadata
+      ) {
+        if (
+          payload.metadata.assignedTo !== payload.actorId &&
+          payload.metadata.assignedTo !== null
+        ) {
           usersToNotify.add(payload.metadata.assignedTo as number);
         }
       }
 
       // 2. Task Updated or Completed (Status change, etc)
-      if ((payload.action === ACTIVITY_ACTION.TASK_UPDATED || payload.action === ACTIVITY_ACTION.TASK_COMPLETED) && payload.metadata && typeof payload.metadata === 'object') {
-        if ('assigneeId' in payload.metadata && payload.metadata.assigneeId !== payload.actorId && payload.metadata.assigneeId !== null) {
+      if (
+        (payload.action === ACTIVITY_ACTION.TASK_UPDATED ||
+          payload.action === ACTIVITY_ACTION.TASK_COMPLETED) &&
+        payload.metadata &&
+        typeof payload.metadata === 'object'
+      ) {
+        if (
+          'assigneeId' in payload.metadata &&
+          payload.metadata.assigneeId !== payload.actorId &&
+          payload.metadata.assigneeId !== null
+        ) {
           usersToNotify.add(payload.metadata.assigneeId as number);
         }
-        if ('creatorId' in payload.metadata && payload.metadata.creatorId !== payload.actorId && payload.metadata.creatorId !== null) {
+        if (
+          'creatorId' in payload.metadata &&
+          payload.metadata.creatorId !== payload.actorId &&
+          payload.metadata.creatorId !== null
+        ) {
           usersToNotify.add(payload.metadata.creatorId as number);
         }
       }
 
       // 3. Application Created
-      if (payload.action === ACTIVITY_ACTION.APPLICATION_CREATED && payload.metadata && typeof payload.metadata === 'object' && 'projectOwnerId' in payload.metadata) {
-        if (payload.metadata.projectOwnerId !== payload.actorId && payload.metadata.projectOwnerId !== null) {
+      if (
+        payload.action === ACTIVITY_ACTION.APPLICATION_CREATED &&
+        payload.metadata &&
+        typeof payload.metadata === 'object' &&
+        'projectOwnerId' in payload.metadata
+      ) {
+        if (
+          payload.metadata.projectOwnerId !== payload.actorId &&
+          payload.metadata.projectOwnerId !== null
+        ) {
           usersToNotify.add(payload.metadata.projectOwnerId as number);
         }
       }
 
       // 4. Application Status changes
       if (
-        (payload.action === ACTIVITY_ACTION.APPLICATION_INTERNAL_APPROVED ||
-         payload.action === ACTIVITY_ACTION.APPLICATION_SUBMITTED ||
-         payload.action === ACTIVITY_ACTION.APPLICATION_APPROVED ||
-         payload.action === ACTIVITY_ACTION.APPLICATION_REJECTED) && 
-        payload.metadata && typeof payload.metadata === 'object' && 'creatorId' in payload.metadata
+        (payload.action === ACTIVITY_ACTION.APPLICATION_SUBMITTED ||
+          payload.action === ACTIVITY_ACTION.APPLICATION_APPROVED ||
+          payload.action === ACTIVITY_ACTION.APPLICATION_REJECTED) &&
+        payload.metadata &&
+        typeof payload.metadata === 'object' &&
+        'creatorId' in payload.metadata
       ) {
         if (payload.metadata.creatorId !== payload.actorId && payload.metadata.creatorId !== null) {
           usersToNotify.add(payload.metadata.creatorId as number);
@@ -105,7 +140,8 @@ export class ActivityLogsService {
           let whereCondition: Prisma.CommentWhereInput | null = null;
           if (commentObj.fileId) whereCondition = { fileId: commentObj.fileId };
           else if (commentObj.taskId) whereCondition = { taskId: commentObj.taskId };
-          else if (commentObj.applicationId) whereCondition = { applicationId: commentObj.applicationId };
+          else if (commentObj.applicationId)
+            whereCondition = { applicationId: commentObj.applicationId };
           else if (commentObj.frameId) whereCondition = { frameId: commentObj.frameId };
 
           if (whereCondition) {
@@ -125,41 +161,70 @@ export class ActivityLogsService {
           if ('mentionedUserIds' in payload.metadata) {
             const mentionedIds = payload.metadata.mentionedUserIds as number[];
             if (Array.isArray(mentionedIds)) {
-              mentionedIds.forEach(id => {
+              mentionedIds.forEach((id) => {
                 if (id !== payload.actorId && id !== null) usersToNotify.add(id);
               });
             }
           }
           // Task Comment
-          if ('assigneeId' in payload.metadata && payload.metadata.assigneeId !== payload.actorId && payload.metadata.assigneeId !== null) {
+          if (
+            'assigneeId' in payload.metadata &&
+            payload.metadata.assigneeId !== payload.actorId &&
+            payload.metadata.assigneeId !== null
+          ) {
             usersToNotify.add(payload.metadata.assigneeId as number);
           }
-          if ('creatorId' in payload.metadata && payload.metadata.creatorId !== payload.actorId && payload.metadata.creatorId !== null) {
+          if (
+            'creatorId' in payload.metadata &&
+            payload.metadata.creatorId !== payload.actorId &&
+            payload.metadata.creatorId !== null
+          ) {
             usersToNotify.add(payload.metadata.creatorId as number);
           }
           // Application Comment
-          if ('applicantId' in payload.metadata && payload.metadata.applicantId !== payload.actorId && payload.metadata.applicantId !== null) {
+          if (
+            'applicantId' in payload.metadata &&
+            payload.metadata.applicantId !== payload.actorId &&
+            payload.metadata.applicantId !== null
+          ) {
             usersToNotify.add(payload.metadata.applicantId as number);
           }
-          if ('projectOwnerId' in payload.metadata && payload.metadata.projectOwnerId !== payload.actorId && payload.metadata.projectOwnerId !== null) {
+          if (
+            'projectOwnerId' in payload.metadata &&
+            payload.metadata.projectOwnerId !== payload.actorId &&
+            payload.metadata.projectOwnerId !== null
+          ) {
             usersToNotify.add(payload.metadata.projectOwnerId as number);
           }
         }
       }
 
       // 6. Member Invited
-      if (payload.action === ACTIVITY_ACTION.MEMBER_INVITED && payload.metadata && typeof payload.metadata === 'object' && 'invitedUserIds' in payload.metadata) {
+      if (
+        payload.action === ACTIVITY_ACTION.MEMBER_INVITED &&
+        payload.metadata &&
+        typeof payload.metadata === 'object' &&
+        'invitedUserIds' in payload.metadata
+      ) {
         const invitedIds = payload.metadata.invitedUserIds as number[];
         if (Array.isArray(invitedIds)) {
-          invitedIds.forEach(id => {
+          invitedIds.forEach((id) => {
             if (id !== payload.actorId && id !== null) usersToNotify.add(id);
           });
         }
       }
 
       // 7. Member Removed
-      if (payload.action === ACTIVITY_ACTION.MEMBER_REMOVED && payload.metadata && typeof payload.metadata === 'object' && 'removedUserId' in payload.metadata) {
-        if (payload.metadata.removedUserId !== payload.actorId && payload.metadata.removedUserId !== null) {
+      if (
+        payload.action === ACTIVITY_ACTION.MEMBER_REMOVED &&
+        payload.metadata &&
+        typeof payload.metadata === 'object' &&
+        'removedUserId' in payload.metadata
+      ) {
+        if (
+          payload.metadata.removedUserId !== payload.actorId &&
+          payload.metadata.removedUserId !== null
+        ) {
           usersToNotify.add(payload.metadata.removedUserId as number);
         }
       }
@@ -174,8 +239,8 @@ export class ActivityLogsService {
           include: {
             activityLog: {
               include: ACTIVITY_INCLUDE,
-            }
-          }
+            },
+          },
         });
         this.realtimeGateway.notifyUser(userId, notif);
       }
@@ -198,7 +263,7 @@ export class ActivityLogsService {
     const skip = (page - 1) * limit;
 
     const where: Prisma.ActivityLogWhereInput = {};
-    
+
     if (query.projectId) {
       where.projectId = query.projectId;
     }

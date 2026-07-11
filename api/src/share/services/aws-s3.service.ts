@@ -14,7 +14,7 @@ export class AwsS3Service {
   constructor() {
     this.region = requireEnv('AWS_REGION');
     this.bucketName = requireEnv('AWS_S3_BUCKET_NAME');
-    
+
     this.s3Client = new S3Client({
       region: this.region,
       credentials: {
@@ -40,7 +40,11 @@ export class AwsS3Service {
    * @param downloadName Optional. If provided, forces download with this filename
    * @returns Pre-signed URL string
    */
-  async getPresignedUrl(keyOrUrl: string, expiresIn = 3600, downloadName?: string): Promise<string> {
+  async getPresignedUrl(
+    keyOrUrl: string,
+    expiresIn = 3600,
+    downloadName?: string,
+  ): Promise<string> {
     try {
       const baseUrl = `https://${this.bucketName}.s3.${this.region}.amazonaws.com/`;
       const key = keyOrUrl.startsWith(baseUrl) ? keyOrUrl.replace(baseUrl, '') : keyOrUrl;
@@ -48,12 +52,17 @@ export class AwsS3Service {
       const command = new GetObjectCommand({
         Bucket: this.bucketName,
         Key: key,
-        ...(downloadName && { ResponseContentDisposition: `attachment; filename="${downloadName}"` }),
+        ...(downloadName && {
+          ResponseContentDisposition: `attachment; filename="${downloadName}"`,
+        }),
       });
 
       return await getSignedUrl(this.s3Client, command, { expiresIn });
     } catch (error) {
-      this.logger.error(`Generate presigned URL fail: ${keyOrUrl}`, error instanceof Error ? error.stack : String(error));
+      this.logger.error(
+        `Generate presigned URL fail: ${keyOrUrl}`,
+        error instanceof Error ? error.stack : String(error),
+      );
       throw new InternalServerErrorException(ERROR.SVGETFILEMATERIALS);
     }
   }
@@ -77,7 +86,10 @@ export class AwsS3Service {
 
       return `https://${this.bucketName}.s3.${this.region}.amazonaws.com/${key}`;
     } catch (error) {
-      this.logger.error(`Upload file to S3 fail: ${key}`, error instanceof Error ? error.stack : String(error));
+      this.logger.error(
+        `Upload file to S3 fail: ${key}`,
+        error instanceof Error ? error.stack : String(error),
+      );
       throw new InternalServerErrorException(ERROR.SVCREATEMATERIAL);
     }
   }

@@ -31,6 +31,8 @@ const USER_SELECT = {
 const BOARD_MEMBER_SELECT = {
   user: USER_SELECT,
   isLead: true,
+  createdAt: true,
+  updatedAt: true,
 } satisfies Prisma.UserEditorBoardSelect;
 
 const EDITOR_BOARD_SELECT = {
@@ -121,7 +123,7 @@ export class EditorBoardsService {
     }
   }
 
-  @UseCache((args) => `board:list`)
+  @UseCache((args) => `board:list:${args[0]}`)
   async getEditorBoards(
     userId: number,
     filter?: FilterBoards,
@@ -189,6 +191,71 @@ export class EditorBoardsService {
     }
   }
 
+  async getEditorBoardDashboard(boardId: number) {
+    try {
+      const board = await this.prisma.editorBoard.findUnique({
+        where: { id: boardId },
+        select: EDITOR_BOARD_SELECT,
+      });
+      if (!board) throw new NotFoundException(ERROR.NFBOARD);
+
+      const firstDayOfMonth = new Date();
+      firstDayOfMonth.setDate(1);
+      firstDayOfMonth.setHours(0, 0, 0, 0);
+
+      const [
+        totalProjects,
+        activeMembers,
+        pendingApprovals,
+        approvedThisMonth,
+        members,
+        projects,
+        applications,
+      ] = await Promise.all([
+        this.prisma.project.count({ where: { editorBoardId: boardId } }),
+        this.prisma.userEditorBoard.count({ where: { editorBoardId: boardId } }),
+        this.prisma.application.count({
+          where: { project: { editorBoardId: boardId }, status: { in: ['PENDING', 'SUBMITTED'] } },
+        }),
+        this.prisma.application.count({
+          where: { project: { editorBoardId: boardId }, status: 'APPROVE', updatedAt: { gte: firstDayOfMonth } },
+        }),
+        this.prisma.userEditorBoard.findMany({
+          where: { editorBoardId: boardId },
+          select: BOARD_MEMBER_SELECT,
+          take: 5,
+        }),
+        this.prisma.project.findMany({
+          where: { editorBoardId: boardId },
+          select: PROJECT_SELECT,
+          take: 5,
+          orderBy: { createdAt: 'desc' },
+        }),
+        this.prisma.application.findMany({
+          where: { project: { editorBoardId: boardId } },
+          select: APPLICATION_LIST_SELECT,
+          take: 5,
+          orderBy: { updatedAt: 'desc' },
+        }),
+      ]);
+
+      return {
+        board,
+        stats: {
+          totalProjects,
+          activeMembers,
+          pendingApprovals,
+          approvedThisMonth,
+        },
+        members,
+        projects,
+        applications,
+      };
+    } catch (error) {
+      this.handleError(error, 'Get editor board dashboard fail', 'SVGETBOARD');
+    }
+  }
+
   @InvalidateCache((args) => [`board:${args[0]}`, `board:list:*`])
   async deleteBoard(id: number) {
     try {
@@ -235,7 +302,11 @@ export class EditorBoardsService {
     }
   }
 
-  @InvalidateCache((args) => [`board:${args[0]}:members:*`])
+  @InvalidateCache((args) => [
+    `board:${args[0]}:members:*`,
+    ...args[1].map((userId: number) => `user:${userId}:editor-boards`),
+    ...args[1].map((userId: number) => `board:list:${userId}:*`),
+  ])
   async addMembersToBoard(editorBoardId: number, userIds: number[], actorId: number) {
     try {
       await this.ensureBoard(editorBoardId);
@@ -327,7 +398,11 @@ export class EditorBoardsService {
     }
   }
 
-  @InvalidateCache((args) => [`board:${args[0]}:members:*`])
+  @InvalidateCache((args) => [
+    `board:${args[0]}:members:*`,
+    `user:${args[1]}:editor-boards`,
+    `board:list:${args[1]}:*`,
+  ])
   async removeBoardMember(editorBoardId: number, userId: number, actorId: number) {
     try {
       await this.ensureBoard(editorBoardId);
@@ -367,7 +442,11 @@ export class EditorBoardsService {
     }
   }
 
-  @InvalidateCache((args) => [`board:${args[0]}:members:*`])
+  @InvalidateCache((args) => [
+    `board:${args[0]}:members:*`,
+    `user:${args[1]}:editor-boards`,
+    `board:list:${args[1]}:*`,
+  ])
   async leaveBoard(editorBoardId: number, userId: number) {
     try {
       const board = await this.ensureBoard(editorBoardId);
@@ -389,7 +468,11 @@ export class EditorBoardsService {
     }
   }
 
-  @InvalidateCache((args) => [`board:${args[0]}:members:*`])
+  @InvalidateCache((args) => [
+    `board:${args[0]}:members:*`,
+    `user:${args[1]}:editor-boards`,
+    `board:list:${args[1]}:*`,
+  ])
   async setToLead(editorBoardId: number, userId: number) {
     try {
       await this.findBoardMember(editorBoardId, userId);
@@ -478,9 +561,13 @@ export class EditorBoardsService {
           throw new NotFoundException(ERROR.NFPROJECT);
         }
 
-        const invalidCreatorProjects = existingProjects.filter(p => p.createdBy !== board?.createdBy);
+        const invalidCreatorProjects = existingProjects.filter(
+          (p) => p.createdBy !== board?.createdBy,
+        );
         if (invalidCreatorProjects.length > 0) {
-          throw new ForbiddenException('All projects must be created by the same creator as the editor board');
+          throw new ForbiddenException(
+            'All projects must be created by the same creator as the editor board',
+          );
         }
 
         const cflProjects = await prisma.project.count({
@@ -518,7 +605,9 @@ export class EditorBoardsService {
       const where: Prisma.ApplicationWhereInput = {
         project: { editorBoardId },
         type: { in: [APPLICATION_TYPE.CREATE_ARC, APPLICATION_TYPE.CREATE_CHAPTER] },
-        status: { in: [APPLICATION_STATUS.INTERNAL_APPROVED, APPLICATION_STATUS.SUBMITTED, APPLICATION_STATUS.APPROVE, APPLICATION_STATUS.REJECT] },
+        status: {
+          in: [APPLICATION_STATUS.SUBMITTED, APPLICATION_STATUS.APPROVE, APPLICATION_STATUS.REJECT],
+        },
         ...(filter?.search && {
           title: { contains: filter.search, mode: 'insensitive' },
         }),

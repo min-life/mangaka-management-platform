@@ -49,7 +49,7 @@ export class UsersService {
     private readonly mailService: MailService,
   ) {}
 
-  @UseCache((args) => `user:list`)
+  @UseCache((args) => `user:list:${args[0]}`)
   async findAll(
     currentUserId: number,
     filter?: { search?: string; isActive?: boolean },
@@ -58,9 +58,7 @@ export class UsersService {
   ) {
     try {
       const currentUserPermissions = await this.getGlobalPermission(currentUserId);
-      const isAdminOrStaff = currentUserPermissions.some(
-        (p) => p === 'admin' || p === 'staff',
-      );
+      const isAdminOrStaff = currentUserPermissions.some((p) => p === 'admin' || p === 'staff');
 
       const where: Prisma.UserWhereInput = {
         ...(filter?.search && {
@@ -354,7 +352,7 @@ export class UsersService {
       const growthByMonth: Record<string, number> = {};
       const growthByYear: Record<string, number> = {};
 
-      users.forEach(user => {
+      users.forEach((user) => {
         const date = user.createdAt;
         const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
         const yearKey = date.getFullYear().toString();
@@ -437,7 +435,12 @@ export class UsersService {
       const validRoleIds = await this.validateSysRoles(roleIds);
 
       await this.prisma.$transaction(async (tx) => {
-        await tx.userRole.deleteMany({ where: { userId } });
+        await tx.userRole.deleteMany({
+          where: {
+            userId,
+            roleId: { notIn: validRoleIds },
+          },
+        });
 
         if (validRoleIds.length > 0) {
           await tx.userRole.createMany({
@@ -599,40 +602,40 @@ export class UsersService {
           throw new ForbiddenException();
         }
         switch (resource) {
-        case 'BOARD':
-          permissions = permissions.concat(await this.getBoardPermission(userId, resourceId!));
-          break;
-        case 'PROJECT':
-          permissions = permissions.concat(await this.getProjectPermission(userId, resourceId!));
-          break;
-        case 'FOLDER':
-          permissions = permissions.concat(await this.getFolderPermission(userId, resourceId!));
-          break;
-        case 'FILE':
-          permissions = permissions.concat(await this.getFilePermission(userId, resourceId!));
-          break;
-        case 'MATERIAL':
-          permissions = permissions.concat(await this.getMaterialPermission(userId, resourceId!));
-          break;
-        case 'TASK':
-          permissions = permissions.concat(await this.getTaskPermission(userId, resourceId!));
-          break;
-        case 'FRAME':
-          permissions = permissions.concat(await this.getFramePermission(userId, resourceId!));
-          break;
-        case 'COMMENT':
-          permissions = permissions.concat(await this.getCommentPermission(userId, resourceId!));
-          break;
-        case 'APPLICATION':
-          permissions = permissions.concat(
-            await this.getApplicationPermission(userId, resourceId!),
-          );
-          break;
-        case 'PROJECT_STAT':
-          permissions = permissions.concat(
-            await this.getProjectStatPermission(userId, resourceId!),
-          );
-          break;
+          case 'BOARD':
+            permissions = permissions.concat(await this.getBoardPermission(userId, resourceId!));
+            break;
+          case 'PROJECT':
+            permissions = permissions.concat(await this.getProjectPermission(userId, resourceId!));
+            break;
+          case 'FOLDER':
+            permissions = permissions.concat(await this.getFolderPermission(userId, resourceId!));
+            break;
+          case 'FILE':
+            permissions = permissions.concat(await this.getFilePermission(userId, resourceId!));
+            break;
+          case 'MATERIAL':
+            permissions = permissions.concat(await this.getMaterialPermission(userId, resourceId!));
+            break;
+          case 'TASK':
+            permissions = permissions.concat(await this.getTaskPermission(userId, resourceId!));
+            break;
+          case 'FRAME':
+            permissions = permissions.concat(await this.getFramePermission(userId, resourceId!));
+            break;
+          case 'COMMENT':
+            permissions = permissions.concat(await this.getCommentPermission(userId, resourceId!));
+            break;
+          case 'APPLICATION':
+            permissions = permissions.concat(
+              await this.getApplicationPermission(userId, resourceId!),
+            );
+            break;
+          case 'PROJECT_STAT':
+            permissions = permissions.concat(
+              await this.getProjectStatPermission(userId, resourceId!),
+            );
+            break;
         }
       }
 
@@ -901,13 +904,9 @@ export class UsersService {
     }
 
     // If yes, get permission
-    permissions = permissions.concat(
-      await this.getProjectOwnerPermission(userId, projectId),
-    );
+    permissions = permissions.concat(await this.getProjectOwnerPermission(userId, projectId));
     if (permissions.length === 0) {
-      permissions = permissions.concat(
-        await this.getProjectMemberPermission(userId, projectId),
-      );
+      permissions = permissions.concat(await this.getProjectMemberPermission(userId, projectId));
     }
 
     // Give specific comment permissions if user is creator
@@ -919,7 +918,10 @@ export class UsersService {
     return permissions;
   }
 
-  private async getApplicationPermission(userId: number, applicationId: number): Promise<Permission[]> {
+  private async getApplicationPermission(
+    userId: number,
+    applicationId: number,
+  ): Promise<Permission[]> {
     let permissions = [] as Permission[];
     // Get application from applicationId
     const application = await this.prisma.application.findUnique({
@@ -1115,7 +1117,10 @@ export class UsersService {
     const clientId = requireEnv('GOOGLE_CLIENT_ID');
     const redirectUri =
       process.env.GOOGLE_LINK_CALLBACK_URL ??
-      requireEnv('GOOGLE_CALLBACK_URL').replace(/\/auth\/google\/callback$/, '/users/me/link-account/callback');
+      requireEnv('GOOGLE_CALLBACK_URL').replace(
+        /\/auth\/google\/callback$/,
+        '/users/me/link-account/callback',
+      );
 
     const state = this.jwtService.sign(
       { userId },
