@@ -1,11 +1,11 @@
-import { 
-  Body, 
-  Controller, 
-  Delete, 
-  Get, 
-  Param, 
-  ParseIntPipe, 
-  Patch, 
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseIntPipe,
+  Patch,
   Post,
   Query,
   UseInterceptors,
@@ -27,11 +27,13 @@ import { CurrentUser, Permissions } from '../share/decorators';
 import type { JwtPayload } from '../auth/interfaces';
 import { MaterialsService } from './materials.service';
 import { FramesService } from '../frames/frames.service';
-import { 
-  MaterialResponseDto, 
-  UpdateMaterialQueryDto,
-} from './dto';
-import { CreateFrameReqDto, FrameResponseDto, FramesResponseDto, QueryFramesReqDto } from '../frames/dto';
+import { MaterialResponseDto, UpdateMaterialQueryDto } from './dto';
+import {
+  CreateFrameReqDto,
+  FrameResponseDto,
+  FramesResponseDto,
+  QueryFramesReqDto,
+} from '../frames/dto';
 
 @ApiTags('Materials')
 @ApiBearerAuth()
@@ -142,9 +144,7 @@ export class MaterialsController {
   @ApiParam({ name: 'id', type: Number, description: 'Material id (the old version to restore)' })
   @ApiOkResponse({ description: 'Material restored successfully', type: MaterialResponseDto })
   @Post(':id/restore')
-  async restoreMaterial(
-    @Param('id', ParseIntPipe) id: number,
-  ) {
+  async restoreMaterial(@Param('id', ParseIntPipe) id: number) {
     const material = await this.materialsService.restoreMaterial(id);
     return {
       data: material,

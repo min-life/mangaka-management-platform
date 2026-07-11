@@ -348,7 +348,10 @@ export class ProjectsController {
   })
   @ApiOperation({ summary: 'Get activity logs for a project' })
   @ApiParam({ name: 'id', type: Number, description: 'Project id' })
-  @ApiOkResponse({ description: 'Project activity logs retrieved successfully', type: ActivityLogsResponseDto })
+  @ApiOkResponse({
+    description: 'Project activity logs retrieved successfully',
+    type: ActivityLogsResponseDto,
+  })
   @Get(':id/activity-logs')
   async getProjectActivityLogs(
     @Param('id', ParseIntPipe) id: number,
@@ -531,7 +534,6 @@ export class ProjectsController {
       data: folder,
     };
   }
-
 
   @Permissions({
     mode: 'ANY',

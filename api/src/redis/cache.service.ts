@@ -61,18 +61,26 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     try {
       let cursor = '0';
       const keysToDelete: string[] = [];
+      const prefix = this.redisClient.options.keyPrefix || '';
+      const matchPattern = `${prefix}${pattern}`;
 
       do {
         const [nextCursor, keys] = await this.redisClient.scan(
           cursor,
           'MATCH',
-          pattern,
+          matchPattern,
           'COUNT',
-          100
+          100,
         );
         cursor = nextCursor;
         if (keys.length > 0) {
-          keysToDelete.push(...keys);
+          // ioredis scan returns raw keys including the prefix.
+          // But when we pass keys to del(), ioredis will prepend the prefix AGAIN.
+          // So we MUST strip the prefix from the returned keys.
+          const strippedKeys = prefix
+            ? keys.map((k) => (k.startsWith(prefix) ? k.slice(prefix.length) : k))
+            : keys;
+          keysToDelete.push(...strippedKeys);
         }
       } while (cursor !== '0');
 

@@ -437,7 +437,7 @@ export class AuthService {
   getGoogleAuthUrl() {
     const clientId = requireEnv('GOOGLE_CLIENT_ID');
     const redirectUri = requireEnv('GOOGLE_CALLBACK_URL');
-    
+
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: redirectUri,

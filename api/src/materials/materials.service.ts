@@ -35,8 +35,6 @@ const MATERIAL_SELECT = {
   updatedAt: true,
 };
 
-
-
 @Injectable()
 export class MaterialsService {
   private readonly logger = new Logger(MaterialsService.name);
@@ -78,8 +76,8 @@ export class MaterialsService {
 
       for (const { fileKey, deleteFlag, type } of [
         { fileKey: 'image', deleteFlag: data.deleteImage, type: 'IMAGE' },
-        { fileKey: 'text',  deleteFlag: data.deleteText,  type: 'TEXT'  },
-        { fileKey: 'source',deleteFlag: data.deleteSource,type: 'SOURCE'},
+        { fileKey: 'text', deleteFlag: data.deleteText, type: 'TEXT' },
+        { fileKey: 'source', deleteFlag: data.deleteSource, type: 'SOURCE' },
       ]) {
         const uploadedFile = data.files[fileKey as keyof typeof data.files]?.[0];
 
@@ -138,7 +136,7 @@ export class MaterialsService {
   async restoreMaterial(id: number) {
     try {
       const material = await this.ensureMaterial(id);
-      
+
       const newerMaterials = await this.prisma.fileMaterial.findMany({
         where: {
           fileId: material.fileId,
@@ -173,10 +171,6 @@ export class MaterialsService {
       this.handleError(error, 'Delete material fail', ERROR.SVDELETEMATERIAL);
     }
   }
-
-
-
-
 
   private async ensureMaterial(id: number) {
     const material = await this.prisma.fileMaterial.findUnique({

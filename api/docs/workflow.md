@@ -69,9 +69,9 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 
 ### 6.2 Quyết định cuối cùng (Finalize) & Luồng Phê duyệt 2 Bước
 1. **Đối với Đơn thường (Publish Request, v.v.)**: Trưởng ban (Lead) hoặc Board Owner ra quyết định cuối bằng cách gọi `PATCH /api/applications/:id/status`.
-2. **Đối với Đơn tạo thư mục (`CREATE_ARC`, `CREATE_CHAPTER`)**: Áp dụng luồng phê duyệt 2 bước nghiêm ngặt:
-   - **Bước 1 (Duyệt cấp Dự án)**: Người có quyền duyệt trong dự án (`project:owner` hoặc `project:application.approve`) duyệt đơn từ `PENDING` -> `INTERNAL_APPROVED` (hoặc `REJECT`). Đơn ở trạng thái này mới được đẩy lên Ban biên tập (Editor Board).
-   - **Bước 2 (Duyệt cấp Ban biên tập)**: Trưởng ban (`board:leader` hoặc `board:owner`) duyệt từ `INTERNAL_APPROVED` -> `APPROVE` (hoặc `REJECT`).
+2. **Đối với Đơn tạo thư mục (`CREATE_ARC`, `CREATE_CHAPTER`)**: Áp dụng luồng phê duyệt 2 bước:
+   - **Bước 1 (Nộp đơn lên Ban biên tập)**: Chỉ người có quyền Trưởng ban (`board:leader` hoặc `board:owner`) mới được phép duyệt đơn từ `PENDING` -> `SUBMITTED` (hoặc `REJECT`) và thiết lập hạn chót bỏ phiếu (`voteDeadline`). Đơn ở trạng thái này mới được đưa vào danh sách bỏ phiếu của Ban biên tập (Editor Board).
+   - **Bước 2 (Duyệt cấp Ban biên tập)**: Trưởng ban (`board:leader` hoặc `board:owner`) duyệt từ `SUBMITTED` -> `APPROVE` (hoặc `REJECT`).
    - **Tự động hóa sau phê duyệt**: Khi đơn đạt trạng thái `APPROVE`, hệ thống sẽ tự động tạo thư mục gốc (`ARC`) hoặc thư mục con (`Chapter`) tương ứng, đồng thời tự động tạo 1 File và 1 FileMaterial đầu tiên chứa bản thảo đính kèm từ đơn.
 
 ## 7. Luồng Công việc (Tasks Flow)
@@ -88,7 +88,12 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 2. **Clone từ Base Material**: Truyền `cloneBaseMaterial: true` để tạo một bản copy của bản vẽ gốc (material không thuộc task nào) và gán cho task mới.
 3. **Clone từ Task khác**: Truyền `cloneMaterialFromTaskId: [ID]` để tạo một bản copy của bản vẽ mới nhất từ một task khác. Phiên bản copy này sẽ hoàn toàn độc lập (sạch), không chứa frame/comment của task cũ, giúp người dùng bắt đầu một phiên làm việc mới trên nền bản vẽ đó.
 
-## 8. Luồng Thư mục & Tập tin (Folders & Files Flow)
+## 8. Luồng Thư mục, Tập tin & Material (Folders, Files & Materials)
+
+> [!WARNING]
+> **Lưu ý quan trọng cho Web Team (Lỗi Axios Multipart)**
+> Khi sử dụng Axios để gọi các API upload file bằng `FormData` (ví dụ: Tạo Material), **TUYỆT ĐỐI KHÔNG** set cứng Header `Content-Type: multipart/form-data`. Việc này sẽ làm mất chuỗi `boundary` tự sinh của Axios, khiến Backend (Multer) không thể đọc được nội dung file và ném lỗi 400 Bad Request. Hãy để Axios tự động xử lý Content-Type.
+
 
 ### 8.1 Cây thư mục (Folder Tree)
 1. **Quy tắc phân loại**:

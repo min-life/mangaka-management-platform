@@ -63,7 +63,10 @@ export class RolesController {
   @Permissions({ mode: 'ANY', permissions: ['admin', 'role:read'] })
   @ApiOperation({ summary: 'Get role permissions' })
   @ApiParam({ name: 'id', type: Number, description: 'Role ID' })
-  @ApiOkResponse({ description: 'Role permissions retrieved successfully', type: PermissionsResponseDto })
+  @ApiOkResponse({
+    description: 'Role permissions retrieved successfully',
+    type: PermissionsResponseDto,
+  })
   findPermissions(@Param('id') id: string) {
     return this.rolesService.findPermissions(Number(id));
   }
@@ -72,7 +75,10 @@ export class RolesController {
   @Permissions({ mode: 'ANY', permissions: ['admin', 'role:update'] })
   @ApiOperation({ summary: 'Replace role permissions' })
   @ApiParam({ name: 'id', type: Number, description: 'Role ID' })
-  @ApiOkResponse({ description: 'Role permissions replaced successfully', type: SuccessResponseDto })
+  @ApiOkResponse({
+    description: 'Role permissions replaced successfully',
+    type: SuccessResponseDto,
+  })
   replacePermissions(@Param('id') id: string, @Body() dto: ReplaceRolePermissionsDto) {
     return this.rolesService.replacePermissions(Number(id), dto.permissionIds);
   }

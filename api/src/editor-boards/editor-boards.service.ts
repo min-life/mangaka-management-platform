@@ -121,7 +121,7 @@ export class EditorBoardsService {
     }
   }
 
-  @UseCache((args) => `board:list`)
+  @UseCache((args) => `board:list:${args[0]}`)
   async getEditorBoards(
     userId: number,
     filter?: FilterBoards,
@@ -235,7 +235,11 @@ export class EditorBoardsService {
     }
   }
 
-  @InvalidateCache((args) => [`board:${args[0]}:members:*`])
+  @InvalidateCache((args) => [
+    `board:${args[0]}:members:*`,
+    ...args[1].map((userId: number) => `user:${userId}:editor-boards`),
+    ...args[1].map((userId: number) => `board:list:${userId}:*`),
+  ])
   async addMembersToBoard(editorBoardId: number, userIds: number[], actorId: number) {
     try {
       await this.ensureBoard(editorBoardId);
@@ -327,7 +331,11 @@ export class EditorBoardsService {
     }
   }
 
-  @InvalidateCache((args) => [`board:${args[0]}:members:*`])
+  @InvalidateCache((args) => [
+    `board:${args[0]}:members:*`,
+    `user:${args[1]}:editor-boards`,
+    `board:list:${args[1]}:*`,
+  ])
   async removeBoardMember(editorBoardId: number, userId: number, actorId: number) {
     try {
       await this.ensureBoard(editorBoardId);
@@ -367,7 +375,11 @@ export class EditorBoardsService {
     }
   }
 
-  @InvalidateCache((args) => [`board:${args[0]}:members:*`])
+  @InvalidateCache((args) => [
+    `board:${args[0]}:members:*`,
+    `user:${args[1]}:editor-boards`,
+    `board:list:${args[1]}:*`,
+  ])
   async leaveBoard(editorBoardId: number, userId: number) {
     try {
       const board = await this.ensureBoard(editorBoardId);
@@ -389,7 +401,11 @@ export class EditorBoardsService {
     }
   }
 
-  @InvalidateCache((args) => [`board:${args[0]}:members:*`])
+  @InvalidateCache((args) => [
+    `board:${args[0]}:members:*`,
+    `user:${args[1]}:editor-boards`,
+    `board:list:${args[1]}:*`,
+  ])
   async setToLead(editorBoardId: number, userId: number) {
     try {
       await this.findBoardMember(editorBoardId, userId);
@@ -478,9 +494,13 @@ export class EditorBoardsService {
           throw new NotFoundException(ERROR.NFPROJECT);
         }
 
-        const invalidCreatorProjects = existingProjects.filter(p => p.createdBy !== board?.createdBy);
+        const invalidCreatorProjects = existingProjects.filter(
+          (p) => p.createdBy !== board?.createdBy,
+        );
         if (invalidCreatorProjects.length > 0) {
-          throw new ForbiddenException('All projects must be created by the same creator as the editor board');
+          throw new ForbiddenException(
+            'All projects must be created by the same creator as the editor board',
+          );
         }
 
         const cflProjects = await prisma.project.count({
@@ -518,7 +538,9 @@ export class EditorBoardsService {
       const where: Prisma.ApplicationWhereInput = {
         project: { editorBoardId },
         type: { in: [APPLICATION_TYPE.CREATE_ARC, APPLICATION_TYPE.CREATE_CHAPTER] },
-        status: { in: [APPLICATION_STATUS.INTERNAL_APPROVED, APPLICATION_STATUS.SUBMITTED, APPLICATION_STATUS.APPROVE, APPLICATION_STATUS.REJECT] },
+        status: {
+          in: [APPLICATION_STATUS.SUBMITTED, APPLICATION_STATUS.APPROVE, APPLICATION_STATUS.REJECT],
+        },
         ...(filter?.search && {
           title: { contains: filter.search, mode: 'insensitive' },
         }),

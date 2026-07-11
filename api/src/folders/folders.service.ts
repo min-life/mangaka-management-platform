@@ -290,7 +290,9 @@ export class FoldersService {
     try {
       const parentFolder = await this.ensureFolder(folderId);
       if (parentFolder.parentId !== null) {
-        throw new BadRequestException('Cannot create a subfolder under a Chapter (maximum depth is 2)');
+        throw new BadRequestException(
+          'Cannot create a subfolder under a Chapter (maximum depth is 2)',
+        );
       }
 
       return await this.prisma.folder.create({

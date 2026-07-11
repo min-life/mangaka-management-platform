@@ -57,6 +57,8 @@ const FILE_SELECT = {
 export const MATERIAL_LIST_SELECT = {
   id: true,
   name: true,
+  taskId: true,
+  materials: true,
   createdByUser: USER_SELECT,
   updatedByUser: USER_SELECT,
   createdAt: true,
@@ -66,15 +68,15 @@ export const MATERIAL_LIST_SELECT = {
       id: true,
       title: true,
       description: true,
-    }
+    },
   },
   task: {
     select: {
       id: true,
       title: true,
       description: true,
-    }
-  }
+    },
+  },
 };
 
 export const TASK_LIST_SELECT = {
@@ -243,9 +245,9 @@ export class FilesService {
       await this.ensureFile(fileId);
 
       const allFiles = [
-        ...(data.files.image?.map(f => ({ file: f, type: 'IMAGE' })) || []),
-        ...(data.files.text?.map(f => ({ file: f, type: 'TEXT' })) || []),
-        ...(data.files.source?.map(f => ({ file: f, type: 'SOURCE' })) || [])
+        ...(data.files.image?.map((f) => ({ file: f, type: 'IMAGE' })) || []),
+        ...(data.files.text?.map((f) => ({ file: f, type: 'TEXT' })) || []),
+        ...(data.files.source?.map((f) => ({ file: f, type: 'SOURCE' })) || []),
       ];
 
       const materialsData = await Promise.all(
@@ -260,7 +262,7 @@ export class FilesService {
             originalName: file.originalname,
             size: file.size,
             mimeType: file.mimetype,
-            type
+            type,
           };
 
           // Try to extract dimensions for IMAGE
@@ -279,7 +281,7 @@ export class FilesService {
           }
 
           return materialObj;
-        })
+        }),
       );
 
       const material = await this.prisma.fileMaterial.create({
@@ -357,7 +359,12 @@ export class FilesService {
     }
   }
 
-  @InvalidateCache((args) => [`file:${args[0]}:tasks:*`, `project:*:tasks:*`])
+  @InvalidateCache((args) => [
+    `file:${args[0]}:tasks:*`,
+    `project:*:tasks:*`,
+    `task:list:*`,
+    args[1].parentId ? `task:${args[1].parentId}:children:*` : null,
+  ])
   async createTask(
     fileId: number,
     data: {
@@ -397,11 +404,11 @@ export class FilesService {
             orderBy: { createdAt: 'desc' },
           })
         : data.cloneBaseMaterial
-        ? await this.prisma.fileMaterial.findFirst({
-            where: { taskId: null, fileId },
-            orderBy: { createdAt: 'desc' },
-          })
-        : null;
+          ? await this.prisma.fileMaterial.findFirst({
+              where: { taskId: null, fileId },
+              orderBy: { createdAt: 'desc' },
+            })
+          : null;
 
       if (sourceMaterial) {
         await this.prisma.fileMaterial.create({
@@ -535,7 +542,10 @@ export class FilesService {
         projectId: fileWithFolder?.folder?.projectId ?? null,
         fileId: fileId,
         actorId: data.userId,
-        metadata: { creatorId: fileWithFolder?.createdBy ?? null, mentionedUserIds: data.mentionedUserIds }
+        metadata: {
+          creatorId: fileWithFolder?.createdBy ?? null,
+          mentionedUserIds: data.mentionedUserIds,
+        },
       } satisfies ActivityEventPayload);
 
       this.realtimeGateway.broadcastComment('FILE', fileId, 'comment:new', comment);

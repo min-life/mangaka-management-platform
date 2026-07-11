@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { APPLICATION_STATUS } from '@prisma/client';
-import { IsEnum, IsOptional, IsString, IsDateString } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsDateString, ValidateIf } from 'class-validator';
 
 export class UpdateApplicationReqDto {
   @ApiPropertyOptional({ example: 'Updated title for application' })
@@ -13,7 +13,7 @@ export class UpdateApplicationReqDto {
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     example: [
       {
         url: 'https://...',
@@ -24,8 +24,8 @@ export class UpdateApplicationReqDto {
         height: 1080,
         ratio: 1.77,
         isThumbnail: true,
-      }
-    ] 
+      },
+    ],
   })
   @IsOptional()
   materials?: unknown;
@@ -36,8 +36,13 @@ export class UpdateApplicationStatusReqDto {
   @IsEnum(APPLICATION_STATUS)
   status!: APPLICATION_STATUS;
 
-  @ApiPropertyOptional({ example: '2026-07-10T12:00:00Z', description: 'Applicable only when status is SUBMITTED' })
-  @IsOptional()
+  @ApiPropertyOptional({
+    example: '2026-07-10T12:00:00Z',
+    description: 'Applicable only when status is SUBMITTED',
+  })
+  @ValidateIf(
+    (o) => o.voteDeadline !== undefined && o.voteDeadline !== null && o.voteDeadline !== '',
+  )
   @IsDateString()
   voteDeadline?: string;
 
@@ -48,7 +53,7 @@ export class UpdateApplicationStatusReqDto {
 }
 
 export class ApplicationMaterialReqDto {
-  @ApiProperty({ 
+  @ApiProperty({
     example: {
       url: 'https://...',
       originalName: 'image.png',
@@ -58,7 +63,7 @@ export class ApplicationMaterialReqDto {
       height: 1080,
       ratio: 1.77,
       isThumbnail: true,
-    }
+    },
   })
   materialItem!: any;
 }

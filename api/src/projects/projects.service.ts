@@ -222,7 +222,7 @@ export class ProjectsService {
     private readonly eventEmitter: EventEmitter2,
     private readonly awsS3Service: AwsS3Service,
     private readonly cacheService: CacheService,
-  ) { }
+  ) {}
 
   @InvalidateCache((args) => [`project:list:${args[0].userId}:*`])
   async createProject(data: {
@@ -237,7 +237,9 @@ export class ProjectsService {
         if (data.editorBoardId) {
           const board = await this.ensureBoard(data.editorBoardId, prisma);
           if (board.createdBy !== data.userId) {
-            throw new ForbiddenException('Project must be created by the same creator as the editor board');
+            throw new ForbiddenException(
+              'Project must be created by the same creator as the editor board',
+            );
           }
         }
 
@@ -280,7 +282,6 @@ export class ProjectsService {
     pagination?: Pagination,
   ) {
     try {
-
       const where: Prisma.ProjectWhereInput = {
         ...(filter?.name && { name: { contains: filter.name, mode: 'insensitive' } }),
         ...(filter?.me
@@ -327,17 +328,25 @@ export class ProjectsService {
     }
   }
 
-  @InvalidateCache((args) => [`project:${args[0]}`, `project:list:${args[1].userId}:*`])
+  @InvalidateCache((args) => [`project:${args[0]}`, `project:list:*`])
   async updateProject(
     id: number,
-    data: { name?: string; description?: string; imageUrl?: string; editorBoardId?: number | null; userId: number },
+    data: {
+      name?: string;
+      description?: string;
+      imageUrl?: string;
+      editorBoardId?: number | null;
+      userId: number;
+    },
   ) {
     try {
       const project = await this.ensureProject(id);
       if (data.editorBoardId) {
         const board = await this.ensureBoard(data.editorBoardId);
         if (board.createdBy !== project.createdBy) {
-          throw new ForbiddenException('Project must be created by the same creator as the editor board');
+          throw new ForbiddenException(
+            'Project must be created by the same creator as the editor board',
+          );
         }
       }
 
@@ -367,7 +376,11 @@ export class ProjectsService {
     }
   }
 
-  @InvalidateCache((args) => [`project:${args[0]}:members:*`])
+  @InvalidateCache((args) => [
+    `project:${args[0]}:members:*`,
+    ...args[1].map((userId: number) => `user:${userId}:projects`),
+    ...args[1].map((userId: number) => `project:list:${userId}:*`),
+  ])
   async addMembersToProject(projectId: number, userIds: number[], roleId: number, actorId: number) {
     try {
       await this.ensureProject(projectId);
@@ -505,10 +518,14 @@ export class ProjectsService {
     }
   }
 
-  @InvalidateCache((args) => [`project:${args[0]}:members:*`])
+  @InvalidateCache((args) => [
+    `project:${args[0]}:members:*`,
+    `user:${args[1]}:projects`,
+    `project:list:${args[1]}:*`,
+  ])
   async updateProjectMember(projectId: number, userId: number, roleId: number, actorId: number) {
     try {
-      await this.findProjectMember(projectId, userId);
+      const existingMember = await this.findProjectMember(projectId, userId);
       await this.ensureProjectRole(roleId);
 
       const updatedMember = await this.prisma.$transaction(async (prisma) => {
@@ -520,6 +537,7 @@ export class ProjectsService {
             roleId,
             createdBy: actorId,
             updatedBy: actorId,
+            createdAt: existingMember.createdAt,
           },
         });
         return prisma.userProject.findFirstOrThrow({
@@ -541,7 +559,11 @@ export class ProjectsService {
     }
   }
 
-  @InvalidateCache((args) => [`project:${args[0]}:members:*`])
+  @InvalidateCache((args) => [
+    `project:${args[0]}:members:*`,
+    `user:${args[1]}:projects`,
+    `project:list:${args[1]}:*`,
+  ])
   async removeProjectMember(projectId: number, userId: number, actorId: number) {
     try {
       const project = await this.ensureProject(projectId);
@@ -567,6 +589,11 @@ export class ProjectsService {
     }
   }
 
+  @InvalidateCache((args) => [
+    `project:${args[0]}:members:*`,
+    `user:${args[1]}:projects`,
+    `project:list:${args[1]}:*`,
+  ])
   async leaveProject(projectId: number, userId: number) {
     try {
       const project = await this.ensureProject(projectId);
@@ -692,28 +719,37 @@ export class ProjectsService {
 
       if (data.type === APPLICATION_TYPE.CREATE_CHAPTER) {
         if (!data.parentFolderId) {
-          throw new BadRequestException('parentFolderId is required for CREATE_CHAPTER application');
+          throw new BadRequestException(
+            'parentFolderId is required for CREATE_CHAPTER application',
+          );
         }
         const parentFolder = await this.ensureProjectFolder(projectId, data.parentFolderId);
         if (parentFolder.parentId !== null) {
-          throw new BadRequestException('Cannot create a subfolder under a Chapter (maximum depth is 2)');
+          throw new BadRequestException(
+            'Cannot create a subfolder under a Chapter (maximum depth is 2)',
+          );
         }
       }
 
       let applicationMaterials: any[] = Array.isArray(data.materials) ? data.materials : [];
 
-      if (data.type === APPLICATION_TYPE.CREATE_ARC || data.type === APPLICATION_TYPE.CREATE_CHAPTER) {
+      if (
+        data.type === APPLICATION_TYPE.CREATE_ARC ||
+        data.type === APPLICATION_TYPE.CREATE_CHAPTER
+      ) {
         const hasImage = data.files?.image && data.files.image.length > 0;
         const hasText = data.files?.text && data.files.text.length > 0;
-        
+
         if (!hasImage || !hasText) {
-          throw new BadRequestException('At least 1 image and 1 text file are required for CREATE_ARC and CREATE_CHAPTER applications');
+          throw new BadRequestException(
+            'At least 1 image and 1 text file are required for CREATE_ARC and CREATE_CHAPTER applications',
+          );
         }
 
         const allFiles = [
-          ...(data.files?.image?.map(f => ({ file: f, type: 'IMAGE' })) || []),
-          ...(data.files?.text?.map(f => ({ file: f, type: 'TEXT' })) || []),
-          ...(data.files?.source?.map(f => ({ file: f, type: 'SOURCE' })) || [])
+          ...(data.files?.image?.map((f) => ({ file: f, type: 'IMAGE' })) || []),
+          ...(data.files?.text?.map((f) => ({ file: f, type: 'TEXT' })) || []),
+          ...(data.files?.source?.map((f) => ({ file: f, type: 'SOURCE' })) || []),
         ];
 
         const uploadedMaterials = await Promise.all(
@@ -727,7 +763,7 @@ export class ProjectsService {
               originalName: file.originalname,
               size: file.size,
               mimeType: file.mimetype,
-              type
+              type,
             };
 
             if (type === 'IMAGE') {
@@ -745,9 +781,9 @@ export class ProjectsService {
             }
 
             return materialObj;
-          })
+          }),
         );
-        
+
         applicationMaterials = [...applicationMaterials, ...uploadedMaterials];
       }
 
@@ -842,7 +878,9 @@ export class ProjectsService {
       if (data.parentId) {
         const parentFolder = await this.ensureProjectFolder(projectId, data.parentId);
         if (parentFolder.parentId !== null) {
-          throw new BadRequestException('Cannot create a subfolder under a Chapter (maximum depth is 2)');
+          throw new BadRequestException(
+            'Cannot create a subfolder under a Chapter (maximum depth is 2)',
+          );
         }
       }
 

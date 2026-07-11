@@ -35,20 +35,26 @@ export function UseCache(keyPrefix: string | ((args: any[]) => string)) {
   };
 }
 
-export function InvalidateCache(patterns: string[] | ((args: any[], result: any) => string[])) {
+export function InvalidateCache(
+  patterns:
+    | (string | null | undefined | false)[]
+    | ((args: any[], result: any) => (string | null | undefined | false)[]),
+) {
   return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
     const originalMethod = descriptor.value;
 
     descriptor.value = async function (...args: any[]) {
       const result = await originalMethod.apply(this, args);
-      
+
       const cacheService = (this as any).cacheService;
       if (cacheService) {
         const resolvedPatterns = typeof patterns === 'function' ? patterns(args, result) : patterns;
-        const normalizedPatterns = resolvedPatterns.map(p => p.endsWith('*') ? p : `${p}:*`);
+        const normalizedPatterns = (resolvedPatterns.filter(Boolean) as string[]).map((p) =>
+          p.endsWith('*') ? p : `${p}:*`,
+        );
         await cacheService.delMultiple(normalizedPatterns);
       }
-      
+
       return result;
     };
 

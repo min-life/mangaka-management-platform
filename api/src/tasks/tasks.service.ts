@@ -92,7 +92,13 @@ export class TasksService {
     }
   }
 
-  @InvalidateCache((args) => [`task:${args[0]}`, `task:list:*`, `file:*:tasks:*`])
+  @InvalidateCache((args) => [
+    `task:${args[0]}`,
+    `task:list:*`,
+    `file:*:tasks:*`,
+    `project:*:tasks:*`,
+    `task:*:children:*`,
+  ])
   async updateTask(
     id: number,
     data: {
@@ -114,11 +120,15 @@ export class TasksService {
       if (data.status && data.status !== task.status && !isProjectOwner) {
         if (data.status === PROGRESS_STATUS.DONE) {
           if (data.userId !== task.createdBy) {
-            throw new ForbiddenException('Chỉ người tạo task hoặc Project Owner mới có quyền chuyển trạng thái thành DONE');
+            throw new ForbiddenException(
+              'Chỉ người tạo task hoặc Project Owner mới có quyền chuyển trạng thái thành DONE',
+            );
           }
         } else {
           if (data.userId !== task.createdBy && data.userId !== task.assignedBy) {
-            throw new ForbiddenException('Chỉ người tạo, người được giao task hoặc Project Owner mới có quyền cập nhật trạng thái');
+            throw new ForbiddenException(
+              'Chỉ người tạo, người được giao task hoặc Project Owner mới có quyền cập nhật trạng thái',
+            );
           }
         }
       }
@@ -171,7 +181,10 @@ export class TasksService {
 
       if (data.status !== undefined && data.status !== task.status) {
         this.eventEmitter.emit(ACTIVITY_EVENT_NAME, {
-          action: data.status === PROGRESS_STATUS.DONE ? ACTIVITY_ACTION.TASK_COMPLETED : ACTIVITY_ACTION.TASK_UPDATED,
+          action:
+            data.status === PROGRESS_STATUS.DONE
+              ? ACTIVITY_ACTION.TASK_COMPLETED
+              : ACTIVITY_ACTION.TASK_UPDATED,
           entityType: ENTITY_TYPE.TASK,
           entityId: updatedTask.id,
           projectId: fileWithFolder?.folder?.projectId ?? null,
@@ -192,7 +205,13 @@ export class TasksService {
     }
   }
 
-  @InvalidateCache((args) => [`task:${args[0]}`, `task:list:*`, `file:*:tasks:*`])
+  @InvalidateCache((args) => [
+    `task:${args[0]}`,
+    `task:list:*`,
+    `file:*:tasks:*`,
+    `project:*:tasks:*`,
+    `task:*:children:*`,
+  ])
   async deleteTask(id: number) {
     try {
       await this.ensureTask(id);
@@ -244,8 +263,6 @@ export class TasksService {
       this.handleError(error, 'Get task children fail', ERROR.SVGETTASKCHILDREN);
     }
   }
-
-
 
   @UseCache((args) => `task:list:${args[0]}`)
   async getMyTasks(
@@ -397,7 +414,7 @@ export class TasksService {
         }),
       ]);
 
-      const mappedComments = comments.map(c => {
+      const mappedComments = comments.map((c) => {
         const material = c.frame?.material;
         const frame = c.frame ? { id: c.frame.id, name: c.frame.name } : null;
         return {

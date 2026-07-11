@@ -51,10 +51,12 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       const userId = payload.userId;
       client.data.userId = userId;
       client.join(`user_${userId}`);
-      
+
       this.logger.log(`Client connected: ${client.id} (User: ${userId})`);
     } catch (error) {
-      this.logger.error(`Connection failed for client ${client.id}: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(
+        `Connection failed for client ${client.id}: ${error instanceof Error ? error.message : String(error)}`,
+      );
       client.emit('auth_error', { message: 'Authentication failed' });
       client.disconnect();
     }
@@ -128,7 +130,12 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.server.to(`user_${userId}`).emit('notification:new', notificationData);
   }
 
-  broadcastComment(entityType: string, entityId: number, eventName: 'comment:new' | 'comment:updated' | 'comment:deleted', data: any) {
+  broadcastComment(
+    entityType: string,
+    entityId: number,
+    eventName: 'comment:new' | 'comment:updated' | 'comment:deleted',
+    data: any,
+  ) {
     const room = `${entityType.toLowerCase()}_comments_${entityId}`;
     this.server.to(room).emit(eventName, data);
   }

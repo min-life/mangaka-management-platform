@@ -19,10 +19,7 @@ export class CommentsController {
   @ApiOperation({ summary: 'Update comment' })
   @ApiParam({ name: 'id', type: Number, description: 'Comment id' })
   @Patch(':id')
-  async updateComment(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() data: UpdateCommentReqDto,
-  ) {
+  async updateComment(@Param('id', ParseIntPipe) id: number, @Body() data: UpdateCommentReqDto) {
     const comment = await this.commentsService.updateComment(id, data);
     return { data: comment };
   }

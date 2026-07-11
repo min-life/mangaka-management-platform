@@ -359,7 +359,10 @@ export class EditorBoardsController {
   })
   @ApiOperation({ summary: 'Get activity logs for an editor board' })
   @ApiParam({ name: 'id', type: Number, description: 'Editor board id' })
-  @ApiOkResponse({ description: 'Editor board activity logs retrieved successfully', type: ActivityLogsResponseDto })
+  @ApiOkResponse({
+    description: 'Editor board activity logs retrieved successfully',
+    type: ActivityLogsResponseDto,
+  })
   @Get(':id/activity-logs')
   async getBoardActivityLogs(
     @Param('id', ParseIntPipe) id: number,

@@ -40,7 +40,7 @@ import { FileResponseDto, FilesResponseDto } from '../files/dto';
 @ApiBearerAuth()
 @Controller('folders')
 export class FoldersController {
-  constructor(private readonly foldersService: FoldersService) { }
+  constructor(private readonly foldersService: FoldersService) {}
 
   @Permissions({
     mode: 'ANY',
