@@ -82,11 +82,18 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 1. **Mở Đơn (`/applications/:id`)**: Thành viên Ban biên tập xem đơn và tài liệu.
 2. **Bỏ phiếu**: Bấm Chấp thuận / Từ chối / Trắng án -> Gọi `POST /api/applications/:id/votes`. (Cho phép bấm lại để đổi phiếu - Upsert).
 
-### 6.2 Quyết định cuối cùng (Finalize) & Luồng Phê duyệt 2 Bước
-1. **Đối với Đơn thường (Publish Request, v.v.)**: Trưởng ban (Lead) hoặc Board Owner ra quyết định cuối bằng cách gọi `PATCH /api/applications/:id/status`.
-2. **Đối với Đơn tạo thư mục (`CREATE_ARC`, `CREATE_CHAPTER`)**: Áp dụng luồng phê duyệt 2 bước:
-   - **Bước 1 (Nộp đơn lên Ban biên tập)**: Chỉ người có quyền Trưởng ban (`board:leader` hoặc `board:owner`) mới được phép duyệt đơn từ `PENDING` -> `SUBMITTED` (hoặc `REJECT`) và thiết lập hạn chót bỏ phiếu (`voteDeadline`). Đơn ở trạng thái này mới được đưa vào danh sách bỏ phiếu của Ban biên tập (Editor Board).
-   - **Bước 2 (Duyệt cấp Ban biên tập)**: Trưởng ban (`board:leader` hoặc `board:owner`) duyệt từ `SUBMITTED` -> `APPROVE` (hoặc `REJECT`).
+### 6.2 Luồng Phê duyệt 2 Bước & Trạng thái Đơn
+Hệ thống áp dụng luồng phê duyệt 2 bước chặt chẽ cho tất cả các loại đơn (hiện tại chỉ có `CREATE_ARC` và `CREATE_CHAPTER`):
+1. **Huỷ đơn (CANCELLED)**: 
+   - Chỉ thực hiện được khi đơn đang ở trạng thái `PENDING`.
+   - **Người thực hiện**: Người tạo đơn.
+2. **Nộp đơn lên Ban (SUBMITTED) hoặc Từ chối sớm (REJECT)**:
+   - Chỉ thực hiện được khi đơn đang ở trạng thái `PENDING`.
+   - **Người thực hiện**: Những người có quyền cấp dự án (`project:owner` hoặc `project:application.approve`). Họ có quyền quyết định trình đơn này lên Ban biên tập (`SUBMITTED`) hoặc từ chối ngay lập tức (`REJECT`).
+   - Việc thiết lập Hạn chót bỏ phiếu (`voteDeadline`) trong bước này chỉ dành cho `board:leader` hoặc `board:owner`.
+3. **Phê duyệt cuối cùng (APPROVE) hoặc Từ chối (REJECT)**:
+   - Chỉ thực hiện được khi đơn đã được trình lên (`SUBMITTED`).
+   - **Người thực hiện**: Trưởng ban hoặc Chủ ban (`board:leader`, `board:owner`).
    - **Tự động hóa sau phê duyệt**: Khi đơn đạt trạng thái `APPROVE`, hệ thống sẽ tự động tạo thư mục gốc (`ARC`) hoặc thư mục con (`Chapter`) tương ứng, đồng thời tự động tạo 1 File và 1 FileMaterial đầu tiên chứa bản thảo đính kèm từ đơn.
 
 ## 7. Luồng Công việc (Tasks Flow)
