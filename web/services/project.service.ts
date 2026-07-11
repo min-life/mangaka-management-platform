@@ -141,6 +141,7 @@ export type ProjectFolderResponse = {
   parentId?: number | null;
   projectId?: number;
   title: string;
+  type?: 'ARC' | 'CHAPTER' | 'VOLUME' | string;
   updatedAt: string;
   updatedBy?: number | null;
   updatedByUser?: UserSummaryResponse | null;
@@ -207,7 +208,7 @@ function normalizeProjectMember(member: ProjectMemberApiResponse): ProjectMember
   if ('user' in member) {
     return {
       avatarUrl: member.user.avatarUrl ?? null,
-      createdAt: member.createdAt,
+      createdAt: member.user.createdAt ?? member.createdAt,
       displayName: member.user.displayName ?? null,
       email: member.user.email ?? '',
       id: member.user.id,
@@ -345,6 +346,11 @@ export async function getProjectStats(projectId: number) {
   );
 
   return response.data ?? null;
+}
+
+export async function importProjectStats(projectId: number | string, metrics: unknown) {
+  const response = await api.post<ProjectStatApiResponse>(`/projects/${projectId}/stats`, { metrics });
+  return response.data;
 }
 
 export async function updateProjectMember(
@@ -492,3 +498,4 @@ export async function updateProjectFolder(
 export async function deleteProjectFolder(folderId: number | string) {
   await api.delete(`/folders/${folderId}`);
 }
+

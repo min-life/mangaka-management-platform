@@ -180,7 +180,14 @@ export class ApplicationsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:application.approve', 'board:leader', 'project:owner'],
+    permissions: [
+      'project:application.approve',
+      'board:leader',
+      'project:owner',
+      'project:application.read',
+      'project:application.create',
+      'project:application.update',
+    ],
     resource: 'APPLICATION',
   })
   @ApiOperation({ summary: 'Update application status' })

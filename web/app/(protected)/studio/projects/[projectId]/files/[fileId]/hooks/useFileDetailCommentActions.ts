@@ -13,6 +13,8 @@ type CommentActionsProps = {
   versions: FileVersionItem[];
   selectedTaskId: string | null;
   file: FileExplorerItem | null;
+  user: any | null;
+  setFrameComments: (update: any) => void;
   loadFile: () => Promise<void>;
   setError: (err: string | null) => void;
   setIsSavingComment: (val: boolean) => void;
@@ -27,6 +29,8 @@ export function useFileDetailCommentActions({
   versions,
   selectedTaskId,
   file,
+  user,
+  setFrameComments,
   loadFile,
   setError,
   setIsSavingComment,
@@ -47,8 +51,21 @@ export function useFileDetailCommentActions({
         });
         await createFrameComment(frame.id, {
           text: comment.content,
-          taskId: selectedTaskId || undefined,
         });
+
+        // Optimistically update the UI
+        setFrameComments((prev: SubmissionFrameComment[]) => [
+          ...prev,
+          {
+            ...comment,
+            id: `temp-${Date.now()}`,
+            frameId: String(frame.id),
+            materialId: String(material.id),
+            author: user?.displayName || user?.email || 'You',
+            time: 'Just now',
+          }
+        ]);
+
         toast.success('Frame comment added.');
         await loadFile();
       }
@@ -60,6 +77,24 @@ export function useFileDetailCommentActions({
     setPendingFrameRegion(null);
     setDraftRegion(null);
     setFrameAnnotationMode(false);
+  };
+
+  const handleReplyToFrame = async (frameId: string, commentContent: string) => {
+    setIsSavingComment(true);
+    setError(null);
+    try {
+      await createFrameComment(frameId, {
+        text: commentContent,
+      });
+      toast.success('Reply posted.');
+      await loadFile();
+    } catch (err) {
+      console.error('Failed to reply to frame:', err);
+      toast.error('Failed to post reply.');
+      setError('Failed to save reply.');
+    } finally {
+      setIsSavingComment(false);
+    }
   };
 
   const handleCreateDiscussionComment = async (commentContent: string) => {
@@ -117,6 +152,7 @@ export function useFileDetailCommentActions({
 
   return {
     handleCreateFrameComment,
+    handleReplyToFrame,
     handleCreateDiscussionComment,
     handleUpdateDiscussionComment,
     handleDeleteDiscussionComment,

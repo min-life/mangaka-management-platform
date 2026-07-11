@@ -71,11 +71,7 @@ export function FileTasksPanel({
         ))}
       </div>
 
-      {annotationMode ? (
-        <p className="mt-3 border border-[#6c5516] bg-[#30270d] px-3 py-2 text-[10px] font-bold leading-4 text-[#ffd35b]">
-          Drag a rectangle on the canvas to define the task region.
-        </p>
-      ) : null}
+
 
       <div className="mt-3 space-y-2 pr-1">
         {visibleTasks.length ? (
@@ -100,10 +96,10 @@ export function FileTasksPanel({
                   <div className="min-w-0">
                     <span className="block truncate text-xs font-black text-white">{task.title}</span>
                     <span className="mt-1 block truncate text-[10px] font-bold text-[#8b94a1]">
-                      {task.assignedTo}
+                      {task.assignedTo || 'Unassigned'}
                     </span>
                     <span className="mt-1 block truncate text-[9px] font-bold text-[#8b94a1]">
-                      Due {task.dueDate ?? 'Not set'}
+                      Due {task.dueDate ?? ''}
                     </span>
                   </div>
                 </div>
@@ -111,10 +107,6 @@ export function FileTasksPanel({
                   <Badge className={`rounded-[3px] border text-[9px] ${fileStatusClassName[task.status]}`}>
                     {fileStatusLabels[task.status]}
                   </Badge>
-                  <span className="flex items-center gap-1 text-[9px] font-black uppercase text-[#8b94a1]">
-                    {task.region ? <Crosshair className="size-3" /> : <FileText className="size-3" />}
-                    {task.region ? 'Region' : 'Whole'}
-                  </span>
                 </div>
               </div>
             </button>

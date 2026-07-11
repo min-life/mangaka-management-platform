@@ -23,11 +23,15 @@ import { Pagination } from '../../../components/Pagination';
 
 import { formatOptionalDate, getInitials, getRoleClassName } from './member-ui';
 
+import { useAuth } from '@/hooks/useAuth';
+
 type DirectoryMembersTableProps = {
   filteredMembers: ProjectMemberResponse[];
   isLoading: boolean;
   onChangeRole: (member: ProjectMemberResponse) => void;
   onRemoveMember: (member: ProjectMemberResponse) => void;
+  canUpdateMember?: boolean;
+  canRemoveMember?: boolean;
   onViewMember: (member: ProjectMemberResponse) => void;
   totalMembers: number;
   page: number;
@@ -43,6 +47,8 @@ export function DirectoryMembersTable({
   isLoading,
   onChangeRole,
   onRemoveMember,
+  canUpdateMember,
+  canRemoveMember,
   onViewMember,
   totalMembers,
   page,
@@ -52,6 +58,7 @@ export function DirectoryMembersTable({
   onLimitChange,
   visibleCount,
 }: DirectoryMembersTableProps) {
+  const { user: currentUser } = useAuth();
   const skeletonRows = Array.from({ length: 5 });
 
   return (
@@ -59,14 +66,11 @@ export function DirectoryMembersTable({
       <Table>
         <TableHeader>
           <TableRow className="h-[40px] border-[#39424f] bg-[#222a34] hover:bg-[#222a34]">
-            <TableHead className="w-[30%] px-5 text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
+            <TableHead className="w-[35%] px-5 text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
               Member
             </TableHead>
-            <TableHead className="w-[20%] text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
+            <TableHead className="w-[25%] text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
               Project Role
-            </TableHead>
-            <TableHead className="w-[10%] pl-6 text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3] text-left">
-              Tasks
             </TableHead>
             <TableHead className="w-[18%] text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
               Joined
@@ -97,9 +101,6 @@ export function DirectoryMembersTable({
                 </TableCell>
                 <TableCell>
                   <div className="h-6 w-28 animate-pulse rounded-[3px] bg-[#1f2937]" />
-                </TableCell>
-                <TableCell className="pl-6">
-                  <div className="h-4 w-10 animate-pulse rounded-[4px] bg-[#1f2937]" />
                 </TableCell>
                 <TableCell>
                   <div className="h-4 w-24 animate-pulse rounded-[4px] bg-[#1f2937]" />
@@ -132,9 +133,16 @@ export function DirectoryMembersTable({
                       </span>
                     )}
                     <div>
-                      <p className="text-sm font-black leading-5 text-white">
-                        {member.displayName ?? member.email}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-black leading-5 text-white">
+                          {member.displayName ?? member.email}
+                        </p>
+                        {currentUser?.id === member.id && (
+                          <Badge className="h-4 rounded-[3px] border-none bg-[#FFD369] px-1.5 text-[9px] font-black text-[#222831] hover:bg-[#FFD369]">
+                            ME
+                          </Badge>
+                        )}
+                      </div>
                       <p className="mt-1 text-[11px] font-bold text-[#aeb7c2]">
                         {member.email}
                       </p>
@@ -150,9 +158,6 @@ export function DirectoryMembersTable({
                   >
                     {member.role.name}
                   </Badge>
-                </TableCell>
-                <TableCell className="pl-6 text-left text-xs font-black text-[#FFD369]">
-                  {member.numberOfTasks ?? 0}
                 </TableCell>
                 <TableCell className="text-xs font-bold text-[#dce7f3]">
                   {formatOptionalDate(member.createdAt)}
@@ -184,20 +189,24 @@ export function DirectoryMembersTable({
                       </DropdownMenuItem>
                       {member.role.name !== 'Owner' && (
                         <>
-                          <DropdownMenuItem
-                            className="gap-2 rounded-[3px] text-xs font-bold focus:bg-[#303842] focus:text-white"
-                            onClick={() => onChangeRole(member)}
-                          >
-                            <UserCog className="size-4" />
-                            Change Role
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="gap-2 rounded-[3px] text-xs font-bold text-red-300 focus:bg-red-950/30 focus:text-red-200"
-                            onClick={() => onRemoveMember(member)}
-                          >
-                            <Trash2 className="size-4" />
-                            Remove Member
-                          </DropdownMenuItem>
+                          {canUpdateMember && (
+                            <DropdownMenuItem
+                              className="gap-2 rounded-[3px] text-xs font-bold focus:bg-[#303842] focus:text-white"
+                              onClick={() => onChangeRole(member)}
+                            >
+                              <UserCog className="size-4" />
+                              Change Role
+                            </DropdownMenuItem>
+                          )}
+                          {(canRemoveMember || member.id === currentUser?.id) && (
+                            <DropdownMenuItem
+                              className="gap-2 rounded-[3px] text-xs font-bold text-red-300 focus:bg-red-950/30 focus:text-red-200"
+                              onClick={() => onRemoveMember(member)}
+                            >
+                              <Trash2 className="size-4" />
+                              {member.id === currentUser?.id ? 'Leave Project' : 'Remove Member'}
+                            </DropdownMenuItem>
+                          )}
                         </>
                       )}
                     </DropdownMenuContent>
