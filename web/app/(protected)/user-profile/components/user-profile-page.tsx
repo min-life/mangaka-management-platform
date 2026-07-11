@@ -325,9 +325,9 @@ function ChangePasswordDialog({
               onChange={(event) => setConfirmPassword(event.target.value)}
             />
           </div>
-          <DialogFooter className="border-t border-white/[0.08] bg-[#101722] px-6 py-4">
+          <DialogFooter className="mx-0 mb-0 rounded-none border-t border-white/[0.08] bg-[#101722] px-6 py-4">
             <Button
-              className="border-black bg-black text-white hover:border-black hover:bg-black/85 hover:text-white"
+              className="border-black bg-black px-5 text-white hover:border-black hover:bg-black/85 hover:text-white"
               disabled={isSubmitting}
               type="button"
               variant="outline"
@@ -336,7 +336,7 @@ function ChangePasswordDialog({
               Cancel
             </Button>
             <Button
-              className="border-black bg-black text-white hover:border-black hover:bg-black/85 hover:text-white"
+              className="border-black bg-black px-5 text-white hover:border-black hover:bg-black/85 hover:text-white"
               disabled={isSubmitting}
               type="submit"
               variant="outline"
