@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ShieldCheck, UserPlus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -17,7 +17,7 @@ import {
 import type { AdminRoleResponse, AdminUserResponse } from '../../admin-api';
 import { AdminTextField, RoleCheckboxList } from './UserFormControls';
 
-export function CreateStaffDialog({
+export function CreateUserDialog({
   isOpen,
   isSubmitting,
   onOpenChange,
@@ -63,16 +63,16 @@ export function CreateStaffDialog({
   return (
     <Dialog onOpenChange={handleOpenChange} open={open}>
       <DialogTrigger asChild>
-        <Button className="bg-[#FFD369] text-[#222831] hover:bg-white">
+        <Button className="bg-[#FFD369] text-[#222831] hover:bg-white disabled:opacity-60">
           <UserPlus className="size-4" />
-          Create Staff
+          Create User
         </Button>
       </DialogTrigger>
       <DialogContent className="border-[#4A5260] bg-[#222831] text-[#EEEEEE]">
         <DialogHeader>
-          <DialogTitle>Create Staff</DialogTitle>
+          <DialogTitle>Create User</DialogTitle>
           <DialogDescription className="text-[#aeb7c2]">
-            Create an admin or staff account. A random password will be emailed after creation.
+            Create an admin or staff user. A random password will be emailed after creation.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
@@ -80,14 +80,14 @@ export function CreateStaffDialog({
             autoComplete="off"
             label="Display Name"
             onChange={setDisplayName}
-            placeholder="Enter staff display name"
+            placeholder="Enter user display name"
             value={displayName}
           />
           <AdminTextField
             autoComplete="new-email"
             label="Email"
             onChange={setEmail}
-            placeholder="staff@example.com"
+            placeholder="user@example.com"
             type="email"
             value={email}
           />
@@ -100,11 +100,11 @@ export function CreateStaffDialog({
         </div>
         <DialogFooter>
           <Button
-            className="bg-[#FFD369] text-[#222831] hover:bg-white"
+            className="bg-[#FFD369] text-[#222831] hover:bg-white disabled:opacity-60"
             disabled={isSubmitting || !email.trim() || roleIds.length === 0}
             onClick={() => void handleSubmit()}
           >
-            Create Staff
+            Create User
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -114,29 +114,56 @@ export function CreateStaffDialog({
 
 export function ManageRolesDialog({
   currentRoles,
+  hasLoadedCurrentRoles,
   isSubmitting,
+  onLoadRoles,
   onSubmit,
   roles,
   user,
 }: {
   currentRoles: AdminRoleResponse[];
+  hasLoadedCurrentRoles: boolean;
   isSubmitting: boolean;
+  onLoadRoles: () => Promise<AdminRoleResponse[]>;
   onSubmit: (roleIds: number[]) => Promise<void>;
   roles: AdminRoleResponse[];
   user: AdminUserResponse;
 }) {
   const [open, setOpen] = useState(false);
   const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>([]);
+  const [isLoadingCurrentRoles, setIsLoadingCurrentRoles] = useState(false);
+  const [rolesError, setRolesError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!open) {
+  const loadCurrentRoles = async () => {
+    setRolesError(null);
+
+    if (hasLoadedCurrentRoles) {
+      setSelectedRoleIds(currentRoles.map((role) => Number(role.id)));
       return;
     }
 
-    queueMicrotask(() => {
-      setSelectedRoleIds(currentRoles.map((role) => Number(role.id)));
-    });
-  }, [currentRoles, open]);
+    setIsLoadingCurrentRoles(true);
+
+    try {
+      const nextRoles = await onLoadRoles();
+      setSelectedRoleIds(nextRoles.map((role) => Number(role.id)));
+    } catch {
+      setSelectedRoleIds([]);
+      setRolesError('Unable to load current roles.');
+    } finally {
+      setIsLoadingCurrentRoles(false);
+    }
+  };
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+
+    if (nextOpen) {
+      queueMicrotask(() => {
+        void loadCurrentRoles();
+      });
+    }
+  };
 
   const handleSubmit = async () => {
     await onSubmit(selectedRoleIds);
@@ -144,10 +171,10 @@ export function ManageRolesDialog({
   };
 
   return (
-    <Dialog onOpenChange={setOpen} open={open}>
+    <Dialog onOpenChange={handleOpenChange} open={open}>
       <DialogTrigger asChild>
         <Button
-          className="border-[#4A5260] bg-[#393E46] text-[#EEEEEE] hover:border-[#FFD369] hover:bg-[#303640]"
+          className="border-[#4A5260] bg-[#393E46] text-[#EEEEEE] hover:border-[#FFD369] hover:bg-[#303640] disabled:opacity-60"
           size="sm"
           variant="outline"
         >
@@ -162,6 +189,10 @@ export function ManageRolesDialog({
             Replace SYS roles assigned to {user.displayName || user.email}.
           </DialogDescription>
         </DialogHeader>
+        {rolesError ? <p className="text-sm font-medium text-red-200">{rolesError}</p> : null}
+        {isLoadingCurrentRoles ? (
+          <p className="text-sm font-medium text-[#aeb7c2]">Loading current roles...</p>
+        ) : null}
         <RoleCheckboxList
           onChange={setSelectedRoleIds}
           roles={roles}
@@ -169,8 +200,8 @@ export function ManageRolesDialog({
         />
         <DialogFooter>
           <Button
-            className="bg-[#FFD369] text-[#222831] hover:bg-white"
-            disabled={isSubmitting}
+            className="bg-[#FFD369] text-[#222831] hover:bg-white disabled:opacity-60"
+            disabled={isSubmitting || isLoadingCurrentRoles}
             onClick={() => void handleSubmit()}
           >
             Save Roles

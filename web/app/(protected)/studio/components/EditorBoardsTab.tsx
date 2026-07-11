@@ -1,9 +1,19 @@
 'use client';
 
 import Link from 'next/link';
-import { Loader2, MoreVertical, Pencil, Trash2, LogOut, ChevronsUpDown, ChevronUp, ChevronDown } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronUp,
+  ChevronsUpDown,
+  Loader2,
+  LogOut,
+  MoreVertical,
+  Pencil,
+  Trash2,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
+import { Can } from '@/components/auth/Can';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,6 +30,19 @@ import {
 } from '@/components/ui/table';
 
 import { Pagination } from './Pagination';
+
+export type EditorBoardRow = {
+  boardId: number;
+  created: string;
+  createdBy: string;
+  createdByUser?: { id?: number | null } | null;
+  description: string;
+  id: string;
+  image?: string | null;
+  name: string;
+  projectCount: number;
+  updated: string;
+};
 
 function SortIcon({
   activeField,
@@ -40,15 +63,11 @@ function SortIcon({
 }
 
 type EditorBoardsTabProps = {
-  boardRows: any[];
-  boardTotal: number;
+  boardRows: EditorBoardRow[];
   isLoadingBoards: boolean;
-  onRenameBoard: (board: any) => void;
-  onDeleteBoard: (board: any) => void;
-  onLeaveBoard: (board: any) => void;
-  apiBoards?: any[];
-  viewMode?: 'gallery' | 'table';
-  formatUserName?: (user?: any) => string;
+  onRenameBoard: (board: EditorBoardRow) => void;
+  onDeleteBoard: (board: EditorBoardRow) => void;
+  onLeaveBoard: (board: EditorBoardRow) => void;
   page: number;
   limit: number;
   total: number;
@@ -62,7 +81,6 @@ type EditorBoardsTabProps = {
 
 export function EditorBoardsTab({
   boardRows,
-  boardTotal,
   isLoadingBoards,
   onRenameBoard,
   onDeleteBoard,
@@ -84,8 +102,8 @@ export function EditorBoardsTab({
       <Table>
         <TableHeader>
           <TableRow className="h-[40px] border-[#393E46] bg-[#252e38] hover:bg-[#252e38]">
-            <TableHead 
-              className="w-[35%] px-5 text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3] cursor-pointer select-none hover:text-white"
+            <TableHead
+              className="w-[45%] px-5 text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3] cursor-pointer select-none hover:text-white"
               onClick={() => onSort('name')}
             >
               <div className="flex items-center gap-1.5">
@@ -99,7 +117,7 @@ export function EditorBoardsTab({
             <TableHead className="w-[180px] text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
               Projects
             </TableHead>
-            <TableHead 
+            <TableHead
               className="w-[180px] text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3] cursor-pointer select-none hover:text-white"
               onClick={() => onSort('createdAt')}
             >
@@ -108,7 +126,7 @@ export function EditorBoardsTab({
                 <SortIcon activeField={sortField} activeOrder={sortOrder} field="createdAt" />
               </div>
             </TableHead>
-            <TableHead 
+            <TableHead
               className="w-[180px] text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3] cursor-pointer select-none hover:text-white"
               onClick={() => onSort('updatedAt')}
             >
@@ -147,7 +165,7 @@ export function EditorBoardsTab({
                 <TableCell className="px-5">
                   <Link
                     className="flex items-center gap-4 rounded-[4px] outline-none transition-opacity hover:opacity-85 focus-visible:ring-2 focus-visible:ring-[#FFD369]"
-                    href={`/studio/editor-boards/${board.boardId}/projects`}
+                    href={`/studio/editor-boards/${board.boardId}`}
                   >
                     {board.image && board.image.trim() !== '' ? (
                       <img
@@ -170,18 +188,12 @@ export function EditorBoardsTab({
                     </div>
                   </Link>
                 </TableCell>
-                <TableCell className="text-xs font-bold text-white">
-                  {board.createdBy}
-                </TableCell>
+                <TableCell className="text-xs font-bold text-white">{board.createdBy}</TableCell>
                 <TableCell className="text-xs font-bold text-white">
                   {board.projectCount} {board.projectCount === 1 ? 'project' : 'projects'}
                 </TableCell>
-                <TableCell className="text-xs font-bold text-white">
-                  {board.created}
-                </TableCell>
-                <TableCell className="text-xs font-bold text-white">
-                  {board.updated}
-                </TableCell>
+                <TableCell className="text-xs font-bold text-white">{board.created}</TableCell>
+                <TableCell className="text-xs font-bold text-white">{board.updated}</TableCell>
                 <TableCell className="pr-5 text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -197,32 +209,35 @@ export function EditorBoardsTab({
                       align="end"
                       className="min-w-36 rounded-[4px] border border-[#393E46] bg-[#101820] p-1 text-white"
                     >
-                      {currentUser?.id === board.createdByUser?.id ? (
-                        <>
-                          <DropdownMenuItem
-                            className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold focus:bg-[#393E46] focus:text-white"
-                            onSelect={() => void onRenameBoard(board)}
-                          >
-                            <Pencil className="size-3.5" />
-                            Rename
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold text-red-300 focus:bg-red-950/30 focus:text-red-200"
-                            onSelect={() => void onDeleteBoard(board)}
-                          >
-                            <Trash2 className="size-3.5" />
-                            Delete
-                          </DropdownMenuItem>
-                        </>
-                      ) : (
+                      <Can
+                        any={['admin', 'board:owner']}
+                        resource="BOARD"
+                        resourceId={board.boardId}
+                      >
+                        <DropdownMenuItem
+                          className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold focus:bg-[#393E46] focus:text-white"
+                          onSelect={() => void onRenameBoard(board)}
+                        >
+                          <Pencil className="size-3.5" />
+                          Rename
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold text-red-300 focus:bg-red-950/30 focus:text-red-200"
+                          onSelect={() => void onDeleteBoard(board)}
+                        >
+                          <Trash2 className="size-3.5" />
+                          Delete
+                        </DropdownMenuItem>
+                      </Can>
+                      {currentUser?.id !== board.createdByUser?.id ? (
+                        <DropdownMenuItem
+                          className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold text-[#dce7f3] focus:bg-[#393E46] focus:text-white"
                           onSelect={() => void onLeaveBoard(board)}
                         >
                           <LogOut className="size-3.5" />
-                          Leave Board
+                          Leave
                         </DropdownMenuItem>
-                      )}
+                      ) : null}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>

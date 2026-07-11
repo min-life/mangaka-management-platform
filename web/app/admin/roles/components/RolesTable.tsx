@@ -35,16 +35,19 @@ import {
 } from './role-utils';
 
 type RolesTableProps = {
+  allRoles: AdminRoleResponse[];
   isLoading: boolean;
   isSubmitting: boolean;
   limit: number;
+  loadedRolePermissionIds: number[];
+  loadingRolePermissionIds: number[];
   onCreateRole: (payload: RoleFormPayload) => Promise<void>;
   onDeleteSelectedRoles: () => void;
   onLimitChange: (limit: number) => void;
   onPageChange: (page: number) => void;
   onReplaceRolePermissions: (role: AdminRoleResponse, permissionIds: number[]) => Promise<void>;
   onSelectedRoleIdsChange: (roleIds: number[]) => void;
-  onToggleRoleDefault: (role: AdminRoleResponse, isDefault: boolean) => void;
+  onToggleRoleDefault: (role: AdminRoleResponse, isDefault: boolean) => Promise<void>;
   page: number;
   permissions: AdminPermissionResponse[];
   rolePermissions: Record<number, AdminPermissionResponse[]>;
@@ -71,9 +74,12 @@ function getPermissionDescription(permissions: AdminPermissionResponse[], fallba
 }
 
 export function RolesTable({
+  allRoles,
   isLoading,
   isSubmitting,
   limit,
+  loadedRolePermissionIds,
+  loadingRolePermissionIds,
   onCreateRole,
   onDeleteSelectedRoles,
   onLimitChange,
@@ -98,6 +104,7 @@ export function RolesTable({
   const [draftRolePermissionIds, setDraftRolePermissionIds] = useState<Record<number, number[]>>(
     {},
   );
+  const [draftRoleDefaults, setDraftRoleDefaults] = useState<Record<number, boolean>>({});
   const canCreateRole = Boolean(newRoleName.trim() && newRoleCode.trim());
   const permissionGroups = useMemo(() => groupPermissionsByResource(permissions), [permissions]);
   const permissionColumns = useMemo(
@@ -138,6 +145,19 @@ export function RolesTable({
     0,
   );
   const columnCount = permissionColumnCount + 5;
+  const stickyRoleClassName =
+    'sticky left-0 z-30 min-w-56 bg-[#111a24] shadow-[10px_0_14px_rgba(0,0,0,0.28)]';
+  const stickyScopeClassName = 'sticky left-56 z-30 min-w-32 bg-[#111a24]';
+  const stickyCodeClassName =
+    'sticky left-[22rem] z-30 min-w-40 bg-[#111a24] shadow-[10px_0_14px_rgba(0,0,0,0.28)]';
+  const permissionGroupClassName =
+    'min-w-28 border-l border-[#FFD369]/35 bg-[#243246] text-center text-[10px] font-black uppercase tracking-[0.08em] text-[#f5d77d]';
+  const permissionActionClassName =
+    'min-w-24 border-l border-[#FFD369]/10 bg-[#344151] text-center text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3] shadow-[inset_0_3px_0_rgba(255,211,105,0.32)]';
+  const permissionGroupCellClassName =
+    'border-l border-[#FFD369]/25 bg-[#111d2b] align-middle text-center shadow-[inset_3px_0_0_rgba(255,211,105,0.22)]';
+  const permissionActionCellClassName =
+    'border-l border-[#2f4257] bg-[#1b2b3d] align-middle text-center shadow-[inset_0_2px_0_rgba(255,255,255,0.04)]';
 
   const toggleRoleSelection = (roleId: number, checked: boolean) => {
     onSelectedRoleIdsChange(
@@ -218,8 +238,18 @@ export function RolesTable({
   const getCurrentRolePermissionIds = (roleId: number) =>
     (rolePermissions[roleId] ?? []).map((permission) => getPermissionId(permission));
 
+  const isRolePermissionsLoaded = (roleId: number) => loadedRolePermissionIds.includes(roleId);
+
+  const isRolePermissionsLoading = (roleId: number) => loadingRolePermissionIds.includes(roleId);
+
   const getDraftRolePermissionIds = (role: AdminRoleResponse) =>
     draftRolePermissionIds[role.id] ?? getCurrentRolePermissionIds(role.id);
+
+  const getDraftRoleDefault = (role: AdminRoleResponse) =>
+    draftRoleDefaults[role.id] ?? role.isDefault;
+
+  const hasDraftDefaultChanges = (role: AdminRoleResponse) =>
+    draftRoleDefaults[role.id] !== undefined && draftRoleDefaults[role.id] !== role.isDefault;
 
   const hasDraftPermissionChanges = (role: AdminRoleResponse) => {
     const currentPermissionIds = [...getCurrentRolePermissionIds(role.id)].sort((a, b) => a - b);
@@ -230,6 +260,9 @@ export function RolesTable({
       currentPermissionIds.some((permissionId, index) => permissionId !== draftPermissionIds[index])
     );
   };
+
+  const hasDraftRoleChanges = (role: AdminRoleResponse) =>
+    hasDraftPermissionChanges(role) || hasDraftDefaultChanges(role);
 
   const replaceNewRoleGroupPermissions = (
     groupPermissions: AdminPermissionResponse[],
@@ -294,6 +327,26 @@ export function RolesTable({
     }));
   };
 
+  const replaceDraftRoleDefault = (role: AdminRoleResponse, checked: boolean) => {
+    setDraftRoleDefaults((currentDrafts) => {
+      if (!checked) {
+        return {
+          ...currentDrafts,
+          [role.id]: false,
+        };
+      }
+
+      const nextDrafts = { ...currentDrafts };
+      allRoles
+        .filter((currentRole) => currentRole.scope === role.scope)
+        .forEach((currentRole) => {
+          nextDrafts[currentRole.id] = currentRole.id === role.id;
+        });
+
+      return nextDrafts;
+    });
+  };
+
   const handleUpdateRolePermissions = async (role: AdminRoleResponse) => {
     await onReplaceRolePermissions(role, getDraftRolePermissionIds(role));
     setDraftRolePermissionIds((currentDrafts) => {
@@ -304,11 +357,27 @@ export function RolesTable({
     });
   };
 
-  const pendingPermissionRoles = roles.filter((role) => hasDraftPermissionChanges(role));
+  const handleUpdateRoleDefault = async (role: AdminRoleResponse) => {
+    await onToggleRoleDefault(role, getDraftRoleDefault(role));
+    setDraftRoleDefaults((currentDrafts) => {
+      const remainingDrafts = { ...currentDrafts };
+      delete remainingDrafts[role.id];
 
-  const handleUpdateDraftPermissions = async () => {
-    for (const role of pendingPermissionRoles) {
-      await handleUpdateRolePermissions(role);
+      return remainingDrafts;
+    });
+  };
+
+  const pendingRoleChanges = allRoles.filter((role) => hasDraftRoleChanges(role));
+
+  const handleUpdateDraftRoles = async () => {
+    for (const role of pendingRoleChanges) {
+      if (hasDraftDefaultChanges(role)) {
+        await handleUpdateRoleDefault(role);
+      }
+
+      if (hasDraftPermissionChanges(role)) {
+        await handleUpdateRolePermissions(role);
+      }
     }
   };
 
@@ -323,11 +392,11 @@ export function RolesTable({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {pendingPermissionRoles.length ? (
+            {pendingRoleChanges.length ? (
               <Button
                 className="bg-[#FFD369] text-[#222831] hover:bg-white"
                 disabled={isSubmitting}
-                onClick={() => void handleUpdateDraftPermissions()}
+                onClick={() => void handleUpdateDraftRoles()}
                 size="sm"
               >
                 <Check className="size-3.5" />
@@ -370,13 +439,19 @@ export function RolesTable({
                   onCheckedChange={(checked) => toggleVisibleRoleSelection(Boolean(checked))}
                 />
               </TableHead>
-              <TableHead className="min-w-56 text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
+              <TableHead
+                className={`${stickyRoleClassName} text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]`}
+              >
                 Role
               </TableHead>
-              <TableHead className="min-w-32 text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
+              <TableHead
+                className={`${stickyScopeClassName} text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]`}
+              >
                 Scope
               </TableHead>
-              <TableHead className="min-w-40 text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
+              <TableHead
+                className={`${stickyCodeClassName} text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]`}
+              >
                 Code
               </TableHead>
               <TableHead className="min-w-28 text-center text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
@@ -387,10 +462,7 @@ export function RolesTable({
                   permissionGroup.isExpandable && expandedGroups.includes(permissionGroup.group);
 
                 return [
-                  <TableHead
-                    className="min-w-28 text-center text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]"
-                    key={permissionGroup.group}
-                  >
+                  <TableHead className={permissionGroupClassName} key={permissionGroup.group}>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         {permissionGroup.isExpandable ? (
@@ -424,7 +496,7 @@ export function RolesTable({
                   ...(isExpanded
                     ? permissionGroup.actions.map((action) => (
                         <TableHead
-                          className="min-w-24 text-center text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]"
+                          className={permissionActionClassName}
                           key={`${permissionGroup.group}-${action}`}
                         >
                           {action}
@@ -440,7 +512,7 @@ export function RolesTable({
               <TableCell className="px-5 align-middle">
                 <Plus className="size-4 text-[#FFD369]" />
               </TableCell>
-              <TableCell className="align-middle">
+              <TableCell className={`${stickyRoleClassName} z-20 align-middle`}>
                 <div className="flex min-w-56 items-center gap-2">
                   <Input
                     className="h-9 border-[#4A5260] bg-[#393E46] text-[#EEEEEE] placeholder:text-[#8f9aa8] focus-visible:border-[#FFD369] focus-visible:ring-[#FFD369]/20"
@@ -451,7 +523,7 @@ export function RolesTable({
                   />
                 </div>
               </TableCell>
-              <TableCell className="align-middle">
+              <TableCell className={`${stickyScopeClassName} z-20 align-middle`}>
                 <Select onValueChange={handleNewRoleScopeChange} value={newRoleScope}>
                   <SelectTrigger className="h-9 w-full border-[#4A5260] bg-[#393E46] text-[#EEEEEE]">
                     <SelectValue />
@@ -469,7 +541,7 @@ export function RolesTable({
                   </SelectContent>
                 </Select>
               </TableCell>
-              <TableCell className="align-middle">
+              <TableCell className={`${stickyCodeClassName} z-20 align-middle`}>
                 <Input
                   className="h-9 border-[#4A5260] bg-[#393E46] font-mono text-[#EEEEEE] placeholder:text-[#8f9aa8] focus-visible:border-[#FFD369] focus-visible:ring-[#FFD369]/20"
                   onChange={(event) => setNewRoleCode(event.target.value)}
@@ -503,7 +575,7 @@ export function RolesTable({
                   );
 
                 return [
-                  <TableCell className="align-middle text-center" key={permissionGroup.group}>
+                  <TableCell className={permissionGroupCellClassName} key={permissionGroup.group}>
                     <div className="flex justify-center">
                       <Checkbox
                         checked={isGroupChecked}
@@ -527,7 +599,7 @@ export function RolesTable({
 
                         return (
                           <TableCell
-                            className="align-middle text-center"
+                            className={permissionActionCellClassName}
                             key={`${permissionGroup.group}-${action}`}
                           >
                             <div className="flex justify-center">
@@ -561,6 +633,8 @@ export function RolesTable({
             ) : roles.length ? (
               roles.map((role) => {
                 const selectedPermissionIds = new Set(getDraftRolePermissionIds(role));
+                const rolePermissionsLoaded = isRolePermissionsLoaded(role.id);
+                const rolePermissionsLoading = isRolePermissionsLoading(role.id);
 
                 return (
                   <TableRow
@@ -576,23 +650,32 @@ export function RolesTable({
                         }
                       />
                     </TableCell>
-                    <TableCell className="align-middle">
+                    <TableCell className={`${stickyRoleClassName} z-20 align-middle`}>
                       <div className="font-black text-white">{role.name}</div>
+                      {!rolePermissionsLoaded ? (
+                        <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#8b94a1]">
+                          {rolePermissionsLoading ? 'Loading permissions' : 'Permissions pending'}
+                        </div>
+                      ) : null}
                     </TableCell>
-                    <TableCell className="align-middle">
+                    <TableCell className={`${stickyScopeClassName} z-20 align-middle`}>
                       <Badge className="border-[#4A5260] text-[#aeb7c2]" variant="outline">
                         {getScopeLabel(role.scope)}
                       </Badge>
                     </TableCell>
-                    <TableCell className="align-middle font-mono text-xs font-bold text-[#aeb7c2]">
+                    <TableCell
+                      className={`${stickyCodeClassName} z-20 align-middle font-mono text-xs font-bold text-[#aeb7c2]`}
+                    >
                       {role.code}
                     </TableCell>
                     <TableCell className="align-middle text-center">
                       <div className="flex justify-center">
                         <Checkbox
-                          checked={role.isDefault}
+                          checked={getDraftRoleDefault(role)}
                           className="data-checked:border-[#FFD369] data-checked:bg-[#FFD369] data-checked:text-[#222831]"
-                          onCheckedChange={(checked) => onToggleRoleDefault(role, Boolean(checked))}
+                          onCheckedChange={(checked) =>
+                            replaceDraftRoleDefault(role, Boolean(checked))
+                          }
                         />
                       </div>
                     </TableCell>
@@ -614,11 +697,12 @@ export function RolesTable({
 
                       return [
                         <TableCell
-                          className="align-middle text-center"
+                          className={permissionGroupCellClassName}
                           key={`${role.id}-${permissionGroup.group}`}
                         >
                           <div className="flex justify-center">
                             <Checkbox
+                              disabled={!rolePermissionsLoaded}
                               checked={isGroupChecked}
                               className="data-checked:border-[#FFD369] data-checked:bg-[#FFD369] data-checked:text-[#222831]"
                               onCheckedChange={(checked) =>
@@ -642,11 +726,12 @@ export function RolesTable({
 
                               return (
                                 <TableCell
-                                  className="text-center"
+                                  className={permissionActionCellClassName}
                                   key={`${role.id}-${permissionGroup.group}-${action}`}
                                 >
                                   <div className="flex justify-center">
                                     <Checkbox
+                                      disabled={!rolePermissionsLoaded}
                                       checked={
                                         permissionId !== null &&
                                         selectedPermissionIds.has(permissionId)
