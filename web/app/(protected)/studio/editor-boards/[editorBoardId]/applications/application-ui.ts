@@ -2,8 +2,6 @@ export function getStatusStyle(status: string) {
   switch (status) {
     case 'APPROVE':
       return 'border-[#315846] bg-[#14291f] text-[#9df2c7]';
-    case 'INTERNAL_APPROVED':
-      return 'border-[#2f5665] bg-[#132832] text-[#8fdaf0]';
     case 'SUBMITTED':
       return 'border-[#6c5516] bg-[#30270d] text-[#ffd35b]';
     case 'PENDING':
@@ -21,8 +19,6 @@ export function getStatusLabel(status: string) {
   switch (status) {
     case 'APPROVE':
       return 'Approved';
-    case 'INTERNAL_APPROVED':
-      return 'Ready for Board';
     case 'SUBMITTED':
       return 'Submitted';
     case 'PENDING':
@@ -52,5 +48,5 @@ export function getApplicationTypeLabel(type?: string) {
 }
 
 export function isBoardReviewableStatus(status: string) {
-  return status === 'SUBMITTED' || status === 'INTERNAL_APPROVED' || status === 'PENDING';
+  return status === 'SUBMITTED' || status === 'PENDING';
 }

@@ -1,6 +1,7 @@
 'use client';
 
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { ChevronLeft, ChevronRight, X, Image as ImageIcon, FileText, FileArchive, Upload, Save } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -44,6 +45,8 @@ type FileTaskSidebarProps = {
   versions: FileVersionItem[];
   members?: Array<{ id: number; name: string }>;
   onRefresh?: () => void | Promise<void>;
+  discussionContextKey: string;
+  setDiscussionContext: (key: string) => void;
 };
 
 type DesktopTaskSidebarProps = FileTaskSidebarProps & {
@@ -76,6 +79,91 @@ function getVersionFooter(
       : 'Today';
 
   return `${versionLabel} - ${dateLabel}`;
+}
+
+function MaterialTabDetail({
+  versions,
+  focusedTask,
+}: {
+  versions: FileVersionItem[];
+  focusedTask: TaskWorkspaceItem | null;
+}) {
+  const [pendingFiles, setPendingFiles] = useState<{
+    img?: File;
+    text?: File;
+    src?: File;
+  }>({});
+
+  // Get the most recent version for the focused task, or the most recent overall version
+  const targetVersion = focusedTask 
+    ? (versions.find(v => v.taskId === Number(focusedTask.id) && v.isCurrent) ?? versions.find(v => v.taskId === Number(focusedTask.id)))
+    : versions[0];
+    
+  const imgMat: any = (targetVersion?.materials as any[] || []).find((m: any) => m.type === 'IMAGE' || m.originalName?.match(/\.(png|jpe?g)$/i) || m.name?.match(/\.(png|jpe?g)$/i));
+  const textMat: any = (targetVersion?.materials as any[] || []).find((m: any) => m.type === 'TEXT' || m.originalName?.match(/\.(txt|md|docx?)$/i) || m.name?.match(/\.(txt|md|docx?)$/i));
+  const srcMat: any = (targetVersion?.materials as any[] || []).find((m: any) => m.type === 'SOURCE' || m.originalName?.match(/\.(zip|rar|clip|psd)$/i) || m.name?.match(/\.(zip|rar|clip|psd)$/i));
+
+  const items = [
+    { type: 'img', label: 'IMG', icon: ImageIcon, current: imgMat?.originalName || imgMat?.name, pending: pendingFiles.img },
+    { type: 'text', label: 'TEXT', icon: FileText, current: textMat?.originalName || textMat?.name, pending: pendingFiles.text },
+    { type: 'src', label: 'SRC', icon: FileArchive, current: srcMat?.originalName || srcMat?.name, pending: pendingFiles.src },
+  ] as const;
+
+  const handleFileChange = (type: 'img' | 'text' | 'src', file: File | undefined) => {
+    setPendingFiles(prev => ({ ...prev, [type]: file }));
+  };
+
+  const hasPending = Boolean(pendingFiles.img || pendingFiles.text || pendingFiles.src);
+
+  return (
+    <div className="flex flex-col gap-4 p-4">
+      <div className="mb-2">
+        <h3 className="text-xs font-black uppercase text-white">Latest Materials</h3>
+        <p className="text-[10px] text-[#8b94a1] mt-1">
+          {focusedTask ? `Task: ${focusedTask.title}` : `Overall File Materials`}
+          {targetVersion ? ` (v${targetVersion.version})` : ''}
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        {items.map((item) => (
+          <div key={item.type} className="flex items-center justify-between rounded-[4px] border border-[#26303b] bg-[#151c25] p-3">
+            <div className="flex items-center gap-3 overflow-hidden pr-3">
+              <div className="grid size-8 shrink-0 place-items-center rounded bg-[#202832]">
+                <item.icon className="size-4 text-[#8b94a1]" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="block text-[10px] font-black uppercase text-[#8b94a1]">{item.label}</span>
+                {item.pending ? (
+                  <span className="block truncate text-xs font-bold text-[#FFD369]">{item.pending.name}</span>
+                ) : item.current ? (
+                  <span className="block truncate text-xs font-bold text-white">{item.current}</span>
+                ) : (
+                  <span className="block text-xs italic text-[#5b626d]">No file uploaded</span>
+                )}
+              </div>
+            </div>
+            
+            <label className="shrink-0 cursor-pointer rounded bg-[#202832] px-3 py-1.5 text-[10px] font-bold text-white hover:bg-[#303842] transition-colors">
+              Update
+              <input 
+                type="file" 
+                className="hidden" 
+                onChange={(e) => handleFileChange(item.type, e.target.files?.[0])} 
+              />
+            </label>
+          </div>
+        ))}
+      </div>
+
+      {hasPending && (
+        <Button className="mt-2 w-full gap-2 bg-[#FFD369] text-[#222831] hover:bg-[#eac04f]">
+          <Save className="size-4" />
+          Save Uploads
+        </Button>
+      )}
+    </div>
+  );
 }
 
 function EmptyTaskDetail() {
@@ -161,15 +249,73 @@ export function DesktopTaskSidebar({
   versions,
   members,
   onRefresh,
+  discussionContextKey,
+  setDiscussionContext,
 }: DesktopTaskSidebarProps) {
+  const [sidebarTab, setSidebarTab] = useState<'task' | 'material'>('task');
+  const [sidebarWidth, setSidebarWidth] = useState(320);
+  const [isResizing, setIsResizing] = useState(false);
+  const [topSectionHeight, setTopSectionHeight] = useState(220);
+  const [isResizingVertical, setIsResizingVertical] = useState(false);
+  const topSectionRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isResizing) {
+        // Width is computed from the right edge of the window
+        const newWidth = document.body.clientWidth - e.clientX;
+        if (newWidth >= 280 && newWidth <= 800) {
+          setSidebarWidth(newWidth);
+        }
+      } else if (isResizingVertical && topSectionRef.current) {
+        const rect = topSectionRef.current.getBoundingClientRect();
+        const newHeight = e.clientY - rect.top;
+        if (newHeight >= 100 && newHeight <= 800) {
+          setTopSectionHeight(newHeight);
+        }
+      }
+    };
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      setIsResizingVertical(false);
+    };
+
+    if (isResizing || isResizingVertical) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      // Prevent text selection while dragging
+      document.body.style.userSelect = 'none';
+    } else {
+      document.body.style.userSelect = '';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing, isResizingVertical]);
+
   if (!isOpen) {
     return null;
   }
 
   return (
-    <aside className="relative hidden h-full w-[320px] shrink-0 flex-col overflow-visible border-l border-[#26303b] bg-[#0d151e] lg:flex">
+    <aside 
+      className="relative hidden h-full shrink-0 flex-col overflow-visible border-l border-[#26303b] bg-[#0d151e] lg:flex"
+      style={{ width: sidebarWidth }}
+    >
+      {/* Resizer Handle */}
+      <div 
+        className="absolute -left-1 top-0 bottom-0 w-2 cursor-col-resize z-50 hover:bg-[#FFD369]/20 transition-colors"
+        onMouseDown={(e) => {
+          e.preventDefault();
+          setIsResizing(true);
+        }}
+      />
+      
       <button
-        className="absolute left-0 top-1/2 z-50 hidden size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-[#FFD369] bg-[#FFD369] text-[#222831] shadow-[0_4px_12px_rgba(0,0,0,0.6)] transition-all hover:bg-[#eac04f] lg:grid"
+        className="absolute left-0 top-1/2 z-40 hidden size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-[#FFD369] bg-[#FFD369] text-[#222831] shadow-[0_4px_12px_rgba(0,0,0,0.6)] transition-all hover:bg-[#eac04f] lg:grid"
         onClick={onClose}
         title="Collapse Sidebar"
         type="button"
@@ -177,19 +323,13 @@ export function DesktopTaskSidebar({
         <ChevronRight className="size-4" />
       </button>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-        <section className="relative shrink-0 border-b border-[#26303b] bg-[#151c25]/30 px-4 py-3">
-          <div className="flex items-center justify-between gap-3">
-            <p className="truncate text-xs font-black uppercase tracking-[0.08em] text-white">
-              Task Summary
-            </p>
-            <Badge className={`rounded-[3px] border text-[9px] ${fileStatusClassName[file.status]}`}>
-              {fileStatusLabels[file.status]}
-            </Badge>
-          </div>
-        </section>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
 
-        <section className="shrink-0 border-b border-[#26303b] p-4">
+        <section 
+          ref={topSectionRef}
+          className="shrink-0 p-4 overflow-y-auto"
+          style={{ height: topSectionHeight }}
+        >
           <FileTasksPanel
             annotationMode={annotationMode}
             canCreateTask={canCreateTask}
@@ -200,21 +340,61 @@ export function DesktopTaskSidebar({
           />
         </section>
 
-        <section className="bg-[#101820] p-4">
-          <TaskDetailPanel
-            canReviewTask={canReviewTask}
-            canSubmitTask={canSubmitTask}
-            focusedTask={focusedTask}
-            onCloseFocusedTask={onCloseFocusedTask}
-            onStartFrameComment={onStartFrameComment}
-            onSubmitTaskWork={onSubmitTaskWork}
-            onMarkReadyForReview={onMarkReadyForReview}
-            onTaskChange={onTaskChange}
-            selectedSubmissionId={selectedSubmissionId}
-            versions={versions}
-            members={members}
-            onRefresh={onRefresh}
-          />
+        {/* Vertical Resizer Handle */}
+        <div 
+          className="relative h-1 cursor-row-resize bg-[#26303b] z-40 hover:bg-[#FFD369] transition-colors shrink-0"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            setIsResizingVertical(true);
+          }}
+        />
+
+        <div className="flex h-11 shrink-0 items-center border-b border-[#26303b] bg-[#091018] px-4">
+          <button
+            className={`relative h-full px-4 text-xs font-black capitalize ${
+              sidebarTab === 'material' ? 'text-[#FFD369]' : 'text-[#8b94a1] hover:text-white'
+            }`}
+            onClick={() => setSidebarTab('material')}
+          >
+            Material
+            {sidebarTab === 'material' && (
+              <span className="absolute bottom-0 left-0 h-[2px] w-full bg-[#FFD369]" />
+            )}
+          </button>
+          <button
+            className={`relative h-full px-4 text-xs font-black capitalize ${
+              sidebarTab === 'task' ? 'text-[#FFD369]' : 'text-[#8b94a1] hover:text-white'
+            }`}
+            onClick={() => setSidebarTab('task')}
+          >
+            Task
+            {sidebarTab === 'task' && (
+              <span className="absolute bottom-0 left-0 h-[2px] w-full bg-[#FFD369]" />
+            )}
+          </button>
+        </div>
+
+        <section className="flex-1 overflow-y-auto bg-[#101820]">
+          {sidebarTab === 'material' ? (
+            <MaterialTabDetail versions={versions} focusedTask={focusedTask} />
+          ) : (
+            <div className="p-4">
+              <TaskDetailPanel
+                canReviewTask={canReviewTask}
+                canSubmitTask={canSubmitTask}
+                focusedTask={focusedTask}
+                onCloseFocusedTask={onCloseFocusedTask}
+                onStartFrameComment={onStartFrameComment}
+                onSubmitTaskWork={onSubmitTaskWork}
+                onMarkReadyForReview={onMarkReadyForReview}
+                onTaskChange={onTaskChange}
+                selectedSubmissionId={selectedSubmissionId}
+                versions={versions}
+                members={members}
+                onRefresh={onRefresh}
+              />
+            </div>
+          )}
         </section>
       </div>
 
@@ -248,47 +428,84 @@ export function MobileTaskDrawer({
   versions,
   members,
   onRefresh,
+  discussionContextKey,
+  setDiscussionContext,
 }: MobileTaskDrawerProps) {
+  const [sidebarTab, setSidebarTab] = useState<'task' | 'material'>('task');
+
   if (!open) {
     return null;
   }
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/60 lg:hidden">
-      <div className="flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-[#26303b] bg-[#0d151e] p-4">
-        <div className="mb-4 flex items-center justify-between border-b border-[#26303b] pb-3">
+      <div className="flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-[#26303b] bg-[#0d151e]">
+        <div className="flex items-center justify-between border-b border-[#26303b] p-4 shrink-0">
           <span className="text-xs font-black uppercase text-white">Tasks</span>
           <Button className="size-8" onClick={onClose} size="icon" variant="ghost">
             <X className="size-4 text-[#8b94a1]" />
           </Button>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col space-y-6">
-          <FileTasksPanel
-            annotationMode={annotationMode}
-            canCreateTask={canCreateTask}
-            onCreateTask={onCreateTask}
-            onSelectTask={onSelectTask}
-            selectedTaskId={selectedTaskId}
-            tasks={tasks}
-          />
-
-          <div className="flex-1 overflow-y-auto border-t border-[#26303b] pt-4">
-            <TaskDetailPanel
-              canReviewTask={canReviewTask}
-              canSubmitTask={canSubmitTask}
-              focusedTask={focusedTask}
-              onCloseFocusedTask={onCloseFocusedTask}
-              onStartFrameComment={onStartFrameComment}
-              onSubmitTaskWork={onSubmitTaskWork}
-              onMarkReadyForReview={onMarkReadyForReview}
-              onTaskChange={onTaskChange}
-              selectedSubmissionId={selectedSubmissionId}
-              versions={versions}
-              members={members}
-              onRefresh={onRefresh}
+        <div className="flex min-h-0 flex-1 flex-col">
+          <section className="shrink-0 border-b border-[#26303b] p-4 max-h-[220px] overflow-y-auto">
+            <FileTasksPanel
+              annotationMode={annotationMode}
+              canCreateTask={canCreateTask}
+              onCreateTask={onCreateTask}
+              onSelectTask={onSelectTask}
+              selectedTaskId={selectedTaskId}
+              tasks={tasks}
             />
+          </section>
+
+          <div className="flex h-11 shrink-0 items-center border-b border-[#26303b] bg-[#091018] px-4">
+            <button
+              className={`relative h-full px-4 text-xs font-black capitalize ${
+                sidebarTab === 'material' ? 'text-[#FFD369]' : 'text-[#8b94a1] hover:text-white'
+              }`}
+              onClick={() => setSidebarTab('material')}
+            >
+              Material
+              {sidebarTab === 'material' && (
+                <span className="absolute bottom-0 left-0 h-[2px] w-full bg-[#FFD369]" />
+              )}
+            </button>
+            <button
+              className={`relative h-full px-4 text-xs font-black capitalize ${
+                sidebarTab === 'task' ? 'text-[#FFD369]' : 'text-[#8b94a1] hover:text-white'
+              }`}
+              onClick={() => setSidebarTab('task')}
+            >
+              Task
+              {sidebarTab === 'task' && (
+                <span className="absolute bottom-0 left-0 h-[2px] w-full bg-[#FFD369]" />
+              )}
+            </button>
           </div>
+
+          <section className="flex-1 overflow-y-auto bg-[#101820]">
+            {sidebarTab === 'material' ? (
+              <MaterialTabDetail versions={versions} focusedTask={focusedTask} />
+            ) : (
+              <div className="p-4">
+                <TaskDetailPanel
+                  canReviewTask={canReviewTask}
+                  canSubmitTask={canSubmitTask}
+                  focusedTask={focusedTask}
+                  onCloseFocusedTask={onCloseFocusedTask}
+                  onStartFrameComment={onStartFrameComment}
+                  onSubmitTaskWork={onSubmitTaskWork}
+                  onMarkReadyForReview={onMarkReadyForReview}
+                  onTaskChange={onTaskChange}
+                  selectedSubmissionId={selectedSubmissionId}
+                  versions={versions}
+                  members={members}
+                  onRefresh={onRefresh}
+                />
+              </div>
+            )}
+          </section>
         </div>
       </div>
     </div>

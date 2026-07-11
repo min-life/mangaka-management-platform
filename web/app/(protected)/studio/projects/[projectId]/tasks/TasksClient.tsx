@@ -264,6 +264,7 @@ export function TasksClient({ projectId }: TasksClientProps) {
         status: input.status,
         deadline,
         assignedBy: input.assignedToId,
+        cloneBaseMaterial: true,
       });
 
       await reload();

@@ -236,6 +236,8 @@ export async function addEditorBoardProjects(
   return response.data ?? (response as { count: number });
 }
 
+import { getProjectApplications } from './application.service';
+
 export async function getEditorBoardApplications<TApplication extends object = ApplicationResponse>(
   boardId: number | string,
   params?: {
@@ -246,15 +248,69 @@ export async function getEditorBoardApplications<TApplication extends object = A
     search?: string;
   },
 ) {
-  const response = await api.get<
-    BoardApplicationsResponse<TApplication>,
-    BoardApplicationsResponse<TApplication>
-  >(`/editor-boards/${boardId}/applications`, { params });
+  // WORKAROUND: The GET /editor-boards/:id/applications endpoint crashes on the backend 
+  // due to an invalid Prisma enum (INTERNAL_APPROVED). 
+  // We compose the applications here on the frontend by fetching the board's projects
+  // and then accumulating the applications for each project.
+  
+  const projectsResponse = await getEditorBoardProjects(boardId, { limit: 100 });
+  const projects = projectsResponse.projects;
+
+  const allApplications: any[] = [];
+  
+  await Promise.all(
+    projects.map(async (project) => {
+      // Use getProjectApplications to ensure we hit the exact same cached endpoint
+      // as the Project Applications view, guaranteeing data consistency.
+      const response = await getProjectApplications(project.id);
+      const projectApps = response.applications || [];
+      allApplications.push(...projectApps);
+    })
+  );
+
+  let filteredApplications = allApplications.filter((app) => {
+    return (app.type === 'CREATE_ARC' || app.type === 'CREATE_CHAPTER') &&
+           (app.status === 'SUBMITTED' || app.status === 'APPROVE' || app.status === 'REJECT' || app.status === 'INTERNAL_APPROVED');
+  });
+
+  if (params?.search) {
+    const searchLower = params.search.toLowerCase();
+    filteredApplications = filteredApplications.filter((app) => 
+      app.title?.toLowerCase().includes(searchLower)
+    );
+  }
+
+  const field = params?.field || 'createdAt';
+  const order = params?.order || 'desc';
+  
+  filteredApplications.sort((a, b) => {
+    let valA = a[field];
+    let valB = b[field];
+    if (field === 'createdAt' || field === 'updatedAt') {
+      valA = new Date(valA || 0).getTime();
+      valB = new Date(valB || 0).getTime();
+    }
+    
+    if (valA < valB) return order === 'asc' ? -1 : 1;
+    if (valA > valB) return order === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const page = params?.page || 1;
+  const limit = params?.limit || 10;
+  const startIndex = (page - 1) * limit;
+  const endIndex = startIndex + limit;
+  
+  const paginatedApplications = filteredApplications.slice(startIndex, endIndex);
 
   return {
-    applications:
-      response.data?.map((item) => ('application' in item ? item.application : item)) ?? [],
-    pagination: response.pagination,
+    applications: paginatedApplications as TApplication[],
+    pagination: {
+      total: filteredApplications.length,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(filteredApplications.length / limit)),
+    },
   };
 }
 
