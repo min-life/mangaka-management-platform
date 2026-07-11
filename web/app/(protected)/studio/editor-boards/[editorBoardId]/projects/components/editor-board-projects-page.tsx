@@ -24,7 +24,6 @@ import {
   Sheet,
   SheetContent,
   SheetDescription,
-  SheetFooter,
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
@@ -147,22 +146,6 @@ function ProjectDrawer({
             <p className="text-[13px] font-medium text-white">{project.contactName}</p>
           </div>
         </div>
-
-        <SheetFooter className="grid grid-cols-2 gap-2 border-t border-[#50555D] bg-[#242a33] p-6">
-          <Button
-            asChild
-            className="h-11 rounded-[4px] border-[#50555D] bg-[#2f353e] text-[13px] font-medium text-white hover:bg-[#50555D]"
-            variant="outline"
-          >
-            <Link href={`/studio/projects/${project.id}/tasks`}>Project Logs</Link>
-          </Button>
-          <Button
-            asChild
-            className="h-11 rounded-[4px] bg-white text-[13px] font-medium text-[#2f3131] hover:bg-[#c6c6c7]"
-          >
-            <Link href={`/studio/projects/${project.id}`}>Open Editor</Link>
-          </Button>
-        </SheetFooter>
       </SheetContent>
     </Sheet>
   );
