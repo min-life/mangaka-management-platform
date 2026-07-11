@@ -58,6 +58,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
     handleCreateAnnotatedTask,
     handleCreateDiscussionComment,
     handleCreateFrameComment,
+    handleReplyToFrame,
     handleCreateReview,
     handleDeleteDiscussionComment,
     handleDeleteVersion,
@@ -98,6 +99,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
     setPanOffset,
     setPendingFrameRegion,
     setPendingTaskRegion,
+    setReplyingFrameId,
     setResourceTab,
     setRotation,
     setSelectedSubmissionId,
@@ -108,6 +110,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
     setVersionHistoryOpen,
     setVersionTabMode,
     setZoom,
+    setDiscussionContext,
     startTaskFrameSelection,
     taskDialogOpen,
     tasks,
@@ -181,7 +184,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
               <FileCanvas controller={controller} />
               
               {isTaskContextLoading && (
-                <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#091018]/60 backdrop-blur-[2px]">
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#091018]/90 backdrop-blur-xl transition-all duration-300">
                   <div className="flex flex-col items-center">
                     <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#39424f] border-t-[#FFD369]"></div>
                     <span className="mt-3 text-xs font-black text-[#aeb7c2]">Loading context...</span>
@@ -216,46 +219,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
               {resourceTab === 'overview' ? (
                 <FileOverviewTab file={file} folder={folder} tasks={tasks} />
               ) : resourceTab === 'discussion' ? (
-                <div className="text-white max-w-4xl mx-auto">
-                  <div className="mb-4 flex flex-wrap items-center justify-between gap-4 border-b border-[#26303b] pb-3">
-                    <div>
-                      <h3 className="text-sm font-black text-white">Task Discussion</h3>
-                      <p className="text-[10px] text-[#8b94a1] mt-0.5">Select a task context below to discuss or view regional frame comments.</p>
-                    </div>
-                    <select
-                      className="h-9 rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 text-xs font-bold text-white outline-none"
-                      value={discussionContextKey}
-                      onChange={(e) => {
-                        const key = e.target.value;
-                        if (key === 'file') {
-                          setSelectedTaskId(null);
-                          setSelectedSubmissionId(null);
-                        } else if (key.startsWith('task:')) {
-                          const tid = key.split(':')[1];
-                          const matchedTask = tasks.find(t => t.id === tid);
-                          if (matchedTask) {
-                            focusFileTask(matchedTask);
-                          }
-                        } else if (key.startsWith('submission:')) {
-                          const sid = key.split(':')[1];
-                          setSelectedSubmissionId(sid);
-                        }
-                      }}
-                    >
-                      <option value="file">Overall File Discussion</option>
-                      {tasks.map((task) => (
-                        <option key={task.id} value={`task:${task.id}`}>
-                          Task: {task.title}
-                        </option>
-                      ))}
-                      {focusedTask?.submissions.map((sub, idx) => (
-                        <option key={sub.id} value={`submission:${sub.id}`}>
-                          Submission #{focusedTask.submissions.length - idx} (Review)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
+                <div className="text-white">
                   <FileCommentsPanel
                     comments={discussionContextKey === 'file' ? fileComments : taskComments}
                     fileId={file.id}
@@ -268,6 +232,9 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
                     onCreateComment={handleCreateDiscussionComment}
                     onUpdateComment={handleUpdateDiscussionComment}
                     onDeleteComment={handleDeleteDiscussionComment}
+                    onReplyToFrame={handleReplyToFrame}
+                    replyingFrameId={controller.replyingFrameId}
+                    setReplyingFrameId={controller.setReplyingFrameId}
                     onSelectFrame={(comment) => {
                       let nextVersion: FileVersionItem | null = null;
                       if (comment.materialId) {
@@ -361,6 +328,8 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
           versions={versions}
           members={members}
           onRefresh={loadFile}
+          discussionContextKey={discussionContextKey}
+          setDiscussionContext={setDiscussionContext}
         />
 
         <MobileTaskDrawer
@@ -401,6 +370,8 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
           versions={versions}
           members={members}
           onRefresh={loadFile}
+          discussionContextKey={discussionContextKey}
+          setDiscussionContext={setDiscussionContext}
         />
       </div>
 
@@ -421,9 +392,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
           setTaskDialogOpen(false);
         }}
         onCreate={handleCreateAnnotatedTask}
-        onRequestFrame={startTaskFrameSelection}
         open={taskDialogOpen}
-        region={pendingTaskRegion}
       />
       <CreateFrameCommentDialog
         onCancel={() => {

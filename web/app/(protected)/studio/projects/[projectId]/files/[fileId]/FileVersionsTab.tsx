@@ -223,29 +223,10 @@ export function FileVersionsTab({
   }, [selectedVersionForDetails?.id]);
 
   return (
-    <div className="max-w-3xl mx-auto space-y-4">
+    <div className="space-y-4">
       {versionTabMode === 'list' ? (
         <>
-          {/* Header */}
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2 text-sm font-black text-white">
-                <History className="size-4 text-[#FFD369]" />
-                Version History
-              </div>
-              <p className="mt-0.5 text-[10px] font-bold text-[#8b94a1]">
-                {versions.length} version{versions.length !== 1 ? 's' : ''} available · Select a version to view files, restore or delete
-              </p>
-            </div>
-            <UIButton
-              className="h-8 rounded-[4px] border border-[#39424f] text-[10px] font-black text-[#aeb7c2] hover:border-[#FFD369]/50 hover:text-white"
-              onClick={() => setVersionHistoryOpen(true)}
-              variant="outline"
-            >
-              <History className="mr-1.5 size-3" />
-              History Drawer
-            </UIButton>
-          </div>
+
 
           {/* Versions Grid */}
           {versions.length === 0 ? (

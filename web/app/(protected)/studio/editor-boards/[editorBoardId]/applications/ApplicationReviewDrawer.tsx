@@ -41,6 +41,7 @@ type CommentItem = ApplicationCommentResponse;
 
 type ApplicationReviewDrawerProps = {
   application: EditorBoardApplicationResponse | null;
+  canApprove: boolean;
   isSubmitting: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdateStatus: (
@@ -108,6 +109,7 @@ function readUploadedFiles(materials: unknown) {
 // PhucTD #editor-board start
 export function ApplicationReviewDrawer({
   application,
+  canApprove,
   isSubmitting,
   onOpenChange,
   onUpdateStatus,
@@ -276,7 +278,6 @@ export function ApplicationReviewDrawer({
     application?.verifiedByUser?.email ??
     (application?.verifyBy ? `User #${application.verifyBy}` : null);
 
-  const canApprove = true;
   const isReviewable = application ? isBoardReviewableStatus(application.status) : false;
 
   const approveVotesCount = votes.filter((v) => v.decision === 'APPROVE').length;

@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { Loader2, MoreVertical, Pencil, Trash2, ChevronsUpDown, ChevronUp, ChevronDown } from 'lucide-react';
+import { Loader2, MoreVertical, Pencil, Trash2, LogOut, ChevronsUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Can } from '@/components/auth/Can';
+import { useAuth } from '@/hooks/useAuth';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,6 +45,10 @@ type EditorBoardsTabProps = {
   isLoadingBoards: boolean;
   onRenameBoard: (board: any) => void;
   onDeleteBoard: (board: any) => void;
+  onLeaveBoard: (board: any) => void;
+  apiBoards?: any[];
+  viewMode?: 'gallery' | 'table';
+  formatUserName?: (user?: any) => string;
   page: number;
   limit: number;
   total: number;
@@ -62,6 +66,7 @@ export function EditorBoardsTab({
   isLoadingBoards,
   onRenameBoard,
   onDeleteBoard,
+  onLeaveBoard,
   page,
   limit,
   total,
@@ -72,6 +77,8 @@ export function EditorBoardsTab({
   sortOrder,
   onSort,
 }: EditorBoardsTabProps) {
+  const { user: currentUser } = useAuth();
+
   return (
     <section className="mt-5 overflow-hidden rounded-[7px] border border-[#393E46] bg-[#0c1219]">
       <Table>
@@ -176,42 +183,48 @@ export function EditorBoardsTab({
                   {board.updated}
                 </TableCell>
                 <TableCell className="pr-5 text-right">
-                  <Can
-                    any={['admin', 'board:owner']}
-                    resource="BOARD"
-                    resourceId={board.boardId}
-                  >
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          className="size-7 text-white hover:bg-[#393E46]"
-                          size="icon"
-                          variant="ghost"
-                        >
-                          <MoreVertical className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent
-                        align="end"
-                        className="min-w-36 rounded-[4px] border border-[#393E46] bg-[#101820] p-1 text-white"
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        className="size-7 text-white hover:bg-[#393E46]"
+                        size="icon"
+                        variant="ghost"
                       >
-                        <DropdownMenuItem
-                          className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold focus:bg-[#393E46] focus:text-white"
-                          onSelect={() => void onRenameBoard(board)}
-                        >
-                          <Pencil className="size-3.5" />
-                          Rename
-                        </DropdownMenuItem>
+                        <MoreVertical className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      className="min-w-36 rounded-[4px] border border-[#393E46] bg-[#101820] p-1 text-white"
+                    >
+                      {currentUser?.id === board.createdByUser?.id ? (
+                        <>
+                          <DropdownMenuItem
+                            className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold focus:bg-[#393E46] focus:text-white"
+                            onSelect={() => void onRenameBoard(board)}
+                          >
+                            <Pencil className="size-3.5" />
+                            Rename
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold text-red-300 focus:bg-red-950/30 focus:text-red-200"
+                            onSelect={() => void onDeleteBoard(board)}
+                          >
+                            <Trash2 className="size-3.5" />
+                            Delete
+                          </DropdownMenuItem>
+                        </>
+                      ) : (
                         <DropdownMenuItem
                           className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold text-red-300 focus:bg-red-950/30 focus:text-red-200"
-                          onSelect={() => void onDeleteBoard(board)}
+                          onSelect={() => void onLeaveBoard(board)}
                         >
-                          <Trash2 className="size-3.5" />
-                          Delete
+                          <LogOut className="size-3.5" />
+                          Leave Board
                         </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </Can>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
               </TableRow>
             ))

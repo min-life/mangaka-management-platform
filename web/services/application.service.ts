@@ -136,6 +136,10 @@ export async function getApplications(params?: {
   search?: string;
   status?: ApplicationStatus;
   type?: ApplicationType;
+  page?: number;
+  limit?: number;
+  field?: string;
+  order?: 'asc' | 'desc';
 }) {
   const response = await api.get<ApplicationsResponse, ApplicationsResponse>('/applications', {
     params: {

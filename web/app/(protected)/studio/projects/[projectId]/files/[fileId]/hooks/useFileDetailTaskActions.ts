@@ -87,24 +87,9 @@ export function useFileDetailTaskActions({
         deadline: deadline,
         assignedBy: options?.assignedBy,
         parentId: options?.parentId,
-        cloneBaseMaterial: true,
+        cloneBaseMaterial: !options?.parentId,
+        cloneMaterialFromTaskId: options?.parentId,
       });
-
-      const newTaskId = createdTaskRes?.id;
-
-      if (task.region && newTaskId) {
-        // Fetch materials cloned for this task
-        const materials = await getTaskMaterials(newTaskId);
-        const clonedMaterial = Array.isArray(materials) ? materials[0] : (materials?.data?.[0] || materials);
-        if (clonedMaterial && clonedMaterial.id) {
-          await createTaskFrame(clonedMaterial.id, {
-            startX: task.region.startX,
-            startY: task.region.startY,
-            endX: task.region.endX,
-            endY: task.region.endY,
-          });
-        }
-      }
 
       await loadFile();
       toast.success('Task created successfully.');

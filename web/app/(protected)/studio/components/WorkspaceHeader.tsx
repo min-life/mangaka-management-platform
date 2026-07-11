@@ -40,11 +40,13 @@ export function WorkspaceHeader({
     <header className="flex h-16 items-center justify-between border-b border-[#393E46] bg-[#222831] px-6">
       {/* LEFT */}
       <div className="flex items-center gap-4">
-        <img
-          src="/brand/1.png"
-          alt="Inkly"
-          className="h-[50px] w-auto object-contain"
-        />
+        <Link href="/studio" className="shrink-0 transition hover:opacity-80">
+          <img
+            src="/brand/1.png"
+            alt="Inkly"
+            className="h-[50px] w-auto object-contain"
+          />
+        </Link>
 
         <div className="h-7 w-px bg-[#434A55]" />
 

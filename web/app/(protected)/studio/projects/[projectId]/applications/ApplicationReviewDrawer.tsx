@@ -72,7 +72,7 @@ export function ApplicationReviewDrawer({
   const displayedRejectionReason =
     rejectionReason ??
     (application?.status === 'REJECT'
-      ? 'Storyboard needs revision before approval. Please clarify the panel flow, reduce unclear transitions, and resubmit the updated manuscript package. *'
+      ? 'No rejection reason provided.'
       : undefined);
   const canConfirmReject = draftRejectReason.trim().length > 0 && !isSubmitting;
 
@@ -173,11 +173,8 @@ export function ApplicationReviewDrawer({
                 <section className="mt-4 rounded-[4px] border border-[#6b2637] bg-[#371522]/40 p-4">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#ff9ab3]">
-                      Rejection Reason *
+                      Rejection Reason
                     </p>
-                    <span className="text-[10px] font-black uppercase text-[#8b94a1]">
-                      UI fallback
-                    </span>
                   </div>
                   <p className="mt-3 text-sm font-medium leading-6 text-[#ffd5df]">
                     {displayedRejectionReason}

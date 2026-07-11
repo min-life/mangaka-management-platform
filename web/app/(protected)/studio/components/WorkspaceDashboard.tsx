@@ -42,6 +42,8 @@ import { Can } from '@/components/auth/Can';
 import {
   getProjects,
   updateProject,
+  deleteProject,
+  leaveProject,
   type ProjectResponse,
 } from '@/services/project.service';
 import {
@@ -57,9 +59,14 @@ import {
   deleteEditorBoard,
   getEditorBoards,
   updateEditorBoard,
+  leaveEditorBoard,
   type EditorBoardResponse,
 } from '@/services/editor-board.service';
 import { getMyTasks } from '@/services/task.service';
+import {
+  getApplications,
+  type ApplicationResponse,
+} from '@/services/application.service';
 import { toast } from '@/lib/toast';
 import { useAsyncResource } from '@/hooks/useAsyncResource';
 import { RefreshingIndicator } from '@/components/ui/refreshing-indicator';
@@ -71,10 +78,11 @@ import { ProjectsTab } from './ProjectsTab';
 import { EditProjectDialog } from './EditProjectDialog';
 import { MyTasksTab } from './MyTasksTab';
 import { EditorBoardsTab } from './EditorBoardsTab';
+import { ApplicationsTab } from './ApplicationsTab';
 import { LoadingState } from '@/components/ui/loading-state';
 
 type ViewMode = 'gallery' | 'table';
-type WorkspaceTab = 'editorBoards' | 'myTasks' | 'projects';
+type WorkspaceTab = 'editorBoards' | 'myTasks' | 'projects' | 'applications';
 
 const statusLabel: Record<string, string> = {
   DONE: 'Done',
@@ -126,10 +134,11 @@ export function WorkspaceDashboard() {
   const [apiProjects, setApiProjects] = useState<ProjectResponse[]>([]);
   const [apiBoards, setApiBoards] = useState<EditorBoardResponse[]>([]);
   const [apiTasks, setApiTasks] = useState<any[]>([]);
+  const [apiApplications, setApiApplications] = useState<ApplicationResponse[]>([]);
 
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab === 'editorBoards' || tab === 'myTasks' || tab === 'projects') {
+    if (tab === 'editorBoards' || tab === 'myTasks' || tab === 'projects' || tab === 'applications') {
       setActiveTab(tab);
       setSearchQuery('');
     }
@@ -159,6 +168,11 @@ export function WorkspaceDashboard() {
   const [tasksTotal, setTasksTotal] = useState(0);
   const [tasksTotalPages, setTasksTotalPages] = useState(1);
 
+  const [applicationsPage, setApplicationsPage] = useState(1);
+  const [applicationsLimit, setApplicationsLimit] = useState(10);
+  const [applicationsTotal, setApplicationsTotal] = useState(0);
+  const [applicationsTotalPages, setApplicationsTotalPages] = useState(1);
+
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [projectsFilter, setProjectsFilter] = useState<'all' | 'me'>('all');
   const [boardsFilter, setBoardsFilter] = useState<'all' | 'me'>('all');
@@ -168,6 +182,9 @@ export function WorkspaceDashboard() {
 
   const [boardsSortField, setBoardsSortField] = useState<'name' | 'updatedAt' | 'createdAt' | undefined>(undefined);
   const [boardsSortOrder, setBoardsSortOrder] = useState<'asc' | 'desc' | undefined>(undefined);
+
+  const [applicationsSortField, setApplicationsSortField] = useState<'title' | 'createdAt' | undefined>(undefined);
+  const [applicationsSortOrder, setApplicationsSortOrder] = useState<'asc' | 'desc' | undefined>(undefined);
 
   const projectsResource = useAsyncResource(async () => {
     return await getProjects({
@@ -184,7 +201,7 @@ export function WorkspaceDashboard() {
       page: boardsPage,
       limit: boardsLimit,
       me: boardsFilter === 'me' ? true : undefined,
-      field: boardsSortField,
+      field: boardsSortField as any,
       order: boardsSortOrder,
     });
   }, []);
@@ -197,13 +214,24 @@ export function WorkspaceDashboard() {
     });
   }, []);
 
+  const applicationsResource = useAsyncResource(async () => {
+    return await getApplications({
+      page: applicationsPage,
+      limit: applicationsLimit,
+      field: applicationsSortField,
+      order: applicationsSortOrder,
+    });
+  }, []);
+
   const isLoadingProjects = projectsResource.isInitialLoading || projectsResource.isRefreshing;
   const isLoadingBoards = boardsResource.isInitialLoading || boardsResource.isRefreshing;
   const isLoadingTasks = tasksResource.isInitialLoading || tasksResource.isRefreshing;
+  const isLoadingApplications = applicationsResource.isInitialLoading || applicationsResource.isRefreshing;
 
   const projectError = projectsResource.error;
   const boardError = boardsResource.error;
   const taskError = tasksResource.error;
+  const applicationError = applicationsResource.error;
 
   useEffect(() => {
     if (projectsResource.data) {
@@ -241,6 +269,18 @@ export function WorkspaceDashboard() {
     }
   }, [tasksResource.data]);
 
+  useEffect(() => {
+    if (applicationsResource.data) {
+      setApiApplications(applicationsResource.data.applications);
+      if (applicationsResource.data.pagination) {
+        setApplicationsPage(applicationsResource.data.pagination.page);
+        setApplicationsLimit(applicationsResource.data.pagination.limit);
+        setApplicationsTotal(applicationsResource.data.pagination.total);
+        setApplicationsTotalPages(applicationsResource.data.pagination.totalPages);
+      }
+    }
+  }, [applicationsResource.data]);
+
   // Soft deps listeners for pagination (separately listen to prevent initial loading screen)
   useEffect(() => {
     void projectsResource.reload().catch(() => {});
@@ -255,10 +295,14 @@ export function WorkspaceDashboard() {
   }, [tasksPage, tasksLimit]);
 
   useEffect(() => {
-    if (!projectsResource.isInitialLoading && !boardsResource.isInitialLoading && !tasksResource.isInitialLoading) {
+    void applicationsResource.reload().catch(() => {});
+  }, [applicationsPage, applicationsLimit, applicationsSortField, applicationsSortOrder]);
+
+  useEffect(() => {
+    if (!projectsResource.isInitialLoading && !boardsResource.isInitialLoading && !tasksResource.isInitialLoading && !applicationsResource.isInitialLoading) {
       setHasLoadedOnce(true);
     }
-  }, [projectsResource.isInitialLoading, boardsResource.isInitialLoading, tasksResource.isInitialLoading]);
+  }, [projectsResource.isInitialLoading, boardsResource.isInitialLoading, tasksResource.isInitialLoading, applicationsResource.isInitialLoading]);
 
   const handleProjectsSort = (field: 'name' | 'updatedAt' | 'createdAt') => {
     if (projectsSortField === field) {
@@ -288,6 +332,22 @@ export function WorkspaceDashboard() {
       setBoardsSortOrder('asc');
     }
     setBoardsPage(1);
+  };
+
+  const handleApplicationsSort = (field: string) => {
+    const sortField = field as 'title' | 'createdAt';
+    if (applicationsSortField === sortField) {
+      if (applicationsSortOrder === 'asc') {
+        setApplicationsSortOrder('desc');
+      } else {
+        setApplicationsSortField(undefined);
+        setApplicationsSortOrder(undefined);
+      }
+    } else {
+      setApplicationsSortField(sortField);
+      setApplicationsSortOrder('asc');
+    }
+    setApplicationsPage(1);
   };
 
   const isProjectsTab = activeTab === 'projects';
@@ -331,6 +391,7 @@ export function WorkspaceDashboard() {
         image: board.imageUrl,
         projectCount: board.numberOfProjects ?? board._count?.projects ?? 0,
         createdBy: formatUserName(board.createdByUser),
+        createdByUser: board.createdByUser,
         created: formatUpdatedAt(board.createdAt),
         updated: formatUpdatedAt(board.updatedAt),
       }))
@@ -374,20 +435,50 @@ export function WorkspaceDashboard() {
       });
   }, [apiTasks, searchQuery, activeTab]);
 
+  const applicationRows = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    return apiApplications
+      .map((app) => {
+        const assigneeName = app.createdByUser?.displayName || app.createdByUser?.email || 'Unknown user';
+        const assigneeInitials = assigneeName.slice(0, 2).toUpperCase();
+        return {
+          id: app.id,
+          title: app.title,
+          type: app.type,
+          status: app.status,
+          project: app.project?.name || 'No project',
+          projectId: app.projectId,
+          createdBy: assigneeName,
+          assignee: {
+            initials: assigneeInitials,
+          },
+          created: formatUpdatedAt(app.createdAt),
+          updated: formatUpdatedAt(app.updatedAt),
+        };
+      })
+      .filter((app) => {
+        if (!normalizedQuery || activeTab !== 'applications') return true;
+        return [app.title, app.type, app.status, app.project, app.createdBy].some((v) =>
+          v.toLowerCase().includes(normalizedQuery),
+        );
+      });
+  }, [apiApplications, searchQuery, activeTab]);
+
   const headerContent = {
     editorBoards: {
       meta: isLoadingBoards ? 'Loading Boards' : `${boardTotal} Editor Boards`,
-      subtitle: 'Coordinate review boards, leads, and editorial ownership across production.',
       title: 'Editor Boards',
     },
     myTasks: {
       meta: isLoadingTasks ? 'Loading Tasks' : `${apiTasks.length} Assigned Tasks`,
-      subtitle: 'Track your cross-project assignments, reviews, and production handoffs.',
       title: 'My Tasks',
+    },
+    applications: {
+      meta: isLoadingApplications ? 'Loading Applications' : `${applicationsTotal} Applications`,
+      title: 'Applications',
     },
     projects: {
       meta: isLoadingProjects ? 'Loading Projects' : `${projectTotal} Active Projects`,
-      subtitle: 'Manage files, tasks, reviews, and publication workflows across your manga studio.',
       title: 'Projects',
     },
   }[activeTab];
@@ -433,6 +524,32 @@ export function WorkspaceDashboard() {
     }
   };
 
+  const handleDeleteProject = async (project: ProjectResponse) => {
+    if (!window.confirm(`Are you sure you want to delete project "${project.name}"? This cannot be undone.`)) {
+      return;
+    }
+    try {
+      await deleteProject(project.id);
+      await loadProjects();
+      toast.success(`Project "${project.name}" deleted.`);
+    } catch {
+      toast.error('Failed to delete project.');
+    }
+  };
+
+  const handleLeaveProject = async (project: ProjectResponse) => {
+    if (!window.confirm(`Are you sure you want to leave project "${project.name}"?`)) {
+      return;
+    }
+    try {
+      await leaveProject(project.id);
+      await loadProjects();
+      toast.success(`You have left project "${project.name}".`);
+    } catch {
+      toast.error('Failed to leave project.');
+    }
+  };
+
   const handleRenameBoard = async (board: { boardId: number; name: string }) => {
     const nextName = window.prompt('Rename editor board', board.name)?.trim();
 
@@ -471,6 +588,24 @@ export function WorkspaceDashboard() {
     }
   };
 
+  const handleLeaveBoard = async (board: { boardId: number; name: string }) => {
+    if (!window.confirm(`Are you sure you want to leave editor board "${board.name}"?`)) {
+      return;
+    }
+
+    setActiveActionId(`board-${board.boardId}`);
+
+    try {
+      await leaveEditorBoard(board.boardId);
+      await loadEditorBoards();
+      toast.success(`You have left board "${board.name}".`);
+    } catch {
+      toast.error('Failed to leave editor board. Please try again.');
+    } finally {
+      setActiveActionId(null);
+    }
+  };
+
   return (
     <main className="min-h-screen overflow-hidden bg-[#222831] text-[#eeeeee]">
       <WorkspaceHeader />
@@ -484,9 +619,6 @@ export function WorkspaceDashboard() {
                 {headerContent.meta}
               </span>
             </div>
-            <p className="mt-1 text-sm font-medium text-[#aeb7c2]">
-              {headerContent.subtitle}
-            </p>
           </div>
         </div>
 
@@ -528,6 +660,18 @@ export function WorkspaceDashboard() {
                 <span className="absolute inset-x-0 bottom-[-1px] h-[3px] bg-[#FFD369]" />
               ) : null}
             </button>
+            <button
+              className={`relative h-full px-2 text-sm ${
+                activeTab === 'applications' ? 'font-bold text-[#FFD369]' : 'font-medium text-white'
+              }`}
+              onClick={() => setActiveTab('applications')}
+              type="button"
+            >
+              Applications
+              {activeTab === 'applications' ? (
+                <span className="absolute inset-x-0 bottom-[-1px] h-[3px] bg-[#FFD369]" />
+              ) : null}
+            </button>
           </div>
           <RefreshingIndicator
             isRefreshing={
@@ -535,7 +679,9 @@ export function WorkspaceDashboard() {
                 ? projectsResource.isRefreshing
                 : activeTab === 'editorBoards'
                   ? boardsResource.isRefreshing
-                  : tasksResource.isRefreshing
+                  : activeTab === 'applications'
+                    ? applicationsResource.isRefreshing
+                    : tasksResource.isRefreshing
             }
           />
         </div>
@@ -547,11 +693,13 @@ export function WorkspaceDashboard() {
               className="min-w-0 flex-1 bg-transparent text-xs font-medium text-white outline-none placeholder:text-[#aeb7c2]"
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={
-                activeTab === 'myTasks'
-                  ? 'Search tasks...'
-                  : activeTab === 'editorBoards'
-                    ? 'Search boards...'
-                    : 'Search projects...'
+                activeTab === 'applications'
+                  ? 'Search applications...'
+                  : activeTab === 'myTasks'
+                    ? 'Search tasks...'
+                    : activeTab === 'editorBoards'
+                      ? 'Search boards...'
+                      : 'Search projects...'
               }
               value={searchQuery}
             />
@@ -589,32 +737,25 @@ export function WorkspaceDashboard() {
           )}
 
           {activeTab === 'editorBoards' && (
-            <div className="flex h-9 overflow-hidden rounded-[4px] border border-[#4b535f] bg-[#393E46] p-1 text-xs">
-              <button
-                className={`px-3 py-1 font-black rounded-[3px] transition ${
-                  boardsFilter === 'all' ? 'bg-[#FFD369] text-[#222831]' : 'text-[#aeb7c2] hover:bg-[#4b535f] hover:text-white'
-                }`}
-                onClick={() => {
-                  setBoardsFilter('all');
-                  setBoardsPage(1);
-                }}
-                type="button"
-              >
-                All Boards
-              </button>
-              <button
-                className={`px-3 py-1 font-black rounded-[3px] transition ${
-                  boardsFilter === 'me' ? 'bg-[#FFD369] text-[#222831]' : 'text-[#aeb7c2] hover:bg-[#4b535f] hover:text-white'
-                }`}
-                onClick={() => {
-                  setBoardsFilter('me');
-                  setBoardsPage(1);
-                }}
-                type="button"
-              >
-                Created by Me
-              </button>
-            </div>
+            <Select
+              value={boardsFilter}
+              onValueChange={(val: 'all' | 'me') => {
+                setBoardsFilter(val);
+                setBoardsPage(1);
+              }}
+            >
+              <SelectTrigger className="h-9 w-40 rounded-[4px] border-[#4b535f] bg-[#101820] text-xs font-bold text-white focus:ring-0">
+                <SelectValue placeholder="Filter..." />
+              </SelectTrigger>
+              <SelectContent className="border-[#39424f] bg-[#151c25] text-white">
+                <SelectItem value="all" className="text-xs font-bold focus:bg-[#303842] focus:text-white">
+                  All Boards
+                </SelectItem>
+                <SelectItem value="me" className="text-xs font-bold focus:bg-[#303842] focus:text-white">
+                  Created by Me
+                </SelectItem>
+              </SelectContent>
+            </Select>
           )}
 
           {isProjectsTab ? (
@@ -649,7 +790,7 @@ export function WorkspaceDashboard() {
                 }}
               />
             </>
-          ) : activeTab === 'myTasks' ? null : (
+          ) : activeTab === 'myTasks' || activeTab === 'applications' ? null : (
             <div className="ml-auto">
               <CreateBoardDialog onCreated={() => void loadEditorBoards()} />
             </div>
@@ -675,12 +816,27 @@ export function WorkspaceDashboard() {
             className={`transition-opacity duration-200 ${
               (activeTab === 'projects' && projectsResource.isRefreshing) ||
               (activeTab === 'editorBoards' && boardsResource.isRefreshing) ||
-              (activeTab === 'myTasks' && tasksResource.isRefreshing)
+              (activeTab === 'myTasks' && tasksResource.isRefreshing) ||
+              (activeTab === 'applications' && applicationsResource.isRefreshing)
                 ? 'opacity-50 pointer-events-none'
                 : ''
             }`}
           >
-            {activeTab === 'myTasks' ? (
+            {activeTab === 'applications' ? (
+              <ApplicationsTab
+                applicationRows={applicationRows}
+                isLoading={applicationsResource.isInitialLoading}
+                page={applicationsPage}
+                limit={applicationsLimit}
+                total={applicationsTotal}
+                totalPages={applicationsTotalPages}
+                onPageChange={setApplicationsPage}
+                onLimitChange={setApplicationsLimit}
+                sortField={applicationsSortField}
+                sortOrder={applicationsSortOrder}
+                onSort={handleApplicationsSort}
+              />
+            ) : activeTab === 'myTasks' ? (
               <MyTasksTab
                 mappedTasks={mappedTasks}
                 isLoadingTasks={tasksResource.isInitialLoading}
@@ -693,11 +849,15 @@ export function WorkspaceDashboard() {
               />
             ) : activeTab === 'editorBoards' ? (
               <EditorBoardsTab
+                apiBoards={apiBoards}
                 boardRows={boardRows}
                 boardTotal={boardTotal}
                 isLoadingBoards={boardsResource.isInitialLoading}
+                viewMode={viewMode}
                 onRenameBoard={handleRenameBoard}
                 onDeleteBoard={handleDeleteBoard}
+                onLeaveBoard={handleLeaveBoard}
+                formatUserName={formatUserName}
                 page={boardsPage}
                 limit={boardsLimit}
                 total={boardsTotal}
@@ -716,6 +876,8 @@ export function WorkspaceDashboard() {
                 isLoadingProjects={projectsResource.isInitialLoading}
                 viewMode={viewMode}
                 onStartEdit={handleStartEditProject}
+                onDeleteProject={handleDeleteProject}
+                onLeaveProject={handleLeaveProject}
                 formatUserName={formatUserName}
                 page={projectsPage}
                 limit={projectsLimit}
