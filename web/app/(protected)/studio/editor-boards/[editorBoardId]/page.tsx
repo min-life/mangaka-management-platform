@@ -2,12 +2,14 @@
 
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ChevronRight, CircleGauge, FileCheck2, Users } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import api from '@/lib/api';
 import { formatActionTitle, formatActivityLogText } from '@/lib/activity-message';
+import { resolveActivityRoute } from '@/lib/activity-route';
 import {
   getEditorBoardById,
   getEditorBoardMembers,
@@ -39,6 +41,7 @@ type PageProps = {
 // PhucTD #editor-board start
 export default function EditorBoardDashboardPage({ params }: PageProps) {
   const { editorBoardId } = use(params);
+  const router = useRouter();
 
   const [board, setBoard] = useState<EditorBoardResponse | null>(null);
   const [members, setMembers] = useState<BoardMemberResponse[]>([]);
@@ -329,10 +332,16 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
               <h2 className="text-sm font-black text-white">Recent Activity</h2>
             </div>
             <div className="grid gap-3">
-              {activities.map((activity) => (
+              {activities.map((activity) => {
+                const route = resolveActivityRoute(activity);
+
+                return (
                 <article
-                  className="rounded-[5px] border border-[#303842] bg-[#202832] p-3"
+                  className={`rounded-[5px] border border-[#303842] bg-[#202832] p-3 ${
+                    route ? 'cursor-pointer transition-colors hover:border-[#FFD369]/50 hover:bg-[#242e3a]' : ''
+                  }`}
                   key={activity.id}
+                  onClick={route ? () => router.push(route) : undefined}
                 >
                   <div className="flex items-start gap-3">
                     <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-[4px] bg-[#101820] text-[#FFD369]">
@@ -354,7 +363,8 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
                     </div>
                   </div>
                 </article>
-              ))}
+                );
+              })}
               {activityError ? (
                 <p className="text-center text-xs text-red-300">{activityError}</p>
               ) : null}

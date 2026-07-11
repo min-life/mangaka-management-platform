@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { AxiosError } from 'axios';
 import { toast } from '@/lib/toast';
@@ -92,6 +93,7 @@ function ApplicationListSkeleton() {
 
 export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
   const [applications, setApplications] = useState<ApplicationResponse[]>([]);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -157,6 +159,8 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
       }
     }
   }, [activities.length, loadApplications]);
+
+  const applicationIdParam = searchParams.get('applicationId');
 
   const filteredApplications = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -322,6 +326,18 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
       console.error('Unable to load application detail:', detailError);
     }
   };
+
+  // Deep link from activity-log/notification clicks, e.g. ?applicationId=123
+  useEffect(() => {
+    if (!applicationIdParam) return;
+    const applicationId = Number(applicationIdParam);
+    if (!Number.isFinite(applicationId)) return;
+
+    queueMicrotask(() => {
+      void handleOpenApplication({ id: applicationId } as ApplicationResponse);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applicationIdParam]);
 
   const refreshSelectedApplication = async (applicationId: number) => {
     const [detail, commentResult] = await Promise.all([

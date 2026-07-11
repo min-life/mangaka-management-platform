@@ -117,14 +117,6 @@ export type ProjectApplicationResponse = {
   updatedAt: string;
 };
 
-export type ProjectStatResponse = {
-  id: number;
-  metrics: unknown;
-  project?: ProjectResponse;
-  projectId?: number;
-  updatedAt: string;
-};
-
 export type ProjectFolderResponse = {
   createdAt: string;
   createdBy?: number | null;
@@ -187,10 +179,6 @@ type ProjectMembersResponse = {
 type ProjectApplicationsResponse = {
   data?: ProjectApplicationResponse[];
   pagination?: PaginationResponse;
-};
-
-type ProjectStatApiResponse = {
-  data?: ProjectStatResponse | null;
 };
 
 type ProjectFoldersResponse = {
@@ -337,14 +325,6 @@ export async function getProjectApplications(
     applications: response.data ?? [],
     pagination: response.pagination,
   };
-}
-
-export async function getProjectStats(projectId: number) {
-  const response = await api.get<ProjectStatApiResponse, ProjectStatApiResponse>(
-    `/projects/${projectId}/stats`,
-  );
-
-  return response.data ?? null;
 }
 
 export async function updateProjectMember(
