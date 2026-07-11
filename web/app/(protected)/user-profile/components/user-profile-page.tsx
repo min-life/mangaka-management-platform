@@ -9,7 +9,6 @@ import {
   ChevronRight,
   FilePenLine,
   Link2,
-  Palette,
   Pencil,
   ShieldCheck,
   UserPlus,
@@ -49,10 +48,6 @@ import {
   type UserProfile,
 } from '../services/user-profile-service';
 
-type ProfileTheme = 'dark' | 'light';
-
-const USER_PROFILE_THEME_KEY = 'mangaka:user-profile-theme';
-
 const ACTIVITY_PAGE_SIZE = 7;
 
 function isSessionExpiredError(error: unknown) {
@@ -78,7 +73,6 @@ function isSessionExpiredError(error: unknown) {
 const text = {
   accountSettings: 'Account Settings',
   activitySummary: 'Activity Summary',
-  appearance: (isDark: boolean) => `Appearance (State ${isDark ? 'Dark' : 'Light'})`,
   assignedEditorBoards: 'Assigned Editor Boards',
   assignedProjects: 'Assigned Projects',
   googleAccountLinked: 'Google Account Linked',
@@ -91,36 +85,20 @@ const text = {
   viewAll: 'View All',
 };
 
-const themeTokens: Record<ProfileTheme, React.CSSProperties> = {
-  dark: {
-    '--profile-bg': '#222831',
-    '--profile-header': '#222831',
-    '--profile-surface': '#1a2029',
-    '--profile-surface-high': '#242a33',
-    '--profile-surface-highest': '#2f353e',
-    '--profile-border': '#50555D',
-    '--profile-text': '#dde3ef',
-    '--profile-title': '#ffffff',
-    '--profile-muted': '#C8C8C8',
-    '--profile-accent': '#FFD369',
-    '--profile-button': '#ffffff',
-    '--profile-button-text': '#2f3131',
-  } as React.CSSProperties,
-  light: {
-    '--profile-bg': '#f5f7fb',
-    '--profile-header': '#ffffff',
-    '--profile-surface': '#ffffff',
-    '--profile-surface-high': '#f1f4f8',
-    '--profile-surface-highest': '#e5eaf1',
-    '--profile-border': '#c9d1dc',
-    '--profile-text': '#1f2937',
-    '--profile-title': '#0f172a',
-    '--profile-muted': '#5f6b7a',
-    '--profile-accent': '#b7791f',
-    '--profile-button': '#111827',
-    '--profile-button-text': '#ffffff',
-  } as React.CSSProperties,
-};
+const profileThemeStyle = {
+  '--profile-bg': '#222831',
+  '--profile-header': '#222831',
+  '--profile-surface': '#1a2029',
+  '--profile-surface-high': '#242a33',
+  '--profile-surface-highest': '#2f353e',
+  '--profile-border': '#50555D',
+  '--profile-text': '#dde3ef',
+  '--profile-title': '#ffffff',
+  '--profile-muted': '#C8C8C8',
+  '--profile-accent': '#FFD369',
+  '--profile-button': '#ffffff',
+  '--profile-button-text': '#2f3131',
+} as React.CSSProperties;
 
 function getInitials(name: string) {
   return (
@@ -389,16 +367,6 @@ export function UserProfilePage() {
   const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
   const [isEditingDisplayName, setIsEditingDisplayName] = useState(false);
   const [draftDisplayName, setDraftDisplayName] = useState('');
-  // Always start with the server-rendered default ('dark') so the client's first
-  // render matches SSR output; the stored preference is applied after mount below.
-  const [theme, setTheme] = useState<ProfileTheme>('dark');
-
-  useEffect(() => {
-    const storedTheme = window.localStorage.getItem(USER_PROFILE_THEME_KEY);
-    if (storedTheme === 'light') {
-      setTheme('light');
-    }
-  }, []);
 
   useEffect(() => {
     if (!getAccessToken()) {
@@ -413,17 +381,13 @@ export function UserProfilePage() {
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem(USER_PROFILE_THEME_KEY, theme);
-  }, [theme]);
-
-  useEffect(() => {
     const activityLog = notifications[0]?.activityLog;
 
     if (!activityLog) {
       return;
     }
 
-    const nextActivity = mapActivityLogToUserActivity(activityLog);
+    const nextActivity = mapActivityLogToUserActivity(activityLog, { isDirectedAtViewer: true });
     setAllActivities((currentActivities) => {
       if (currentActivities.some((activity) => activity.id === nextActivity.id)) {
         return currentActivities;
@@ -436,12 +400,10 @@ export function UserProfilePage() {
     setVisibleActivityCount((current) => current + 1);
   }, [notifications]);
 
-  const themeStyle = useMemo(() => themeTokens[theme], [theme]);
   const displayName = currentUser?.displayName ?? authUser?.displayName ?? 'Unnamed User';
   const avatarUrl = currentUser?.avatarUrl ?? authUser?.avatarUrl ?? '';
   const roleName = getPrimaryRole(currentUser);
   const initials = getInitials(displayName);
-  const isDarkTheme = theme === 'dark';
   const activities = useMemo(
     () => allActivities.slice(0, visibleActivityCount),
     [allActivities, visibleActivityCount],
@@ -479,7 +441,7 @@ export function UserProfilePage() {
     setIsActivitiesLoading(true);
 
     try {
-      const activityData = await getCurrentUserContextActivities(authUser?.id);
+      const activityData = await getCurrentUserContextActivities();
 
       setAllActivities(activityData);
       setVisibleActivityCount(ACTIVITY_PAGE_SIZE);
@@ -614,11 +576,8 @@ export function UserProfilePage() {
 
   return (
     <div
-      className={cn(
-        'min-h-screen bg-[var(--profile-bg)] text-[var(--profile-text)]',
-        isDarkTheme && 'dark',
-      )}
-      style={themeStyle}
+      className="dark min-h-screen bg-[var(--profile-bg)] text-[var(--profile-text)]"
+      style={profileThemeStyle}
     >
       <ChangePasswordDialog
         isSubmitting={isPasswordSubmitting}
@@ -791,13 +750,6 @@ export function UserProfilePage() {
                   icon={ShieldCheck}
                   label={text.securityPassword}
                   onClick={() => setIsPasswordOpen(true)}
-                />
-                <SettingsButton
-                  icon={Palette}
-                  label={text.appearance(isDarkTheme)}
-                  onClick={() =>
-                    setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))
-                  }
                 />
               </div>
             </Card>
