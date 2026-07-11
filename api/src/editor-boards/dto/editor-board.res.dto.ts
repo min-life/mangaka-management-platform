@@ -53,6 +53,12 @@ export class BoardMemberResDto {
 
   @ApiProperty({ example: false })
   isLead!: boolean;
+
+  @ApiProperty({ example: '2026-06-18T03:00:00.000Z' })
+  createdAt!: Date;
+
+  @ApiProperty({ example: '2026-06-18T03:00:00.000Z' })
+  updatedAt!: Date;
 }
 
 export class BoardProjectResDto {

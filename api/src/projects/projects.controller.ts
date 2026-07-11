@@ -8,10 +8,11 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
@@ -45,9 +46,11 @@ import {
   SetProjectEditorBoardReqDto,
   UpdateProjectMemberReqDto,
   UpdateProjectReqDto,
-  CreateProjectStatReqDto,
+  UploadProjectStatReqDto,
+  QueryProjectStatReqDto,
   ProjectStatResponseDto,
   SuccessResponseDto,
+  ProjectDashboardResponseDto,
 } from './dto';
 import { ActivityLogsResponseDto } from '../activity-logs/dto';
 import { TasksResponseDto } from '../tasks/dto';
@@ -147,6 +150,23 @@ export class ProjectsController {
     return {
       data: project,
     };
+  }
+
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['project:owner', 'project:read'],
+    resource: 'PROJECT',
+  })
+  @ApiOperation({ summary: 'Get project dashboard statistics' })
+  @ApiParam({ name: 'id', type: Number, description: 'Project id' })
+  @ApiOkResponse({ description: 'Project dashboard retrieved successfully', type: ProjectDashboardResponseDto })
+  @Get(':id/dashboard')
+  async getProjectDashboard(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    const data = await this.projectsService.getProjectDashboard(id, currentUser.userId);
+    return { data };
   }
 
   @Permissions({
@@ -547,8 +567,11 @@ export class ProjectsController {
     type: ProjectStatResponseDto,
   })
   @Get(':id/stats')
-  async getProjectStats(@Param('id', ParseIntPipe) id: number) {
-    const projectStat = await this.projectsService.getProjectStats(id);
+  async getProjectStats(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: QueryProjectStatReqDto,
+  ) {
+    const projectStat = await this.projectsService.getProjectStats(id, query);
     return {
       data: projectStat,
     };
@@ -556,21 +579,24 @@ export class ProjectsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:update', 'project:owner'],
+    permissions: ['project:owner', 'board:owner', 'board:leader'],
     resource: 'PROJECT',
   })
   @ApiOperation({ summary: 'Import project stats' })
+  @ApiConsumes('multipart/form-data')
   @ApiParam({ name: 'id', type: Number, description: 'Project id' })
   @ApiCreatedResponse({
     description: 'Project stats imported successfully',
     type: ProjectStatResponseDto,
   })
   @Post(':id/stats')
+  @UseInterceptors(FileInterceptor('file'))
   async importProjectStats(
     @Param('id', ParseIntPipe) id: number,
-    @Body() data: CreateProjectStatReqDto,
+    @Body() data: UploadProjectStatReqDto,
+    @UploadedFile() file: any,
   ) {
-    const projectStat = await this.projectsService.importProjectStats(id, data);
+    const projectStat = await this.projectsService.importProjectStats(id, data, file);
     return {
       data: projectStat,
     };

@@ -31,6 +31,8 @@ const USER_SELECT = {
 const BOARD_MEMBER_SELECT = {
   user: USER_SELECT,
   isLead: true,
+  createdAt: true,
+  updatedAt: true,
 } satisfies Prisma.UserEditorBoardSelect;
 
 const EDITOR_BOARD_SELECT = {
@@ -186,6 +188,71 @@ export class EditorBoardsService {
       return board;
     } catch (error) {
       this.handleError(error, 'Get editor board fail', ERROR.SVGETBOARD);
+    }
+  }
+
+  async getEditorBoardDashboard(boardId: number) {
+    try {
+      const board = await this.prisma.editorBoard.findUnique({
+        where: { id: boardId },
+        select: EDITOR_BOARD_SELECT,
+      });
+      if (!board) throw new NotFoundException(ERROR.NFBOARD);
+
+      const firstDayOfMonth = new Date();
+      firstDayOfMonth.setDate(1);
+      firstDayOfMonth.setHours(0, 0, 0, 0);
+
+      const [
+        totalProjects,
+        activeMembers,
+        pendingApprovals,
+        approvedThisMonth,
+        members,
+        projects,
+        applications,
+      ] = await Promise.all([
+        this.prisma.project.count({ where: { editorBoardId: boardId } }),
+        this.prisma.userEditorBoard.count({ where: { editorBoardId: boardId } }),
+        this.prisma.application.count({
+          where: { project: { editorBoardId: boardId }, status: { in: ['PENDING', 'SUBMITTED'] } },
+        }),
+        this.prisma.application.count({
+          where: { project: { editorBoardId: boardId }, status: 'APPROVE', updatedAt: { gte: firstDayOfMonth } },
+        }),
+        this.prisma.userEditorBoard.findMany({
+          where: { editorBoardId: boardId },
+          select: BOARD_MEMBER_SELECT,
+          take: 5,
+        }),
+        this.prisma.project.findMany({
+          where: { editorBoardId: boardId },
+          select: PROJECT_SELECT,
+          take: 5,
+          orderBy: { createdAt: 'desc' },
+        }),
+        this.prisma.application.findMany({
+          where: { project: { editorBoardId: boardId } },
+          select: APPLICATION_LIST_SELECT,
+          take: 5,
+          orderBy: { updatedAt: 'desc' },
+        }),
+      ]);
+
+      return {
+        board,
+        stats: {
+          totalProjects,
+          activeMembers,
+          pendingApprovals,
+          approvedThisMonth,
+        },
+        members,
+        projects,
+        applications,
+      };
+    } catch (error) {
+      this.handleError(error, 'Get editor board dashboard fail', 'SVGETBOARD');
     }
   }
 

@@ -36,6 +36,7 @@ import {
   QueryBoardProjectsReqDto,
   QueryBoardsReqDto,
   UpdateBoardReqDto,
+  EditorBoardDashboardResponseDto,
 } from './dto';
 import { ActivityLogsService } from '../activity-logs/activity-logs.service';
 import { ActivityLogsResponseDto } from '../activity-logs/dto';
@@ -111,6 +112,23 @@ export class EditorBoardsController {
     return {
       data: board,
     };
+  }
+
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['board:leader', 'board:member', 'board:owner'],
+    resource: 'BOARD',
+  })
+  @ApiOperation({ summary: 'Get editor board dashboard statistics' })
+  @ApiParam({ name: 'id', type: Number, description: 'Editor board id' })
+  @ApiOkResponse({
+    description: 'Editor board dashboard retrieved successfully',
+    type: EditorBoardDashboardResponseDto,
+  })
+  @Get(':id/dashboard')
+  async getEditorBoardDashboard(@Param('id', ParseIntPipe) id: number) {
+    const data = await this.editorBoardsService.getEditorBoardDashboard(id);
+    return { data };
   }
 
   @Permissions({

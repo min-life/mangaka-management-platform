@@ -26,6 +26,7 @@ import { randomUUID } from 'crypto';
 import sizeOf from 'image-size';
 import { CacheService } from '../redis/cache.service';
 import { UseCache, InvalidateCache } from '../share/decorators/cache.decorator';
+import { parse } from 'csv-parse/sync';
 const PROJECT_MEMBER_SELECT = {
   user: {
     select: {
@@ -209,7 +210,13 @@ const PROJECT_STAT_SELECT = {
   project: {
     select: PROJECT_SELECT,
   },
-  metrics: true,
+  year: true,
+  month: true,
+  views: true,
+  sales: true,
+  revenue: true,
+  reviews: true,
+  rating: true,
   updatedAt: true,
 } satisfies Prisma.ProjectStatSelect;
 
@@ -325,6 +332,124 @@ export class ProjectsService {
       return project;
     } catch (error) {
       this.handleError(error, 'Get project fail', ERROR.SVGETPROJECT);
+    }
+  }
+
+  async getProjectDashboard(projectId: number, userId: number) {
+    try {
+      const project = await this.prisma.project.findUnique({
+        where: { id: projectId },
+      });
+      if (!project) throw new NotFoundException(ERROR.NFPROJECT);
+
+      const [
+        totalMembers,
+        totalFolders,
+        totalFiles,
+        totalTasks,
+        progressStatsRaw,
+        activeTasks,
+        overdueTasks,
+        dueSoonTasks,
+        pendingApplications,
+        recentFilesRaw
+      ] = await Promise.all([
+        this.prisma.userProject.count({ where: { projectId } }),
+        this.prisma.folder.count({ where: { projectId } }),
+        this.prisma.file.count({ where: { folder: { projectId } } }),
+        this.prisma.task.count({ where: { file: { folder: { projectId } } } }),
+        this.prisma.task.groupBy({
+          by: ['status'],
+          _count: true,
+          where: { file: { folder: { projectId } } },
+        }),
+        this.prisma.task.findMany({
+          where: { file: { folder: { projectId } }, assignedBy: userId, status: { not: 'DONE' } },
+          select: { id: true, title: true, status: true, deadline: true, fileId: true },
+          take: 5,
+          orderBy: { createdAt: 'desc' }
+        }),
+        this.prisma.task.findMany({
+          where: { file: { folder: { projectId } }, deadline: { lt: new Date() }, status: { not: 'DONE' } },
+          select: { id: true, title: true, status: true, deadline: true, fileId: true },
+          take: 5,
+          orderBy: { deadline: 'asc' }
+        }),
+        this.prisma.task.findMany({
+          where: { file: { folder: { projectId } }, deadline: { gte: new Date(), lte: new Date(Date.now() + 24 * 60 * 60 * 1000) }, status: { not: 'DONE' } },
+          select: { id: true, title: true, status: true, deadline: true, fileId: true },
+          take: 5,
+          orderBy: { deadline: 'asc' }
+        }),
+        this.prisma.application.findMany({
+          where: { projectId, status: { in: ['PENDING', 'SUBMITTED'] } },
+          select: { id: true, title: true, status: true },
+          take: 5,
+          orderBy: { createdAt: 'desc' }
+        }),
+        this.prisma.file.findMany({
+          where: { folder: { projectId } },
+          select: {
+            id: true,
+            title: true,
+            updatedAt: true,
+            folder: { select: { id: true, title: true } },
+            fileMaterials: {
+              where: { taskId: null },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              select: { materials: true }
+            }
+          },
+          take: 4,
+          orderBy: { updatedAt: 'desc' }
+        })
+      ]);
+
+      const progressStats = {
+        completedTasks: progressStatsRaw.find((p) => p.status === 'DONE')?._count || 0,
+        pendingTasks: progressStatsRaw.find((p) => p.status === 'PENDING')?._count || 0,
+        inProgressTasks: progressStatsRaw.find((p) => p.status === 'INPROGRESS')?._count || 0,
+        reviewTasks: progressStatsRaw.find((p) => p.status === 'REVIEW')?._count || 0,
+      };
+
+      const recentFiles = recentFilesRaw.map(file => {
+        let imageUrl: string | null = null;
+        if (file.fileMaterials && file.fileMaterials.length > 0) {
+          const materialsArray = file.fileMaterials[0].materials as any[];
+          if (Array.isArray(materialsArray) && materialsArray.length > 0) {
+            imageUrl = materialsArray[0]?.url || null;
+          }
+        }
+        return {
+          id: file.id,
+          title: file.title,
+          updatedAt: file.updatedAt,
+          folder: file.folder,
+          imageUrl
+        };
+      });
+
+      return {
+        overview: {
+          totalMembers,
+          totalFolders,
+          totalFiles,
+          totalTasks,
+        },
+        progressStats,
+        myWorkspace: {
+          activeTasks,
+        },
+        actionNeeded: {
+          overdueTasks,
+          dueSoonTasks,
+          pendingApplications,
+        },
+        recentFiles,
+      };
+    } catch (error) {
+      this.handleError(error, 'Get project dashboard fail', 'SVGETPROJECT');
     }
   }
 
@@ -1090,49 +1215,180 @@ export class ProjectsService {
     throw new InternalServerErrorException(clientMessage);
   }
 
-  @UseCache((args) => `project:${args[0]}:stats`)
-  async getProjectStats(projectId: number) {
+  async getProjectStats(projectId: number, query: any) {
     try {
       await this.ensureProject(projectId);
 
-      const projectStat = await this.prisma.projectStat.findFirst({
-        where: { projectId },
-        select: PROJECT_STAT_SELECT,
+      let targetYear = query.year;
+
+      // Filter scope
+      const whereClause: Prisma.ProjectStatWhereInput = { projectId };
+      if (query.chapterId) {
+        whereClause.folderId = query.chapterId;
+      } else if (query.arcId) {
+        // Find all chapters under this arc
+        const arcChapters = await this.prisma.folder.findMany({
+          where: { parentId: query.arcId, projectId },
+          select: { id: true },
+        });
+        whereClause.folderId = { in: arcChapters.map((c) => c.id) };
+      }
+
+      // If no year provided, find the max year for the given scope
+      if (!targetYear) {
+        const maxYearStat = await this.prisma.projectStat.findFirst({
+          where: whereClause,
+          orderBy: { year: 'desc' },
+          select: { year: true },
+        });
+        targetYear = maxYearStat ? maxYearStat.year : new Date().getFullYear();
+      }
+
+      whereClause.year = targetYear;
+
+      const rawStats = await this.prisma.projectStat.findMany({
+        where: whereClause,
       });
 
-      return projectStat;
+      // Aggregate data
+      const monthMap = new Map<number, any>();
+      for (let i = 1; i <= 12; i++) {
+        monthMap.set(i, {
+          month: i,
+          views: 0,
+          sales: 0,
+          revenue: 0,
+          reviews: 0,
+          rating: 0,
+          _totalRatingScore: 0,
+        });
+      }
+
+      for (const row of rawStats) {
+        const item = monthMap.get(row.month)!;
+        item.views += row.views;
+        item.sales += row.sales;
+        item.revenue += row.revenue;
+        item.reviews += row.reviews;
+        item._totalRatingScore += row.rating * row.reviews;
+      }
+
+      const summary = {
+        totalViews: 0,
+        totalSales: 0,
+        totalRevenue: 0,
+        totalReviews: 0,
+        averageRating: 0,
+        _totalRatingScore: 0,
+      };
+
+      const months: any[] = [];
+      for (let i = 1; i <= 12; i++) {
+        const item = monthMap.get(i)!;
+        if (item.reviews > 0) {
+          item.rating = item._totalRatingScore / item.reviews;
+        } else {
+          item.rating = 0;
+        }
+        item.rating = Math.round(item.rating * 100) / 100;
+
+        summary.totalViews += item.views;
+        summary.totalSales += item.sales;
+        summary.totalRevenue += item.revenue;
+        summary.totalReviews += item.reviews;
+        summary._totalRatingScore += item._totalRatingScore;
+
+        delete item._totalRatingScore;
+        months.push(item);
+      }
+
+      if (summary.totalReviews > 0) {
+        summary.averageRating =
+          Math.round((summary._totalRatingScore / summary.totalReviews) * 100) / 100;
+      } else {
+        summary.averageRating = 0;
+      }
+      delete (summary as any)._totalRatingScore;
+
+      return {
+        year: targetYear,
+        summary,
+        months,
+      };
     } catch (error) {
       this.handleError(error, 'Get project stats fail', ERROR.SVGETPROJECTSTATSBYPROJECT);
     }
   }
 
-  async importProjectStats(projectId: number, data: { metrics: unknown }) {
+  async importProjectStats(projectId: number, data: any, file: any) {
     try {
       await this.ensureProject(projectId);
 
-      const existingStat = await this.prisma.projectStat.findFirst({
-        where: { projectId },
+      if (!file) {
+        throw new BadRequestException('CSV file is required');
+      }
+
+      const chapterFolder = await this.prisma.folder.findUnique({
+        where: { id: data.chapterId },
       });
 
-      if (existingStat) {
-        return await this.prisma.projectStat.update({
-          where: { id: existingStat.id },
-          data: {
-            metrics: data.metrics as Prisma.InputJsonValue,
+      if (
+        !chapterFolder ||
+        chapterFolder.projectId !== projectId ||
+        chapterFolder.parentId === null
+      ) {
+        throw new BadRequestException('Invalid chapterId');
+      }
+
+      const records = parse(file.buffer, {
+        columns: (header) => header.map((column: string) => column.trim().toLowerCase()),
+        skip_empty_lines: true,
+      });
+
+      for (const rawRow of records) {
+        const row = rawRow as any;
+        const year = parseInt(row.year);
+        const month = parseInt(row.month);
+
+        if (isNaN(year) || isNaN(month)) continue;
+
+        const views = parseInt(row['total views']) || 0;
+        const sales = parseInt(row['total sales']) || 0;
+        const revenue = parseFloat(row['total revenue']) || 0;
+        const reviews = parseInt(row['total reviews']) || 0;
+        const rating = parseFloat(row['average rating']) || 0;
+
+        await this.prisma.projectStat.upsert({
+          where: {
+            folderId_year_month: {
+              folderId: data.chapterId,
+              year,
+              month,
+            },
+          },
+          update: {
+            views,
+            sales,
+            revenue,
+            reviews,
+            rating,
             updatedAt: new Date(),
           },
-          select: PROJECT_STAT_SELECT,
+          create: {
+            projectId,
+            folderId: data.chapterId,
+            year,
+            month,
+            views,
+            sales,
+            revenue,
+            reviews,
+            rating,
+          },
         });
       }
 
-      return await this.prisma.projectStat.create({
-        data: {
-          projectId,
-          metrics: data.metrics as Prisma.InputJsonValue,
-          updatedAt: new Date(),
-        },
-        select: PROJECT_STAT_SELECT,
-      });
+      return { success: true };
     } catch (error) {
       this.handleError(error, 'Import project stats fail', ERROR.SVIMPORTPROJECTSTATS);
     }
