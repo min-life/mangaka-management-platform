@@ -1,9 +1,16 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Search } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 import {
   createAdminRole,
@@ -12,21 +19,26 @@ import {
   getAdminRolePermissions,
   getAdminRoles,
   replaceAdminRolePermissions,
+  updateAdminRole,
   type AdminPermissionResponse,
   type AdminRoleResponse,
 } from '../../admin-api';
 import { PageHeader } from '../../components/PageHeader';
-import { RoleFormDialog } from './RoleFormDialog';
 import { RolesTable } from './RolesTable';
 import { getPermissionId, sortRolesByApiFields, type RoleFormPayload } from './role-utils';
 
-// Codex #admin-ui start
 export default function AdminRolesClient() {
   const [roles, setRoles] = useState<AdminRoleResponse[]>([]);
   const [permissions, setPermissions] = useState<AdminPermissionResponse[]>([]);
   const [rolePermissions, setRolePermissions] = useState<Record<number, AdminPermissionResponse[]>>(
     {},
   );
+  const [searchQuery, setSearchQuery] = useState('');
+  const [scopeFilter, setScopeFilter] = useState('all');
+  const [defaultFilter, setDefaultFilter] = useState('all');
+  const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>([]);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -79,6 +91,7 @@ export default function AdminRolesClient() {
 
   const refreshRoles = async (nextMessage: string) => {
     setMessage(nextMessage);
+    setSelectedRoleIds([]);
     await loadRoles();
   };
 
@@ -99,26 +112,15 @@ export default function AdminRolesClient() {
     }
   };
 
-  const handleTogglePermission = async (
-    role: AdminRoleResponse,
-    permission: AdminPermissionResponse,
-    checked: boolean,
-  ) => {
-    const currentPermissions = rolePermissions[role.id] ?? [];
-    const currentPermissionIds = currentPermissions.map((item) => getPermissionId(item));
-    const permissionId = getPermissionId(permission);
-    const nextPermissionIds = checked
-      ? Array.from(new Set([...currentPermissionIds, permissionId]))
-      : currentPermissionIds.filter((currentPermissionId) => currentPermissionId !== permissionId);
-
+  const handleReplaceRolePermissions = async (role: AdminRoleResponse, permissionIds: number[]) => {
     setIsSubmitting(true);
     setError(null);
 
     try {
-      await replaceAdminRolePermissions(role.id, nextPermissionIds);
+      await replaceAdminRolePermissions(role.id, permissionIds);
       setRolePermissions((currentRolePermissions) => ({
         ...currentRolePermissions,
-        [role.id]: permissions.filter((item) => nextPermissionIds.includes(getPermissionId(item))),
+        [role.id]: permissions.filter((item) => permissionIds.includes(getPermissionId(item))),
       }));
       setMessage('Role permissions updated successfully.');
     } catch {
@@ -128,18 +130,95 @@ export default function AdminRolesClient() {
     }
   };
 
-  const handleDeleteRole = async (role: AdminRoleResponse) => {
+  const handleToggleRoleDefault = async (role: AdminRoleResponse, isDefault: boolean) => {
     setIsSubmitting(true);
     setError(null);
 
     try {
-      await deleteAdminRole(role.id);
-      await refreshRoles('Role deleted successfully.');
+      const updatedRole = await updateAdminRole(role.id, { isDefault });
+      setRoles((currentRoles) =>
+        currentRoles.map((currentRole) =>
+          currentRole.id === updatedRole.id ? updatedRole : currentRole,
+        ),
+      );
+      setMessage('Role default status updated successfully.');
     } catch {
-      setError('Unable to delete role. This role may still be assigned to users or projects.');
+      setError('Unable to update role default status.');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleDeleteRoles = async (roleIds: number[]) => {
+    if (!roleIds.length) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      await Promise.all(roleIds.map((roleId) => deleteAdminRole(roleId)));
+      await refreshRoles('Selected roles deleted successfully.');
+    } catch {
+      setError('Unable to delete selected roles. One or more roles may still be assigned.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const visibleRoles = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+
+    if (!normalizedQuery) {
+      return sortedRoles.filter((role) => {
+        const matchesScope = scopeFilter === 'all' || role.scope === scopeFilter;
+        const matchesDefault =
+          defaultFilter === 'all' ||
+          (defaultFilter === 'default' && role.isDefault) ||
+          (defaultFilter === 'custom' && !role.isDefault);
+
+        return matchesScope && matchesDefault;
+      });
+    }
+
+    return sortedRoles.filter((role) => {
+      const matchesSearch = [role.name, role.code, role.scope === 'SYS' ? 'System' : 'Project']
+        .join(' ')
+        .toLowerCase()
+        .includes(normalizedQuery);
+      const matchesScope = scopeFilter === 'all' || role.scope === scopeFilter;
+      const matchesDefault =
+        defaultFilter === 'all' ||
+        (defaultFilter === 'default' && role.isDefault) ||
+        (defaultFilter === 'custom' && !role.isDefault);
+
+      return matchesSearch && matchesScope && matchesDefault;
+    });
+  }, [defaultFilter, scopeFilter, searchQuery, sortedRoles]);
+
+  const totalPages = Math.max(1, Math.ceil(visibleRoles.length / limit));
+  const safePage = Math.min(page, totalPages);
+  const paginatedRoles = visibleRoles.slice((safePage - 1) * limit, safePage * limit);
+
+  const handleSearchChange = (value: string) => {
+    setPage(1);
+    setSearchQuery(value);
+  };
+
+  const handleLimitChange = (nextLimit: number) => {
+    setPage(1);
+    setLimit(nextLimit);
+  };
+
+  const handleScopeFilterChange = (value: string) => {
+    setPage(1);
+    setScopeFilter(value);
+  };
+
+  const handleDefaultFilterChange = (value: string) => {
+    setPage(1);
+    setDefaultFilter(value);
   };
 
   return (
@@ -147,20 +226,6 @@ export default function AdminRolesClient() {
       <PageHeader
         title="Roles"
         description="Manage role records and permission assignments from the backend role workflow."
-        action={
-          <RoleFormDialog
-            availablePermissions={permissions}
-            defaultScope="SYS"
-            isSubmitting={isSubmitting}
-            onSubmit={handleCreateRole}
-            trigger={
-              <Button className="bg-[#FFD369] text-[#222831] hover:bg-white">
-                <Plus className="size-4" />
-                Create Role
-              </Button>
-            }
-          />
-        }
       />
 
       {message ? (
@@ -174,18 +239,57 @@ export default function AdminRolesClient() {
         </p>
       ) : null}
 
+      <div className="grid gap-3 md:grid-cols-[1fr_180px_180px]">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#8f9aa8]" />
+          <Input
+            className="h-10 border-[#4A5260] bg-[#393E46] pl-9 text-[#EEEEEE] placeholder:text-[#8f9aa8] focus-visible:border-[#FFD369] focus-visible:bg-[#414854] focus-visible:ring-[#FFD369]/20"
+            onChange={(event) => handleSearchChange(event.target.value)}
+            placeholder="Search roles by name, code, or scope"
+            value={searchQuery}
+          />
+        </div>
+        <Select onValueChange={handleScopeFilterChange} value={scopeFilter}>
+          <SelectTrigger className="h-10 w-full border-[#4A5260] bg-[#393E46] text-[#EEEEEE] focus-visible:border-[#FFD369] focus-visible:ring-[#FFD369]/20">
+            <SelectValue placeholder="Scope" />
+          </SelectTrigger>
+          <SelectContent className="border-[#4A5260] bg-[#393E46] text-[#EEEEEE]">
+            <SelectItem value="all">All Scopes</SelectItem>
+            <SelectItem value="SYS">System</SelectItem>
+            <SelectItem value="PRJ">Project</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select onValueChange={handleDefaultFilterChange} value={defaultFilter}>
+          <SelectTrigger className="h-10 w-full border-[#4A5260] bg-[#393E46] text-[#EEEEEE] focus-visible:border-[#FFD369] focus-visible:ring-[#FFD369]/20">
+            <SelectValue placeholder="Default" />
+          </SelectTrigger>
+          <SelectContent className="border-[#4A5260] bg-[#393E46] text-[#EEEEEE]">
+            <SelectItem value="all">All Defaults</SelectItem>
+            <SelectItem value="default">Default</SelectItem>
+            <SelectItem value="custom">Custom</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       <RolesTable
         isLoading={isLoading}
         isSubmitting={isSubmitting}
-        onDeleteRole={(role) => void handleDeleteRole(role)}
-        onTogglePermission={(role, permission, checked) =>
-          void handleTogglePermission(role, permission, checked)
-        }
+        limit={limit}
+        onCreateRole={handleCreateRole}
+        onDeleteSelectedRoles={() => void handleDeleteRoles(selectedRoleIds)}
+        onLimitChange={handleLimitChange}
+        onPageChange={setPage}
+        onReplaceRolePermissions={handleReplaceRolePermissions}
+        onSelectedRoleIdsChange={setSelectedRoleIds}
+        onToggleRoleDefault={(role, isDefault) => void handleToggleRoleDefault(role, isDefault)}
+        page={safePage}
         permissions={permissions}
         rolePermissions={rolePermissions}
-        roles={sortedRoles}
+        roles={paginatedRoles}
+        selectedRoleIds={selectedRoleIds}
+        total={visibleRoles.length}
+        totalPages={totalPages}
       />
     </>
   );
 }
-// Codex #admin-ui end

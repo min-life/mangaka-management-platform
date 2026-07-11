@@ -43,9 +43,10 @@ export function buildStableMaterialVersions(rawVersions: FileMaterialVersionReco
   return versionsByAge
     .map((versionRecord, index) => {
       const versionNumber = index + 1;
+      const materials = versionRecord.materials || [];
       const thumbnailMaterial =
-        versionRecord.materials.find((material) => material.isThumbnail) ||
-        versionRecord.materials[0];
+        materials.find((material) => material.isThumbnail) ||
+        materials[0];
 
       return {
         author:
@@ -56,7 +57,7 @@ export function buildStableMaterialVersions(rawVersions: FileMaterialVersionReco
         id: String(versionRecord.id),
         taskId: versionRecord.taskId != null ? Number(versionRecord.taskId) : null,
         isCurrent: versionRecord.id === newestId,
-        materials: versionRecord.materials,
+        materials: materials,
         note: versionRecord.name || `Version ${versionNumber}`,
         previewUrl: thumbnailMaterial?.url,
         version: versionNumber,

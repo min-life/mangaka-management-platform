@@ -1,10 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNumber, IsOptional, IsNotEmpty } from 'class-validator';
+import { IsNumber, IsOptional, IsNotEmpty, IsString, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class UpdateFrameReqDto {
   @ApiPropertyOptional({ example: 'Frame 1' })
   @IsOptional()
+  @IsString()
   name?: string;
 
   @ApiPropertyOptional({ example: 15.5, type: Number })
@@ -84,9 +85,11 @@ export class QueryFramesReqDto {
 
   @ApiPropertyOptional({ example: 'createdAt', enum: ['createdAt'] })
   @IsOptional()
+  @IsIn(['createdAt'])
   field?: 'createdAt';
 
   @ApiPropertyOptional({ example: 'desc', enum: ['asc', 'desc'] })
   @IsOptional()
+  @IsIn(['asc', 'desc'])
   order?: 'asc' | 'desc';
 }

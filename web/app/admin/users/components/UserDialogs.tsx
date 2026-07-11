@@ -27,18 +27,12 @@ export function CreateStaffDialog({
   isOpen?: boolean;
   isSubmitting: boolean;
   onOpenChange?: (open: boolean) => void;
-  onSubmit: (payload: {
-    displayName?: string;
-    email: string;
-    password?: string;
-    roleIds: number[];
-  }) => Promise<void>;
+  onSubmit: (payload: { displayName?: string; email: string; roleIds: number[] }) => Promise<void>;
   roles: AdminRoleResponse[];
 }) {
   const [internalOpen, setInternalOpen] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [roleIds, setRoleIds] = useState<number[]>([]);
 
   const open = isOpen ?? internalOpen;
@@ -49,7 +43,6 @@ export function CreateStaffDialog({
     if (nextOpen) {
       setDisplayName('');
       setEmail('');
-      setPassword('');
       setRoleIds([]);
     }
   };
@@ -58,14 +51,12 @@ export function CreateStaffDialog({
     await onSubmit({
       displayName: displayName.trim() || undefined,
       email: email.trim(),
-      password: password.trim() || undefined,
       roleIds,
     });
     setInternalOpen(false);
     onOpenChange?.(false);
     setDisplayName('');
     setEmail('');
-    setPassword('');
     setRoleIds([]);
   };
 
@@ -81,7 +72,7 @@ export function CreateStaffDialog({
         <DialogHeader>
           <DialogTitle>Create Staff</DialogTitle>
           <DialogDescription className="text-[#aeb7c2]">
-            Create an active staff account and assign SYS roles.
+            Create an admin or staff account. A random password will be emailed after creation.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
@@ -100,15 +91,12 @@ export function CreateStaffDialog({
             type="email"
             value={email}
           />
-          <AdminTextField
-            autoComplete="new-password"
-            label="Password"
-            onChange={setPassword}
-            placeholder="Optional temporary password"
-            type="password"
-            value={password}
+          <RoleCheckboxList
+            label="Roles"
+            onChange={setRoleIds}
+            roles={roles}
+            selectedRoleIds={roleIds}
           />
-          <RoleCheckboxList onChange={setRoleIds} roles={roles} selectedRoleIds={roleIds} />
         </div>
         <DialogFooter>
           <Button

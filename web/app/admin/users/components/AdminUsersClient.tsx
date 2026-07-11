@@ -10,7 +10,6 @@ import {
   getAdminUserRoles,
   getAdminUsers,
   replaceAdminUserRoles,
-  updateAdminUser,
   type AdminRoleResponse,
   type AdminUserResponse,
 } from '../../admin-api';
@@ -19,7 +18,6 @@ import { CreateStaffDialog } from './UserDialogs';
 import { UserFilters } from './UserFilters';
 import { UsersTable } from './UsersTable';
 
-// Codex #admin-ui start
 export default function AdminUsersClient() {
   const pathname = usePathname();
   const router = useRouter();
@@ -28,7 +26,8 @@ export default function AdminUsersClient() {
   const [roles, setRoles] = useState<AdminRoleResponse[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCreateStaffOpen, setIsCreateStaffOpen] = useState(false);
@@ -88,16 +87,44 @@ export default function AdminUsersClient() {
         [user.displayName, user.email]
           .filter(Boolean)
           .some((value) => value?.toLowerCase().includes(normalizedQuery));
-      const matchesStatus =
-        statusFilter === 'all' ||
-        (statusFilter === 'active' && user.isActive) ||
-        (statusFilter === 'disabled' && !user.isActive);
       const matchesRole =
         roleFilter === 'all' || user.roles?.some((role) => String(role.id) === roleFilter);
 
-      return matchesSearch && matchesStatus && matchesRole;
+      return matchesSearch && matchesRole;
     });
-  }, [roleFilter, searchQuery, statusFilter, users]);
+  }, [roleFilter, searchQuery, users]);
+
+  const creatableRoles = useMemo(
+    () =>
+      roles.filter((role) => {
+        const normalizedRole = `${role.code} ${role.name}`.toLowerCase();
+
+        return (
+          (normalizedRole.includes('admin') || normalizedRole.includes('staff')) &&
+          !normalizedRole.includes('member')
+        );
+      }),
+    [roles],
+  );
+
+  const totalPages = Math.max(1, Math.ceil(visibleUsers.length / limit));
+  const safePage = Math.min(page, totalPages);
+  const paginatedUsers = visibleUsers.slice((safePage - 1) * limit, safePage * limit);
+
+  const handleSearchChange = (value: string) => {
+    setPage(1);
+    setSearchQuery(value);
+  };
+
+  const handleRoleFilterChange = (value: string) => {
+    setPage(1);
+    setRoleFilter(value);
+  };
+
+  const handleLimitChange = (nextLimit: number) => {
+    setPage(1);
+    setLimit(nextLimit);
+  };
 
   const refreshWithMessage = async (nextMessage: string) => {
     setMessage(nextMessage);
@@ -107,26 +134,12 @@ export default function AdminUsersClient() {
   const handleCreateUser = async (payload: {
     displayName?: string;
     email: string;
-    password?: string;
     roleIds: number[];
   }) => {
     await runMutation('Unable to create staff user.', async () => {
-      await createAdminUser(payload);
-      await refreshWithMessage('Staff user created successfully.');
-    });
-  };
-
-  const handleUpdateUser = async (
-    userId: number,
-    payload: {
-      displayName?: string;
-      email?: string;
-      isActive?: boolean;
-    },
-  ) => {
-    await runMutation('Unable to update staff user.', async () => {
-      await updateAdminUser(userId, payload);
-      await refreshWithMessage('Staff user updated successfully.');
+      const createdUser = await createAdminUser(payload);
+      await forceResetAdminUserPassword(createdUser.id);
+      await refreshWithMessage('Staff user created. A temporary password was sent by email.');
     });
   };
 
@@ -139,8 +152,8 @@ export default function AdminUsersClient() {
 
   const handleForceResetPassword = async (user: AdminUserResponse) => {
     await runMutation('Unable to force reset password.', async () => {
-      const result = await forceResetAdminUserPassword(user.id);
-      setMessage(`Temporary password for ${user.email}: ${result.newPassword}`);
+      await forceResetAdminUserPassword(user.id);
+      setMessage(`Temporary password was sent to ${user.email}.`);
     });
   };
 
@@ -166,10 +179,10 @@ export default function AdminUsersClient() {
             isSubmitting={isSubmitting}
             onOpenChange={setIsCreateStaffOpen}
             onSubmit={handleCreateUser}
-            roles={roles}
+            roles={creatableRoles}
           />
         }
-        description="Search, filter, and manage staff accounts with system roles and account status."
+        description="Search, filter, and manage staff accounts with system roles."
         title="Users"
       />
 
@@ -188,22 +201,24 @@ export default function AdminUsersClient() {
         roleFilter={roleFilter}
         roles={roles}
         searchQuery={searchQuery}
-        setRoleFilter={setRoleFilter}
-        setSearchQuery={setSearchQuery}
-        setStatusFilter={setStatusFilter}
-        statusFilter={statusFilter}
+        setRoleFilter={handleRoleFilterChange}
+        setSearchQuery={handleSearchChange}
       />
 
       <UsersTable
         handleForceResetPassword={handleForceResetPassword}
         handleReplaceRoles={handleReplaceRoles}
-        handleUpdateUser={handleUpdateUser}
         isLoading={isLoading}
         isSubmitting={isSubmitting}
+        limit={limit}
+        onLimitChange={handleLimitChange}
+        onPageChange={setPage}
+        page={safePage}
         roles={roles}
-        users={visibleUsers}
+        total={visibleUsers.length}
+        totalPages={totalPages}
+        users={paginatedUsers}
       />
     </>
   );
 }
-// Codex #admin-ui end

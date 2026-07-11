@@ -10,16 +10,23 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 2. **Kích hoạt (`/verify-email`)**: User bấm link từ email -> Mở Frontend lấy tham số `token` -> Gọi `POST /api/auth/verify-email`. Kích hoạt thành công chuyển về trang Đăng nhập.
 
 ### 1.2 Luồng Đăng nhập & Duy trì phiên
-1. **Đăng nhập (`/login`)**: Gọi `POST /api/auth/login`. Thành công sẽ lưu `accessToken` (Memory/Local Storage). `refreshToken` được giữ trong Cookie HttpOnly.
-2. **Tự động gia hạn (Refresh Token)**: Axios Interceptor bắt lỗi 401. Gọi ngầm `POST /api/auth/refresh` lấy token mới và gọi lại request bị lỗi. Nếu thất bại, văng về trang Đăng nhập.
+1. **Đăng nhập (`/login`)**: Gọi `POST /api/auth/login`. Thành công sẽ lưu `accessToken`. Về phía `refreshToken`:
+   - **Web**: Trình duyệt sẽ tự động nhận và lưu trong Cookie `HttpOnly`. Web có thể phớt lờ `refreshToken` trả ra trong JSON.
+   - **Mobile**: Lấy `refreshToken` từ JSON Response và lưu vào Secure Store.
+2. **Tự động gia hạn (Refresh Token)**: Axios Interceptor bắt lỗi 401. Gọi ngầm `POST /api/auth/refresh`. Web sẽ tự động gửi kèm Cookie. Mobile phải chủ động truyền `refreshToken` lên qua Body request. Nếu thất bại, văng về trang Đăng nhập.
 
 ### 1.3 Luồng Quên & Đặt lại mật khẩu
 1. **Quên pass (`/forgot-password`)**: Gọi `POST /api/auth/forgot`. Luôn chuyển hướng sang trang Check Email để chống dò quét tài khoản.
 2. **Đặt lại pass (`/reset-password`)**: Nhận token từ URL, nhập pass mới -> Gọi `POST /api/auth/reset`. Đổi thành công sẽ tự động đăng xuất các thiết bị khác.
 
 ### 1.4 Luồng Đăng nhập Google
-1. **Điều hướng**: Từ `/login`, bấm nút Google -> Frontend gọi `GET /api/auth/google`. API trả về JSON chứa URL của Google (`{ data: { url: '...' } }`). Frontend lấy URL này và chủ động chuyển hướng (ví dụ: `window.location.href = url`).
-2. **Callback**: Google trả về backend -> Backend xử lý đăng nhập hoặc tự động tạo tài khoản mới nếu chưa tồn tại. Sau đó backend redirect ngược về Frontend (`/auth/oauth-success` hoặc `oauth-error`).
+1. **Dành cho Web (Redirect OAuth)**:
+   - Từ `/login`, bấm nút Google -> Frontend gọi `GET /api/auth/google`. API trả về URL. Frontend lấy URL này và chuyển hướng (Redirect).
+   - Google trả về backend -> Backend xử lý đăng nhập, gán Cookie HttpOnly và redirect ngược về Frontend (`/auth/oauth-success` hoặc `oauth-error`).
+2. **Dành cho Mobile App (Native SDK)**:
+   - Sử dụng SDK Native (như `expo-auth-session`) mở màn hình Google Login nội bộ và lấy `idToken`.
+   - Gửi `idToken` bằng cách gọi `POST /api/auth/google/mobile`.
+   - Backend sẽ verify token và trả về JSON chứa cả `accessToken` và `refreshToken`. Mobile lưu vào Secure Store.
 
 ## 2. Luồng Quản lý Người dùng (Users Flow)
 
@@ -55,11 +62,19 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 ### 4.3 Quản lý Thành viên
 1. **Thêm/Sửa/Xóa**: Hiển thị bảng thành viên. Thay đổi dropdown chức danh -> `PATCH /api/projects/:id/members/:userId`. Kích người -> `DELETE /api/projects/:id/members/:userId`.
 
+### 4.4 Dashboard Thống kê
+1. **Tổng quan & Tiến độ**: Vào trang Dashboard của dự án, Frontend gọi `GET /api/projects/:id/dashboard`. API này trả về tổng hợp (Overview), tiến độ task (Progress), các công việc cần xử lý gấp (Action Needed) và các tệp tin mới nhất được presign ảnh (Recent Files). Tối ưu hóa bằng Promise.all để giảm thời gian phản hồi.
+
 ## 5. Luồng Ban Biên Tập (Editor Boards Flow)
 
-### 5.1 Quản trị Ban
+### 5.1 Quản trị Ban & Theo dõi Thành viên
 1. **Tạo & Kích thành viên**: Người tạo tự thành Chủ ban (`isLead = true`). Có thể kích member (`DELETE /api/editor-boards/:id/members/:userId`).
-2. **Bổ nhiệm Trưởng ban**: Bấm menu kebab cạnh tên -> Chọn "Bổ nhiệm Lead" -> `PATCH /api/editor-boards/:id/members/:userId/lead`. Người cũ sẽ tự động giáng chức thành member.
+   - Khi tham gia Board, hệ thống tự động ghi nhận thời gian tham gia (`createdAt`).
+   - Khi có bất kỳ thay đổi nào về quyền hoặc trạng thái, hệ thống tự động cập nhật thời gian (`updatedAt`). Các trường thời gian này do DB quản lý và Frontend chỉ có quyền Read.
+2. **Bổ nhiệm Trưởng ban**: Bấm menu kebab cạnh tên -> Chọn "Bổ nhiệm Lead" -> `PATCH /api/editor-boards/:id/members/:userId/lead`. Người cũ sẽ tự động giáng chức thành member và thời gian cập nhật của 2 người sẽ được ghi lại tự động (`updatedAt`).
+
+### 5.2 Dashboard Thống kê
+1. **Tổng quan**: Tại trang Dashboard của ban biên tập, Frontend gọi API gộp `GET /api/editor-boards/:id/dashboard`. Backend sẽ thực hiện truy vấn đồng thời (`Promise.all`) để gom thông tin cơ bản của Ban (board), số liệu thống kê (stats), thành viên nổi bật (members), dự án (projects), đơn từ đang chờ (applications). Cách tiếp cận này (BFF - Backend For Frontend) giúp giảm tải số lượng HTTP requests, tối ưu hoá thời gian load trang.
 
 ## 6. Luồng Đơn từ & Bỏ phiếu (Applications Flow)
 
@@ -67,11 +82,18 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 1. **Mở Đơn (`/applications/:id`)**: Thành viên Ban biên tập xem đơn và tài liệu.
 2. **Bỏ phiếu**: Bấm Chấp thuận / Từ chối / Trắng án -> Gọi `POST /api/applications/:id/votes`. (Cho phép bấm lại để đổi phiếu - Upsert).
 
-### 6.2 Quyết định cuối cùng (Finalize) & Luồng Phê duyệt 2 Bước
-1. **Đối với Đơn thường (Publish Request, v.v.)**: Trưởng ban (Lead) hoặc Board Owner ra quyết định cuối bằng cách gọi `PATCH /api/applications/:id/status`.
-2. **Đối với Đơn tạo thư mục (`CREATE_ARC`, `CREATE_CHAPTER`)**: Áp dụng luồng phê duyệt 2 bước nghiêm ngặt:
-   - **Bước 1 (Duyệt cấp Dự án)**: Người có quyền duyệt trong dự án (`project:owner` hoặc `project:application.approve`) duyệt đơn từ `PENDING` -> `INTERNAL_APPROVED` (hoặc `REJECT`). Đơn ở trạng thái này mới được đẩy lên Ban biên tập (Editor Board).
-   - **Bước 2 (Duyệt cấp Ban biên tập)**: Trưởng ban (`board:leader` hoặc `board:owner`) duyệt từ `INTERNAL_APPROVED` -> `APPROVE` (hoặc `REJECT`).
+### 6.2 Luồng Phê duyệt 2 Bước & Trạng thái Đơn
+Hệ thống áp dụng luồng phê duyệt 2 bước chặt chẽ cho tất cả các loại đơn (hiện tại chỉ có `CREATE_ARC` và `CREATE_CHAPTER`):
+1. **Huỷ đơn (CANCELLED)**: 
+   - Chỉ thực hiện được khi đơn đang ở trạng thái `PENDING`.
+   - **Người thực hiện**: Người tạo đơn.
+2. **Nộp đơn lên Ban (SUBMITTED) hoặc Từ chối sớm (REJECT)**:
+   - Chỉ thực hiện được khi đơn đang ở trạng thái `PENDING`.
+   - **Người thực hiện**: Những người có quyền cấp dự án (`project:owner` hoặc `project:application.approve`). Họ có quyền quyết định trình đơn này lên Ban biên tập (`SUBMITTED`) hoặc từ chối ngay lập tức (`REJECT`).
+   - Việc thiết lập Hạn chót bỏ phiếu (`voteDeadline`) trong bước này chỉ dành cho `board:leader` hoặc `board:owner`.
+3. **Phê duyệt cuối cùng (APPROVE) hoặc Từ chối (REJECT)**:
+   - Chỉ thực hiện được khi đơn đã được trình lên (`SUBMITTED`).
+   - **Người thực hiện**: Trưởng ban hoặc Chủ ban (`board:leader`, `board:owner`).
    - **Tự động hóa sau phê duyệt**: Khi đơn đạt trạng thái `APPROVE`, hệ thống sẽ tự động tạo thư mục gốc (`ARC`) hoặc thư mục con (`Chapter`) tương ứng, đồng thời tự động tạo 1 File và 1 FileMaterial đầu tiên chứa bản thảo đính kèm từ đơn.
 
 ## 7. Luồng Công việc (Tasks Flow)
@@ -88,7 +110,12 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 2. **Clone từ Base Material**: Truyền `cloneBaseMaterial: true` để tạo một bản copy của bản vẽ gốc (material không thuộc task nào) và gán cho task mới.
 3. **Clone từ Task khác**: Truyền `cloneMaterialFromTaskId: [ID]` để tạo một bản copy của bản vẽ mới nhất từ một task khác. Phiên bản copy này sẽ hoàn toàn độc lập (sạch), không chứa frame/comment của task cũ, giúp người dùng bắt đầu một phiên làm việc mới trên nền bản vẽ đó.
 
-## 8. Luồng Thư mục & Tập tin (Folders & Files Flow)
+## 8. Luồng Thư mục, Tập tin & Material (Folders, Files & Materials)
+
+> [!WARNING]
+> **Lưu ý quan trọng cho Web Team (Lỗi Axios Multipart)**
+> Khi sử dụng Axios để gọi các API upload file bằng `FormData` (ví dụ: Tạo Material), **TUYỆT ĐỐI KHÔNG** set cứng Header `Content-Type: multipart/form-data`. Việc này sẽ làm mất chuỗi `boundary` tự sinh của Axios, khiến Backend (Multer) không thể đọc được nội dung file và ném lỗi 400 Bad Request. Hãy để Axios tự động xử lý Content-Type.
+
 
 ### 8.1 Cây thư mục (Folder Tree)
 1. **Quy tắc phân loại**:
@@ -122,8 +149,14 @@ Tài liệu này mô tả cách Frontend điều hướng và gọi API để ma
 
 ## 11. Luồng Thống kê (Stats Flow)
 
-### 11.1 Thống kê Dự án
-1. **Xem tiến độ**: Gọi `GET /api/projects/:id/stats` để vẽ các biểu đồ tiến độ, số task hoàn thành, số đơn từ.
+### 11.1 Thống kê Dự án (Project Stats) thông qua CSV
+Hệ thống cho phép nhập và tổng hợp số liệu của dự án thông qua file CSV theo cấp độ Chapter.
+1. **Upload Dữ liệu**: Gọi `POST /api/projects/:id/stats` (multipart/form-data). Truyền file CSV chứa dữ liệu của 1 năm cho một Chapter cụ thể (tham số `chapterId`). 
+   - File CSV phải có 2 cột bắt buộc là `Month` và `Year`.
+   - Backend sẽ tự động đọc các cột chỉ số (vd: `Total Views`, `Total Sales`, `Total Revenue`, `Total Reviews`, `Average Rating`) và lưu/ghi đè (Upsert) vào CSDL theo cấp Chapter.
+2. **Lấy Dữ liệu Tổng hợp (Aggregation)**: Gọi `GET /api/projects/:id/stats`.
+   - Có thể lọc theo `?year=...&arcId=...&chapterId=...`. Nếu không truyền `year`, Backend tự động tìm năm hiện có lớn nhất.
+   - Backend sẽ tính toán gộp (SUM/Average) các chỉ số theo cấp Arc hoặc cấp Project tương ứng nếu không truyền `chapterId`. Dữ liệu trả về bao gồm `summary` (tổng kết cả năm) và mảng `months` (chi tiết từng tháng).
 
 ## 12. Luồng Lịch sử Hoạt động (Activity Logs Flow)
 

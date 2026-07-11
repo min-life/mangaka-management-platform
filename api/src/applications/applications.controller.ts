@@ -36,7 +36,7 @@ import { ApiCreatedResponse } from '@nestjs/swagger';
 @ApiBearerAuth()
 @Controller('applications')
 export class ApplicationsController {
-  constructor(private readonly applicationsService: ApplicationsService) { }
+  constructor(private readonly applicationsService: ApplicationsService) {}
 
   @Permissions({
     mode: 'ANY',
@@ -67,7 +67,13 @@ export class ApplicationsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:comment.create', 'board:leader', 'project:owner', 'board:member', 'board:owner'],
+    permissions: [
+      'project:comment.create',
+      'board:leader',
+      'project:owner',
+      'board:member',
+      'board:owner',
+    ],
     resource: 'APPLICATION',
   })
   @ApiOperation({ summary: 'Create comment for application' })
@@ -113,7 +119,13 @@ export class ApplicationsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:application.read', 'board:leader', 'project:owner', 'board:member', 'board:owner'],
+    permissions: [
+      'project:application.read',
+      'board:leader',
+      'project:owner',
+      'board:member',
+      'board:owner',
+    ],
     resource: 'APPLICATION',
   })
   @ApiOperation({ summary: 'Get application details' })
@@ -168,7 +180,14 @@ export class ApplicationsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:application.approve', 'board:leader', 'project:owner'],
+    permissions: [
+      'project:application.approve',
+      'board:leader',
+      'project:owner',
+      'project:application.read',
+      'project:application.create',
+      'project:application.update',
+    ],
     resource: 'APPLICATION',
   })
   @ApiOperation({ summary: 'Update application status' })
@@ -196,7 +215,13 @@ export class ApplicationsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:application.read', 'project:owner', 'board:leader', 'board:member', 'board:owner'],
+    permissions: [
+      'project:application.read',
+      'project:owner',
+      'board:leader',
+      'board:member',
+      'board:owner',
+    ],
     resource: 'APPLICATION',
   })
   @ApiOperation({ summary: 'Get application votes' })
@@ -251,7 +276,11 @@ export class ApplicationsController {
     @CurrentUser() currentUser: JwtPayload,
     @Body() data: ApplicationMaterialReqDto,
   ) {
-    const application = await this.applicationsService.addApplicationMaterial(id, currentUser.userId, data.materialItem);
+    const application = await this.applicationsService.addApplicationMaterial(
+      id,
+      currentUser.userId,
+      data.materialItem,
+    );
     return { data: application };
   }
 
@@ -271,7 +300,12 @@ export class ApplicationsController {
     @CurrentUser() currentUser: JwtPayload,
     @Body() data: ApplicationMaterialReqDto,
   ) {
-    const application = await this.applicationsService.updateApplicationMaterial(id, currentUser.userId, index, data.materialItem);
+    const application = await this.applicationsService.updateApplicationMaterial(
+      id,
+      currentUser.userId,
+      index,
+      data.materialItem,
+    );
     return { data: application };
   }
 
@@ -290,7 +324,11 @@ export class ApplicationsController {
     @Param('index', ParseIntPipe) index: number,
     @CurrentUser() currentUser: JwtPayload,
   ) {
-    const application = await this.applicationsService.deleteApplicationMaterial(id, currentUser.userId, index);
+    const application = await this.applicationsService.deleteApplicationMaterial(
+      id,
+      currentUser.userId,
+      index,
+    );
     return { data: application };
   }
 }

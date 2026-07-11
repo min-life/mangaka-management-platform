@@ -7,6 +7,7 @@ import {
   FolderOpen,
   LayoutDashboard,
   Users,
+  Settings,
 } from 'lucide-react';
 
 import { StudioSidebar, type StudioSidebarItem } from '../../components/StudioSidebar';

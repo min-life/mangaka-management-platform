@@ -46,7 +46,13 @@ const PROJECT_STAT_SELECT = {
   project: {
     select: PROJECT_SELECT,
   },
-  metrics: true,
+  year: true,
+  month: true,
+  views: true,
+  sales: true,
+  revenue: true,
+  reviews: true,
+  rating: true,
   updatedAt: true,
 } satisfies Prisma.ProjectStatSelect;
 
@@ -83,7 +89,6 @@ export class ProjectStatsService {
       return await this.prisma.projectStat.update({
         where: { id },
         data: {
-          metrics: data.metrics as Prisma.InputJsonValue,
           updatedAt: new Date(),
         },
         select: PROJECT_STAT_SELECT,

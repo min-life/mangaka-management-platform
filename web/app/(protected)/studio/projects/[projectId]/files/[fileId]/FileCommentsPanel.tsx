@@ -91,43 +91,111 @@ export function FileCommentsPanel({
           </p>
         ) : null}
       </div>
-      <div className="mt-3 space-y-2 pr-1">
+      <div className="mt-3 flex flex-col gap-2 pr-1">
         {frameComments.map((item, index) => (
-          <button
-            className="w-full border border-[#6c5516] bg-[#30270d] p-3 text-left hover:bg-[#3a3011]"
+          <article
+            className="group relative cursor-pointer rounded-r-[4px] border-y border-r border-[#303842] border-l-4 border-l-[#FFD369] bg-[#151c25] p-3 transition-colors hover:bg-[#1a232f]"
             key={item.id}
             onClick={() => onSelectFrame?.(item)}
-            type="button"
           >
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-black text-[#ffd35b]">Frame {index + 1} - {item.author}</p>
-              <div className="flex shrink-0 items-center gap-2">
-                {item.materialVersion && item.materialId !== currentMaterialId ? (
-                  <span className="rounded-[3px] border border-[#6c5516] bg-[#191307] px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.08em] text-[#FFD369]">
-                    {item.materialVersion}
-                  </span>
-                ) : null}
-                <p className="text-[10px] font-bold text-[#d9bd70]">{item.time}</p>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="grid size-5 shrink-0 place-items-center rounded-full bg-[#303842] text-[10px] font-black text-white">
+                  {item.author.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
+                  <span className="font-black text-white truncate max-w-[100px]">{item.author}</span>
+                  {item.materialId !== currentMaterialId && (
+                    <>
+                      <span className="text-[#4b535f]">·</span>
+                      <span className="truncate max-w-[120px] font-bold text-[#FFD369]" title={item.materialName || `Frame ${index + 1}`}>
+                        {item.materialName || `Frame ${index + 1}`}
+                      </span>
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
-            {item.taskId ? (
-              <p className="mt-1 text-[10px] font-bold text-[#caa95a]">
-                Task #{item.taskId}
-              </p>
-            ) : null}
-            <p className="mt-2 text-xs font-medium leading-5 text-[#fff0bc]">{item.content}</p>
-          </button>
-        ))}
-        {comments.map((comment) => (
-          <article className="rounded-[4px] border border-[#303842] bg-[#151c25] p-3" key={comment.id}>
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-black text-white">{comment.author}</p>
-              <div className="flex items-center gap-2">
-                <p className="text-[10px] font-bold text-[#8b94a1]">{comment.time}</p>
+              <div className="flex shrink-0 items-center gap-1">
+                <span className="text-[10px] font-bold text-[#8b94a1]">{item.time}</span>
                 {onUpdateComment ? (
                   <button
                     aria-label="Edit comment"
-                    className="grid size-6 place-items-center rounded-[3px] text-[#8b94a1] hover:bg-[#303842] hover:text-white"
+                    className="grid size-6 place-items-center rounded-[3px] text-[#8b94a1] opacity-0 transition-opacity hover:bg-[#303842] hover:text-white group-hover:opacity-100"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      startEditing(item);
+                    }}
+                    type="button"
+                  >
+                    <Pencil className="size-3.5" />
+                  </button>
+                ) : null}
+                {onDeleteComment ? (
+                  <button
+                    aria-label="Delete comment"
+                    className="grid size-6 place-items-center rounded-[3px] text-[#8b94a1] opacity-0 transition-opacity hover:bg-red-950/40 hover:text-red-300 group-hover:opacity-100"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void onDeleteComment(item.id);
+                    }}
+                    type="button"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                ) : null}
+              </div>
+            </div>
+            {editingCommentId === item.id ? (
+              <div className="mt-2 pl-7" onClick={(e) => e.stopPropagation()}>
+                <div className="rounded-[4px] border border-[#39424f] bg-[#101820] p-2">
+                  <textarea
+                    className="h-20 w-full resize-none bg-transparent text-xs font-medium leading-5 text-white outline-none"
+                    onChange={(event) => setEditingContent(event.target.value)}
+                    value={editingContent}
+                  />
+                  <div className="mt-2 flex justify-end gap-2">
+                    <Button className="h-7 px-2 text-[10px]" onClick={cancelEditing} variant="ghost">
+                      <X className="size-3" />
+                      Cancel
+                    </Button>
+                    <Button
+                      className="h-7 rounded-[4px] bg-[#FFD369] px-3 text-[10px] font-black text-[#222831] hover:bg-[#eac04f]"
+                      disabled={!editingContent.trim() || isSaving}
+                      onClick={() => void saveEditing()}
+                    >
+                      Save
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-1.5 pl-7 text-xs font-medium leading-5 text-[#dce7f3]">
+                {item.content}
+              </div>
+            )}
+          </article>
+        ))}
+
+        {comments.map((comment) => (
+          <article 
+            className="group rounded-r-[4px] border-y border-r border-[#303842] border-l-4 border-l-[#4b535f] bg-[#151c25] p-3" 
+            key={comment.id}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="grid size-5 shrink-0 place-items-center rounded-full bg-[#303842] text-[10px] font-black text-white">
+                  {comment.author.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
+                  <span className="font-black text-white truncate max-w-[120px]">{comment.author}</span>
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <span className="text-[10px] font-bold text-[#8b94a1]">{comment.time}</span>
+                {onUpdateComment ? (
+                  <button
+                    aria-label="Edit comment"
+                    className="grid size-6 place-items-center rounded-[3px] text-[#8b94a1] opacity-0 transition-opacity hover:bg-[#303842] hover:text-white group-hover:opacity-100"
                     onClick={() => startEditing(comment)}
                     type="button"
                   >
@@ -137,7 +205,7 @@ export function FileCommentsPanel({
                 {onDeleteComment ? (
                   <button
                     aria-label="Delete comment"
-                    className="grid size-6 place-items-center rounded-[3px] text-[#8b94a1] hover:bg-red-950/40 hover:text-red-300"
+                    className="grid size-6 place-items-center rounded-[3px] text-[#8b94a1] opacity-0 transition-opacity hover:bg-red-950/40 hover:text-red-300 group-hover:opacity-100"
                     onClick={() => void onDeleteComment(comment.id)}
                     type="button"
                   >
@@ -147,28 +215,32 @@ export function FileCommentsPanel({
               </div>
             </div>
             {editingCommentId === comment.id ? (
-              <div className="mt-3 rounded-[4px] border border-[#39424f] bg-[#101820] p-2">
-                <textarea
-                  className="h-20 w-full resize-none bg-transparent text-xs font-medium leading-5 text-white outline-none"
-                  onChange={(event) => setEditingContent(event.target.value)}
-                  value={editingContent}
-                />
-                <div className="mt-2 flex justify-end gap-2">
-                  <Button className="h-7 px-2 text-[10px]" onClick={cancelEditing} variant="ghost">
-                    <X className="size-3" />
-                    Cancel
-                  </Button>
-                  <Button
-                    className="h-7 rounded-[4px] bg-[#FFD369] px-3 text-[10px] font-black text-[#222831] hover:bg-[#eac04f]"
-                    disabled={!editingContent.trim() || isSaving}
-                    onClick={() => void saveEditing()}
-                  >
-                    Save
-                  </Button>
+              <div className="mt-2 pl-7">
+                <div className="rounded-[4px] border border-[#39424f] bg-[#101820] p-2">
+                  <textarea
+                    className="h-20 w-full resize-none bg-transparent text-xs font-medium leading-5 text-white outline-none"
+                    onChange={(event) => setEditingContent(event.target.value)}
+                    value={editingContent}
+                  />
+                  <div className="mt-2 flex justify-end gap-2">
+                    <Button className="h-7 px-2 text-[10px]" onClick={cancelEditing} variant="ghost">
+                      <X className="size-3" />
+                      Cancel
+                    </Button>
+                    <Button
+                      className="h-7 rounded-[4px] bg-[#FFD369] px-3 text-[10px] font-black text-[#222831] hover:bg-[#eac04f]"
+                      disabled={!editingContent.trim() || isSaving}
+                      onClick={() => void saveEditing()}
+                    >
+                      Save
+                    </Button>
+                  </div>
                 </div>
               </div>
             ) : (
-              <p className="mt-2 text-xs font-medium leading-5 text-[#dce7f3]">{comment.content}</p>
+              <div className="mt-1.5 pl-7 text-xs font-medium leading-5 text-[#dce7f3]">
+                {comment.content}
+              </div>
             )}
           </article>
         ))}

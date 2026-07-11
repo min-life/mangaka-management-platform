@@ -36,6 +36,7 @@ import {
   QueryBoardProjectsReqDto,
   QueryBoardsReqDto,
   UpdateBoardReqDto,
+  EditorBoardDashboardResponseDto,
 } from './dto';
 import { ActivityLogsService } from '../activity-logs/activity-logs.service';
 import { ActivityLogsResponseDto } from '../activity-logs/dto';
@@ -111,6 +112,23 @@ export class EditorBoardsController {
     return {
       data: board,
     };
+  }
+
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['board:leader', 'board:member', 'board:owner'],
+    resource: 'BOARD',
+  })
+  @ApiOperation({ summary: 'Get editor board dashboard statistics' })
+  @ApiParam({ name: 'id', type: Number, description: 'Editor board id' })
+  @ApiOkResponse({
+    description: 'Editor board dashboard retrieved successfully',
+    type: EditorBoardDashboardResponseDto,
+  })
+  @Get(':id/dashboard')
+  async getEditorBoardDashboard(@Param('id', ParseIntPipe) id: number) {
+    const data = await this.editorBoardsService.getEditorBoardDashboard(id);
+    return { data };
   }
 
   @Permissions({
@@ -359,7 +377,10 @@ export class EditorBoardsController {
   })
   @ApiOperation({ summary: 'Get activity logs for an editor board' })
   @ApiParam({ name: 'id', type: Number, description: 'Editor board id' })
-  @ApiOkResponse({ description: 'Editor board activity logs retrieved successfully', type: ActivityLogsResponseDto })
+  @ApiOkResponse({
+    description: 'Editor board activity logs retrieved successfully',
+    type: ActivityLogsResponseDto,
+  })
   @Get(':id/activity-logs')
   async getBoardActivityLogs(
     @Param('id', ParseIntPipe) id: number,

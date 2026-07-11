@@ -20,6 +20,7 @@ export type AuthUser = {
   updatedAt?: string;
   role?: string;
   permissions?: string[];
+  roles?: { code: string; name: string; scope: string; isDefault: boolean }[];
 };
 
 // Giá trị AuthProvider chia sẻ cho toàn bộ protected pages qua useAuth().

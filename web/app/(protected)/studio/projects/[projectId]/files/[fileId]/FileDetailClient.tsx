@@ -18,16 +18,10 @@ type FileDetailClientProps = {
 export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetailClientProps) {
   const controller = useFileDetailController({ fileId, focusedTaskId, projectId });
   const searchParams = useSearchParams();
-  const arcId = searchParams.get('arcId');
-  const chapterId = searchParams.get('chapterId');
+  const backParam = searchParams.get('back');
+  const backHref = backParam ? decodeURIComponent(backParam) : `/studio/projects/${projectId}/files`;
 
-  const backParams = new URLSearchParams();
-  if (arcId) backParams.set('arcId', arcId);
-  if (chapterId) backParams.set('chapterId', chapterId);
-  const backQuery = backParams.toString();
-  const backHref = `/studio/projects/${projectId}/files${backQuery ? `?${backQuery}` : ''}`;
-
-  if (controller.isLoading) {
+  if (controller.isInitialLoading) {
     return (
       <LoadingState
         message="Loading file workspace..."

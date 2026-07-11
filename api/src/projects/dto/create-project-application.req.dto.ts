@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { APPLICATION_TYPE } from '@prisma/client';
-import { IsEnum, IsNotEmpty, IsOptional, IsString, IsNumber } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreateProjectApplicationReqDto {
   @ApiProperty({ example: 'Publish request for chapter 01' })
@@ -18,7 +19,7 @@ export class CreateProjectApplicationReqDto {
   @IsString()
   folderImageUrl?: string;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     example: [
       {
         url: 'https://...',
@@ -29,8 +30,8 @@ export class CreateProjectApplicationReqDto {
         height: 1080,
         ratio: 1.77,
         isThumbnail: true,
-      }
-    ] 
+      },
+    ],
   })
   @IsOptional()
   materials?: unknown;
@@ -41,7 +42,9 @@ export class CreateProjectApplicationReqDto {
 
   @ApiPropertyOptional({ example: 1, description: 'Parent folder ID for CREATE_CHAPTER type' })
   @IsOptional()
-  @IsNumber()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
   parentFolderId?: number;
 
   @ApiPropertyOptional({

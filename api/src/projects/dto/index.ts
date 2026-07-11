@@ -11,3 +11,4 @@ export * from './query-project-folders.req.dto';
 export * from './create-project-folder.req.dto';
 export * from './project.res.dto';
 export * from './project-stat.dto';
+export * from './project-dashboard.dto';

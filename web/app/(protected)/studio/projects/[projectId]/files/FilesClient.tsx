@@ -191,53 +191,60 @@ export function FilesClient({ projectId }: FilesClientProps) {
     [files, folders],
   );
 
+  const arcDirectFiles = useMemo(() => {
+    if (!selectedArc) return [];
+    return files.filter((f) => f.folderId === selectedArc.id);
+  }, [files, selectedArc]);
+
+  const visibleArcFiles = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    return arcDirectFiles.filter((file) => {
+      if (!normalizedQuery) return true;
+      return [file.title, file.description ?? '', file.category].some((value) =>
+        value.toLowerCase().includes(normalizedQuery),
+      );
+    });
+  }, [arcDirectFiles, searchQuery]);
+
+
   const handleCreateFile = async (input: {
-    assetFile?: File;
     description?: string;
     folderId: number;
-    previewUrl?: string;
+    imageFile?: File;
+    textFile?: File;
+    sourceFile?: File;
     title: string;
   }) => {
     setIsSubmitting(true);
 
     try {
-      const createdFile = await createFolderFile(input.folderId, {
+      const rawResponse = await createFolderFile(input.folderId, {
         description: input.description,
         title: input.title,
       });
 
-      if (input.assetFile) {
+      // Backend trả về { data: { id, ... } } hoặc trực tiếp { id, ... }
+      const createdFile = (rawResponse as any)?.data ?? rawResponse;
+      const fileId: number = createdFile?.id;
+
+      if (!fileId) {
+        throw new Error('Không lấy được ID của file vừa tạo.');
+      }
+
+      const hasFiles = input.imageFile || input.textFile || input.sourceFile;
+      if (hasFiles) {
         const formData = new FormData();
-        formData.append('name', input.assetFile.name.replace(/\.[^/.]+$/, ''));
+        const firstName = (input.imageFile ?? input.textFile ?? input.sourceFile)!.name;
+        formData.append('name', firstName.replace(/\.[^/.]+$/, ''));
 
-        if (input.assetFile.type.startsWith('image/')) {
-          formData.append('image', input.assetFile);
-        } else if (
-          input.assetFile.type.startsWith('text/') ||
-          input.assetFile.type === 'application/pdf' ||
-          /\.(txt|doc|docx)$/i.test(input.assetFile.name)
-        ) {
-          formData.append('text', input.assetFile);
-        } else {
-          formData.append('source', input.assetFile);
-        }
+        if (input.imageFile) formData.append('image', input.imageFile);
+        if (input.textFile) formData.append('text', input.textFile);
+        if (input.sourceFile) formData.append('source', input.sourceFile);
 
-        await createMaterial(createdFile.id, formData);
+        await createMaterial(fileId, formData);
       }
 
-      if (input.previewUrl) {
-        setData((currentData) => {
-          if (!currentData) return null;
-          return {
-            ...currentData,
-            files: currentData.files.map((file) =>
-              file.id === createdFile.id ? { ...file, previewUrl: input.previewUrl } : file,
-            ),
-          };
-        });
-      }
-
-      toast.success(input.assetFile ? 'File created with initial material.' : 'File created.');
+      toast.success(hasFiles ? 'File created with initial material.' : 'File created.');
       await reload();
     } catch {
       toast.error('Failed to create file. Please try again.');
@@ -380,11 +387,12 @@ export function FilesClient({ projectId }: FilesClientProps) {
                     <FileCollection
                       files={visibleFiles}
                       onSearchChange={setSearchQuery}
-                      onSelectFile={(file) =>
+                      onSelectFile={(file) => {
+                        const currentUrl = `/studio/projects/${projectId}/files${window.location.search}`;
                         router.push(
-                          `/studio/projects/${projectId}/files/${file.id}?arcId=${selectedArcId ?? ''}&chapterId=${selectedChapterId ?? ''}`
-                        )
-                      }
+                          `/studio/projects/${projectId}/files/${file.id}?back=${encodeURIComponent(currentUrl)}`
+                        );
+                      }}
                       onViewModeChange={setViewMode}
                       searchQuery={searchQuery}
                       selectedFileId={null}
@@ -401,6 +409,17 @@ export function FilesClient({ projectId }: FilesClientProps) {
                   onSelectChapter={handleSelectChapter}
                   selectedArc={selectedArc}
                   selectedArcIndex={arcs.findIndex((arc) => arc.id === selectedArc.id)}
+                  arcFiles={visibleArcFiles}
+                  arcSearchQuery={searchQuery}
+                  onArcSearchChange={setSearchQuery}
+                  onSelectFile={(file) => {
+                    const currentUrl = `/studio/projects/${projectId}/files${window.location.search}`;
+                    router.push(
+                      `/studio/projects/${projectId}/files/${file.id}?back=${encodeURIComponent(currentUrl)}`
+                    );
+                  }}
+                  arcViewMode={viewMode}
+                  onArcViewModeChange={setViewMode}
                 />
               ) : (
                 <ArcGrid

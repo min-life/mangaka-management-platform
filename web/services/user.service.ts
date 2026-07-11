@@ -128,3 +128,12 @@ export async function getUserEditorBoards(userId: number | string) {
   return response.data ?? response;
 }
 
+export async function hasPassword() {
+  const response = await api.get<{ data: { hasPassword: boolean } }, { data: { hasPassword: boolean } }>('/users/me/has-password');
+  return response.data?.hasPassword ?? false;
+}
+
+export async function createPassword(password: string) {
+  const response = await api.post<any, any>('/users/me/password', { newPassword: password });
+  return response.data;
+}

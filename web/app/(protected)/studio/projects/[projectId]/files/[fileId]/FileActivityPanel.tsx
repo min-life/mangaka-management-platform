@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Activity, Circle } from 'lucide-react';
+import { useEffect, useState, useMemo } from 'react';
+import { Activity, Check, MessageSquare, Plus, Upload, Circle, Pencil } from 'lucide-react';
 
 import { getActivityVerbPhrase, getActorLabel } from '@/lib/activity-message';
 import { getFileActivityLogs } from '@/services/file.service';
@@ -18,8 +18,8 @@ function ActivitySkeleton() {
   return (
     <div className="mt-4 space-y-4">
       {Array.from({ length: 5 }).map((_, index) => (
-        <div className="relative ml-2 border-l border-[#39424f] pb-2 pl-4" key={index}>
-          <div className="absolute -left-1.5 top-1 size-3 rounded-full border border-[#39424f] bg-[#0d151e]" />
+        <div className="relative ml-2 border-l-2 border-dashed border-[#39424f] pb-2 pl-4" key={index}>
+          <div className="absolute -left-2 top-1 size-4 rounded-full border border-[#39424f] bg-[#0d151e]" />
           <div className="h-3 w-4/5 animate-pulse rounded-[4px] bg-[#1f2937]" />
           <div className="mt-2 h-3 w-20 animate-pulse rounded-[4px] bg-[#1f2937]" />
         </div>
@@ -31,6 +31,7 @@ function ActivitySkeleton() {
 type FileActivityPanelProps = {
   fileId: number | string;
   projectId: number | string;
+  onTaskClick?: (taskId: string) => void;
 };
 
 function formatRelativeTime(dateString: string) {
@@ -46,6 +47,28 @@ function formatRelativeTime(dateString: string) {
   if (diffMins < 60) return `${diffMins}m ago`;
   if (diffHours < 24) return `${diffHours}h ago`;
   if (diffDays < 7) return `${diffDays}d ago`;
+
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: '2-digit',
+  });
+}
+
+function formatDateGrouping(dateString: string) {
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return dateString;
+  const now = new Date();
+
+  const isSameDay = (d1: Date, d2: Date) =>
+    d1.getDate() === d2.getDate() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getFullYear() === d2.getFullYear();
+
+  if (isSameDay(date, now)) return 'Today';
+
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (isSameDay(date, yesterday)) return 'Yesterday';
 
   return date.toLocaleDateString('en-US', {
     month: 'short',
@@ -72,16 +95,139 @@ const activityTone: Record<string, 'default' | 'success' | 'warning'> = {
 };
 
 function formatActivityLog(log: any): FileActivityItem {
+  const actor = log.actor?.displayName || log.actor?.email || `User #${log.actorId}`;
+  let label = '';
+  let tone: 'default' | 'success' | 'warning' = 'default';
+  let type: FileActivityItem['type'] = 'default';
+  let metadata: FileActivityItem['metadata'] = undefined;
+
+  switch (log.action) {
+    case 'FILE_CREATED':
+      label = 'created the file';
+      tone = 'success';
+      type = 'create';
+      break;
+    case 'FILE_DELETED':
+      label = 'deleted the file';
+      tone = 'warning';
+      break;
+    case 'MATERIAL_UPLOADED':
+      label = 'uploaded a new material';
+      tone = 'success';
+      type = 'upload';
+      metadata = {
+        materialId: log.metadata?.materialId,
+        materialName: log.metadata?.materialName || log.metadata?.fileName || log.metadata?.title
+      };
+      break;
+    case 'MATERIAL_RESTORED':
+      label = 'restored a material';
+      tone = 'default';
+      break;
+    case 'TASK_CREATED':
+      label = 'created task';
+      tone = 'default';
+      type = 'create';
+      metadata = { taskId: log.metadata?.taskId, taskName: log.metadata?.title || 'Unknown Task' };
+      break;
+    case 'TASK_ASSIGNED':
+      label = 'assigned task';
+      tone = 'default';
+      metadata = { taskId: log.metadata?.taskId, taskName: log.metadata?.title || 'Unknown Task' };
+      break;
+    case 'TASK_UPDATED':
+      label = 'updated task';
+      tone = 'default';
+      type = 'edit';
+      metadata = { taskId: log.metadata?.taskId, taskName: log.metadata?.title || 'Unknown Task' };
+      break;
+    case 'TASK_COMPLETED':
+      label = 'completed task';
+      tone = 'success';
+      type = 'complete';
+      metadata = { taskId: log.metadata?.taskId, taskName: log.metadata?.title || 'Unknown Task' };
+      break;
+    case 'TASK_DELETED':
+      label = 'deleted a task';
+      tone = 'warning';
+      break;
+    case 'COMMENT_CREATED':
+      label = 'added a comment';
+      tone = 'default';
+      type = 'comment';
+      break;
+    case 'COMMENT_DELETED':
+      label = 'deleted a comment';
+      tone = 'warning';
+      break;
+    case 'MEMBER_INVITED':
+      label = 'invited a new member';
+      tone = 'success';
+      type = 'create';
+      break;
+    case 'MEMBER_REMOVED':
+      label = 'removed a member';
+      tone = 'warning';
+      break;
+    case 'ROLE_CHANGED':
+      label = 'changed member role';
+      tone = 'default';
+      break;
+    case 'FOLDER_CREATED':
+      label = 'created a folder';
+      tone = 'success';
+      type = 'create';
+      break;
+    case 'FOLDER_MOVED':
+      label = 'moved a folder';
+      tone = 'default';
+      break;
+    case 'FOLDER_DELETED':
+      label = 'deleted a folder';
+      tone = 'warning';
+      break;
+    case 'APPLICATION_CREATED':
+      label = 'created review application';
+      tone = 'default';
+      type = 'create';
+      break;
+    case 'APPLICATION_INTERNAL_APPROVED':
+      label = 'internally approved the application';
+      tone = 'success';
+      type = 'complete';
+      break;
+    case 'APPLICATION_SUBMITTED':
+      label = 'submitted the application';
+      tone = 'success';
+      type = 'complete';
+      break;
+    case 'APPLICATION_APPROVED':
+      label = 'approved the application';
+      tone = 'success';
+      type = 'complete';
+      break;
+    case 'APPLICATION_REJECTED':
+      label = 'rejected the application';
+      tone = 'warning';
+      break;
+    default:
+      label = String(log.action).toLowerCase().replace(/_/g, ' ');
+      tone = 'default';
+  }
+
   return {
     id: String(log.id),
     actor: getActorLabel(log.actor, log.actorId),
     label: getActivityVerbPhrase(log),
     time: formatRelativeTime(log.createdAt),
-    tone: activityTone[log.action] ?? 'default',
+    rawDate: log.createdAt,
+    type,
+    metadata,
+    tone,
   };
 }
 
-export function FileActivityPanel({ fileId, projectId }: FileActivityPanelProps) {
+export function FileActivityPanel({ fileId, projectId, onTaskClick }: FileActivityPanelProps) {
   const [activities, setActivities] = useState<FileActivityItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -120,6 +266,38 @@ export function FileActivityPanel({ fileId, projectId }: FileActivityPanelProps)
     }
   }, [realtimeLogs, fileId]);
 
+  const groupedActivities = useMemo(() => {
+    const groups: { dateLabel: string; items: FileActivityItem[] }[] = [];
+    activities.forEach((item) => {
+      const dateLabel = formatDateGrouping(item.rawDate);
+      const lastGroup = groups[groups.length - 1];
+      if (lastGroup && lastGroup.dateLabel === dateLabel) {
+        lastGroup.items.push(item);
+      } else {
+        groups.push({ dateLabel, items: [item] });
+      }
+    });
+    return groups;
+  }, [activities]);
+
+  const renderBadge = (item: FileActivityItem) => {
+    const commonClass = "absolute -bottom-1 -right-1 flex size-3 items-center justify-center rounded-full border border-[#151c25] bg-[#0d151e]";
+    switch (item.type) {
+      case 'create':
+        return <div className={commonClass}><Plus className="size-2 text-[#9df2c7]" /></div>;
+      case 'comment':
+        return <div className={commonClass}><MessageSquare className="size-2 text-[#8b94a1]" /></div>;
+      case 'upload':
+        return <div className={commonClass}><Upload className="size-2 text-[#9df2c7]" /></div>;
+      case 'complete':
+        return <div className={commonClass}><Check className="size-2 text-[#9df2c7]" /></div>;
+      case 'edit':
+        return <div className={commonClass}><Pencil className="size-2 text-[#8b94a1]" /></div>;
+      default:
+        return <div className={commonClass}><Circle className="size-1.5 fill-[#8b94a1] text-[#8b94a1]" /></div>;
+    }
+  };
+
   return (
     <section>
       <div className="flex items-center justify-between gap-3 border-b border-[#26303b] pb-3">
@@ -143,17 +321,50 @@ export function FileActivityPanel({ fileId, projectId }: FileActivityPanelProps)
           No activity logs recorded for this file yet.
         </p>
       ) : (
-        <div className="mt-3 space-y-1">
-          {activities.map((item) => (
-            <article className="relative ml-2 border-l border-[#39424f] pb-4 pl-4 last:pb-0" key={item.id}>
-              <Circle
-                className={`absolute -left-1.5 top-1 size-3 fill-[#0d151e] ${activityToneClassName[item.tone]}`}
-              />
-              <p className="text-[11px] font-bold leading-5 text-[#dce7f3]">
-                <span className="font-black text-white">{item.actor}</span> {item.label}
-              </p>
-              <p className="mt-1 text-[10px] font-bold text-[#8b94a1]">{item.time}</p>
-            </article>
+        <div className="mt-4">
+          {groupedActivities.map((group, groupIdx) => (
+            <div key={group.dateLabel} className="mb-4">
+              <div className="mb-3 pl-6 text-[10px] font-black text-[#8b94a1] uppercase tracking-wider">
+                {group.dateLabel}
+              </div>
+              <div className="space-y-0">
+                {group.items.map((item, itemIdx) => {
+                  const isLastInGroup = itemIdx === group.items.length - 1;
+                  const isLastOverall = groupIdx === groupedActivities.length - 1 && isLastInGroup;
+
+                  return (
+                    <article className={`relative ml-[11px] pl-6 ${!isLastOverall ? 'border-l-2 border-dashed border-[#39424f] pb-4' : 'pb-0'}`} key={item.id}>
+                      <div className="absolute -left-[11px] top-0">
+                        <div className="relative flex size-5 items-center justify-center rounded-full bg-[#303842] text-[10px] font-black text-white">
+                          {item.actor.charAt(0).toUpperCase()}
+                          {renderBadge(item)}
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        <p className="text-[11px] font-medium leading-5 text-[#dce7f3]">
+                          <span className="font-black text-white mr-1">{item.actor}</span>
+                          {item.label}
+                          {item.metadata?.taskName && (
+                            <span
+                              className="ml-1 font-bold text-[#FFD369] cursor-pointer hover:underline"
+                              onClick={() => item.metadata?.taskId && onTaskClick?.(item.metadata.taskId)}
+                            >
+                              "{item.metadata.taskName}"
+                            </span>
+                          )}
+                          {item.metadata?.materialId && !item.metadata?.taskName && (
+                            <span className="ml-1 font-bold text-[#FFD369]">
+                              "{item.metadata.materialName || `Material #${item.metadata.materialId}`}"
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-[10px] font-bold text-[#8b94a1]">{item.time}</p>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </div>
           ))}
         </div>
       )}

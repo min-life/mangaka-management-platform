@@ -154,7 +154,20 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
         // 1. Khi KHÔNG bấm vào task: Gọi GET /files/:id/materials chỉ lấy các version gốc
         const materialsRes = await getFileMaterials(fileId);
         const versionsArray = (materialsRes || []) as FileMaterialVersionRecord[];
-        dbVersions = buildStableMaterialVersions(versionsArray);
+
+        // Fetch full detail (with presigned URLs) for each material in parallel
+        const fullMaterials = await Promise.all(
+          versionsArray.map(async (m: any) => {
+            try {
+              const res = await getMaterialById(m.id);
+              const full = (res as any)?.data ?? res;
+              return full ?? m;
+            } catch {
+              return m; // fallback to basic data on error
+            }
+          })
+        );
+        dbVersions = buildStableMaterialVersions(fullMaterials);
       } else {
         const taskIdNum = Number(selectedTaskId);
         if (selectedTaskId && !isNaN(taskIdNum) && taskIdNum > 0) {
@@ -179,7 +192,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
           );
 
           const isFileName = (name: string) => /\.[a-zA-Z0-9]+$/.test(name);
-          
+
           // Sắp xếp tăng dần theo thời gian tạo (cũ nhất lên đầu) để đánh số phiên bản chính xác
           const sortedMaterials = [...fullMaterials].sort(
             (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
@@ -206,7 +219,19 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
           // Fallback if taskId is not a valid number
           const materialsRes = await getFileMaterials(fileId);
           const versionsArray = (materialsRes || []) as FileMaterialVersionRecord[];
-          dbVersions = buildStableMaterialVersions(versionsArray);
+
+          const fullMaterials = await Promise.all(
+            versionsArray.map(async (m: any) => {
+              try {
+                const res = await getMaterialById(m.id);
+                const full = (res as any)?.data ?? res;
+                return full ?? m;
+              } catch {
+                return m;
+              }
+            })
+          );
+          dbVersions = buildStableMaterialVersions(fullMaterials);
         }
       }
     } catch (err) {
@@ -348,6 +373,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
                 id: String(comment.id),
                 materialId: String(comment.material?.id ?? version.id),
                 materialVersion: `v${version.version}`,
+                materialName: version.note || `Material #${version.id}`,
                 region: {
                   endX: Number(frame.endX),
                   endY: Number(frame.endY),
@@ -427,6 +453,10 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
       updatedAt: response.updatedAt,
     };
 
+    const frameCommentIds = new Set(dbComments.map((c) => c.id));
+    const filteredFileComments = dbFileComments.filter((c) => !frameCommentIds.has(c.id));
+    const filteredTaskComments = dbTaskComments.filter((c) => !frameCommentIds.has(c.id));
+
     return {
       project: projData,
       folders: productionFolders,
@@ -434,15 +464,12 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
       versions: dbVersions,
       tasks: dbTasks,
       frameComments: dbComments,
-      fileComments: dbFileComments,
-      taskComments: dbTaskComments,
+      fileComments: filteredFileComments,
+      taskComments: filteredTaskComments,
       file: mappedFile,
     };
   }, [fileId, projectId, selectedTaskId]);
 
-  useEffect(() => {
-    void reload().catch(() => { });
-  }, [selectedTaskId]);
 
   const file = data?.file ?? null;
   const project = data?.project ?? null;
@@ -462,6 +489,8 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
   const taskComments = data?.taskComments ?? [];
   const members = data?.members ?? [];
   const isLoading = isInitialLoading || isRefreshing;
+  // Expose separately so consumers can distinguish
+  // first-load (block everything) from background refresh (only overlay canvas)
 
 
 
@@ -598,6 +627,16 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     });
   }, [setData]);
 
+  const setVersionsCustom = useCallback((nextVersions: any[]) => {
+    setData((currentData) => {
+      if (!currentData) return null;
+      return {
+        ...currentData,
+        versions: nextVersions,
+      };
+    });
+  }, [setData]);
+
   const {
     handleCreateAnnotatedTask,
     focusFileTask,
@@ -626,6 +665,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     setFile: setFileCustom,
     setTasks: setTasksCustom,
     setSelectedVersion,
+    setVersions: setVersionsCustom,
   });
 
   const {
@@ -742,6 +782,8 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     handleMarkReadyForReview: canSubmitTask ? handleMarkReadyForReview : undefined,
     handleUpdateDiscussionComment,
     isLoading,
+    isInitialLoading,
+    isRefreshing,
     isPanning,
     isSavingComment,
     isSubmittingReview,

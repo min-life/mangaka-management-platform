@@ -196,23 +196,6 @@ export default function ProjectDashboardPage() {
             </p>
           </div>
         </div>
-
-        <div className="flex items-center gap-3">
-          <Button
-            onClick={() => router.push(`/studio/projects/${projectId}/files`)}
-            className="h-9 rounded-[4px] border-[#4b535f] bg-[#222a34] px-4 text-xs font-black text-white hover:bg-[#303842]"
-            variant="outline"
-          >
-            <Upload className="size-4" />
-            Upload Assets
-          </Button>
-          <Button
-            onClick={() => router.push(`/studio/projects/${projectId}/tasks`)}
-            className="h-9 rounded-[4px] bg-[#FFD369] px-4 text-xs font-black text-[#101820] hover:bg-[#e6e8eb]"
-          >
-            Manage Tasks
-          </Button>
-        </div>
       </div>
 
       <div className="mt-5 grid grid-cols-4 gap-4">
