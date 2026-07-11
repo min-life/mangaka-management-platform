@@ -43,7 +43,9 @@ const labelClassName = 'text-[10px] font-black uppercase tracking-[0.08em] text-
 function getErrorMessage(error: unknown) {
   if (error instanceof AxiosError) {
     const message = error.response?.data?.message;
-    return typeof message === 'string' ? message : 'Import failed. Please check the CSV file and try again.';
+    if (typeof message === 'string') return message;
+    if (Array.isArray(message) && message.length) return message.join(' ');
+    if (error.response?.status) return `Import failed (HTTP ${error.response.status}).`;
   }
   return 'Import failed. Please check the CSV file and try again.';
 }

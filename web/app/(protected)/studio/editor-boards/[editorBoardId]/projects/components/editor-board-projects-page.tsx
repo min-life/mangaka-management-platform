@@ -3,12 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import {
-  MoreVertical,
-  Plus,
-  Search,
-  X,
-} from 'lucide-react';
+import { ArrowLeft, Plus, Search } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -20,13 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -36,6 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { StatisticsClient } from '@/app/(protected)/studio/projects/[projectId]/statistics/StatisticsClient';
 
 import {
   getEditorBoardProjects,
@@ -69,85 +58,19 @@ function ProjectCover({ project }: { project: EditorBoardProject }) {
   );
 }
 
-function MemberStack({ members }: { members: EditorBoardProject['members'] }) {
-  const visibleMembers = members.slice(0, 3);
-  const hiddenCount = Math.max(0, members.length - visibleMembers.length);
-
-  return (
-    <div className="flex items-center -space-x-2">
-      {visibleMembers.map((member) => (
-        <Avatar
-          className="size-8 border-2 border-[#1a2029]"
-          key={member.id}
-          title={member.roleName}
-        >
-          <AvatarImage alt={member.displayName} src={member.avatarUrl} />
-          <AvatarFallback>{member.displayName.slice(0, 2).toUpperCase()}</AvatarFallback>
-        </Avatar>
-      ))}
-      {hiddenCount > 0 ? (
-        <span className="grid size-8 place-items-center rounded-full border-2 border-[#1a2029] bg-[#2f353e] text-[10px] font-bold text-[#dde3ef]">
-          +{hiddenCount}
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
-function ProjectDrawer({
-  open,
-  project,
-  onOpenChange,
-}: {
-  open: boolean;
-  project: EditorBoardProject | null;
-  onOpenChange: (open: boolean) => void;
-}) {
-  if (!project) {
-    return null;
+function UserCell({ user }: { user: EditorBoardProject['createdBy'] }) {
+  if (!user) {
+    return <span className="text-xs font-bold text-[#8b94a1]">—</span>;
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        className="w-[400px] max-w-[calc(100vw-32px)] gap-0 border-[#50555D] bg-[#1a2029] p-0 text-[#dde3ef] sm:max-w-[400px]"
-        side="right"
-        showCloseButton={false}
-      >
-        <SheetHeader className="border-b border-[#50555D] bg-[#242a33] p-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <SheetTitle className="text-[24px] font-semibold leading-8 text-white">
-                Project Overview
-              </SheetTitle>
-              <SheetDescription className="text-sm text-[#C8C8C8]">
-                Detailed production summary and editorial status.
-              </SheetDescription>
-            </div>
-            <button
-              aria-label="Close project overview"
-              className="grid size-8 place-items-center rounded-[4px] text-[#C8C8C8] hover:bg-[#2f353e] hover:text-white"
-              onClick={() => onOpenChange(false)}
-              type="button"
-            >
-              <X className="size-4" />
-            </button>
-          </div>
-        </SheetHeader>
-
-        <div className="flex-1 overflow-y-auto p-6">
-          <h3 className="text-[18px] font-semibold leading-6 text-[#FFD369]">{project.name}</h3>
-          <p className="mt-1 text-sm leading-5 text-[#C8C8C8]">{project.description}</p>
-
-          <div className="mt-8 rounded-[4px] border border-[#50555D] bg-[#0e141c] p-4">
-            <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-              Contact
-            </p>
-            <p className="text-[13px] font-medium text-white">{project.contactName}</p>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+    <div className="flex items-center gap-2">
+      <Avatar className="size-7 border border-[#1a2029]">
+        <AvatarImage alt={user.displayName} src={user.avatarUrl ?? undefined} />
+        <AvatarFallback>{user.displayName.slice(0, 2).toUpperCase()}</AvatarFallback>
+      </Avatar>
+      <span className="truncate text-xs font-bold text-[#dce7f3]">{user.displayName}</span>
+    </div>
   );
 }
 
@@ -155,7 +78,7 @@ export function EditorBoardProjectsPage() {
   const params = useParams<{ editorBoardId?: string }>();
   const editorBoardId = params.editorBoardId ?? '1';
   const [projects, setProjects] = useState<EditorBoardProject[]>([]);
-  const [selectedProject, setSelectedProject] = useState<EditorBoardProject | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -205,9 +128,7 @@ export function EditorBoardProjectsPage() {
     return projects
       .filter((project) => {
         const matchesSearch =
-          !normalizedSearch ||
-          project.name.toLowerCase().includes(normalizedSearch) ||
-          project.imprintName.toLowerCase().includes(normalizedSearch);
+          !normalizedSearch || project.name.toLowerCase().includes(normalizedSearch);
 
         return matchesSearch;
       })
@@ -226,15 +147,39 @@ export function EditorBoardProjectsPage() {
   }, [visibleProjects, page, limit]);
 
   const totalPages = Math.ceil(visibleProjects.length / limit);
-  return (
-    <>
+  const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null;
+
+  if (selectedProjectId !== null) {
+    return (
       <main className="px-5 py-6">
-        <section className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-end">
-          <div>
-            <h1 className="text-[24px] font-black leading-8 text-white">Project Dashboard</h1>
-            <p className="mt-1 text-sm font-medium text-[#aeb7c2]">
-              Overseeing {projects.length} active manga productions in this editor board.
-            </p>
+        <button
+          className="mb-4 inline-flex items-center gap-2 rounded-[4px] px-2 py-1.5 text-xs font-black text-[#aeb7c2] hover:bg-[#17202b] hover:text-white"
+          onClick={() => setSelectedProjectId(null)}
+          type="button"
+        >
+          <ArrowLeft className="size-4" />
+          Back to Projects
+        </button>
+        {selectedProject ? (
+          <p className="mb-4 -mt-1 text-xs font-bold text-[#8b94a1]">
+            Project / <span className="text-white">{selectedProject.name}</span>
+          </p>
+        ) : null}
+        <div className="rounded-[5px] border border-[#39424f] bg-[#101820]">
+          <StatisticsClient projectId={selectedProjectId} />
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="px-5 py-6">
+      <section className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+        <div>
+          <h1 className="text-[24px] font-black leading-8 text-white">Project Dashboard</h1>
+          <p className="mt-1 text-sm font-medium text-[#aeb7c2]">
+            Overseeing {projects.length} active manga productions in this editor board.
+          </p>
           </div>
 
           <div className="flex flex-wrap items-end gap-2">
@@ -284,17 +229,17 @@ export function EditorBoardProjectsPage() {
             <Table>
               <TableHeader>
                 <TableRow className="h-[40px] border-[#39424f] bg-[#222a34] hover:bg-[#222a34]">
-                  <TableHead className="w-[32%] px-5 text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
+                  <TableHead className="w-[28%] px-5 text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
                     Project Name
                   </TableHead>
                   <TableHead className="w-[20%] text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
-                    Members
+                    Created By
                   </TableHead>
                   <TableHead className="w-[16%] text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
                     Created At
                   </TableHead>
-                  <TableHead className="w-[72px] pr-5 text-right text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
-                    Actions
+                  <TableHead className="w-[16%] pr-5 text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
+                    Updated At
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -318,42 +263,24 @@ export function EditorBoardProjectsPage() {
                       <TableRow
                         className="h-[72px] cursor-pointer border-l-4 border-l-transparent border-r-0 border-t-0 border-b-[#303842] bg-[#101820] transition-all hover:border-l-[#FFD369] hover:bg-[#17202b]"
                         key={project.id}
-                        onClick={() => setSelectedProject(project)}
+                        onClick={() => setSelectedProjectId(project.id)}
                       >
                         <TableCell className="px-5">
                           <div className="flex items-center gap-4">
                             <ProjectCover project={project} />
                             <div>
                               <p className="text-sm font-black leading-5 text-white">{project.name}</p>
-                              <p className="mt-1 text-[11px] font-bold text-[#aeb7c2]">{project.imprintName}</p>
                             </div>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Link
-                            aria-label={`View members for ${project.name}`}
-                            className="inline-flex rounded-[4px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD369]"
-                            href={`/studio/editor-boards/${editorBoardId}/members`}
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            <MemberStack members={project.members} />
-                          </Link>
+                          <UserCell user={project.createdBy} />
                         </TableCell>
                         <TableCell className="text-xs font-bold text-[#dce7f3]">
                           {formatDate(project.createdAt)}
                         </TableCell>
-                        <TableCell className="pr-5 text-right">
-                          <button
-                            aria-label={`Open actions for ${project.name}`}
-                            className="text-[#C8C8C8] hover:text-white"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setSelectedProject(project);
-                            }}
-                            type="button"
-                          >
-                            <MoreVertical className="size-5" />
-                          </button>
+                        <TableCell className="pr-5 text-xs font-bold text-[#dce7f3]">
+                          {formatDate(project.updatedAt)}
                         </TableCell>
                       </TableRow>
                     );
@@ -382,17 +309,7 @@ export function EditorBoardProjectsPage() {
               }}
             />
           </div>
-        </section>
-      </main>
-      <ProjectDrawer
-        open={Boolean(selectedProject)}
-        project={selectedProject}
-        onOpenChange={(open) => {
-          if (!open) {
-            setSelectedProject(null);
-          }
-        }}
-      />
-    </>
+      </section>
+    </main>
   );
 }

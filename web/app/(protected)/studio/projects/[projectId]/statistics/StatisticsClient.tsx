@@ -65,11 +65,28 @@ function isStatsEmpty(stats: ProjectStatsResult): boolean {
   );
 }
 
-function chartData(months: ProjectStatMonth[], key: keyof ProjectStatMonth) {
-  return months.map((month) => ({
-    label: MONTH_LABELS[month.month - 1] ?? String(month.month),
-    value: month[key],
-  }));
+type MetricKey = 'views' | 'sales' | 'revenue' | 'reviews' | 'rating';
+
+function chartData(months: ProjectStatMonth[], key: MetricKey) {
+  // The response only contains months that actually have data. Render from Jan
+  // up to the LAST month with data, and no further — months after it are hidden
+  // entirely (no label, no node). A month missing inside that range renders as
+  // null so the line breaks there while its X-axis label is still shown, and a
+  // month present with a genuine 0 still gets a node.
+  if (months.length === 0) {
+    return [];
+  }
+
+  const byMonth = new Map(months.map((month) => [month.month, month]));
+  const lastMonth = months.reduce((max, month) => Math.max(max, month.month), 0);
+
+  return MONTH_LABELS.slice(0, lastMonth).map((label, index) => {
+    const entry = byMonth.get(index + 1);
+    return {
+      label,
+      value: entry ? entry[key] : null,
+    };
+  });
 }
 
 function KpiCard({ label, value }: { label: string; value: string }) {
@@ -91,7 +108,7 @@ function StatsLineChart({
   title,
 }: {
   color: string;
-  data: { label: string; value: number }[];
+  data: { label: string; value: number | null }[];
   icon: React.ReactNode;
   title: string;
 }) {
@@ -109,7 +126,7 @@ function StatsLineChart({
       >
         <LineChart data={data} margin={{ bottom: 0, left: 4, right: 4, top: 8 }}>
           <CartesianGrid stroke="#26303c" vertical={false} />
-          <XAxis dataKey="label" fontSize={11} stroke="#5b626d" tickLine={false} />
+          <XAxis dataKey="label" fontSize={11} interval={0} stroke="#5b626d" tickLine={false} />
           <YAxis
             fontSize={11}
             stroke="#5b626d"
@@ -119,7 +136,8 @@ function StatsLineChart({
           />
           <ChartTooltip content={<ChartTooltipContent />} cursor={{ stroke: '#39424f' }} />
           <Line
-            dataKey={title}
+            connectNulls={false}
+            dataKey="value"
             dot={{ r: 3, fill: color }}
             name={title}
             stroke={color}
