@@ -35,14 +35,8 @@ export function FileDetailHeader({
   versions,
 }: FileDetailHeaderProps) {
   const searchParams = useSearchParams();
-  const arcId = searchParams.get('arcId');
-  const chapterId = searchParams.get('chapterId');
-
-  const backParams = new URLSearchParams();
-  if (arcId) backParams.set('arcId', arcId);
-  if (chapterId) backParams.set('chapterId', chapterId);
-  const backQuery = backParams.toString();
-  const backHref = `/studio/projects/${projectId}/files${backQuery ? `?${backQuery}` : ''}`;
+  const backParam = searchParams.get('back');
+  const backHref = backParam ? decodeURIComponent(backParam) : `/studio/projects/${projectId}/files`;
 
   return (
     <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-[#26303b] bg-[#151c25] px-5 py-3">

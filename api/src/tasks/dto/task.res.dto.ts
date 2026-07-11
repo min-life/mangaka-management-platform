@@ -79,7 +79,6 @@ export class TaskResDto {
   updatedAt!: Date;
 }
 
-
 export class TaskSummaryResDto {
   @ApiProperty({ example: 10 })
   id!: number;
@@ -120,7 +119,6 @@ export class TaskSummaryResDto {
   @ApiProperty({ example: '2026-06-18T03:00:00.000Z' })
   updatedAt!: Date;
 }
-
 
 export class TaskResponseDto {
   @ApiProperty({ type: TaskResDto })

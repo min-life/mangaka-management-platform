@@ -51,7 +51,6 @@ export class ActivityLogResDto {
   actor?: UserResDto;
 }
 
-
 export class ActivityLogsResponseDto {
   @ApiProperty({ type: [ActivityLogResDto] })
   data!: ActivityLogResDto[];

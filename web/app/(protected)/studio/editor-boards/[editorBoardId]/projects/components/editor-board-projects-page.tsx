@@ -38,8 +38,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-import { ProjectMetrics } from '@/components/project/ProjectMetrics';
-
 import {
   getEditorBoardProjects,
   type EditorBoardProject,
@@ -110,8 +108,6 @@ function ProjectDrawer({
     return null;
   }
 
-  const stat = project.projectStats[0];
-
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
@@ -150,15 +146,6 @@ function ProjectDrawer({
             </p>
             <p className="text-[13px] font-medium text-white">{project.contactName}</p>
           </div>
-
-          {stat ? (
-            <div className="mt-6">
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                Production Metrics
-              </p>
-              <ProjectMetrics columns={2} metrics={stat.metrics} updatedAt={stat.updatedAt} />
-            </div>
-          ) : null}
         </div>
 
         <SheetFooter className="grid grid-cols-2 gap-2 border-t border-[#50555D] bg-[#242a33] p-6">

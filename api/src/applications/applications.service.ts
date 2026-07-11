@@ -7,7 +7,13 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
-import { APPLICATION_STATUS, APPLICATION_TYPE, Prisma, ACTIVITY_ACTION, ENTITY_TYPE } from '@prisma/client';
+import {
+  APPLICATION_STATUS,
+  APPLICATION_TYPE,
+  Prisma,
+  ACTIVITY_ACTION,
+  ENTITY_TYPE,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -150,7 +156,11 @@ export class ApplicationsService {
     }
   }
 
-  @InvalidateCache((args) => [`application:${args[0]}`, `application:list:*`, `project:*:applications:*`])
+  @InvalidateCache((args) => [
+    `application:${args[0]}`,
+    `application:list:*`,
+    `project:*:applications:*`,
+  ])
   async updateApplication(
     id: number,
     data: {
@@ -182,7 +192,7 @@ export class ApplicationsService {
     try {
       const application = await this.ensureApplication(id);
       const materialsArray = [...((application.materials as any[]) || [])];
-      
+
       materialsArray.push(materialItem);
 
       return await this.prisma.application.update({
@@ -198,12 +208,16 @@ export class ApplicationsService {
     }
   }
 
-  @InvalidateCache((args) => [`application:${args[0]}`, `application:list:*`, `project:*:applications:*`])
+  @InvalidateCache((args) => [
+    `application:${args[0]}`,
+    `application:list:*`,
+    `project:*:applications:*`,
+  ])
   async updateApplicationMaterial(id: number, userId: number, index: number, materialItem: any) {
     try {
       const application = await this.ensureApplication(id);
       const materialsArray = [...((application.materials as any[]) || [])];
-      
+
       if (index >= 0 && index < materialsArray.length) {
         materialsArray[index] = { ...materialsArray[index], ...materialItem };
       }
@@ -221,12 +235,16 @@ export class ApplicationsService {
     }
   }
 
-  @InvalidateCache((args) => [`application:${args[0]}`, `application:list:*`, `project:*:applications:*`])
+  @InvalidateCache((args) => [
+    `application:${args[0]}`,
+    `application:list:*`,
+    `project:*:applications:*`,
+  ])
   async deleteApplicationMaterial(id: number, userId: number, index: number) {
     try {
       const application = await this.ensureApplication(id);
       const materialsArray = [...((application.materials as any[]) || [])];
-      
+
       if (index >= 0 && index < materialsArray.length) {
         materialsArray.splice(index, 1);
       }
@@ -244,7 +262,11 @@ export class ApplicationsService {
     }
   }
 
-  @InvalidateCache((args) => [`application:${args[0]}`, `application:list:*`, `project:*:applications:*`])
+  @InvalidateCache((args) => [
+    `application:${args[0]}`,
+    `application:list:*`,
+    `project:*:applications:*`,
+  ])
   async deleteApplication(id: number) {
     try {
       await this.ensureApplication(id);
@@ -254,7 +276,11 @@ export class ApplicationsService {
     }
   }
 
-  @InvalidateCache((args) => [`application:${args[0]}`, `application:list:*`, `project:*:applications:*`])
+  @InvalidateCache((args) => [
+    `application:${args[0]}`,
+    `application:list:*`,
+    `project:*:applications:*`,
+  ])
   async updateApplicationStatus(
     id: number,
     data: {
@@ -268,25 +294,47 @@ export class ApplicationsService {
       const application = await this.ensureApplication(id);
 
       // Perform two-stage permission validation for folder creation applications
-      const permissions = await this.usersService.getUserPermissions(data.userId, 'APPLICATION', id);
+      const permissions = await this.usersService.getUserPermissions(
+        data.userId,
+        'APPLICATION',
+        id,
+      );
 
-      if (data.status === APPLICATION_STATUS.INTERNAL_APPROVED) {
-        if (application.status !== APPLICATION_STATUS.PENDING) {
-          throw new BadRequestException('Application status must be PENDING to perform project-level approval');
+      if (data.status === APPLICATION_STATUS.SUBMITTED) {
+        if (
+          application.status !== APPLICATION_STATUS.PENDING &&
+          application.status !== APPLICATION_STATUS.SUBMITTED
+        ) {
+          throw new BadRequestException('Application status must be PENDING to submit');
         }
-        if (!permissions.includes('project:owner') && !permissions.includes('project:application.approve')) {
-          throw new ForbiddenException('You do not have permission to perform project-level approval');
+        if (application.status === APPLICATION_STATUS.PENDING) {
+          if (!permissions.includes('board:leader') && !permissions.includes('board:owner')) {
+            throw new ForbiddenException(
+              'Only board leaders and owners can submit this application',
+            );
+          }
+        }
+        if (
+          data.voteDeadline &&
+          !permissions.includes('board:leader') &&
+          !permissions.includes('board:owner')
+        ) {
+          throw new ForbiddenException('Only board leaders and owners can set a vote deadline');
         }
       } else if (data.status === APPLICATION_STATUS.APPROVE) {
         if (
           application.type === APPLICATION_TYPE.CREATE_ARC ||
           application.type === APPLICATION_TYPE.CREATE_CHAPTER
         ) {
-          if (application.status !== APPLICATION_STATUS.INTERNAL_APPROVED) {
-            throw new BadRequestException('Application must be approved at project-level (INTERNAL_APPROVED) before board-level approval');
+          if (application.status !== APPLICATION_STATUS.SUBMITTED) {
+            throw new BadRequestException(
+              'Application must be SUBMITTED before board-level approval',
+            );
           }
           if (!permissions.includes('board:leader') && !permissions.includes('board:owner')) {
-            throw new ForbiddenException('You do not have permission to perform board-level approval');
+            throw new ForbiddenException(
+              'You do not have permission to perform board-level approval',
+            );
           }
         }
       } else if (data.status === APPLICATION_STATUS.REJECT) {
@@ -295,28 +343,23 @@ export class ApplicationsService {
           application.type === APPLICATION_TYPE.CREATE_CHAPTER
         ) {
           if (application.status === APPLICATION_STATUS.PENDING) {
-            if (!permissions.includes('project:owner') && !permissions.includes('project:application.approve')) {
-              throw new ForbiddenException('You do not have permission to reject this application at project level');
+            if (
+              !permissions.includes('project:owner') &&
+              !permissions.includes('project:application.approve')
+            ) {
+              throw new ForbiddenException(
+                'You do not have permission to reject this application at project level',
+              );
             }
-          } else if (application.status === APPLICATION_STATUS.INTERNAL_APPROVED) {
+          } else if (application.status === APPLICATION_STATUS.SUBMITTED) {
             if (!permissions.includes('board:leader') && !permissions.includes('board:owner')) {
-              throw new ForbiddenException('You do not have permission to reject this application at board level');
+              throw new ForbiddenException(
+                'You do not have permission to reject this application at board level',
+              );
             }
           } else {
             throw new BadRequestException('Cannot reject application in its current status');
           }
-        }
-      }
-
-      if (data.status === APPLICATION_STATUS.SUBMITTED) {
-        if (
-          application.status !== APPLICATION_STATUS.INTERNAL_APPROVED &&
-          application.status !== APPLICATION_STATUS.SUBMITTED
-        ) {
-          throw new BadRequestException(ERROR.EVLINTERNALAPPROVAL);
-        }
-        if (data.voteDeadline && !permissions.includes('board:leader') && !permissions.includes('board:owner')) {
-          throw new ForbiddenException('Only board leaders and owners can set a vote deadline');
         }
       }
 
@@ -342,15 +385,23 @@ export class ApplicationsService {
           application.type === APPLICATION_TYPE.CREATE_CHAPTER
         ) {
           const folderParentId =
-            application.type === APPLICATION_TYPE.CREATE_CHAPTER ? application.parentFolderId : null;
+            application.type === APPLICATION_TYPE.CREATE_CHAPTER
+              ? application.parentFolderId
+              : null;
 
           if (folderParentId) {
-            const parentFolder = await this.prisma.folder.findUnique({ where: { id: folderParentId } });
+            const parentFolder = await this.prisma.folder.findUnique({
+              where: { id: folderParentId },
+            });
             if (!parentFolder || parentFolder.projectId !== application.projectId) {
-              throw new NotFoundException('Parent folder not found or does not belong to this project');
+              throw new NotFoundException(
+                'Parent folder not found or does not belong to this project',
+              );
             }
             if (parentFolder.parentId !== null) {
-              throw new BadRequestException('Cannot create a subfolder under a Chapter (maximum depth is 2)');
+              throw new BadRequestException(
+                'Cannot create a subfolder under a Chapter (maximum depth is 2)',
+              );
             }
           }
 
@@ -358,7 +409,10 @@ export class ApplicationsService {
           let imageUrl: string | null = null;
           const materialsData = application.materials as any[];
           if (Array.isArray(materialsData)) {
-            const thumbnail = materialsData.find((m) => m.isThumbnail) || materialsData.find((m) => m.type === 'IMAGE') || materialsData[0];
+            const thumbnail =
+              materialsData.find((m) => m.isThumbnail) ||
+              materialsData.find((m) => m.type === 'IMAGE') ||
+              materialsData[0];
             if (thumbnail && thumbnail.url) {
               imageUrl = thumbnail.url;
             }
@@ -409,8 +463,10 @@ export class ApplicationsService {
 
       let action: ACTIVITY_ACTION = ACTIVITY_ACTION.APPLICATION_SUBMITTED;
       if (data.status === APPLICATION_STATUS.APPROVE) action = ACTIVITY_ACTION.APPLICATION_APPROVED;
-      else if (data.status === APPLICATION_STATUS.REJECT) action = ACTIVITY_ACTION.APPLICATION_REJECTED;
-      else if (data.status === APPLICATION_STATUS.INTERNAL_APPROVED) action = ACTIVITY_ACTION.APPLICATION_INTERNAL_APPROVED;
+      else if (data.status === APPLICATION_STATUS.REJECT)
+        action = ACTIVITY_ACTION.APPLICATION_REJECTED;
+      else if (data.status === APPLICATION_STATUS.SUBMITTED)
+        action = ACTIVITY_ACTION.APPLICATION_SUBMITTED;
 
       this.eventEmitter.emit(ACTIVITY_EVENT_NAME, {
         action,
@@ -456,6 +512,7 @@ export class ApplicationsService {
     }
   }
 
+  @InvalidateCache((args) => [`application:${args[0]}:votes:*`])
   async castVote(
     applicationId: number,
     userId: number,
@@ -470,7 +527,9 @@ export class ApplicationsService {
       }
 
       if (!application.voteDeadline) {
-        throw new BadRequestException('Voting cannot start until a deadline is set by the board leader');
+        throw new BadRequestException(
+          'Voting cannot start until a deadline is set by the board leader',
+        );
       }
 
       if (new Date() > new Date(application.voteDeadline)) {

@@ -20,12 +20,9 @@ async function bootstrap() {
       }
 
       const isConfiguredOrigin = configuredOrigins.includes(origin);
-      const isLocalDevOrigin = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(
-        origin,
-      );
-      const isLanDevOrigin = /^https?:\/\/(10|172\.(1[6-9]|2\d|3[0-1])|192\.168)\.\d+\.\d+\.\d+(:\d+)?$/.test(
-        origin,
-      );
+      const isLocalDevOrigin = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(origin);
+      const isLanDevOrigin =
+        /^https?:\/\/(10|172\.(1[6-9]|2\d|3[0-1])|192\.168)\.\d+\.\d+\.\d+(:\d+)?$/.test(origin);
 
       callback(null, isConfiguredOrigin || isLocalDevOrigin || isLanDevOrigin);
     },

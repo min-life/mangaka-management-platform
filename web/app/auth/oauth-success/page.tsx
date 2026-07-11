@@ -1,12 +1,13 @@
 'use client';
 
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
 import { useAuth } from '@/hooks/useAuth';
 import { setAccessToken } from '@/lib/auth-storage';
 import { toast } from '@/lib/toast';
+import { hasPassword } from '@/services/user.service';
 
 function LoadingState() {
   return (
@@ -19,23 +20,22 @@ function LoadingState() {
 function OAuthSuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { refreshUser } = useAuth();
+  const { refreshUser, status, user } = useAuth();
+  const [isProcessing, setIsProcessing] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
 
     const accessToken = searchParams.get('access_token');
-    const nextPath = searchParams.get('next') ?? '/studio';
-    const safeNextPath = nextPath.startsWith('/') ? nextPath : '/studio';
+    const linked = searchParams.get('linked');
 
-    if (searchParams.get('linked') === 'google') {
+    if (linked === 'google') {
       toast.success('Google account linked successfully');
       void refreshUser().finally(() => {
         if (isMounted) {
           router.replace('/user-profile');
         }
       });
-
       return () => {
         isMounted = false;
       };
@@ -48,15 +48,39 @@ function OAuthSuccessContent() {
 
     setAccessToken(accessToken);
     void refreshUser().finally(() => {
-      if (isMounted) {
-        router.replace(safeNextPath);
-      }
+      if (!isMounted) return;
+      hasPassword()
+        .then((hasPwd) => {
+          if (!isMounted) return;
+          if (!hasPwd) {
+            router.replace('/auth/setup-password');
+          } else {
+            setIsProcessing(false);
+          }
+        })
+        .catch(() => {
+          if (isMounted) setIsProcessing(false);
+        });
     });
 
     return () => {
       isMounted = false;
     };
   }, [refreshUser, router, searchParams]);
+
+  useEffect(() => {
+    if (!isProcessing && status === 'authenticated' && user) {
+      const nextPath = searchParams.get('next') ?? '/studio';
+      const safeNextPath = nextPath.startsWith('/') ? nextPath : '/studio';
+      
+      const isAdmin = user.roles?.some(r => r.code === 'ADMIN' || r.code === 'STAFF') || false;
+      if (isAdmin && safeNextPath === '/studio') {
+        router.replace('/admin');
+      } else {
+        router.replace(safeNextPath);
+      }
+    }
+  }, [isProcessing, status, user, router, searchParams]);
 
   return <LoadingState />;
 }

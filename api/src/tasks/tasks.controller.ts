@@ -30,7 +30,14 @@ import {
   UpdateTaskReqDto,
 } from './dto';
 
-import { CommentResponseDto, CommentsResponseDto, CreateCommentReqDto, QueryCommentsReqDto, FramesResponseDto, QueryFramesReqDto } from '../frames/dto';
+import {
+  CommentResponseDto,
+  CommentsResponseDto,
+  CreateCommentReqDto,
+  QueryCommentsReqDto,
+  FramesResponseDto,
+  QueryFramesReqDto,
+} from '../frames/dto';
 
 @ApiTags('Tasks')
 @ApiBearerAuth()
@@ -77,10 +84,7 @@ export class TasksController {
     type: FramesResponseDto,
   })
   @Get(':id/frames')
-  async getTaskFrames(
-    @Param('id', ParseIntPipe) id: number,
-    @Query() query: QueryFramesReqDto,
-  ) {
+  async getTaskFrames(@Param('id', ParseIntPipe) id: number, @Query() query: QueryFramesReqDto) {
     const result = await this.tasksService.getTaskFrames(
       id,
       query.field && query.order ? { field: query.field, order: query.order } : undefined,
@@ -232,7 +236,7 @@ export class TasksController {
   })
   @ApiOperation({ summary: 'Get task materials' })
   @ApiParam({ name: 'id', type: Number, description: 'Task id' })
-  @ApiOkResponse({ 
+  @ApiOkResponse({
     description: 'Task materials retrieved successfully',
     type: MaterialsResponseDto,
   })
@@ -247,5 +251,4 @@ export class TasksController {
     );
     return result;
   }
-
 }

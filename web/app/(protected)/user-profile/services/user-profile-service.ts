@@ -1,4 +1,5 @@
 import api from '@/lib/api';
+import { formatActionTitle, getEntityTypeLabel } from '@/lib/activity-message';
 import { getActivityLogs, type ActivityLogResponse } from '@/services/activity-log.service';
 import { getNotifications } from '@/services/notification.service';
 import { getUsers, type UserResponse } from '@/services/user.service';
@@ -66,6 +67,7 @@ export type UserActivity = {
   description: string | null;
   status: ProgressStatus;
   projectName: string;
+  href: string | null;
   createdAt: string;
   updatedAt: string;
   timeLabel: string;
@@ -132,9 +134,12 @@ function normalizeProject(project: ApiUserProject): UserProject {
   };
 }
 
-export function getGoogleLinkAccountUrl() {
-  const baseUrl = (api.defaults.baseURL ?? 'http://localhost:3001/api').replace(/\/$/, '');
-  return `${baseUrl}/users/me/link-account`;
+export async function getGoogleLinkAccountUrl() {
+  const response = await api.get<{ data: { url: string } }, { data: { url: string } }>(
+    '/users/me/link-account',
+  );
+
+  return response.data.url;
 }
 
 export async function getCurrentUserProfile() {
@@ -161,14 +166,6 @@ export async function getCurrentUserEditorBoards(userId?: number) {
   );
 
   return unwrapData<UserEditorBoard[]>(response);
-}
-
-function formatActionTitle(action: string) {
-  return action
-    .toLowerCase()
-    .split('_')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
 }
 
 function formatTimeLabel(value: string) {
@@ -244,6 +241,13 @@ export function mapActivityLogToUserActivity(
     activity.editorBoardId ?? (activity.entityType === 'EDITOR_BOARD' ? activity.entityId : null);
   const editorBoardName =
     options?.editorBoards?.find((board) => board.id === boardId)?.name ?? null;
+  const linkedProjectId =
+    activity.projectId ?? (activity.entityType === 'PROJECT' ? activity.entityId : null);
+  const href = linkedProjectId
+    ? `/studio/projects/${linkedProjectId}`
+    : boardId
+      ? `/studio/editor-boards/${boardId}`
+      : null;
   const projectName =
     getMetadataLabel(activity.metadata, ['projectName', 'fileName', 'folderName']) ??
     editorBoardName ??
@@ -255,7 +259,7 @@ export function mapActivityLogToUserActivity(
   const actorName =
     activity.actor?.displayName ?? activity.actor?.email ?? `User #${activity.actorId}`;
   const resolvedEntityName = getMetadataLabel(activity.metadata, ['entityName']);
-  const entityLabel = activity.entityType.toLowerCase().replaceAll('_', ' ');
+  const entityLabel = getEntityTypeLabel(activity.entityType);
   const entityName =
     activity.entityType === 'EDITOR_BOARD' && editorBoardName
       ? `editor board "${editorBoardName}"`
@@ -294,6 +298,7 @@ export function mapActivityLogToUserActivity(
     description,
     status: 'DONE',
     projectName,
+    href,
     createdAt: activity.createdAt,
     updatedAt: activity.createdAt,
     timeLabel: formatTimeLabel(activity.createdAt),

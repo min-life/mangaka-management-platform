@@ -31,7 +31,7 @@ export class PresignUrlInterceptor implements NestInterceptor {
 
     if (typeof data === 'object') {
       if (data instanceof Date) return data;
-      
+
       const result: any = {};
       for (const [key, value] of Object.entries(data)) {
         result[key] = await this.processData(value);

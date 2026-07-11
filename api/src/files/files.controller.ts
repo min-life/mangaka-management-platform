@@ -55,7 +55,7 @@ export class FilesController {
   constructor(
     private readonly filesService: FilesService,
     private readonly activityLogsService: ActivityLogsService,
-  ) { }
+  ) {}
 
   @Permissions({
     mode: 'ANY',
@@ -305,7 +305,10 @@ export class FilesController {
   })
   @ApiOperation({ summary: 'Get file activity logs' })
   @ApiParam({ name: 'id', type: Number, description: 'File id' })
-  @ApiOkResponse({ description: 'File activity logs retrieved successfully', type: ActivityLogsResponseDto })
+  @ApiOkResponse({
+    description: 'File activity logs retrieved successfully',
+    type: ActivityLogsResponseDto,
+  })
   @Get(':id/activity-logs')
   async getFileActivityLogs(
     @Param('id', ParseIntPipe) id: number,

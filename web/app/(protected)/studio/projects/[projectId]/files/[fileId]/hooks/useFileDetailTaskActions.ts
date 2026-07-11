@@ -30,6 +30,7 @@ type TaskActionsProps = {
   setFile: React.Dispatch<React.SetStateAction<FileExplorerItem | null>>;
   setTasks: React.Dispatch<React.SetStateAction<FileTaskItem[]>>;
   setSelectedVersion: (val: FileVersionItem | null) => void;
+  setVersions: (val: FileVersionItem[]) => void;
 };
 
 export function useFileDetailTaskActions({
@@ -54,6 +55,7 @@ export function useFileDetailTaskActions({
   setFile,
   setTasks,
   setSelectedVersion,
+  setVersions,
 }: TaskActionsProps) {
   const handleCreateAnnotatedTask = async (
     task: FileTaskItem,
@@ -120,6 +122,10 @@ export function useFileDetailTaskActions({
     setSelectedTaskId(task?.id ?? null);
     setSelectedSubmissionId(null);
     setFrameAnnotationMode(false);
+    // Clear stale versions immediately so canvas shows blank/loading
+    // instead of the previous task's (or file-level) materials while
+    // the new fetch is in-flight.
+    setVersions([]);
 
     if (!task) {
       setFocusedTask(null);
@@ -128,14 +134,10 @@ export function useFileDetailTaskActions({
     }
 
     if (task.targetVersion) {
-      const matchVersionItem = versions.find(
-        (v) => `v${v.version}` === task.targetVersion
-      );
-      if (matchVersionItem) {
-        setSelectedVersion(matchVersionItem);
-      } else {
-        setSelectedVersion(null);
-      }
+      // Reset selectedVersion before reload — the stale version object would point to old
+      // file-level material, causing a "wrong image flash". After reload, currentVersion
+      // (newest task material) will be picked up automatically via displayedPreviewUrl.
+      setSelectedVersion(null);
     } else {
       setSelectedVersion(null);
     }

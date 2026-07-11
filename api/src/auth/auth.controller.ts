@@ -15,6 +15,7 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
+import { GoogleVerifyDto } from './dto/google-verify.dto';
 import { AuthService } from './auth.service';
 import type { GoogleUser } from './interfaces';
 import { Cookie } from '../share/decorators/cookie.decorator';
@@ -71,12 +72,11 @@ export class AuthController {
   }
 
   @Public()
-  @ApiOperation({ summary: 'Initiate Google OAuth' })
-  @ApiOkResponse({ description: 'Redirects to Google OAuth' })
+  @ApiOperation({ summary: 'Get Google OAuth URL for Login' })
+  @ApiOkResponse({ description: 'Returns Google OAuth URL' })
   @Get('google')
-  @UseGuards(AuthGuard('google'))
   googleAuth() {
-    return;
+    return this.authService.getGoogleAuthUrl();
   }
 
   @Public()
@@ -102,17 +102,26 @@ export class AuthController {
   }
 
   @Public()
+  @ApiOperation({ summary: 'Login with Google (Mobile)' })
+  @ApiOkResponse({ description: 'Mobile Google Login successful' })
+  @Post('google/mobile')
+  async googleMobileLogin(@Body() body: GoogleVerifyDto) {
+    return this.authService.verifyGoogleMobileLogin(body.idToken);
+  }
+
+  @Public()
   @ApiOperation({ summary: 'Login with email and password' })
   @ApiOkResponse({ description: 'Login successful' })
   @Post('login')
   async login(@Body() body: LoginDto, @Res({ passthrough: true }) response: Response) {
-    const { refreshToken, refreshTokenExpiresAt, ...loginResponse } =
-      await this.authService.login(body);
+    const loginResponse = await this.authService.login(body);
 
-    response.cookie('refreshToken', refreshToken, {
-      ...REFRESH_COOKIE_OPTIONS,
-      expires: refreshTokenExpiresAt,
-    });
+    if (loginResponse?.refreshToken) {
+      response.cookie('refreshToken', loginResponse.refreshToken, {
+        ...REFRESH_COOKIE_OPTIONS,
+        expires: loginResponse.refreshTokenExpiresAt,
+      });
+    }
 
     return loginResponse;
   }
@@ -126,13 +135,14 @@ export class AuthController {
     @Body() body: Partial<RefreshTokenDto>,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const { refreshToken, refreshTokenExpiresAt, ...refreshResponse } =
-      await this.authService.refresh(cookieRefreshToken ?? body.refreshToken);
+    const refreshResponse = await this.authService.refresh(cookieRefreshToken ?? body.refreshToken);
 
-    response.cookie('refreshToken', refreshToken, {
-      ...REFRESH_COOKIE_OPTIONS,
-      expires: refreshTokenExpiresAt,
-    });
+    if (refreshResponse?.refreshToken) {
+      response.cookie('refreshToken', refreshResponse.refreshToken, {
+        ...REFRESH_COOKIE_OPTIONS,
+        expires: refreshResponse.refreshTokenExpiresAt,
+      });
+    }
 
     return refreshResponse;
   }

@@ -32,7 +32,6 @@ type AdminActionDialogProps = {
   submitLabel?: string;
 };
 
-// Codex #admin-ui start
 export function AdminActionDialog({
   trigger,
   title,
@@ -78,4 +77,3 @@ export function AdminActionDialog({
     </Dialog>
   );
 }
-// Codex #admin-ui end
