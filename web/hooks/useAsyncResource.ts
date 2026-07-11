@@ -8,7 +8,9 @@ export function useAsyncResource<T>(fetcher: () => Promise<T>, deps: any[] = [],
 
   // 1. Tránh vòng lặp vô hạn: Dùng ref để giữ bản cập nhật của fetcher
   const fetcherRef = useRef(fetcher);
-  fetcherRef.current = fetcher;
+  useEffect(() => {
+    fetcherRef.current = fetcher;
+  }, [fetcher]);
 
   // 2. Tránh stale closure & theo dõi lượt tải đầu: Dùng ref đánh dấu đã từng tải thành công
   const hasLoadedRef = useRef(false);
@@ -68,6 +70,7 @@ export function useAsyncResource<T>(fetcher: () => Promise<T>, deps: any[] = [],
   // Reset khi đổi identity chính (projectId, fileId thay đổi) và bắt lỗi để tránh Unhandled Promise Rejection
   useEffect(() => {
     hasLoadedRef.current = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setData(null);
     void load(false).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps

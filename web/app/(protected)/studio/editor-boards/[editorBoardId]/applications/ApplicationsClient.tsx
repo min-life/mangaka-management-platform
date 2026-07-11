@@ -28,7 +28,6 @@ type ApplicationsClientProps = {
 
 export type EditorBoardApplicationStatus =
   | ApplicationStatus
-  | 'INTERNAL_APPROVED'
   | 'SUBMITTED';
 
 export type EditorBoardApplicationType =
@@ -47,7 +46,6 @@ export type EditorBoardApplicationResponse = Omit<ApplicationResponse, 'status' 
 const STATUS_FILTERS = [
   'ALL',
   'SUBMITTED',
-  'INTERNAL_APPROVED',
   'APPROVE',
   'REJECT',
 ] as const;

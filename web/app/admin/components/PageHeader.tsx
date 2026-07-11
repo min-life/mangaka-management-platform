@@ -6,7 +6,6 @@ type PageHeaderProps = {
   action?: ReactNode;
 };
 
-// Codex #admin-ui start
 export function PageHeader({ title, description, action }: PageHeaderProps) {
   return (
     <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -18,4 +17,3 @@ export function PageHeader({ title, description, action }: PageHeaderProps) {
     </div>
   );
 }
-// Codex #admin-ui end

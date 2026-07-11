@@ -68,43 +68,54 @@ export default function ProjectDashboardPage() {
 
     async function loadDashboardData() {
       try {
-        const proj = await getProjectById(Number(projectId));
+        const [proj, membersRes, appsRes, foldersRes] = await Promise.all([
+          getProjectById(Number(projectId)),
+          getProjectMembers(Number(projectId)),
+          getProjectApplications(projectId),
+          getProjectFolders(Number(projectId)),
+        ]);
         if (!isMounted) return;
-        setProject(proj);
 
-        const membersRes = await getProjectMembers(Number(projectId));
-        if (!isMounted) return;
+        setProject(proj);
+        
         const membersList = membersRes.members || [];
         setMembersCount(membersList.length);
 
-        const appsRes = await getProjectApplications(projectId);
-        if (!isMounted) return;
         const appsList = appsRes.applications || [];
         setApplicationsCount(appsList.length);
         const publishingReqs = appsList.filter((app: any) => app.type === 'PUBLISH_REQUEST');
         setPublishingRequestsCount(publishingReqs.length);
 
-        const foldersRes = await getProjectFolders(Number(projectId));
-        if (!isMounted) return;
         const foldersList = foldersRes.folders || [];
-        let tempFilesCount = 0;
-        const loadedTasks: any[] = [];
 
-        for (const folder of foldersList) {
-          const filesRes = await getFolderFiles(folder.id);
-          const filesList = filesRes.files || [];
-          tempFilesCount += filesList.length;
-          for (const file of filesList) {
-            const fileTasks = await getFileTasks(file.id);
-            loadedTasks.push(
-              ...fileTasks.map((t: any) => ({
-                ...t,
-                fileName: file.title,
-                folderName: folder.title,
-              })),
+        // Parallelize fetching files for folders
+        const filesByFolder = await Promise.all(
+          foldersList.map(async (folder) => {
+            const filesRes = await getFolderFiles(folder.id);
+            return { folder, files: filesRes.files || [] };
+          })
+        );
+
+        let tempFilesCount = 0;
+        const filePromises: Promise<any[]>[] = [];
+
+        for (const { folder, files } of filesByFolder) {
+          tempFilesCount += files.length;
+          for (const file of files) {
+            filePromises.push(
+              getFileTasks(file.id).then((fileTasks) =>
+                fileTasks.map((t: any) => ({
+                  ...t,
+                  fileName: file.title,
+                  folderName: folder.title,
+                }))
+              )
             );
           }
         }
+
+        const tasksNested = await Promise.all(filePromises);
+        const loadedTasks = tasksNested.flat();
 
         if (!isMounted) return;
         setFilesCount(tempFilesCount);

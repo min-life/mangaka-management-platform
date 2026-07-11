@@ -1,9 +1,9 @@
 import api from '@/lib/api';
+import { AxiosError } from 'axios';
 
 export type ApplicationStatus =
   | 'APPROVE'
   | 'CANCELLED'
-  | 'INTERNAL_APPROVED'
   | 'PENDING'
   | 'REJECT'
   | 'SUBMITTED';
@@ -44,6 +44,7 @@ export type ApplicationResponse = {
   updatedByUser?: UserSummary | null;
   verifyBy?: number | null;
   verifiedByUser?: UserSummary | null;
+  voteDeadline?: string | null;
 };
 
 type PaginationResponse = {
@@ -67,8 +68,8 @@ export type ApplicationCommentResponse = {
   createdAt: string;
   id: number;
   updatedAt: string;
-  user?: UserSummary | null;
-  userId?: number;
+  createdByUser?: UserSummary | null;
+  applicationId?: number;
 };
 
 type ApplicationCommentsResponse = {
@@ -201,10 +202,10 @@ export async function createProjectApplication(
     body,
     body instanceof FormData
       ? {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        }
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
       : undefined,
   );
 
@@ -254,7 +255,7 @@ export async function getApplicationVotes(applicationId: number | string) {
   const response = await api.get<{ data: ApplicationVoteResponse[] }, { data: ApplicationVoteResponse[] }>(
     `/applications/${applicationId}/votes`,
   );
-  return response.data;
+  return response.data ?? [];
 }
 
 export async function voteApplication(
@@ -270,20 +271,30 @@ export async function voteApplication(
 }
 
 export async function getApplicationComments(applicationId: number | string) {
-  const response = await api.get<ApplicationCommentsResponse, ApplicationCommentsResponse>(
-    `/applications/${applicationId}/comments`,
-    {
-      params: {
-        field: 'createdAt',
-        order: 'desc',
+  try {
+    const response = await api.get<ApplicationCommentsResponse, ApplicationCommentsResponse>(
+      `/applications/${applicationId}/comments`,
+      {
+        params: {
+          field: 'createdAt',
+          order: 'desc',
+        },
       },
-    },
-  );
+    );
 
-  return {
-    comments: response.data ?? [],
-    pagination: response.pagination,
-  };
+    return {
+      comments: response.data ?? [],
+      pagination: response.pagination,
+    };
+  } catch (error) {
+    if (error instanceof AxiosError && error.response?.status === 404) {
+      return {
+        comments: [],
+        pagination: { limit: 10, page: 1, total: 0, totalPages: 0 },
+      };
+    }
+    throw error;
+  }
 }
 
 export async function createApplicationComment(
