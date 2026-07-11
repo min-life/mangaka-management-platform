@@ -653,22 +653,13 @@ export class ProjectsService {
       const existingMember = await this.findProjectMember(projectId, userId);
       await this.ensureProjectRole(roleId);
 
-      const updatedMember = await this.prisma.$transaction(async (prisma) => {
-        await prisma.userProject.deleteMany({ where: { projectId, userId } });
-        await prisma.userProject.create({
-          data: {
-            projectId,
-            userId,
-            roleId,
-            createdBy: actorId,
-            updatedBy: actorId,
-            createdAt: existingMember.createdAt,
-          },
-        });
-        return prisma.userProject.findFirstOrThrow({
-          where: { projectId, userId },
-          select: buildProjectMemberSelect(projectId),
-        });
+      const updatedMember = await this.prisma.userProject.update({
+        where: { userId_projectId: { userId, projectId } },
+        data: {
+          roleId,
+          updatedBy: actorId,
+        },
+        select: buildProjectMemberSelect(projectId),
       });
 
       const { _count, ...userWithoutCount } = updatedMember.user as any;
@@ -1179,10 +1170,9 @@ export class ProjectsService {
   private async findProjectMember(projectId: number, userId: number) {
     await this.ensureProject(projectId);
 
-    const member = await this.prisma.userProject.findFirst({
+    const member = await this.prisma.userProject.findUnique({
       where: {
-        projectId,
-        userId,
+        userId_projectId: { userId, projectId },
       },
       select: buildProjectMemberSelect(projectId),
     });
