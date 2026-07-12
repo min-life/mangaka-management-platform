@@ -66,7 +66,7 @@ import { getMyTasks, type TaskResponse } from '@/services/task.service';
 import { getApplications, type ApplicationResponse } from '@/services/application.service';
 import { toast } from '@/lib/toast';
 import { useAsyncResource } from '@/hooks/useAsyncResource';
-import { RefreshingIndicator } from '@/components/ui/refreshing-indicator';
+
 
 import { CreateBoardDialog } from './CreateBoardDialog';
 import { CreateProjectDialog } from './CreateProjectDialog';
@@ -217,7 +217,7 @@ export function WorkspaceDashboard() {
       field: projectsSortField,
       order: projectsSortOrder,
     });
-  }, []);
+  }, [], [projectsPage, projectsLimit, projectsFilter, projectsSortField, projectsSortOrder]);
 
   const boardsResource = useAsyncResource(async () => {
     return await getEditorBoards({
@@ -227,7 +227,7 @@ export function WorkspaceDashboard() {
       field: boardsSortField,
       order: boardsSortOrder,
     });
-  }, []);
+  }, [], [boardsPage, boardsLimit, boardsFilter, boardsSortField, boardsSortOrder]);
 
   const tasksResource = useAsyncResource(async () => {
     return await getMyTasks({
@@ -235,7 +235,7 @@ export function WorkspaceDashboard() {
       page: tasksPage,
       limit: tasksLimit,
     });
-  }, []);
+  }, [], [tasksPage, tasksLimit]);
 
   const applicationsResource = useAsyncResource(async () => {
     return await getApplications({
@@ -244,7 +244,7 @@ export function WorkspaceDashboard() {
       field: applicationsSortField,
       order: applicationsSortOrder,
     });
-  }, []);
+  }, [], [applicationsPage, applicationsLimit, applicationsSortField, applicationsSortOrder]);
 
   const isLoadingProjects = projectsResource.isInitialLoading || projectsResource.isRefreshing;
   const isLoadingBoards = boardsResource.isInitialLoading || boardsResource.isRefreshing;
@@ -317,24 +317,14 @@ export function WorkspaceDashboard() {
     }
   }, [applicationsResource.data]);
 
-  // Soft deps listeners for pagination (separately listen to prevent initial loading screen)
-  useEffect(() => {
-    void projectsResource.reload().catch(() => {});
-  }, [projectsPage, projectsLimit, projectsFilter, projectsSortField, projectsSortOrder]);
 
-  useEffect(() => {
-    void boardsResource.reload().catch(() => {});
-  }, [boardsPage, boardsLimit, boardsFilter, boardsSortField, boardsSortOrder]);
-
-  useEffect(() => {
-    void tasksResource.reload().catch(() => {});
-  }, [tasksPage, tasksLimit]);
 
   useEffect(() => {
     if (
       !projectsResource.isInitialLoading &&
       !boardsResource.isInitialLoading &&
-      !tasksResource.isInitialLoading
+      !tasksResource.isInitialLoading &&
+      !applicationsResource.isInitialLoading
     ) {
       queueMicrotask(() => {
         setHasLoadedOnce(true);
@@ -344,6 +334,7 @@ export function WorkspaceDashboard() {
     projectsResource.isInitialLoading,
     boardsResource.isInitialLoading,
     tasksResource.isInitialLoading,
+    applicationsResource.isInitialLoading,
   ]);
 
   const handleProjectsSort = (field: 'name' | 'updatedAt' | 'createdAt') => {
@@ -720,17 +711,6 @@ export function WorkspaceDashboard() {
               ) : null}
             </button>
           </div>
-          <RefreshingIndicator
-            isRefreshing={
-              activeTab === 'projects'
-                ? projectsResource.isRefreshing
-                : activeTab === 'editorBoards'
-                  ? boardsResource.isRefreshing
-                  : activeTab === 'applications'
-                    ? applicationsResource.isRefreshing
-                    : tasksResource.isRefreshing
-            }
-          />
         </div>
 
         <div className="mt-5 flex flex-wrap items-center gap-3">
