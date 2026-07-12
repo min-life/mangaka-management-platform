@@ -4,6 +4,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import 'dotenv/config';
 import { AppModule } from './app.module';
+import { PrismaExceptionFilter } from './share/filters/prisma-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -35,6 +36,7 @@ async function bootstrap() {
       transform: true,
     }),
   );
+  app.useGlobalFilters(new PrismaExceptionFilter());
   app.setGlobalPrefix('api');
   app.use(cookieParser());
   const config = new DocumentBuilder()

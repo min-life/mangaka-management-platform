@@ -1,9 +1,11 @@
 import { SCOPE } from '@prisma/client';
-import { ArrayUnique, IsArray, IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
+import { ArrayUnique, IsArray, IsBoolean, IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class UpdateRoleDto {
   @IsString()
   @IsOptional()
+  @Transform(({ value }) => typeof value === 'string' ? value.trim().toUpperCase() : value)
   code?: string;
 
   @IsString()
@@ -20,7 +22,7 @@ export class UpdateRoleDto {
 
   @IsArray()
   @ArrayUnique()
-  @IsString({ each: true })
+  @IsNumber({}, { each: true })
   @IsOptional()
-  permissionIds?: string[];
+  permissionIds?: number[];
 }
