@@ -1,5 +1,5 @@
 import { SCOPE } from '@prisma/client';
-import { IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { ArrayUnique, IsArray, IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CreateRoleDto {
   @IsNotEmpty()
@@ -17,4 +17,10 @@ export class CreateRoleDto {
   @IsBoolean()
   @IsOptional()
   isDefault?: boolean;
+
+  @IsArray()
+  @ArrayUnique()
+  @IsString({ each: true })
+  @IsOptional()
+  permissionIds?: string[];
 }

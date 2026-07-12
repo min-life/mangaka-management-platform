@@ -72,6 +72,13 @@ export class RolesService {
         });
       });
 
+      if (dto.permissionIds !== undefined) {
+        await this.replacePermissions(
+          role.id,
+          dto.permissionIds.map((id) => Number(id)),
+        );
+      }
+
       return { data: serializeRole(role) };
     } catch (error) {
       this.handleUniqueCodeConflict(error);
