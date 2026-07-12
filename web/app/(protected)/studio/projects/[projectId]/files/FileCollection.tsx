@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Clock, FileText, Grid2X2, List, Search, Tag } from 'lucide-react';
+import { Clock, FileText, Grid2X2, List, Search, Tag, Loader2 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,8 @@ type FileCollectionProps = {
   searchQuery: string;
   selectedFileId: number | null;
   viewMode: FileViewMode;
+  hideSearch?: boolean;
+  isLoading?: boolean;
 };
 
 export function FileCollection({
@@ -33,21 +35,25 @@ export function FileCollection({
   searchQuery,
   selectedFileId,
   viewMode,
+  hideSearch,
+  isLoading,
 }: FileCollectionProps) {
   return (
     <section className="min-w-0 bg-[#0d151e]">
       {/* Toolbar */}
-      <div className="flex h-12 items-center justify-between gap-3 border-b border-[#1e2936] px-4">
+      <div className={`flex h-12 items-center gap-3 border-b border-[#1e2936] px-4 ${hideSearch ? 'justify-end' : 'justify-between'}`}>
         {/* Search */}
-        <div className="flex h-8 min-w-0 max-w-sm flex-1 items-center gap-2 rounded-[5px] border border-[#2a3444] bg-[#111923] px-3 transition-colors focus-within:border-[#FFD369]/40 focus-within:bg-[#141e2a]">
-          <Search className="size-3.5 shrink-0 text-[#5d6878]" />
-          <input
-            className="min-w-0 flex-1 bg-transparent text-xs font-medium text-white outline-none placeholder:text-[#5d6878]"
-            onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Search files..."
-            value={searchQuery}
-          />
-        </div>
+        {!hideSearch && (
+          <div className="flex h-8 min-w-0 max-w-sm flex-1 items-center gap-2 rounded-[5px] border border-[#2a3444] bg-[#111923] px-3 transition-colors focus-within:border-[#FFD369]/40 focus-within:bg-[#141e2a]">
+            <Search className="size-3.5 shrink-0 text-[#5d6878]" />
+            <input
+              className="min-w-0 flex-1 bg-transparent text-xs font-medium text-white outline-none placeholder:text-[#5d6878]"
+              onChange={(event) => onSearchChange(event.target.value)}
+              placeholder="Search files..."
+              value={searchQuery}
+            />
+          </div>
+        )}
         {/* File count */}
         <span className="shrink-0 text-[11px] font-bold text-[#5d6878]">
           {files.length} {files.length === 1 ? 'file' : 'files'}
@@ -75,7 +81,11 @@ export function FileCollection({
         </div>
       </div>
 
-      {files.length ? (
+      {isLoading ? (
+        <div className="grid min-h-[300px] place-items-center px-6">
+          <Loader2 className="size-8 animate-spin text-[#FFD369]" />
+        </div>
+      ) : files.length ? (
         viewMode === 'table' ? (
           /* ── LIST VIEW ── */
           <div className="overflow-x-auto">

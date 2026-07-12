@@ -21,7 +21,6 @@ import {
 import {
   getFileTasks,
   createFileTask,
-  getFileMaterialVersions,
 } from '@/services/file.service';
 import { updateTask, createTaskComment } from '@/services/task.service';
 import { LoadingState } from '@/components/ui/loading-state';
@@ -44,10 +43,6 @@ import {
 type TaskScope = 'ALL' | 'MINE' | 'OVERDUE' | 'REVIEW';
 type TaskView = 'KANBAN' | 'TABLE';
 
-type TasksClientProps = {
-  projectId: number;
-};
-
 const scopeLabels: Record<TaskScope, string> = {
   ALL: 'All Tasks',
   MINE: 'My Tasks',
@@ -55,10 +50,13 @@ const scopeLabels: Record<TaskScope, string> = {
   REVIEW: 'Review Queue',
 };
 
-export function TasksClient({ projectId }: TasksClientProps) {
+import { useProjectParams } from '@/hooks/useProjectParams';
+
+export function TasksClient() {
   const router = useRouter();
   const { user } = useAuth();
-  const { can: canProject } = usePermissions({ resource: 'PROJECT', resourceId: projectId });
+  const { slug, numericId } = useProjectParams();
+  const { can: canProject } = usePermissions({ resource: 'PROJECT', resourceId: numericId });
   const [query, setQuery] = useState('');
   const [scope, setScope] = useState<TaskScope>('ALL');
   const [view, setView] = useState<TaskView>('TABLE');
@@ -70,15 +68,15 @@ export function TasksClient({ projectId }: TasksClientProps) {
     setPage(1);
   }, [query, scope, view]);
 
-  const { activities } = useRealtimeProjectActivity(projectId);
+  const { activities } = useRealtimeProjectActivity(numericId);
 
   const { data, error, isInitialLoading, isRefreshing, reload } = useAsyncResource(async () => {
-    const foldersRes = await getProjectFolders(projectId);
+    const foldersRes = await getProjectFolders(numericId);
     const foldersList = foldersRes.folders || [];
 
     let apiMembers: { id: number; name: string }[] = [];
     try {
-      const membersRes = await getProjectMembers(projectId);
+      const membersRes = await getProjectMembers(numericId);
       apiMembers = (membersRes.members || []).map((m) => ({
         id: m.id,
         name: m.displayName || m.email,
@@ -103,25 +101,6 @@ export function TasksClient({ projectId }: TasksClientProps) {
       try {
         const dbTasks = await getFileTasks(file.id);
 
-        let previewUrl = '';
-        let fileVersions: any[] = [];
-        try {
-          const versionsRes = await getFileMaterialVersions(file.id);
-          const rawArray = (versionsRes as any).data || versionsRes.versions || [];
-          fileVersions = rawArray.map((v: any, index: number, arr: any[]) => ({
-            createdAt: v.createdAt,
-            version: arr.length - index,
-          }));
-          const latestVersion = rawArray[0];
-          if (latestVersion) {
-            const thumbnailMaterial =
-              latestVersion.materials.find((m: any) => m.isThumbnail) || latestVersion.materials[0];
-            previewUrl = thumbnailMaterial?.downloadUrl || thumbnailMaterial?.url || '';
-          }
-        } catch {
-          // ignore previewUrl errors
-        }
-
         return dbTasks.map((t: any) => {
           const frame = t.commentFrames?.[0];
           const region = frame
@@ -136,23 +115,7 @@ export function TasksClient({ projectId }: TasksClientProps) {
           const assigneeName = t.assignedByUser?.displayName || t.assignedByUser?.email || 'Unassigned';
 
           const versionMatch = t.description?.match(/\[version:(v\d+)\]/);
-          let taskVersion = versionMatch ? versionMatch[1] : undefined;
-
-          if (!taskVersion && fileVersions.length > 0 && t.createdAt) {
-            const sorted = [...fileVersions].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-            const taskTime = new Date(t.createdAt).getTime();
-            let matchedVer = sorted[0];
-            for (const v of sorted) {
-              if (new Date(v.createdAt).getTime() <= taskTime) {
-                matchedVer = v;
-              } else {
-                break;
-              }
-            }
-            if (matchedVer) {
-              taskVersion = `v${matchedVer.version}`;
-            }
-          }
+          const taskVersion = versionMatch ? versionMatch[1] : undefined;
 
           const cleanDesc = t.description ? t.description.replace(/\s*\[version:v\d+\]/g, '') : '';
 
@@ -164,7 +127,7 @@ export function TasksClient({ projectId }: TasksClientProps) {
             fileTitle: file.title,
             id: String(t.id),
             isMine: user?.id != null && t.assignedByUser?.id === user.id,
-            previewUrl,
+            previewUrl: '', // Not used in UI
             priority: 'MEDIUM',
             region,
             status: t.status,
@@ -187,7 +150,7 @@ export function TasksClient({ projectId }: TasksClientProps) {
       projectFiles: apiProjectFiles,
       tasks: allTasks
     };
-  }, [projectId]);
+  }, [numericId]);
 
   const members = data?.members ?? [];
   const projectFiles = data?.projectFiles ?? [];
@@ -277,7 +240,7 @@ export function TasksClient({ projectId }: TasksClientProps) {
 
   const openTask = (task: TaskWorkspaceItem) => {
     router.push(
-      `/studio/projects/${projectId}/files/${task.fileId}?taskId=${encodeURIComponent(task.id)}&from=tasks`,
+      `/studio/projects/${slug}/files/${task.fileId}?taskId=${encodeURIComponent(task.id)}&from=tasks`,
     );
   };
 
@@ -305,33 +268,7 @@ export function TasksClient({ projectId }: TasksClientProps) {
     }
   };
 
-  const stats = [
-    { icon: ListChecks, label: 'Total Tasks', value: tasks.length, tone: 'text-white' },
-    {
-      icon: AlertTriangle,
-      label: 'Pending',
-      value: tasks.filter((task) => task.status === 'PENDING').length,
-      tone: 'text-[#dce7f3]',
-    },
-    {
-      icon: UserRoundCheck,
-      label: 'In Progress',
-      value: tasks.filter((task) => task.status === 'INPROGRESS').length,
-      tone: 'text-[#9ddde8]',
-    },
-    {
-      icon: AlertTriangle,
-      label: 'Needs Review',
-      value: tasks.filter((task) => task.status === 'REVIEW').length,
-      tone: 'text-[#FFD369]',
-    },
-  ];
 
-  if (isInitialLoading) {
-    return (
-      <LoadingState message="Loading production tasks..." minHeight="70vh" />
-    );
-  }
 
   return (
     <section className="min-h-full w-full max-w-full bg-[#101820] px-5 py-6 overflow-hidden">
@@ -354,17 +291,7 @@ export function TasksClient({ projectId }: TasksClientProps) {
         </p>
       ) : null}
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map(({ icon: Icon, label, tone, value }) => (
-          <article className="border border-[#39424f] bg-[#151c25] px-4 py-4" key={label}>
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#aeb7c2]">{label}</p>
-              <Icon className={`size-4 ${tone}`} />
-            </div>
-            <p className={`mt-3 text-2xl font-black ${tone}`}>{value}</p>
-          </article>
-        ))}
-      </div>
+
 
       <div className={`mt-5 w-full max-w-full overflow-x-auto border border-[#303842] bg-[#0d151e] transition-opacity duration-200 ${isRefreshing ? 'opacity-50 pointer-events-none' : ''}`}>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#303842] px-4 py-3">
@@ -416,7 +343,7 @@ export function TasksClient({ projectId }: TasksClientProps) {
 
         <div className="overflow-x-auto p-4">
           {view === 'TABLE' ? (
-            <TaskTable onOpenTask={openTask} tasks={paginatedTasks} />
+            <TaskTable isLoading={isInitialLoading} onOpenTask={openTask} tasks={paginatedTasks} />
           ) : (
             <TaskKanban
               canReview={canReview}

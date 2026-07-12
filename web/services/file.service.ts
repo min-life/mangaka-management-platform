@@ -180,6 +180,16 @@ export async function getFileComments(fileId: number | string) {
   return response.data ?? [];
 }
 
+export async function getFileAllFrames(fileId: number | string) {
+  const response = await api.get<{ data: unknown[] }, { data: unknown[] }>(`/files/${fileId}/frames`);
+  return response.data ?? [];
+}
+
+export async function getFileAllFrameComments(fileId: number | string) {
+  const response = await api.get<{ data: unknown[] }, { data: unknown[] }>(`/files/${fileId}/frame-comments`);
+  return response.data ?? [];
+}
+
 export async function createFileComment(fileId: number | string, content: string | object) {
   const response = await api.post<{ data: unknown }, { data: unknown }>(`/files/${fileId}/comments`, {
     content,

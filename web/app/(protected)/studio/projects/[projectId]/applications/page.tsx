@@ -6,8 +6,6 @@ type ApplicationsPageProps = {
   }>;
 };
 
-export default async function ApplicationsPage({ params }: ApplicationsPageProps) {
-  const { projectId } = await params;
-
-  return <ApplicationsClient projectId={Number(projectId)} />;
+export default async function ApplicationsPage() {
+  return <ApplicationsClient />;
 }

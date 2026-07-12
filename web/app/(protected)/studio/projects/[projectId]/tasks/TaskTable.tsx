@@ -10,9 +10,13 @@ import {
   type TaskWorkspaceItem,
 } from './task-ui';
 
-type TaskTableProps = { onOpenTask: (task: TaskWorkspaceItem) => void; tasks: TaskWorkspaceItem[] };
+type TaskTableProps = { isLoading?: boolean; onOpenTask: (task: TaskWorkspaceItem) => void; tasks: TaskWorkspaceItem[] };
 
-export function TaskTable({ onOpenTask, tasks }: TaskTableProps) {
+import { Skeleton } from '@/components/ui/skeleton';
+
+export function TaskTable({ isLoading, onOpenTask, tasks }: TaskTableProps) {
+  const skeletonRows = Array.from({ length: 5 });
+
   return (
     <div className="w-full rounded-[5px] border border-[#303842]">
       <div className="hidden w-full lg:block">
@@ -24,7 +28,27 @@ export function TaskTable({ onOpenTask, tasks }: TaskTableProps) {
           <span>Status</span>
           <span>Due</span>
         </div>
-        {tasks.length ? (
+        {isLoading ? (
+          skeletonRows.map((_, index) => (
+            <div
+              className="grid min-h-[72px] w-full grid-cols-[minmax(180px,2fr)_minmax(80px,1fr)_minmax(120px,1.2fr)_100px_90px_110px] gap-x-4 items-center border-t border-[#303842] bg-[#151c25] px-4"
+              key={index}
+            >
+              <div className="flex items-center gap-3">
+                <Skeleton className="size-9 rounded-[4px] bg-[#2f353e]" />
+                <div className="space-y-2 flex-1">
+                  <Skeleton className="h-4 w-3/4 rounded-[4px] bg-[#2f353e]" />
+                  <Skeleton className="h-3 w-1/2 rounded-[4px] bg-[#2f353e]" />
+                </div>
+              </div>
+              <Skeleton className="h-4 w-full rounded-[4px] bg-[#2f353e]" />
+              <Skeleton className="h-4 w-full rounded-[4px] bg-[#2f353e]" />
+              <Skeleton className="h-4 w-full rounded-[4px] bg-[#2f353e]" />
+              <Skeleton className="h-6 w-16 rounded-[3px] bg-[#2f353e]" />
+              <Skeleton className="h-4 w-full rounded-[4px] bg-[#2f353e]" />
+            </div>
+          ))
+        ) : tasks.length ? (
           tasks.map((task) => (
             <button
               className="grid min-h-[72px] w-full grid-cols-[minmax(180px,2fr)_minmax(80px,1fr)_minmax(120px,1.2fr)_100px_90px_110px] gap-x-4 items-center border-t border-[#303842] bg-[#151c25] px-4 text-left transition hover:border-[#FFD369]/40 hover:bg-[#1b2530]"
@@ -36,7 +60,7 @@ export function TaskTable({ onOpenTask, tasks }: TaskTableProps) {
                 <span className="grid size-9 shrink-0 place-items-center rounded-[4px] border border-[#39424f] bg-[#202832] text-[#FFD369]">
                   {task.region ? <Crosshair className="size-4" /> : <FileText className="size-4" />}
                 </span>
-                <span className="min-w-0">
+                <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-black text-white">{task.title}</span>
                   <span className="mt-1 block truncate text-[10px] font-bold text-[#8b94a1]">
                     Updated {task.updatedAt}

@@ -461,6 +461,7 @@ export function WorkspaceDashboard() {
             color: '#0ea5e9',
             initials: assigneeInitials,
             name: assigneeName,
+            user: t.assignedByUser,
           },
           status: t.status,
           due: t.deadline ? new Date(t.deadline).toLocaleDateString() : 'No due date',
@@ -490,6 +491,7 @@ export function WorkspaceDashboard() {
           project: app.project?.name || 'No project',
           projectId: app.projectId,
           createdBy: assigneeName,
+          createdByUser: app.createdByUser,
           assignee: {
             initials: assigneeInitials,
           },
@@ -760,69 +762,47 @@ export function WorkspaceDashboard() {
           </div>
 
           {activeTab === 'projects' && (
-            <div className="flex h-9 overflow-hidden rounded-[4px] border border-[#4b535f] bg-[#393E46] p-1 text-xs">
-              <button
-                className={`px-3 py-1 font-black rounded-[3px] transition ${
-                  projectsFilter === 'all'
-                    ? 'bg-[#FFD369] text-[#222831]'
-                    : 'text-[#aeb7c2] hover:bg-[#4b535f] hover:text-white'
-                }`}
-                onClick={() => {
-                  setProjectsFilter('all');
-                  setProjectsPage(1);
-                }}
-                type="button"
-              >
-                All Projects
-              </button>
-              <button
-                className={`px-3 py-1 font-black rounded-[3px] transition ${
-                  projectsFilter === 'me'
-                    ? 'bg-[#FFD369] text-[#222831]'
-                    : 'text-[#aeb7c2] hover:bg-[#4b535f] hover:text-white'
-                }`}
-                onClick={() => {
-                  setProjectsFilter('me');
-                  setProjectsPage(1);
-                }}
-                type="button"
-              >
-                Created by Me
-              </button>
-            </div>
+            <Select
+              value={projectsFilter}
+              onValueChange={(value) => {
+                setProjectsFilter(value as 'all' | 'me');
+                setProjectsPage(1);
+              }}
+            >
+              <SelectTrigger className="h-9 w-[150px] border-[#4b535f] bg-[#393E46] text-xs font-black text-white focus:ring-1 focus:ring-[#FFD369]">
+                <SelectValue placeholder="Filter projects" />
+              </SelectTrigger>
+              <SelectContent className="border-[#4b535f] bg-[#2a333d] text-white">
+                <SelectItem value="all" className="text-xs font-bold focus:bg-[#393E46] focus:text-[#FFD369] cursor-pointer">
+                  All Projects
+                </SelectItem>
+                <SelectItem value="me" className="text-xs font-bold focus:bg-[#393E46] focus:text-[#FFD369] cursor-pointer">
+                  Created by Me
+                </SelectItem>
+              </SelectContent>
+            </Select>
           )}
 
           {activeTab === 'editorBoards' && (
-            <div className="flex h-9 overflow-hidden rounded-[4px] border border-[#4b535f] bg-[#393E46] p-1 text-xs">
-              <button
-                className={`px-3 py-1 font-black rounded-[3px] transition ${
-                  boardsFilter === 'all'
-                    ? 'bg-[#FFD369] text-[#222831]'
-                    : 'text-[#aeb7c2] hover:bg-[#4b535f] hover:text-white'
-                }`}
-                onClick={() => {
-                  setBoardsFilter('all');
-                  setBoardsPage(1);
-                }}
-                type="button"
-              >
-                All Boards
-              </button>
-              <button
-                className={`px-3 py-1 font-black rounded-[3px] transition ${
-                  boardsFilter === 'me'
-                    ? 'bg-[#FFD369] text-[#222831]'
-                    : 'text-[#aeb7c2] hover:bg-[#4b535f] hover:text-white'
-                }`}
-                onClick={() => {
-                  setBoardsFilter('me');
-                  setBoardsPage(1);
-                }}
-                type="button"
-              >
-                Created by Me
-              </button>
-            </div>
+            <Select
+              value={boardsFilter}
+              onValueChange={(value) => {
+                setBoardsFilter(value as 'all' | 'me');
+                setBoardsPage(1);
+              }}
+            >
+              <SelectTrigger className="h-9 w-[150px] border-[#4b535f] bg-[#393E46] text-xs font-black text-white focus:ring-1 focus:ring-[#FFD369]">
+                <SelectValue placeholder="Filter boards" />
+              </SelectTrigger>
+              <SelectContent className="border-[#4b535f] bg-[#2a333d] text-white">
+                <SelectItem value="all" className="text-xs font-bold focus:bg-[#393E46] focus:text-[#FFD369] cursor-pointer">
+                  All Boards
+                </SelectItem>
+                <SelectItem value="me" className="text-xs font-bold focus:bg-[#393E46] focus:text-[#FFD369] cursor-pointer">
+                  Created by Me
+                </SelectItem>
+              </SelectContent>
+            </Select>
           )}
 
           {isProjectsTab ? (
@@ -892,6 +872,7 @@ export function WorkspaceDashboard() {
               <ApplicationsTab
                 applicationRows={applicationRows}
                 isLoading={applicationsResource.isInitialLoading}
+                formatUserName={formatUserName}
                 page={applicationsPage}
                 limit={applicationsLimit}
                 total={applicationsTotal}
@@ -906,6 +887,7 @@ export function WorkspaceDashboard() {
               <MyTasksTab
                 mappedTasks={mappedTasks}
                 isLoadingTasks={tasksResource.isInitialLoading}
+                formatUserName={formatUserName}
                 page={tasksPage}
                 limit={tasksLimit}
                 total={tasksTotal}
@@ -917,6 +899,7 @@ export function WorkspaceDashboard() {
               <EditorBoardsTab
                 boardRows={boardRows}
                 isLoadingBoards={boardsResource.isInitialLoading}
+                formatUserName={formatUserName}
                 onRenameBoard={handleRenameBoard}
                 onDeleteBoard={handleDeleteBoard}
                 onLeaveBoard={handleLeaveBoard}

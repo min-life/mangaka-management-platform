@@ -499,3 +499,33 @@ export async function deleteProjectFolder(folderId: number | string) {
   await api.delete(`/folders/${folderId}`);
 }
 
+export type ProjectDashboardResponse = {
+  overview: {
+    totalMembers: number;
+    totalFolders: number;
+    totalFiles: number;
+    totalTasks: number;
+  };
+  progressStats: {
+    completedTasks: number;
+    pendingTasks: number;
+    inProgressTasks: number;
+    reviewTasks: number;
+  };
+  myWorkspace: {
+    activeTasks: any[];
+  };
+  actionNeeded: {
+    overdueTasks: any[];
+    dueSoonTasks: any[];
+    pendingApplications: any[];
+  };
+  recentFiles: any[];
+};
+
+export async function getProjectDashboard(projectId: number | string) {
+  const response = await api.get<ApiResponse<ProjectDashboardResponse>, ApiResponse<ProjectDashboardResponse>>(
+    `/projects/${projectId}/dashboard`
+  );
+  return response.data ?? (response as unknown as ProjectDashboardResponse);
+}

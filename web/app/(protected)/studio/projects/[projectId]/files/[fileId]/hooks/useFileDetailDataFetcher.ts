@@ -48,7 +48,7 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
 
   const loadData = useCallback(async (isRefresh = false, signal?: AbortSignal) => {
     const currentLoadId = ++activeLoadRef.current;
-    
+
     if (isRefresh) {
       setIsRefreshing(true);
     } else {
@@ -232,9 +232,9 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
                 assetName = (thumbnailMaterial as any)?.name || (thumbnailMaterial as any)?.originalName || `submission-${versionTag}.png`;
               }
             } else {
-              const currentV = dbVersions.filter(v => v.taskId === t.id).find(v => v.isCurrent) 
-                || dbVersions.find(v => v.taskId === t.id) 
-                || dbVersions.find(v => v.isCurrent && !v.taskId) 
+              const currentV = dbVersions.filter(v => v.taskId === t.id).find(v => v.isCurrent)
+                || dbVersions.find(v => v.taskId === t.id)
+                || dbVersions.find(v => v.isCurrent && !v.taskId)
                 || dbVersions[dbVersions.length - 1];
               if (currentV) {
                 previewUrl = currentV.previewUrl;
@@ -333,8 +333,8 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
           try {
             const frames = await getMaterialFrames(matId);
             const material = dbVersions.find(v => String(v.id) === String(matId));
-            return frames.map((f: any) => ({ 
-              ...f, 
+            return frames.map((f: any) => ({
+              ...f,
               injectedMaterialId: matId,
               injectedTaskId: material?.taskId,
             }));

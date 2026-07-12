@@ -46,9 +46,7 @@ import {
   readMaterialSummary,
 } from './application-ui';
 
-type ApplicationsClientProps = {
-  projectId: number;
-};
+import { useProjectParams } from '@/hooks/useProjectParams';
 
 type ApplicationStatusFilter = 'ALL' | ApplicationStatus;
 
@@ -89,8 +87,9 @@ function ApplicationListSkeleton() {
   );
 }
 
-export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
+export function ApplicationsClient() {
   const { user } = useAuth();
+  const { numericId: projectId } = useProjectParams();
   const [applications, setApplications] = useState<ApplicationResponse[]>([]);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -193,9 +192,7 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
     });
   }, [applications, searchQuery, statusFilter]);
 
-  const pendingCount = applications.filter((application) => application.status === 'PENDING').length;
-  const approvedCount = applications.filter((application) => application.status === 'APPROVE').length;
-  const rejectedCount = applications.filter((application) => application.status === 'REJECT').length;
+
 
   const resetCreateForm = () => {
     setTitle('');
@@ -466,29 +463,6 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
 
 
 
-      <div className="mt-5 grid grid-cols-3 gap-4">
-        <article className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-4">
-          <p className="text-xs font-black uppercase tracking-[0.08em] text-[#aeb7c2]">
-            Pending Review
-          </p>
-          <p className="mt-3 text-2xl font-black text-white">{pendingCount}</p>
-          <p className="mt-1 text-[11px] font-bold text-[#FFD369]">Need attention</p>
-        </article>
-        <article className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-4">
-          <p className="text-xs font-black uppercase tracking-[0.08em] text-[#aeb7c2]">
-            Approved Requests
-          </p>
-          <p className="mt-3 text-2xl font-black text-white">{approvedCount}</p>
-          <p className="mt-1 text-[11px] font-bold text-[#9df2c7]">Cleared for production</p>
-        </article>
-        <article className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-4">
-          <p className="text-xs font-black uppercase tracking-[0.08em] text-[#aeb7c2]">
-            Rejected Requests
-          </p>
-          <p className="mt-3 text-2xl font-black text-white">{rejectedCount}</p>
-          <p className="mt-1 text-[11px] font-bold text-[#ff9ab3]">Needs revision</p>
-        </article>
-      </div>
 
       <div className="mt-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <div className="flex h-10 min-w-0 flex-1 items-center gap-3 rounded-[4px] border border-[#39424f] bg-[#151c25] px-4 text-[#8b94a1]">

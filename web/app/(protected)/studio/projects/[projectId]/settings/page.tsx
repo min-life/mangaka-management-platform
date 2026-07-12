@@ -16,9 +16,10 @@ import {
 } from '@/services/project.service';
 import { getEditorBoards, type EditorBoardResponse } from '@/services/editor-board.service';
 
+import { useProjectParams } from '@/hooks/useProjectParams';
+
 export default function ProjectSettingsPage() {
-  const params = useParams();
-  const projectId = params.projectId ? String(params.projectId) : '';
+  const { numericId: projectId } = useProjectParams();
 
   const [project, setProject] = useState<ProjectResponse | null>(null);
   const [editorBoards, setEditorBoards] = useState<EditorBoardResponse[]>([]);

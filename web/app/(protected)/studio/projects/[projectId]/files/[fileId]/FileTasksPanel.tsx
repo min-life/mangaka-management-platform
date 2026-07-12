@@ -80,15 +80,22 @@ export function FileTasksPanel({
       <div className="mt-3 space-y-2 pr-1">
         {visibleTasks.length ? (
           visibleTasks.map((task) => (
-            <button
-              className={`w-full rounded-[4px] border p-3 text-left transition-colors ${
+            <div
+              className={`w-full rounded-[4px] border p-3 text-left transition-colors cursor-pointer ${
                 selectedTaskId === task.id
                   ? 'border-[#FFD369] bg-[#16202b]'
                   : 'border-[#303842] bg-[#151c25] hover:border-[#4b535f] hover:bg-[#1b2530]'
               }`}
               key={task.id}
               onClick={() => onSelectTask(selectedTaskId === task.id ? null : task.id)}
-              type="button"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onSelectTask(selectedTaskId === task.id ? null : task.id);
+                }
+              }}
+              role="button"
+              tabIndex={0}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex min-w-0 items-start gap-2">
@@ -141,7 +148,8 @@ export function FileTasksPanel({
                   </div>
                 </div>
               </div>
-            </button>
+            </div>
+
           ))
         ) : (
           <p className="border border-[#303842] bg-[#151c25] px-3 py-5 text-center text-[10px] font-bold text-[#8b94a1]">

@@ -322,6 +322,8 @@ export function FileCanvas({ controller }: FileCanvasProps) {
             const canvasFrameIds = new Set(canvasFrameComments.map(c => c.frameId || c.id));
             const activeThreads = Array.from(frameThreadsMap.values()).filter(t => canvasFrameIds.has(t.frameId));
 
+            console.log('DEBUG ACTIVE_THREADS:', activeThreads.map(t => ({ id: t.comment.id, region: t.comment.region })));
+
             return activeThreads.map(({ frameId, comment, displayIndex }) => (
               <button
                 aria-label={`Open frame comment ${displayIndex}`}
@@ -343,10 +345,10 @@ export function FileCanvas({ controller }: FileCanvasProps) {
                 }}
                 onPointerDown={(event) => event.stopPropagation()}
                 style={{
-                  height: `${(comment.region.endY - comment.region.startY) * 100}%`,
+                  height: `${Math.max(comment.region.endY - comment.region.startY, 0.04) * 100}%`,
                   left: `${comment.region.startX * 100}%`,
                   top: `${comment.region.startY * 100}%`,
-                  width: `${(comment.region.endX - comment.region.startX) * 100}%`,
+                  width: `${Math.max(comment.region.endX - comment.region.startX, 0.04) * 100}%`,
                 }}
                 type="button"
               >

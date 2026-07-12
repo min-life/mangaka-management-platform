@@ -12,6 +12,8 @@ import {
   List,
   Calendar,
   Hash,
+  Search,
+  Loader2,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -310,6 +312,8 @@ type ChapterGridProps = {
   onSelectFile?: (file: import('./file-ui').FileExplorerItem) => void;
   arcViewMode?: 'grid' | 'table';
   onArcViewModeChange?: (mode: 'grid' | 'table') => void;
+  isLoadingArcFiles?: boolean;
+  isLoadingChapters?: boolean;
 };
 
 export function ChapterGrid({
@@ -326,6 +330,8 @@ export function ChapterGrid({
   onSelectFile,
   arcViewMode,
   onArcViewModeChange,
+  isLoadingArcFiles,
+  isLoadingChapters,
 }: ChapterGridProps) {
   const [chapterViewMode, setChapterViewMode] = useState<'grid' | 'list'>('grid');
   const arcCoverUrl = getFolderCover(selectedArc, folderCovers, getArcCover(Math.max(0, selectedArcIndex)));
@@ -387,6 +393,17 @@ export function ChapterGrid({
             <p className="mt-0.5 text-xs font-medium text-[#8b94a1]">Choose the chapter you are producing.</p>
           </div>
           <div className="flex items-center gap-3">
+            {onArcSearchChange && arcSearchQuery !== undefined && (
+              <div className="flex h-8 w-64 items-center gap-2 rounded-[5px] border border-[#2a3444] bg-[#111923] px-3 transition-colors focus-within:border-[#FFD369]/40 focus-within:bg-[#141e2a]">
+                <Search className="size-3.5 shrink-0 text-[#5d6878]" />
+                <input
+                  className="min-w-0 flex-1 bg-transparent text-xs font-medium text-white outline-none placeholder:text-[#5d6878]"
+                  onChange={(event) => onArcSearchChange(event.target.value)}
+                  placeholder="Search chapters & files..."
+                  value={arcSearchQuery}
+                />
+              </div>
+            )}
             <Badge className="rounded-[3px] border border-[#4a4f55] bg-[#20282b] text-[#dce7f3] font-bold">
               {chapters.length} chapters
             </Badge>
@@ -411,7 +428,11 @@ export function ChapterGrid({
           </div>
         </div>
 
-        {chapters.length === 0 ? (
+        {isLoadingChapters ? (
+          <div className="grid min-h-[200px] place-items-center px-6">
+            <Loader2 className="size-8 animate-spin text-[#FFD369]" />
+          </div>
+        ) : chapters.length === 0 ? (
           <div className="flex items-center gap-3 rounded-[6px] border border-dashed border-[#2a3444] bg-[#0f1822] px-4 py-6 text-xs font-medium text-[#5d6878]">
             <BookOpen className="size-4 shrink-0 text-[#3d4654]" />
             No chapters yet. Submit a Chapter application to add the first chapter.
@@ -545,6 +566,8 @@ export function ChapterGrid({
             searchQuery={arcSearchQuery}
             selectedFileId={null}
             viewMode={arcViewMode}
+            hideSearch={true}
+            isLoading={isLoadingArcFiles}
           />
         </div>
       )}

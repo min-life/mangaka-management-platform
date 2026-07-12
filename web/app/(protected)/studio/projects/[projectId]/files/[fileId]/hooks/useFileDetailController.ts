@@ -49,6 +49,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
 
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
+  const [commentFilterMode, setCommentFilterMode] = useState<string>('all');
   const [isSavingComment, setIsSavingComment] = useState(false);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [replyingFrameId, setReplyingFrameId] = useState<string | null>(null);
@@ -115,6 +116,8 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     setPanStart,
     setSelectedTaskId,
     setTaskDialogOpen,
+    zoom,
+    rotation,
   });
   const {
     annotationMode,
@@ -384,6 +387,8 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     discussionContextKey,
     discussionContextLabel,
     discussionFrameComments,
+    commentFilterMode,
+    setCommentFilterMode,
     displayedPreviewUrl,
     draftRegion,
     error,

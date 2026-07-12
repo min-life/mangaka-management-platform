@@ -10,7 +10,7 @@ import {
   DesktopTaskSidebar,
   ExpandTaskSidebarButton,
   MobileTaskDrawer,
-} from './FileTaskSidebars';
+} from './sidebars';
 import { FileVersionsTab } from './FileVersionsTab';
 import { TaskFormDialog } from './TaskFormDialog';
 import { CreateFrameCommentDialog } from './CreateFrameCommentDialog';
@@ -30,20 +30,13 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
     canCreateTask,
     canReviewTask,
     canSubmitTask,
-    canRestoreVersion,
-    canDeleteVersion,
-    canvasFrameComments,
     canvasRef,
-    comparisonOpacity,
-    currentMaterialId,
-    currentVersionName,
-    deletingVersionId,
     desktopSidebarOpen,
     discussionContextKey,
     discussionContextLabel,
     discussionFrameComments,
-    displayedPreviewUrl,
-    draftRegion,
+    commentFilterMode,
+    setCommentFilterMode,
     error,
     file,
     fileComments,
@@ -51,10 +44,6 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
     folder,
     focusFileTask,
     focusedTask,
-    frameAnnotationMode,
-    handleCanvasPointerDown,
-    handleCanvasPointerMove,
-    handleCanvasPointerUp,
     handleCreateAnnotatedTask,
     handleCreateDiscussionComment,
     handleCreateFrameComment,
@@ -67,54 +56,39 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
     handleUpdateDiscussionComment,
     isLoading,
     isTaskContextLoading,
-    isPanning,
     isSavingComment,
     isSubmittingReview,
-    isViewingHistoricalVersion,
     loadFile,
     members,
     mobileTasksOpen,
-    panOffset,
     pendingFrameRegion,
-    pendingTaskRegion,
     projectId,
     resourceTab,
-    rotation,
-    selectedSubmission,
     selectedSubmissionId,
     selectedTaskId,
     selectedVersion,
     selectedVersionForDetails,
     setAnnotationMode,
     setAnnotationStart,
-    setComparisonOpacity,
     setDesktopSidebarOpen,
     setDraftRegion,
     setError,
     setFrameAnnotationMode,
     setIsSubmittingReview,
     setMobileTasksOpen,
-    setPanOffset,
     setPendingFrameRegion,
     setPendingTaskRegion,
-    setReplyingFrameId,
     setResourceTab,
-    setRotation,
     setSelectedSubmissionId,
-    setSelectedTaskId,
     setSelectedVersion,
     setSelectedVersionForDetails,
     setTaskDialogOpen,
 
-
-    setZoom,
     setDiscussionContext,
-    startTaskFrameSelection,
 
     taskDialogOpen,
     tasks,
     versions,
-    zoom,
   } = controller;
 
   const { activities } = useRealtimeProjectActivity(projectId);
@@ -132,7 +106,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
         void loadFile();
       }
     }
-  }, [activities.length, file?.id, loadFile]);
+  }, [activities, activities.length, file?.id, loadFile]);
 
   // Reload file comments when there is a new direct file comment event
   useEffect(() => {
@@ -158,7 +132,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
         isSubmittingReview={isSubmittingReview}
         onCreateReview={handleCreateReview}
         onOpenMobileTasks={() => setMobileTasksOpen(true)}
-        projectId={projectId}
+
         taskCount={tasks.length}
         versions={versions}
       />
@@ -226,8 +200,8 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
                     taskId={focusedTask?.id ? Number(focusedTask.id) : null}
                     contextKey={discussionContextKey}
                     contextLabel={discussionContextLabel}
-                    currentMaterialId={currentMaterialId}
                     frameComments={discussionFrameComments}
+                    filterMode={commentFilterMode}
                     isSaving={isSavingComment}
                     onCreateComment={handleCreateDiscussionComment}
                     onUpdateComment={handleUpdateDiscussionComment}
@@ -326,6 +300,9 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
           onRefresh={loadFile}
           discussionContextKey={discussionContextKey}
           setDiscussionContext={setDiscussionContext}
+          commentFilterMode={commentFilterMode}
+          setCommentFilterMode={setCommentFilterMode}
+          discussionFrameComments={discussionFrameComments}
         />
 
         <MobileTaskDrawer
@@ -368,6 +345,9 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
           onRefresh={loadFile}
           discussionContextKey={discussionContextKey}
           setDiscussionContext={setDiscussionContext}
+          commentFilterMode={commentFilterMode}
+          setCommentFilterMode={setCommentFilterMode}
+          discussionFrameComments={discussionFrameComments}
         />
       </div>
 

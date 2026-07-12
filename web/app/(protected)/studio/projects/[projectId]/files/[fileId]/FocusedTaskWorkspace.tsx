@@ -43,6 +43,9 @@ type FocusedTaskWorkspaceProps = {
   targetVersion?: string;
   members?: Array<{ id: number; name: string }>;
   onRefresh?: () => void | Promise<void>;
+  commentFilterMode?: string;
+  setCommentFilterMode?: (mode: string) => void;
+  discussionFrameComments?: any[];
 };
 
 export function FocusedTaskWorkspace({
@@ -58,6 +61,9 @@ export function FocusedTaskWorkspace({
   targetVersion,
   members = [],
   onRefresh,
+  commentFilterMode = 'all',
+  setCommentFilterMode,
+  discussionFrameComments = [],
 }: FocusedTaskWorkspaceProps) {
   const [reviewNote, setReviewNote] = useState('');
   
@@ -190,10 +196,31 @@ export function FocusedTaskWorkspace({
             </div>
           )
         ) : null}
+
+        {/* Filter comments for discussion */}
+        {setCommentFilterMode && (
+          <div className="mt-3">
+            <span className="text-[10px] font-black uppercase text-[#dce7f3] mb-1.5 block">Discussion Filter</span>
+            <select
+              value={commentFilterMode}
+              onChange={(e) => setCommentFilterMode(e.target.value)}
+              className="w-full rounded-[4px] bg-[#151c25] p-2 text-xs font-bold text-[#8b94a1] border border-[#26303b] outline-none hover:border-[#39424f] focus:border-[#FFD369] focus:text-white"
+            >
+              <option value="all">All Comments</option>
+              <option value="frame">All Frame Comments</option>
+              <option value="general">General Comments Only</option>
+              {Array.from(new Set(discussionFrameComments.map(c => c.frameId))).sort((a, b) => Number(a) - Number(b)).map(frameId => (
+                <option key={`frame-${frameId}`} value={`frame:${frameId}`}>
+                  Frame {frameId} Only
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </section>
     </>
   );
-}
+  }
 
   return (
     <>
@@ -274,6 +301,27 @@ export function FocusedTaskWorkspace({
           </div>
         </div>
       ) : null}
+
+      {/* Filter comments for discussion */}
+      {setCommentFilterMode && (
+        <div className="mt-3">
+          <span className="text-[10px] font-black uppercase text-[#dce7f3] mb-1.5 block">Discussion Filter</span>
+          <select
+            value={commentFilterMode}
+            onChange={(e) => setCommentFilterMode(e.target.value)}
+            className="w-full rounded-[4px] bg-[#151c25] p-2 text-xs font-bold text-[#8b94a1] border border-[#26303b] outline-none hover:border-[#39424f] focus:border-[#FFD369] focus:text-white"
+          >
+            <option value="all">All Comments</option>
+            <option value="frame">All Frame Comments</option>
+            <option value="general">General Comments Only</option>
+            {Array.from(new Set(discussionFrameComments.map(c => c.frameId))).sort((a, b) => Number(a) - Number(b)).map(frameId => (
+              <option key={`frame-${frameId}`} value={`frame:${frameId}`}>
+                Frame {frameId} Only
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       </section>
     </>
   );
