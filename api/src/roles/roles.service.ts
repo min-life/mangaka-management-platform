@@ -75,7 +75,7 @@ export class RolesService {
       if (dto.permissionIds !== undefined) {
         await this.replacePermissions(
           role.id,
-          dto.permissionIds.map((id) => Number(id)),
+          dto.permissionIds,
         );
       }
 
@@ -119,7 +119,7 @@ export class RolesService {
       if (dto.permissionIds !== undefined) {
         await this.replacePermissions(
           roleId,
-          dto.permissionIds.map((id) => Number(id)),
+          dto.permissionIds,
         );
       }
 

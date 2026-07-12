@@ -1,5 +1,5 @@
 import { SCOPE } from '@prisma/client';
-import { ArrayUnique, IsArray, IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { ArrayUnique, IsArray, IsBoolean, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class CreateRoleDto {
   @IsNotEmpty()
@@ -20,7 +20,7 @@ export class CreateRoleDto {
 
   @IsArray()
   @ArrayUnique()
-  @IsString({ each: true })
+  @IsNumber({}, { each: true })
   @IsOptional()
-  permissionIds?: string[];
+  permissionIds?: number[];
 }
