@@ -653,22 +653,13 @@ export class ProjectsService {
       const existingMember = await this.findProjectMember(projectId, userId);
       await this.ensureProjectRole(roleId);
 
-      const updatedMember = await this.prisma.$transaction(async (prisma) => {
-        await prisma.userProject.deleteMany({ where: { projectId, userId } });
-        await prisma.userProject.create({
-          data: {
-            projectId,
-            userId,
-            roleId,
-            createdBy: actorId,
-            updatedBy: actorId,
-            createdAt: existingMember.createdAt,
-          },
-        });
-        return prisma.userProject.findFirstOrThrow({
-          where: { projectId, userId },
-          select: buildProjectMemberSelect(projectId),
-        });
+      const updatedMember = await this.prisma.userProject.update({
+        where: { userId_projectId: { userId, projectId } },
+        data: {
+          roleId,
+          updatedBy: actorId,
+        },
+        select: buildProjectMemberSelect(projectId),
       });
 
       const { _count, ...userWithoutCount } = updatedMember.user as any;
@@ -1179,10 +1170,9 @@ export class ProjectsService {
   private async findProjectMember(projectId: number, userId: number) {
     await this.ensureProject(projectId);
 
-    const member = await this.prisma.userProject.findFirst({
+    const member = await this.prisma.userProject.findUnique({
       where: {
-        projectId,
-        userId,
+        userId_projectId: { userId, projectId },
       },
       select: buildProjectMemberSelect(projectId),
     });
@@ -1261,11 +1251,13 @@ export class ProjectsService {
           reviews: 0,
           rating: 0,
           _totalRatingScore: 0,
+          _hasData: false,
         });
       }
 
       for (const row of rawStats) {
         const item = monthMap.get(row.month)!;
+        item._hasData = true;
         item.views += row.views;
         item.sales += row.sales;
         item.revenue += row.revenue;
@@ -1285,6 +1277,10 @@ export class ProjectsService {
       const months: any[] = [];
       for (let i = 1; i <= 12; i++) {
         const item = monthMap.get(i)!;
+        if (!item._hasData) {
+          continue;
+        }
+
         if (item.reviews > 0) {
           item.rating = item._totalRatingScore / item.reviews;
         } else {
@@ -1299,6 +1295,7 @@ export class ProjectsService {
         summary._totalRatingScore += item._totalRatingScore;
 
         delete item._totalRatingScore;
+        delete item._hasData;
         months.push(item);
       }
 

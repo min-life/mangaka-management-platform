@@ -100,13 +100,17 @@ export class ApplicationsController {
     type: ApplicationsResponseDto,
   })
   @Get()
-  async getApplications(@Query() query: QueryApplicationsReqDto) {
+  async getApplications(
+    @CurrentUser() currentUser: JwtPayload,
+    @Query() query: QueryApplicationsReqDto,
+  ) {
     const result = await this.applicationsService.getApplications(
       {
         projectId: query.projectId,
         search: query.search,
         type: query.type,
         status: query.status,
+        userId: currentUser.userId,
       },
       query.field && query.order ? { field: query.field, order: query.order } : undefined,
       query.page && query.limit ? { page: query.page, limit: query.limit } : undefined,
@@ -180,7 +184,14 @@ export class ApplicationsController {
 
   @Permissions({
     mode: 'ANY',
-    permissions: ['project:application.approve', 'board:leader', 'project:owner'],
+    permissions: [
+      'project:application.approve',
+      'board:leader',
+      'project:owner',
+      'project:application.read',
+      'project:application.create',
+      'project:application.update',
+    ],
     resource: 'APPLICATION',
   })
   @ApiOperation({ summary: 'Update application status' })

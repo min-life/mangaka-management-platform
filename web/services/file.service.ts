@@ -136,6 +136,7 @@ export async function createFileTask(
     status?: string;
     title: string;
     cloneBaseMaterial?: boolean;
+    cloneMaterialFromTaskId?: number;
   },
 ) {
   const response = await api.post<{ data: { id: number } }, { data: { id: number } }>(

@@ -14,7 +14,7 @@ import {
   type AdminUserResponse,
 } from '../../admin-api';
 import { PageHeader } from '../../components/PageHeader';
-import { CreateStaffDialog } from './UserDialogs';
+import { CreateUserDialog } from './UserDialogs';
 import { UserFilters } from './UserFilters';
 import { UsersTable } from './UsersTable';
 
@@ -24,13 +24,14 @@ export default function AdminUsersClient() {
   const searchParams = useSearchParams();
   const [users, setUsers] = useState<AdminUserResponse[]>([]);
   const [roles, setRoles] = useState<AdminRoleResponse[]>([]);
+  const [userRolesById, setUserRolesById] = useState<Record<number, AdminRoleResponse[]>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isCreateStaffOpen, setIsCreateStaffOpen] = useState(false);
+  const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,14 +45,7 @@ export default function AdminUsersClient() {
         getAdminRoles('SYS'),
       ]);
 
-      const usersWithRoles = await Promise.all(
-        usersResult.users.map(async (user) => ({
-          ...user,
-          roles: await getAdminUserRoles(user.id),
-        })),
-      );
-
-      setUsers(usersWithRoles);
+      setUsers(usersResult.users);
       setRoles(sysRoles);
     } catch {
       setError('Unable to load admin users.');
@@ -68,12 +62,13 @@ export default function AdminUsersClient() {
   }, [loadAdminUsers]);
 
   useEffect(() => {
-    if (searchParams.get('create') !== 'staff') {
+    const createMode = searchParams.get('create');
+    if (createMode !== 'user' && createMode !== 'staff') {
       return;
     }
 
     queueMicrotask(() => {
-      setIsCreateStaffOpen(true);
+      setIsCreateUserOpen(true);
       router.replace(pathname, { scroll: false });
     });
   }, [pathname, router, searchParams]);
@@ -88,11 +83,13 @@ export default function AdminUsersClient() {
           .filter(Boolean)
           .some((value) => value?.toLowerCase().includes(normalizedQuery));
       const matchesRole =
-        roleFilter === 'all' || user.roles?.some((role) => String(role.id) === roleFilter);
+        roleFilter === 'all' ||
+        userRolesById[user.id]?.some((role) => String(role.id) === roleFilter) ||
+        user.roles?.some((role) => String(role.id) === roleFilter);
 
       return matchesSearch && matchesRole;
     });
-  }, [roleFilter, searchQuery, users]);
+  }, [roleFilter, searchQuery, userRolesById, users]);
 
   const creatableRoles = useMemo(
     () =>
@@ -131,21 +128,48 @@ export default function AdminUsersClient() {
     await loadAdminUsers();
   };
 
+  const getCachedUserRoles = useCallback(
+    (userId: number) => userRolesById[userId],
+    [userRolesById],
+  );
+
+  const loadUserRoles = useCallback(
+    async (userId: number) => {
+      const cachedRoles = userRolesById[userId];
+      if (cachedRoles) {
+        return cachedRoles;
+      }
+
+      const nextRoles = await getAdminUserRoles(userId);
+      setUserRolesById((currentRoles) =>
+        currentRoles[userId] ? currentRoles : { ...currentRoles, [userId]: nextRoles },
+      );
+
+      return nextRoles;
+    },
+    [userRolesById],
+  );
+
   const handleCreateUser = async (payload: {
     displayName?: string;
     email: string;
     roleIds: number[];
   }) => {
-    await runMutation('Unable to create staff user.', async () => {
+    await runMutation('Unable to create user.', async () => {
       const createdUser = await createAdminUser(payload);
       await forceResetAdminUserPassword(createdUser.id);
-      await refreshWithMessage('Staff user created. A temporary password was sent by email.');
+      await refreshWithMessage('User created. A temporary password was sent by email.');
     });
   };
 
   const handleReplaceRoles = async (userId: number, roleIds: number[]) => {
     await runMutation('Unable to update user roles.', async () => {
       await replaceAdminUserRoles(userId, roleIds);
+      const nextRoles = roles.filter((role) => roleIds.includes(Number(role.id)));
+      setUserRolesById((currentRoles) => ({ ...currentRoles, [userId]: nextRoles }));
+      setUsers((currentUsers) =>
+        currentUsers.map((user) => (user.id === userId ? { ...user, roles: nextRoles } : user)),
+      );
       await refreshWithMessage('User roles updated successfully.');
     });
   };
@@ -174,15 +198,15 @@ export default function AdminUsersClient() {
     <>
       <PageHeader
         action={
-          <CreateStaffDialog
-            isOpen={isCreateStaffOpen}
+          <CreateUserDialog
+            isOpen={isCreateUserOpen}
             isSubmitting={isSubmitting}
-            onOpenChange={setIsCreateStaffOpen}
+            onOpenChange={setIsCreateUserOpen}
             onSubmit={handleCreateUser}
             roles={creatableRoles}
           />
         }
-        description="Search, filter, and manage staff accounts with system roles."
+        description="Search, filter, and manage user accounts with system roles."
         title="Users"
       />
 
@@ -208,9 +232,11 @@ export default function AdminUsersClient() {
       <UsersTable
         handleForceResetPassword={handleForceResetPassword}
         handleReplaceRoles={handleReplaceRoles}
+        getCachedUserRoles={getCachedUserRoles}
         isLoading={isLoading}
         isSubmitting={isSubmitting}
         limit={limit}
+        loadUserRoles={loadUserRoles}
         onLimitChange={handleLimitChange}
         onPageChange={setPage}
         page={safePage}

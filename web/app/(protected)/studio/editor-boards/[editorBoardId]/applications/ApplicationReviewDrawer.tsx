@@ -41,6 +41,7 @@ type CommentItem = ApplicationCommentResponse;
 
 type ApplicationReviewDrawerProps = {
   application: EditorBoardApplicationResponse | null;
+  canApprove: boolean;
   isSubmitting: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdateStatus: (
@@ -108,6 +109,7 @@ function readUploadedFiles(materials: unknown) {
 // PhucTD #editor-board start
 export function ApplicationReviewDrawer({
   application,
+  canApprove,
   isSubmitting,
   onOpenChange,
   onUpdateStatus,
@@ -276,8 +278,8 @@ export function ApplicationReviewDrawer({
     application?.verifiedByUser?.email ??
     (application?.verifyBy ? `User #${application.verifyBy}` : null);
 
-  const canApprove = true;
   const isReviewable = application ? isBoardReviewableStatus(application.status) : false;
+  const isVoteable = isReviewable && !!application?.voteDeadline;
 
   const approveVotesCount = votes.filter((v) => v.decision === 'APPROVE').length;
   const rejectVotesCount = votes.filter((v) => v.decision === 'REJECT').length;
@@ -369,9 +371,21 @@ export function ApplicationReviewDrawer({
                 <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8b94a1]">
                   Request Type
                 </p>
-                <p className="mt-3 text-sm font-black text-white">
-                  {getApplicationTypeLabel(application.type)}
-                </p>
+                <div className="mt-3 flex items-center justify-between">
+                  <p className="text-sm font-black text-white">
+                    {getApplicationTypeLabel(application.type)}
+                  </p>
+                  {application.voteDeadline && (
+                    <div className="flex flex-col items-end">
+                      <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#FFD369]">
+                        Vote Deadline
+                      </p>
+                      <p className="text-sm font-black text-white">
+                        {new Date(application.voteDeadline).toLocaleDateString()}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </section>
 
               <section className="mt-4 rounded-[4px] border border-[#303842] bg-[#151c25] p-4">
@@ -510,7 +524,13 @@ export function ApplicationReviewDrawer({
                   )}
                 </div>
 
-                {isReviewable ? (
+                {isReviewable && !application.voteDeadline ? (
+                  <div className="mt-4 border-t border-[#303842] pt-4">
+                    <p className="text-xs font-bold text-[#ff9ab3]">
+                      Voting cannot start until a deadline is set by a board leader.
+                    </p>
+                  </div>
+                ) : isVoteable ? (
                   <div className="mt-4 border-t border-[#303842] pt-4">
                     <p className="mb-2 text-xs font-black text-white">
                       {hasVoted ? 'Update Your Vote' : 'Your Vote'}

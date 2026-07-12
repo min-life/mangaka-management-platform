@@ -1,5 +1,5 @@
 import api from '@/lib/api';
-import type { ApplicationResponse } from './application.service';
+import { getProjectApplications, type ApplicationResponse } from './application.service';
 import type { ProjectResponse } from './project.service';
 
 export type CreateEditorBoardPayload = {
@@ -77,10 +77,47 @@ type BoardMembersResponse = {
   pagination?: PaginationResponse;
 };
 
-type BoardApplicationsResponse<TApplication> = {
-  data?: Array<TApplication | { application: TApplication }>;
-  pagination?: PaginationResponse;
+export type EditorBoardDashboardStats = {
+  activeMembers: number;
+  approvedThisMonth: number;
+  pendingApprovals: number;
+  totalProjects: number;
 };
+
+type DashboardMemberResponse =
+  | BoardMemberResponse
+  | {
+      createdAt?: string;
+      isLead: boolean;
+      updatedAt?: string;
+      user: UserSummaryResponse;
+    };
+
+type DashboardProjectResponse = ProjectResponse | { project: ProjectResponse };
+
+type DashboardApplicationResponse<TApplication> = TApplication | { application: TApplication };
+
+export type EditorBoardDashboardResponse<TApplication extends object = ApplicationResponse> = {
+  applications: TApplication[];
+  board: EditorBoardResponse;
+  members: BoardMemberResponse[];
+  projects: ProjectResponse[];
+  stats: EditorBoardDashboardStats;
+};
+
+type EditorBoardDashboardApiResponse<TApplication> = {
+  data?: {
+    applications?: DashboardApplicationResponse<TApplication>[];
+    board: EditorBoardResponse;
+    members?: DashboardMemberResponse[];
+    projects?: DashboardProjectResponse[];
+    stats: EditorBoardDashboardStats;
+  };
+};
+
+type EditorBoardDashboardApiData<TApplication> = NonNullable<
+  EditorBoardDashboardApiResponse<TApplication>['data']
+>;
 
 export type AddBoardMembersPayload = {
   userIds: number[];
@@ -101,6 +138,17 @@ function normalizeBoardMember(member: BoardMemberApiResponse): BoardMemberRespon
   return member;
 }
 
+function normalizeDashboardMember(member: DashboardMemberResponse): BoardMemberResponse {
+  if ('user' in member) {
+    return {
+      ...member.user,
+      isLead: member.isLead,
+    };
+  }
+
+  return member;
+}
+
 export async function createEditorBoard(payload: CreateEditorBoardPayload) {
   const response = await api.post<
     ApiResponse<EditorBoardResponse>,
@@ -111,7 +159,7 @@ export async function createEditorBoard(payload: CreateEditorBoardPayload) {
 }
 
 export async function getEditorBoards(params?: {
-  field?: 'name' | 'createdAt';
+  field?: 'name' | 'updatedAt' | 'createdAt';
   limit?: number;
   me?: boolean;
   name?: string;
@@ -135,6 +183,34 @@ export async function getEditorBoardById(boardId: number) {
   >(`/editor-boards/${boardId}`);
 
   return response.data ?? (response as EditorBoardResponse);
+}
+
+export async function getEditorBoardDashboard<TApplication extends object = ApplicationResponse>(
+  boardId: number | string,
+): Promise<EditorBoardDashboardResponse<TApplication>> {
+  const response = await api.get<
+    EditorBoardDashboardApiResponse<TApplication> | EditorBoardDashboardApiData<TApplication>,
+    EditorBoardDashboardApiResponse<TApplication> | EditorBoardDashboardApiData<TApplication>
+  >(`/editor-boards/${boardId}/dashboard`);
+  const data = 'board' in response ? response : response.data;
+
+  if (!data?.board) {
+    throw new Error('Editor board dashboard response did not include board data.');
+  }
+
+  return {
+    applications:
+      data?.applications?.map((item) => ('application' in item ? item.application : item)) ?? [],
+    board: data.board,
+    members: data?.members?.map(normalizeDashboardMember) ?? [],
+    projects: data?.projects?.map((item) => ('project' in item ? item.project : item)) ?? [],
+    stats: data?.stats ?? {
+      activeMembers: 0,
+      approvedThisMonth: 0,
+      pendingApprovals: 0,
+      totalProjects: 0,
+    },
+  };
 }
 
 export async function updateEditorBoard(boardId: number, payload: UpdateEditorBoardPayload) {
@@ -167,8 +243,7 @@ export async function getEditorBoardProjects(
 
   return {
     pagination: response.pagination,
-    projects:
-      response.data?.map((item) => ('project' in item ? item.project : item)) ?? [],
+    projects: response.data?.map((item) => ('project' in item ? item.project : item)) ?? [],
   };
 }
 
@@ -205,17 +280,19 @@ export async function removeEditorBoardMember(boardId: number | string, userId: 
 }
 
 export async function setEditorBoardMemberLead(boardId: number | string, userId: number) {
-  const response = await api.patch<ApiResponse<BoardMemberApiResponse>, ApiResponse<BoardMemberApiResponse>>(
-    `/editor-boards/${boardId}/members/${userId}/lead`,
-  );
+  const response = await api.patch<
+    ApiResponse<BoardMemberApiResponse>,
+    ApiResponse<BoardMemberApiResponse>
+  >(`/editor-boards/${boardId}/members/${userId}/lead`);
 
   return normalizeBoardMember(response.data ?? (response as BoardMemberApiResponse));
 }
 
 export async function getEditorBoardMember(boardId: number | string, userId: number) {
-  const response = await api.get<ApiResponse<BoardMemberApiResponse>, ApiResponse<BoardMemberApiResponse>>(
-    `/editor-boards/${boardId}/members/${userId}`,
-  );
+  const response = await api.get<
+    ApiResponse<BoardMemberApiResponse>,
+    ApiResponse<BoardMemberApiResponse>
+  >(`/editor-boards/${boardId}/members/${userId}`);
 
   return normalizeBoardMember(response.data ?? (response as BoardMemberApiResponse));
 }
@@ -236,7 +313,9 @@ export async function addEditorBoardProjects(
   return response.data ?? (response as { count: number });
 }
 
-export async function getEditorBoardApplications<TApplication extends object = ApplicationResponse>(
+export async function getEditorBoardApplications<
+  TApplication extends ApplicationResponse = ApplicationResponse,
+>(
   boardId: number | string,
   params?: {
     field?: 'createdAt' | 'updatedAt' | 'title';
@@ -246,15 +325,73 @@ export async function getEditorBoardApplications<TApplication extends object = A
     search?: string;
   },
 ) {
-  const response = await api.get<
-    BoardApplicationsResponse<TApplication>,
-    BoardApplicationsResponse<TApplication>
-  >(`/editor-boards/${boardId}/applications`, { params });
+  const projectsResponse = await getEditorBoardProjects(boardId, { limit: 100 });
+  const projects = projectsResponse.projects;
+
+  const allApplications: TApplication[] = [];
+  const visibleApplicationStatuses = new Set<string>([
+    'APPROVE',
+    'INTERNAL_APPROVED',
+    'REJECT',
+    'SUBMITTED',
+  ]);
+
+  await Promise.all(
+    projects.map(async (project) => {
+      const response = await getProjectApplications(project.id);
+      const projectApps = (response.applications || []) as TApplication[];
+      allApplications.push(...projectApps);
+    }),
+  );
+
+  let filteredApplications = allApplications.filter((app) => {
+    return (
+      (app.type === 'CREATE_ARC' || app.type === 'CREATE_CHAPTER') &&
+      visibleApplicationStatuses.has(app.status)
+    );
+  });
+
+  if (params?.search) {
+    const searchLower = params.search.toLowerCase();
+    filteredApplications = filteredApplications.filter((app) =>
+      app.title?.toLowerCase().includes(searchLower),
+    );
+  }
+
+  const field = params?.field || 'createdAt';
+  const order = params?.order || 'desc';
+
+  const getSortableValue = (application: TApplication) => {
+    if (field === 'createdAt' || field === 'updatedAt') {
+      return new Date(application[field] || 0).getTime();
+    }
+
+    return application[field] ?? '';
+  };
+
+  filteredApplications.sort((a, b) => {
+    const valA = getSortableValue(a);
+    const valB = getSortableValue(b);
+
+    if (valA < valB) return order === 'asc' ? -1 : 1;
+    if (valA > valB) return order === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const page = params?.page || 1;
+  const limit = params?.limit || 10;
+  const startIndex = (page - 1) * limit;
+  const endIndex = startIndex + limit;
+
+  const paginatedApplications = filteredApplications.slice(startIndex, endIndex);
 
   return {
-    applications:
-      response.data?.map((item) => ('application' in item ? item.application : item)) ?? [],
-    pagination: response.pagination,
+    applications: paginatedApplications as TApplication[],
+    pagination: {
+      total: filteredApplications.length,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(filteredApplications.length / limit)),
+    },
   };
 }
-

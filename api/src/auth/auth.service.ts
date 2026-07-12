@@ -421,7 +421,7 @@ export class AuthService {
   private async createRefreshToken(userId: number, email: string) {
     const refreshTokenExpiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_IN_MS);
     const refreshToken = await this.jwtService.signAsync(
-      { userId, email },
+      { userId, email, jti: randomUUID() },
       {
         secret: requireEnv('REFRESH_TOKEN_SECRET'),
         expiresIn: REFRESH_TOKEN_EXPIRES_IN as any,

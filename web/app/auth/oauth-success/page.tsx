@@ -7,7 +7,6 @@ import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { setAccessToken } from '@/lib/auth-storage';
 import { toast } from '@/lib/toast';
-import { hasPassword } from '@/services/user.service';
 
 function LoadingState() {
   return (
@@ -49,18 +48,7 @@ function OAuthSuccessContent() {
     setAccessToken(accessToken);
     void refreshUser().finally(() => {
       if (!isMounted) return;
-      hasPassword()
-        .then((hasPwd) => {
-          if (!isMounted) return;
-          if (!hasPwd) {
-            router.replace('/auth/setup-password');
-          } else {
-            setIsProcessing(false);
-          }
-        })
-        .catch(() => {
-          if (isMounted) setIsProcessing(false);
-        });
+      setIsProcessing(false);
     });
 
     return () => {

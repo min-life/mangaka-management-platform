@@ -50,9 +50,7 @@ export function WorkspaceHeader({
             {eyebrow}
           </p>
 
-          <h1 className="text-[15px] font-semibold text-white">
-            {title}
-          </h1>
+          <h1 className="text-[15px] font-semibold text-white">{title}</h1>
         </div>
       </div>
 

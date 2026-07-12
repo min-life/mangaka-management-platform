@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-import { getAdminRoles, getAdminUserStats, getAdminUsers } from './admin-api';
+import { getAdminRoles, getAdminUserStats } from './admin-api';
 import { MetricCard } from './components/MetricCard';
 import { PageHeader } from './components/PageHeader';
 
@@ -197,19 +197,14 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     queueMicrotask(() => {
-      void Promise.all([getAdminUserStats(), getAdminUsers({ limit: 100 }), getAdminRoles()])
-        .then(([stats, usersResult, roles]) => {
-          const currentMonth = new Date().getMonth();
-          const currentYear = new Date().getFullYear();
-          const monthlyUsers = usersResult.users.filter((user) => {
-            const createdAt = new Date(user.createdAt);
-            return createdAt.getMonth() === currentMonth && createdAt.getFullYear() === currentYear;
-          });
+      void Promise.all([getAdminUserStats(), getAdminRoles()])
+        .then(([stats, roles]) => {
+          const currentMonthKey = formatMonthKey(new Date().getFullYear(), new Date().getMonth());
 
           setTotalUsers(stats.total);
           setActiveUsers(stats.active);
           setTotalRoles(roles.length);
-          setNewUsersThisMonth(monthlyUsers.length);
+          setNewUsersThisMonth(stats.growthByMonth?.[currentMonthKey] ?? 0);
           setGrowthByMonth(stats.growthByMonth ?? {});
         })
         .catch(() => setError('Unable to load admin dashboard metrics.'));
@@ -276,9 +271,9 @@ export default function AdminDashboardPage() {
               asChild
               className="justify-start !bg-[#FFD369] !text-[#222831] hover:!bg-[#ffe29a]"
             >
-              <Link href="/admin/users?create=staff">
+              <Link href="/admin/users?create=user">
                 <UserPlus className="size-4" />
-                Create Staff
+                Create User
               </Link>
             </Button>
             <Button

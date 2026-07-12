@@ -97,13 +97,14 @@ export class ApplicationsService {
     private readonly cacheService: CacheService,
   ) {}
 
-  @UseCache((args) => `application:list`)
+  @UseCache((args) => `application:list${args[0]?.userId ? `:${args[0].userId}` : ''}`)
   async getApplications(
     filter?: {
       projectId?: number;
       search?: string;
       type?: APPLICATION_TYPE;
       status?: APPLICATION_STATUS;
+      userId?: number;
     },
     sort?: { field: 'title' | 'createdAt'; order: 'asc' | 'desc' },
     pagination?: Pagination,
@@ -114,6 +115,7 @@ export class ApplicationsService {
         ...(filter?.search && { title: { contains: filter.search, mode: 'insensitive' } }),
         ...(filter?.type && { type: filter.type }),
         ...(filter?.status && { status: filter.status }),
+        ...(filter?.userId && { createdBy: filter.userId }),
       };
       const orderBy: Prisma.ApplicationOrderByWithRelationInput = sort
         ? { [sort.field]: sort.order }
@@ -301,18 +303,16 @@ export class ApplicationsService {
       );
 
       if (data.status === APPLICATION_STATUS.SUBMITTED) {
-        if (
-          application.status !== APPLICATION_STATUS.PENDING &&
-          application.status !== APPLICATION_STATUS.SUBMITTED
-        ) {
+        if (application.status !== APPLICATION_STATUS.PENDING) {
           throw new BadRequestException('Application status must be PENDING to submit');
         }
-        if (application.status === APPLICATION_STATUS.PENDING) {
-          if (!permissions.includes('board:leader') && !permissions.includes('board:owner')) {
-            throw new ForbiddenException(
-              'Only board leaders and owners can submit this application',
-            );
-          }
+        if (
+          !permissions.includes('project:owner') &&
+          !permissions.includes('project:application.approve')
+        ) {
+          throw new ForbiddenException(
+            'Only project owners and application approvers can submit this application',
+          );
         }
         if (
           data.voteDeadline &&
@@ -322,44 +322,41 @@ export class ApplicationsService {
           throw new ForbiddenException('Only board leaders and owners can set a vote deadline');
         }
       } else if (data.status === APPLICATION_STATUS.APPROVE) {
-        if (
-          application.type === APPLICATION_TYPE.CREATE_ARC ||
-          application.type === APPLICATION_TYPE.CREATE_CHAPTER
-        ) {
-          if (application.status !== APPLICATION_STATUS.SUBMITTED) {
-            throw new BadRequestException(
-              'Application must be SUBMITTED before board-level approval',
-            );
-          }
-          if (!permissions.includes('board:leader') && !permissions.includes('board:owner')) {
-            throw new ForbiddenException(
-              'You do not have permission to perform board-level approval',
-            );
-          }
+        if (application.status !== APPLICATION_STATUS.SUBMITTED) {
+          throw new BadRequestException(
+            'Application must be SUBMITTED before board-level approval',
+          );
+        }
+        if (!permissions.includes('board:leader') && !permissions.includes('board:owner')) {
+          throw new ForbiddenException(
+            'You do not have permission to perform board-level approval',
+          );
         }
       } else if (data.status === APPLICATION_STATUS.REJECT) {
-        if (
-          application.type === APPLICATION_TYPE.CREATE_ARC ||
-          application.type === APPLICATION_TYPE.CREATE_CHAPTER
-        ) {
-          if (application.status === APPLICATION_STATUS.PENDING) {
-            if (
-              !permissions.includes('project:owner') &&
-              !permissions.includes('project:application.approve')
-            ) {
-              throw new ForbiddenException(
-                'You do not have permission to reject this application at project level',
-              );
-            }
-          } else if (application.status === APPLICATION_STATUS.SUBMITTED) {
-            if (!permissions.includes('board:leader') && !permissions.includes('board:owner')) {
-              throw new ForbiddenException(
-                'You do not have permission to reject this application at board level',
-              );
-            }
-          } else {
-            throw new BadRequestException('Cannot reject application in its current status');
+        if (application.status === APPLICATION_STATUS.PENDING) {
+          if (
+            !permissions.includes('project:owner') &&
+            !permissions.includes('project:application.approve')
+          ) {
+            throw new ForbiddenException(
+              'You do not have permission to reject this application at project level',
+            );
           }
+        } else if (application.status === APPLICATION_STATUS.SUBMITTED) {
+          if (!permissions.includes('board:leader') && !permissions.includes('board:owner')) {
+            throw new ForbiddenException(
+              'You do not have permission to reject this application at board level',
+            );
+          }
+        } else {
+          throw new BadRequestException('Cannot reject application in its current status');
+        }
+      } else if (data.status === APPLICATION_STATUS.CANCELLED) {
+        if (application.status !== APPLICATION_STATUS.PENDING) {
+          throw new BadRequestException('Only PENDING applications can be cancelled');
+        }
+        if (application.createdBy !== data.userId) {
+          throw new ForbiddenException('Only the application creator can cancel it');
         }
       }
 

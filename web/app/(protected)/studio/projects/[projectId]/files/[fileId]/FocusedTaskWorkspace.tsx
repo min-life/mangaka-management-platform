@@ -483,7 +483,8 @@ export function FocusedTaskWorkspace({
         <p className="mt-2 text-[10px] leading-4 text-[#dce7f3]">{task.description}</p>
 
         <p className="mt-2 flex items-center gap-1 text-[9px] font-bold text-[#8b94a1]">
-          <UserRound className="size-3" /> {task.assignee} · Due {task.dueDate}
+          <UserRound className="size-3" /> {task.assignee || (task as any).assignedTo || 'Unassigned'}
+          {task.dueDate ? ` · Due ${task.dueDate}` : ''}
         </p>
       </div>
 

@@ -115,6 +115,7 @@ export class MaterialsController {
       deleteImage: query.deleteImage,
       deleteText: query.deleteText,
       deleteSource: query.deleteSource,
+      name: query.name,
       userId: currentUser.userId,
     });
     return {
