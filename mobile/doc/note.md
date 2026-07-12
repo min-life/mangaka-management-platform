@@ -119,10 +119,8 @@ Member bỏ sao
 cho edit role
 thêm join ngày nào
 bỏ role tag
-Contribute -> thêm edit
----
 
--Profile: Link account gg **\_\_**CHưa được đang chờ BE
+Contribute -> thêm edit
 
 Editor Boards -> thêm các thông tin ở card
 -> out đang call api bị sai
@@ -131,17 +129,20 @@ Editor Boards -> thêm các thông tin ở card
 Application -> nếu là lead thì cho xem được bao nhiêu lượt vote
 
 Profile-> mangaka workspace
-
-Project Detail -> sửa ảnh thành giữ nguyên kích thước khung đổi ảnh cho thành display content 
-
-File ->
-->Overview -> bỏ thống kê 
-->Task -> bỏ frame
--> Material _> xóa  selected material
-+ 1 combo box để filter theo task
-
-editor board detail -> chưa handle được đâu là owner
-+ thêm check owner để thêm tính năng edit + xóa
-
+Project Detail -> sửa ảnh thành giữ nguyên kích thước khung đổi ảnh cho thành display content
 
 aplication detail -> material : đang sai dữ liệu
+editor board detail -> chưa handle được đâu là owner
+
+- thêm check owner để thêm tính năng edit + xóa
+
+File ->
+->Overview -> bỏ thống kê
+->Task -> bỏ frame
+-> Material \_> xóa selected material
+
+- 1 combo box để filter theo task
+
+---
+
+-Profile: Link account gg **\_\_**CHưa được đang chờ BE

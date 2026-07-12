@@ -1,5 +1,9 @@
 import { Colors } from '@/src/constants/colors';
-import { ApplicationItem, ApplicationStatus } from '@/src/types/applications';
+import {
+  ApplicationItem,
+  ApplicationMaterialPage,
+  ApplicationStatus,
+} from '@/src/types/applications';
 import { EditorBoardItem, EditorBoardMember } from '@/src/types/editorBoards';
 import {
   ProjectItem,
@@ -250,6 +254,32 @@ function normalizeApplicationStatus(status: ApiApplication['status']): Applicati
   return 'PENDING';
 }
 
+function mapApplicationMaterial(
+  applicationId: number,
+  item: unknown,
+  index: number,
+): ApplicationMaterialPage {
+  const material = isRecord(item) ? item : {};
+  const originalName =
+    stringValue(material.originalName) ??
+    stringValue(material.url)?.split('/').pop() ??
+    `Untitled material ${index + 1}`;
+  const type = stringValue(material.type);
+
+  return {
+    height: numberValue(material.height),
+    id: `${applicationId}-material-${index}`,
+    isThumbnail: material.isThumbnail === true,
+    mimeType: stringValue(material.mimeType),
+    originalName,
+    size: numberValue(material.size),
+    title: originalName,
+    type,
+    url: stringValue(material.url),
+    width: numberValue(material.width),
+  };
+}
+
 export function mapApplication(application: ApiApplication): ApplicationItem {
   if (!application) {
     throw new Error('Application response is missing.');
@@ -264,15 +294,7 @@ export function mapApplication(application: ApiApplication): ApplicationItem {
     id: String(application.id),
     materials: {
       note: rawMaterials.length > 0 ? `${rawMaterials.length} linked material item(s).` : '',
-      pages: rawMaterials.map((item, index) => ({
-        fileName: `Material ${index + 1}`,
-        id: `${application.id}-material-${index}`,
-        status: 'Ready',
-        title:
-          typeof item === 'object' && item && 'title' in item
-            ? String((item as { title?: unknown }).title)
-            : `Material ${index + 1}`,
-      })),
+      pages: rawMaterials.map((item, index) => mapApplicationMaterial(application.id, item, index)),
     },
     projectId: String(
       application.projectId ??
@@ -326,6 +348,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function stringValue(value: unknown) {
   return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function numberValue(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
 export function materialImage(material?: Record<string, unknown> | Array<Record<string, unknown>>) {

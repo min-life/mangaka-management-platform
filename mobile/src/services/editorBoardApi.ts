@@ -165,6 +165,12 @@ export async function leaveEditorBoard(boardId: string) {
   });
 }
 
+export async function deleteEditorBoard(boardId: string) {
+  return apiRequest<void>(`/editor-boards/${boardId}`, {
+    method: 'DELETE',
+  });
+}
+
 export async function removeEditorBoardMember(boardId: string, userId: string) {
   return apiRequest<void>(`/editor-boards/${boardId}/members/${userId}`, {
     method: 'DELETE',

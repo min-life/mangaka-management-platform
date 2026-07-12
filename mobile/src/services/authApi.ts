@@ -1,7 +1,7 @@
 import * as WebBrowser from 'expo-web-browser';
 
 import { API_BASE_URL, apiRequest } from './apiClient';
-import { getAccessToken, saveAccessToken } from './tokenStorage';
+import { getAccessToken, getRefreshToken, saveAccessToken, saveRefreshToken } from './tokenStorage';
 
 export interface LoginPayload {
   email: string;
@@ -10,10 +10,14 @@ export interface LoginPayload {
 
 export interface LoginResponse {
   accessToken: string;
+  refreshToken?: string;
+  refreshTokenExpiresAt?: string;
 }
 
 export interface RefreshAccessTokenResponse {
   accessToken: string;
+  refreshToken?: string;
+  refreshTokenExpiresAt?: string;
 }
 
 export interface ForgotPasswordResponse {
@@ -112,7 +116,11 @@ export async function login(payload: LoginPayload): Promise<LoginResponse> {
     throw new Error('Invalid login response.');
   }
 
-  return { accessToken };
+  return {
+    accessToken,
+    refreshToken: body.refreshToken,
+    refreshTokenExpiresAt: body.refreshTokenExpiresAt,
+  };
 }
 
 export async function loginWithGoogle(): Promise<LoginResponse> {
@@ -192,7 +200,9 @@ export async function forgotPassword(email: string): Promise<void> {
 }
 
 export async function refreshAccessToken(): Promise<string> {
+  const refreshToken = await getRefreshToken();
   const body = await apiRequest<RefreshAccessTokenResponse>('/auth/refresh', {
+    body: refreshToken ? { refreshToken } : undefined,
     method: 'POST',
     skipAuthRefresh: true,
   });
@@ -203,11 +213,16 @@ export async function refreshAccessToken(): Promise<string> {
   }
 
   await saveAccessToken(accessToken);
+  if (typeof body.refreshToken === 'string' && body.refreshToken.trim()) {
+    await saveRefreshToken(body.refreshToken);
+  }
   return accessToken;
 }
 
 export async function logout(accessToken?: string | null): Promise<void> {
+  const refreshToken = await getRefreshToken();
   await apiRequest<void>('/auth/logout', {
+    body: refreshToken ? { refreshToken } : undefined,
     headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
     method: 'POST',
   });

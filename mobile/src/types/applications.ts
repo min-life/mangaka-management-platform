@@ -2,10 +2,16 @@ export type ApplicationType = 'CREATE_ARC' | 'CREATE_CHAPTER';
 export type ApplicationStatus = 'PENDING' | 'APPROVE' | 'REJECT' | 'CANCELLED';
 
 export interface ApplicationMaterialPage {
+  height?: number;
   id: string;
+  isThumbnail?: boolean;
+  mimeType?: string;
+  originalName: string;
+  size?: number;
   title: string;
-  fileName: string;
-  status: 'Ready' | 'Needs review' | 'Blocked';
+  type?: string;
+  url?: string;
+  width?: number;
 }
 
 export interface ApplicationItem {

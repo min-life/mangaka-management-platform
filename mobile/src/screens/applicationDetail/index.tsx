@@ -18,10 +18,11 @@ import { Colors } from '@/src/constants/colors';
 import { RootStackParamList } from '@/src/navigation/types';
 import { ApiComment } from '@/src/services/apiTypes';
 import {
+  ApplicationVoteSummary,
   createApplicationComment,
   fetchApplication,
   fetchApplicationComments,
-  fetchLeadApplicationVoteCount,
+  fetchApplicationVoteSummary,
 } from '@/src/services/applicationApi';
 import { mapComment } from '@/src/services/mappers';
 import { subscribeToComments } from '@/src/services/realtimeClient';
@@ -57,16 +58,19 @@ function visibleCountForHighlight(comments: ResourceTaskComment[], highlightedCo
 
 function ApplicationOverview({
   application,
-  isVoteCountLoading,
-  voteCount,
-  voteCountErrorMessage,
+  isVoteSummaryLoading,
+  voteSummary,
+  voteSummaryErrorMessage,
 }: {
   application: ApplicationItem;
-  isVoteCountLoading: boolean;
-  voteCount: number | null;
-  voteCountErrorMessage: string;
+  isVoteSummaryLoading: boolean;
+  voteSummary: ApplicationVoteSummary | null;
+  voteSummaryErrorMessage: string;
 }) {
-  const shouldShowVoteCount = Boolean(voteCount !== null || voteCountErrorMessage);
+  const totalVotes = voteSummary?.total ?? 0;
+  const approveFlex = voteSummary?.approve ?? 0;
+  const rejectFlex = voteSummary?.reject ?? 0;
+  const abstainFlex = voteSummary?.abstain ?? 0;
 
   return (
     <View
@@ -106,38 +110,38 @@ function ApplicationOverview({
         </View>
       </View>
 
-      {shouldShowVoteCount ? (
-        <View
-          className="mt-5 flex-row items-center justify-between rounded-xl px-4 py-3"
-          style={{
-            backgroundColor: Colors.surfaceContainer,
-            borderWidth: 1,
-            borderColor: Colors.borderSubtle,
-          }}
-        >
+      <View
+        className="mt-5 rounded-xl p-4"
+        style={{
+          backgroundColor: Colors.surfaceContainer,
+          borderWidth: 1,
+          borderColor: Colors.borderSubtle,
+        }}
+      >
+        <View className="flex-row items-center justify-between gap-3">
           <View className="flex-row items-center gap-3">
             <View
-              className="h-9 w-9 items-center justify-center rounded-lg"
+              className="h-10 w-10 items-center justify-center rounded-lg"
               style={{ backgroundColor: Colors.iconBg }}
             >
-              <MaterialIcon name="how_to_vote" color={Colors.accent} size={18} />
+              <MaterialIcon name="how_to_vote" color={Colors.accent} size={19} />
             </View>
             <View>
               <Text
                 className="text-[11px] font-bold uppercase"
                 style={{ color: Colors.textFaint }}
               >
-                Votes
+                Voting
               </Text>
               <Text className="mt-0.5 text-[13px] font-semibold" style={{ color: Colors.text }}>
-                Board lead view
+                Application decision
               </Text>
             </View>
           </View>
 
-          {isVoteCountLoading ? (
+          {isVoteSummaryLoading ? (
             <ActivityIndicator color={Colors.accent} size="small" />
-          ) : voteCountErrorMessage ? (
+          ) : voteSummaryErrorMessage ? (
             <Text
               className="text-right text-[12px] font-semibold"
               style={{ color: Colors.textMuted }}
@@ -145,26 +149,101 @@ function ApplicationOverview({
               Unavailable
             </Text>
           ) : (
-            <Text className="text-[22px] font-black" style={{ color: Colors.text }}>
-              {voteCount}
-            </Text>
+            <View className="items-end">
+              <Text className="text-[24px] font-black" style={{ color: Colors.text }}>
+                {totalVotes}
+              </Text>
+              <Text className="text-[11px] font-bold uppercase" style={{ color: Colors.textFaint }}>
+                Votes
+              </Text>
+            </View>
           )}
         </View>
-      ) : null}
+
+        {!isVoteSummaryLoading && !voteSummaryErrorMessage ? (
+          <>
+            <View
+              className="mt-4 h-2 flex-row overflow-hidden rounded-full"
+              style={{ backgroundColor: Colors.iconBg }}
+            >
+              <View style={{ flex: approveFlex, backgroundColor: Colors.statusDone }} />
+              <View style={{ flex: rejectFlex, backgroundColor: '#EF4444' }} />
+              <View style={{ flex: abstainFlex, backgroundColor: Colors.statusPending }} />
+            </View>
+
+            <View className="mt-4 flex-row gap-2">
+              {[
+                { color: Colors.statusDone, label: 'Approve', value: voteSummary?.approve ?? 0 },
+                { color: '#EF4444', label: 'Reject', value: voteSummary?.reject ?? 0 },
+                { color: Colors.statusPending, label: 'Abstain', value: voteSummary?.abstain ?? 0 },
+              ].map((item) => (
+                <View
+                  key={item.label}
+                  className="flex-1 rounded-lg px-3 py-2"
+                  style={{
+                    backgroundColor: Colors.overlayLight,
+                    borderWidth: 1,
+                    borderColor: Colors.borderSubtle,
+                  }}
+                >
+                  <View className="flex-row items-center gap-1.5">
+                    <View className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
+                    <Text
+                      className="text-[10px] font-bold uppercase"
+                      numberOfLines={1}
+                      style={{ color: Colors.textFaint }}
+                    >
+                      {item.label}
+                    </Text>
+                  </View>
+                  <Text className="mt-1 text-[16px] font-black" style={{ color: Colors.text }}>
+                    {item.value}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </>
+        ) : null}
+
+        {voteSummaryErrorMessage ? (
+          <Text className="mt-3 text-[12px] leading-5" style={{ color: Colors.textFaint }}>
+            {voteSummaryErrorMessage}
+          </Text>
+        ) : null}
+      </View>
+
     </View>
   );
 }
 
 function ApplicationMaterials({ application }: { application: ApplicationItem }) {
+  const materialCount = application.materials.pages.length;
+
   return (
     <View className="mt-6 gap-3">
-      <Text
-        className="text-[12px] font-bold uppercase"
-        style={{ color: Colors.textMuted, letterSpacing: 1 }}
-      >
-        Materials
-      </Text>
-      {application.materials.pages.length > 0 ? (
+      <View className="flex-row items-center justify-between">
+        <View>
+          <Text
+            className="text-[12px] font-bold uppercase"
+            style={{ color: Colors.textMuted, letterSpacing: 1 }}
+          >
+            Materials
+          </Text>
+          <Text className="mt-1 text-[13px]" style={{ color: Colors.textFaint }}>
+            {materialCount > 0 ? application.materials.note : 'No linked files for this request.'}
+          </Text>
+        </View>
+        <View
+          className="rounded-full px-3 py-1"
+          style={{ backgroundColor: Colors.surfaceContainer }}
+        >
+          <Text className="text-[12px] font-bold" style={{ color: Colors.text }}>
+            {materialCount}
+          </Text>
+        </View>
+      </View>
+
+      {materialCount > 0 ? (
         application.materials.pages.map((material) => (
           <ApplicationMaterialRow key={material.id} material={material} />
         ))
@@ -462,9 +541,9 @@ export default function ApplicationDetailScreen({
   const [isCommentsLoading, setIsCommentsLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
-  const [voteCount, setVoteCount] = useState<number | null>(null);
-  const [isVoteCountLoading, setIsVoteCountLoading] = useState(false);
-  const [voteCountErrorMessage, setVoteCountErrorMessage] = useState('');
+  const [voteSummary, setVoteSummary] = useState<ApplicationVoteSummary | null>(null);
+  const [isVoteSummaryLoading, setIsVoteSummaryLoading] = useState(false);
+  const [voteSummaryErrorMessage, setVoteSummaryErrorMessage] = useState('');
   const scrollViewRef = useRef<ScrollView | null>(null);
   const didScrollToInitialCommentRef = useRef(false);
   const didScrollToLatestDiscussionRef = useRef(false);
@@ -490,40 +569,39 @@ export default function ApplicationDetailScreen({
   }, [loadApplication]);
 
   useEffect(() => {
-    if (!application?.id || !application.projectId) {
-      setVoteCount(null);
-      setVoteCountErrorMessage('');
-      setIsVoteCountLoading(false);
+    if (!application?.id) {
+      setVoteSummary(null);
+      setVoteSummaryErrorMessage('');
+      setIsVoteSummaryLoading(false);
       return undefined;
     }
 
     let isActive = true;
-    setVoteCount(null);
-    setVoteCountErrorMessage('');
-    setIsVoteCountLoading(true);
+    setVoteSummary(null);
+    setVoteSummaryErrorMessage('');
+    setIsVoteSummaryLoading(true);
 
-    void fetchLeadApplicationVoteCount({
-      applicationId: application.id,
-      projectId: application.projectId,
-    })
+    void fetchApplicationVoteSummary(application.id)
       .then((result) => {
         if (!isActive) return;
-        setVoteCount(result.canViewVotes ? result.voteCount : null);
-        setVoteCountErrorMessage('');
+        setVoteSummary(result);
+        setVoteSummaryErrorMessage('');
       })
       .catch((error) => {
         if (!isActive) return;
-        setVoteCount(null);
-        setVoteCountErrorMessage(error instanceof Error ? error.message : 'Unable to load votes.');
+        setVoteSummary(null);
+        setVoteSummaryErrorMessage(
+          error instanceof Error ? error.message : 'Unable to load votes.',
+        );
       })
       .finally(() => {
-        if (isActive) setIsVoteCountLoading(false);
+        if (isActive) setIsVoteSummaryLoading(false);
       });
 
     return () => {
       isActive = false;
     };
-  }, [application?.id, application?.projectId]);
+  }, [application?.id]);
 
   const addDiscussionComment = useCallback((comment: ApiComment) => {
     const nextComment = mapComment(comment);
@@ -658,9 +736,9 @@ export default function ApplicationDetailScreen({
           {activeTab === 'Overview' ? (
             <ApplicationOverview
               application={application}
-              isVoteCountLoading={isVoteCountLoading}
-              voteCount={voteCount}
-              voteCountErrorMessage={voteCountErrorMessage}
+              isVoteSummaryLoading={isVoteSummaryLoading}
+              voteSummary={voteSummary}
+              voteSummaryErrorMessage={voteSummaryErrorMessage}
             />
           ) : null}
 

@@ -2,7 +2,13 @@ import { Platform } from 'react-native';
 
 import { resetToLogin } from '@/src/navigation/navigationRef';
 
-import { clearSession, getAccessToken, saveAccessToken } from './tokenStorage';
+import {
+  clearSession,
+  getAccessToken,
+  getRefreshToken,
+  saveAccessToken,
+  saveRefreshToken,
+} from './tokenStorage';
 
 interface ApiErrorBody {
   error?: string;
@@ -22,6 +28,7 @@ interface ApiFetchResult {
 
 interface RefreshResponse {
   accessToken?: unknown;
+  refreshToken?: unknown;
 }
 
 export class ApiClientError extends Error {
@@ -164,7 +171,9 @@ async function handleSessionExpired() {
   if (!sessionExpirationPromise) {
     sessionExpirationPromise = (async () => {
       try {
+        const refreshToken = await getRefreshToken();
         await performApiFetch(AUTH_LOGOUT_PATH, {
+          body: refreshToken ? { refreshToken } : undefined,
           method: 'POST',
           skipAuthRefresh: true,
         });
@@ -181,7 +190,9 @@ async function handleSessionExpired() {
 }
 
 async function requestFreshAccessToken() {
+  const refreshToken = await getRefreshToken();
   const body = await apiRequest<RefreshResponse>(AUTH_REFRESH_PATH, {
+    body: refreshToken ? { refreshToken } : undefined,
     method: 'POST',
     skipAuthRefresh: true,
   });
@@ -192,6 +203,9 @@ async function requestFreshAccessToken() {
   }
 
   await saveAccessToken(accessToken);
+  if (typeof body.refreshToken === 'string' && body.refreshToken.trim()) {
+    await saveRefreshToken(body.refreshToken);
+  }
   return accessToken;
 }
 

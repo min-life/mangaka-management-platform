@@ -114,9 +114,18 @@ export interface ApiFolder {
   project?: { id: number; name: string } | null;
   projectId?: number;
   title: string;
+  type?: 'ARC' | 'CHAPTER' | 'VOLUME' | string;
   updatedAt: string;
   updatedBy?: number | null;
   updatedByUser?: ApiUserSummary | null;
+}
+
+export interface ApiProjectStat {
+  id: number;
+  metrics?: unknown;
+  project?: ApiProject;
+  projectId?: number;
+  updatedAt: string;
 }
 
 export interface ApiFile {

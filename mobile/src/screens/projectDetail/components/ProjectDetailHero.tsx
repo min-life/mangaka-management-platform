@@ -37,7 +37,7 @@ export default function ProjectDetailHero({ project }: ProjectDetailHeroProps) {
           <Image
             source={{ uri: project.coverUri }}
             className="h-full w-full"
-            resizeMode="cover"
+            resizeMode="contain"
           />
         ) : (
           <View className="h-full w-full items-center justify-center">

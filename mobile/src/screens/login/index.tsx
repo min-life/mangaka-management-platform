@@ -6,7 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 import { RootStackNavProp } from '@/src/navigation/types';
 import { Colors } from '@/src/constants/colors';
 import { login, loginWithGoogle } from '@/src/services/authApi';
-import { saveAccessToken } from '@/src/services/tokenStorage';
+import { saveAccessToken, saveSession } from '@/src/services/tokenStorage';
 import LoginBrandHeader from './components/LoginBrandHeader';
 import LoginFormCard from './components/LoginFormCard';
 
@@ -44,7 +44,7 @@ export default function LoginScreen() {
         password,
       });
 
-      await saveAccessToken(response.accessToken);
+      await saveSession(response.accessToken, response.refreshToken);
       setIsLoading(false);
       setLoginSuccess(true);
 
@@ -68,8 +68,8 @@ export default function LoginScreen() {
 
     try {
       const response = await loginWithGoogle();
-
       await saveAccessToken(response.accessToken);
+
       setIsGoogleLoading(false);
       setLoginSuccess(true);
 

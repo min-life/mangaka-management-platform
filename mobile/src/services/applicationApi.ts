@@ -3,16 +3,16 @@ import {
   ApiApplicationVote,
   ApiComment,
   ApiDataResponse,
-  ApiEditorBoard,
   ApiListResponse,
 } from './apiTypes';
 import { apiRequest } from './apiClient';
 import { mapApplication, mapComment, uniqueById } from './mappers';
 
-type PermissionsResponse = ApiDataResponse<string[]> | string[];
-
-function permissionList(response: PermissionsResponse) {
-  return Array.isArray(response) ? response : response.data ?? [];
+export interface ApplicationVoteSummary {
+  abstain: number;
+  approve: number;
+  reject: number;
+  total: number;
 }
 
 export async function fetchApplications(
@@ -51,40 +51,19 @@ export async function fetchApplication(applicationId: string) {
   return mapApplication(response.data);
 }
 
-export async function fetchLeadApplicationVoteCount(params: {
-  applicationId: string;
-  projectId: string;
-}) {
-  const boardResponse = await apiRequest<ApiDataResponse<ApiEditorBoard | null>>(
-    `/projects/${params.projectId}/editor-boards`,
-  ).catch(() => ({ data: null }));
-  const boardId = boardResponse.data?.id;
-
-  if (!boardId) {
-    return { canViewVotes: false, voteCount: null };
-  }
-
-  const permissionsResponse = await apiRequest<PermissionsResponse>(
-    `/permissions/me/boards/${boardId}`,
-  ).catch(() => null);
-  if (!permissionsResponse) {
-    return { canViewVotes: false, voteCount: null };
-  }
-
-  const permissions = permissionList(permissionsResponse);
-  const canViewVotes = permissions.includes('board:leader') || permissions.includes('board:owner');
-
-  if (!canViewVotes) {
-    return { canViewVotes: false, voteCount: null };
-  }
-
+export async function fetchApplicationVoteSummary(
+  applicationId: string,
+): Promise<ApplicationVoteSummary> {
   const votesResponse = await apiRequest<ApiListResponse<ApiApplicationVote>>(
-    `/applications/${params.applicationId}/votes`,
+    `/applications/${applicationId}/votes`,
   );
+  const votes = votesResponse.data ?? [];
 
   return {
-    canViewVotes: true,
-    voteCount: votesResponse.data?.length ?? votesResponse.pagination?.total ?? 0,
+    abstain: votes.filter((vote) => vote.decision === 'ABSTAIN').length,
+    approve: votes.filter((vote) => vote.decision === 'APPROVE').length,
+    reject: votes.filter((vote) => vote.decision === 'REJECT').length,
+    total: votes.length,
   };
 }
 

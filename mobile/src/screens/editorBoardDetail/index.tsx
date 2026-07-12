@@ -16,7 +16,11 @@ import BottomNavBar from '@/src/components/shared/BottomNavBar';
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
 import { RootStackParamList } from '@/src/navigation/types';
-import { fetchEditorBoardBundle, leaveEditorBoard } from '@/src/services/editorBoardApi';
+import {
+  deleteEditorBoard,
+  fetchEditorBoardBundle,
+  leaveEditorBoard,
+} from '@/src/services/editorBoardApi';
 import { ProjectDetailMenuItem, ProjectDetailTopBar } from '@/src/screens/projectDetail/components';
 import { ApplicationItem } from '@/src/types/applications';
 import { EditorBoardItem, EditorBoardMember } from '@/src/types/editorBoards';
@@ -114,7 +118,7 @@ export default function EditorBoardDetailScreen({
   const [boardProjects, setBoardProjects] = useState<ProjectItem[]>([]);
   const [publishRequests, setPublishRequests] = useState<ApplicationItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isLeavingBoard, setIsLeavingBoard] = useState(false);
+  const [isBoardActionPending, setIsBoardActionPending] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -165,12 +169,13 @@ export default function EditorBoardDetailScreen({
 
   const lead = members.find((member) => member.role === 'Lead');
   const primaryProject = boardProjects[0];
+  const isOwner = board.currentUserRole === 'Owner';
 
   const performLeaveBoard = async () => {
-    if (isLeavingBoard) return;
+    if (isBoardActionPending) return;
 
     setIsMoreMenuOpen(false);
-    setIsLeavingBoard(true);
+    setIsBoardActionPending(true);
     try {
       await leaveEditorBoard(route.params.boardId);
       navigation.navigate('EditorBoards');
@@ -180,7 +185,25 @@ export default function EditorBoardDetailScreen({
         error instanceof Error ? error.message : 'Unable to leave editor board.',
       );
     } finally {
-      setIsLeavingBoard(false);
+      setIsBoardActionPending(false);
+    }
+  };
+
+  const performDeleteBoard = async () => {
+    if (isBoardActionPending) return;
+
+    setIsMoreMenuOpen(false);
+    setIsBoardActionPending(true);
+    try {
+      await deleteEditorBoard(route.params.boardId);
+      navigation.navigate('EditorBoards');
+    } catch (error) {
+      Alert.alert(
+        'Cannot delete board',
+        error instanceof Error ? error.message : 'Unable to delete editor board.',
+      );
+    } finally {
+      setIsBoardActionPending(false);
     }
   };
 
@@ -189,6 +212,14 @@ export default function EditorBoardDetailScreen({
     Alert.alert('Out', `Leave ${board.name}?`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Out', style: 'destructive', onPress: performLeaveBoard },
+    ]);
+  };
+
+  const handleDeletePress = () => {
+    setIsMoreMenuOpen(false);
+    Alert.alert('Delete board', `Delete ${board.name}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: performDeleteBoard },
     ]);
   };
 
@@ -242,18 +273,18 @@ export default function EditorBoardDetailScreen({
           <TouchableOpacity
             activeOpacity={0.76}
             accessibilityRole="button"
-            disabled={isLeavingBoard}
+            disabled={isBoardActionPending}
             className="min-w-[132px] flex-row items-center rounded-lg px-3 py-3"
-            onPress={handleOutPress}
-            style={{ opacity: isLeavingBoard ? 0.56 : 1 }}
+            onPress={isOwner ? handleDeletePress : handleOutPress}
+            style={{ opacity: isBoardActionPending ? 0.56 : 1 }}
           >
-            {isLeavingBoard ? (
+            {isBoardActionPending ? (
               <ActivityIndicator color="#EF4444" size="small" />
             ) : (
-              <MaterialIcon name="logout" color="#EF4444" size={18} />
+              <MaterialIcon name={isOwner ? 'delete' : 'logout'} color="#EF4444" size={18} />
             )}
             <Text className="ml-2 text-[14px] font-semibold" style={{ color: '#EF4444' }}>
-              Out
+              {isOwner ? 'Delete board' : 'Out'}
             </Text>
           </TouchableOpacity>
         </View>

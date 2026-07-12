@@ -71,8 +71,6 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
   const [materialDetailsById, setMaterialDetailsById] = useState<
     Record<string, ResourceFileMaterialVersion>
   >({});
-  const [isMaterialDetailLoading, setIsMaterialDetailLoading] = useState(false);
-  const [materialDetailError, setMaterialDetailError] = useState('');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedFrame, setSelectedFrame] = useState<ResourceTaskFrame | null>(null);
   const [discussionScope, setDiscussionScope] = useState<DiscussionScope>('file');
@@ -106,7 +104,6 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
         : null;
       setFile(nextFile);
       setMaterialDetailsById({});
-      setMaterialDetailError('');
       setFileDiscussionCommentCount(nextFile.comments?.length ?? 0);
       setParentName(parentBundle?.folder.name ?? 'Resource');
       const initialTask = route.params.initialTaskId
@@ -174,28 +171,17 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
   useEffect(() => {
     const versionId = selectedVersionSummary?.id;
     if (!versionId || selectedVersionDetail?.hasDetail) {
-      setIsMaterialDetailLoading(false);
       return;
     }
 
     let isMounted = true;
-    setIsMaterialDetailLoading(true);
-    setMaterialDetailError('');
 
     fetchMaterialVersion(versionId)
       .then((detail) => {
         if (!isMounted) return;
         setMaterialDetailsById((prev) => ({ ...prev, [detail.id]: detail }));
       })
-      .catch((error) => {
-        if (!isMounted) return;
-        setMaterialDetailError(
-          error instanceof Error ? error.message : 'Unable to load material detail.',
-        );
-      })
-      .finally(() => {
-        if (isMounted) setIsMaterialDetailLoading(false);
-      });
+      .catch(() => undefined);
 
     return () => {
       isMounted = false;
@@ -567,9 +553,7 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
 
         <ResourceFileTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
-        {activeTab === 'Overview' && (
-          <OverviewPanel description={description} file={file} fileContent={file.content} />
-        )}
+        {activeTab === 'Overview' && <OverviewPanel description={description} file={file} />}
 
         {activeTab === 'Tasks' && (
           <TasksPanel
@@ -618,10 +602,8 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
 
         {activeTab === 'Materials' && (
           <MaterialsPanel
-            detailError={materialDetailError}
-            isSelectedVersionLoading={isMaterialDetailLoading}
-            selectedVersion={selectedVersion ?? null}
             selectedVersionId={selectedVersion?.id ?? null}
+            tasks={tasks}
             versions={versions}
             onSelectVersion={handleSelectVersion}
           />

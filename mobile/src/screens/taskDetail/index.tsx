@@ -505,9 +505,7 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
           tabs={TASK_DETAIL_TABS}
         />
 
-        {activeTab === 'Overview' && (
-          <OverviewPanel description={description} fileContent={file.content} />
-        )}
+        {activeTab === 'Overview' && <OverviewPanel description={description} file={file} />}
 
         {activeTab === 'Tasks' && (
           <TasksPanel
@@ -556,6 +554,7 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
         {activeTab === 'Materials' && (
           <MaterialsPanel
             selectedVersionId={selectedVersion?.id ?? null}
+            tasks={tasks}
             versions={versions}
             onSelectVersion={handleSelectVersion}
           />
