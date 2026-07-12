@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import { UserResDto } from '../../share/dto';
 
 export class PaginationResDto {
@@ -23,15 +24,19 @@ export class FrameResDto {
   name?: string | null;
 
   @ApiProperty({ example: 10.5, type: Number })
+  @Transform(({ value }) => value ? Number(value) : value)
   startX!: number;
 
   @ApiProperty({ example: 20.3, type: Number })
+  @Transform(({ value }) => value ? Number(value) : value)
   startY!: number;
 
   @ApiProperty({ example: 100.7, type: Number })
+  @Transform(({ value }) => value ? Number(value) : value)
   endX!: number;
 
   @ApiProperty({ example: 150.2, type: Number })
+  @Transform(({ value }) => value ? Number(value) : value)
   endY!: number;
 
   @ApiProperty({ example: 10 })

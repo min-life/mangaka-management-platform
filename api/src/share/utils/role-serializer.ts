@@ -8,6 +8,7 @@ export function serializeRole(role: {
   isDefault: boolean;
   createdAt: Date;
   updatedAt: Date;
+  rolePermissions?: { permission: { id: number; name: string; scope: string } }[];
 }) {
   return {
     id: role.id,
@@ -17,5 +18,14 @@ export function serializeRole(role: {
     isDefault: role.isDefault,
     createdAt: role.createdAt,
     updatedAt: role.updatedAt,
+    ...(role.rolePermissions
+      ? {
+          permissions: role.rolePermissions.map((rp) => ({
+            id: String(rp.permission.id),
+            name: rp.permission.name,
+            scope: rp.permission.scope,
+          })),
+        }
+      : {}),
   };
 }
