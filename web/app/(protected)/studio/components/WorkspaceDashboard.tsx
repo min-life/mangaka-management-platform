@@ -769,7 +769,7 @@ export function WorkspaceDashboard() {
                 setProjectsPage(1);
               }}
             >
-              <SelectTrigger className="h-9 w-[150px] border-[#4b535f] bg-[#393E46] text-xs font-black text-white focus:ring-1 focus:ring-[#FFD369]">
+              <SelectTrigger className="h-9 w-[150px] rounded-[4px] border-[#4b535f] bg-[#393E46] text-xs font-black text-white focus:ring-1 focus:ring-[#FFD369]">
                 <SelectValue placeholder="Filter projects" />
               </SelectTrigger>
               <SelectContent className="border-[#4b535f] bg-[#2a333d] text-white">
@@ -791,7 +791,7 @@ export function WorkspaceDashboard() {
                 setBoardsPage(1);
               }}
             >
-              <SelectTrigger className="h-9 w-[150px] border-[#4b535f] bg-[#393E46] text-xs font-black text-white focus:ring-1 focus:ring-[#FFD369]">
+              <SelectTrigger className="h-9 w-[150px] rounded-[4px] border-[#4b535f] bg-[#393E46] text-xs font-black text-white focus:ring-1 focus:ring-[#FFD369]">
                 <SelectValue placeholder="Filter boards" />
               </SelectTrigger>
               <SelectContent className="border-[#4b535f] bg-[#2a333d] text-white">
