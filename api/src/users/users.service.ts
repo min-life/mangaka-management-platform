@@ -179,7 +179,9 @@ export class UsersService {
       });
 
       if (isRandomPassword) {
-        await this.mailService.sendForceResetPasswordEmail(email, rawPassword);
+        this.mailService
+          .sendForceResetPasswordEmail(email, rawPassword)
+          .catch((error) => this.logger.error('Failed to send force reset password email', error));
       }
 
       return { data: this.serializeUser(user) };
