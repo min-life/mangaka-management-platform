@@ -23,7 +23,6 @@ export function TaskDetailPanel({
   onSubmitTaskWork,
   onMarkReadyForReview,
   onTaskChange,
-  selectedSubmissionId,
   versions,
   members,
   onRefresh,
@@ -42,7 +41,6 @@ export function TaskDetailPanel({
   | 'onSubmitTaskWork'
   | 'onMarkReadyForReview'
   | 'onTaskChange'
-  | 'selectedSubmissionId'
   | 'versions'
   | 'members'
   | 'onRefresh'
@@ -65,7 +63,6 @@ export function TaskDetailPanel({
       onSubmitWork={onSubmitTaskWork}
       onMarkReadyForReview={onMarkReadyForReview}
       onTaskChange={onTaskChange}
-      selectedSubmissionId={selectedSubmissionId}
       task={focusedTask}
       targetVersion={getTargetVersion(focusedTask, versions)}
       members={members}

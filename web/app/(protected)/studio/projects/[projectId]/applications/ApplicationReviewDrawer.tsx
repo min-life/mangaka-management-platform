@@ -1,7 +1,10 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { Check, FileUp, X, AlertTriangle } from 'lucide-react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { Check, FileUp, X, AlertTriangle, Download, UserCircle } from 'lucide-react';
+import Link from 'next/link';
+import { useAuth } from '@/hooks/useAuth';
+import { useRealtimeComments } from '@/hooks/use-realtime-activity';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,7 +25,9 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import type { ApplicationResponse, ApplicationStatus } from '@/services/application.service';
+import { Textarea } from '@/components/ui/textarea';
+import type { ApplicationResponse, ApplicationStatus, ApplicationCommentResponse } from '@/services/application.service';
+import { getApplicationComments, createApplicationComment } from '@/services/application.service';
 
 import {
   applicationStatusClassName,
@@ -38,6 +43,7 @@ type ApplicationReviewDrawerProps = {
   canApprove: boolean;
   canSubmit: boolean;
   canCancel: boolean;
+  isLoadingDetail?: boolean;
   isSubmitting: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdateStatus: (
@@ -45,7 +51,6 @@ type ApplicationReviewDrawerProps = {
     status: ApplicationStatus,
     options?: { rejectionReason?: string; voteDeadline?: string },
   ) => void;
-  onDeleteApplication: (application: ApplicationResponse) => void;
   rejectionReason?: string;
 };
 
@@ -54,12 +59,13 @@ export function ApplicationReviewDrawer({
   canApprove,
   canSubmit,
   canCancel,
+  isLoadingDetail,
   isSubmitting,
   onOpenChange,
   onUpdateStatus,
-  onDeleteApplication,
   rejectionReason,
 }: ApplicationReviewDrawerProps) {
+  const { user } = useAuth();
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
@@ -80,6 +86,117 @@ export function ApplicationReviewDrawer({
       ? 'No rejection reason provided.'
       : undefined);
   const canConfirmReject = draftRejectReason.trim().length > 0 && !isSubmitting;
+
+  const [comments, setComments] = useState<ApplicationCommentResponse[]>([]);
+  const [commentsError, setCommentsError] = useState('');
+  const [isLoadingComments, setIsLoadingComments] = useState(false);
+  const [isSendingComment, setIsSendingComment] = useState(false);
+  const [newComment, setNewComment] = useState('');
+  const commentInputRef = useRef<HTMLTextAreaElement>(null);
+  const { createdComments } = useRealtimeComments('APPLICATION', application?.id);
+
+  const mergeComment = (comment: ApplicationCommentResponse) => {
+    setComments((currentComments) => {
+      const exists = currentComments.some((currentComment) => currentComment.id === comment.id);
+      if (exists) {
+        return currentComments.map((currentComment) =>
+          currentComment.id === comment.id ? comment : currentComment,
+        );
+      }
+
+      return [...currentComments, comment].sort(
+        (first, second) =>
+          new Date(first.createdAt).getTime() - new Date(second.createdAt).getTime(),
+      );
+    });
+  };
+
+  const handleReply = (displayName: string | null | undefined) => {
+    if (displayName) {
+      setNewComment(`@${displayName} `);
+      commentInputRef.current?.focus();
+    }
+  };
+
+  const handleSendComment = async () => {
+    if (!application) return;
+    if (!newComment.trim()) return;
+
+    setIsSendingComment(true);
+    setCommentsError('');
+
+    try {
+      const response = await createApplicationComment(application.id, { text: newComment.trim() });
+      if (response) {
+        mergeComment(response);
+      }
+      setNewComment('');
+    } catch {
+      setCommentsError('Unable to send comment.');
+    } finally {
+      setIsSendingComment(false);
+    }
+  };
+
+  const renderCommentText = (text: string) => {
+    if (text.startsWith('@')) {
+      const firstSpaceIndex = text.indexOf(' ', text.indexOf(' ') + 1);
+      if (firstSpaceIndex !== -1) {
+        const mention = text.substring(0, firstSpaceIndex);
+        const rest = text.substring(firstSpaceIndex);
+        return (
+          <>
+            <span className="font-medium text-[#FFD369]">{mention}</span>
+            {rest}
+          </>
+        );
+      }
+    }
+    return text;
+  };
+
+  useEffect(() => {
+    if (!application?.id) {
+      return;
+    }
+
+    const applicationId = application.id;
+    let isMounted = true;
+
+    async function loadComments() {
+      setIsLoadingComments(true);
+      setCommentsError('');
+
+      try {
+        const response = await getApplicationComments(applicationId);
+        if (isMounted) {
+          setComments(response.comments);
+        }
+      } catch {
+        if (isMounted) {
+          setComments([]);
+          setCommentsError('Unable to load comments.');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingComments(false);
+        }
+      }
+    }
+
+    void loadComments();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [application?.id]);
+
+  useEffect(() => {
+    const newestComment = createdComments.at(-1) as ApplicationCommentResponse | undefined;
+    if (newestComment) {
+      mergeComment(newestComment);
+    }
+  }, [createdComments]);
 
   const handleOpenRejectDialog = () => {
     setDraftRejectReason(rejectionReason ?? '');
@@ -106,7 +223,14 @@ export function ApplicationReviewDrawer({
 
   return (
     <>
-      <Sheet onOpenChange={onOpenChange} open={Boolean(application)}>
+      <Sheet onOpenChange={(open) => {
+        onOpenChange(open);
+        if (!open) {
+          setComments([]);
+          setNewComment('');
+          setCommentsError('');
+        }
+      }} open={Boolean(application)}>
         <SheetContent
           className="w-[540px] max-w-[92vw] gap-0 border-[#39424f] bg-[#101820] p-0 text-white sm:max-w-[540px]"
           showCloseButton={false}
@@ -140,7 +264,7 @@ export function ApplicationReviewDrawer({
                 </div>
               </SheetHeader>
 
-              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 [scrollbar-gutter:stable]">
                 <div className="grid grid-cols-2 gap-3">
                   <article className="rounded-[4px] border border-[#303842] bg-[#151c25] p-4">
                     <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8b94a1]">
@@ -201,21 +325,54 @@ export function ApplicationReviewDrawer({
                     Uploaded Files
                   </p>
                   <div className="mt-3 space-y-2">
-                    {uploadedFiles.length ? (
-                      uploadedFiles.map((file) => (
-                        <div
-                          className="flex min-h-12 items-center gap-3 rounded-[3px] border border-[#303842] bg-[#101820] px-3 py-2"
-                          key={`${file.name}-${file.sizeBytes ?? 'unknown'}`}
-                        >
-                          <FileUp className="size-4 shrink-0 text-[#FFD369]" />
-                          <div className="min-w-0">
-                            <p className="truncate text-xs font-black text-white">{file.name}</p>
-                            <p className="mt-1 text-[11px] font-bold text-[#8b94a1]">
-                              {file.mimeType ?? 'Unknown type'} - {formatFileSize(file.sizeBytes)}
-                            </p>
-                          </div>
+                    {isLoadingDetail ? (
+                      <div className="flex min-h-12 items-center gap-3 rounded-[3px] border border-[#303842] bg-[#101820] px-3 py-2">
+                        <div className="size-4 shrink-0 animate-pulse rounded bg-[#1f2937]" />
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="h-3 w-1/2 animate-pulse rounded bg-[#1f2937]" />
+                          <div className="h-2 w-1/3 animate-pulse rounded bg-[#1f2937]" />
                         </div>
-                      ))
+                      </div>
+                    ) : uploadedFiles.length ? (
+                      uploadedFiles.map((file) => {
+                        const content = (
+                          <>
+                            <FileUp className="size-4 shrink-0 text-[#FFD369]" />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-xs font-black text-white">{file.name}</p>
+                              <p className="mt-1 text-[11px] font-bold text-[#8b94a1]">
+                                {file.mimeType ?? 'Unknown type'} - {formatFileSize(file.sizeBytes)}
+                              </p>
+                            </div>
+                            {file.url ? (
+                              <Download className="size-4 shrink-0 text-[#aeb7c2] transition-colors group-hover:text-white" />
+                            ) : null}
+                          </>
+                        );
+
+                        const wrapperClassName = "group flex min-h-12 items-center gap-3 rounded-[3px] border border-[#303842] bg-[#101820] px-3 py-2 transition-colors hover:border-[#4b535f] hover:bg-[#151c25]";
+                        const key = `${file.name}-${file.sizeBytes ?? 'unknown'}`;
+
+                        if (file.url) {
+                          return (
+                            <Link
+                              className={wrapperClassName}
+                              href={file.url}
+                              key={key}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {content}
+                            </Link>
+                          );
+                        }
+
+                        return (
+                          <div className={wrapperClassName} key={key}>
+                            {content}
+                          </div>
+                        );
+                      })
                     ) : (
                       <p className="text-xs font-bold text-[#aeb7c2]">No uploaded files.</p>
                     )}
@@ -263,6 +420,115 @@ export function ApplicationReviewDrawer({
                         </div>
                       </div>
                     )}
+                  </div>
+                </section>
+
+                <section className="mt-4 rounded-[4px] border border-[#303842] bg-[#151c25] p-4 flex flex-col">
+                  <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8b94a1] mb-4">
+                    Comments
+                  </p>
+
+                  {commentsError ? (
+                    <p className="mb-4 rounded-[4px] border border-red-400/30 bg-red-950/20 px-3 py-2 text-xs font-bold text-red-300">
+                      {commentsError}
+                    </p>
+                  ) : null}
+
+                  {isLoadingComments ? (
+                    <p className="mb-4 text-xs font-bold text-[#8b94a1]">Loading comments...</p>
+                  ) : comments.length === 0 ? (
+                    <p className="text-xs font-bold text-[#8b94a1] mb-4">
+                      No comments yet. Start the discussion!
+                    </p>
+                  ) : (
+                    <div className="space-y-3 mb-4">
+                      {comments.map((comment) => {
+                        const isCurrentUserComment = comment.createdByUser?.id === user?.id;
+                        const commentContent = typeof comment.content === 'object' && comment.content !== null ? (comment.content as any).text ?? '' : '';
+
+                        // Skip rendering rejection reason comments
+                        if (typeof comment.content === 'object' && comment.content !== null && (comment.content as any).kind === 'REJECTION_REASON') {
+                          return null;
+                        }
+
+                        return (
+                          <div
+                            className={`flex gap-3 rounded-[4px] border p-3 ${
+                              isCurrentUserComment
+                                ? 'border-[#FFD369]/35 bg-[#1d2630]'
+                                : 'border-transparent bg-[#101820]'
+                            }`}
+                            key={comment.id}
+                          >
+                            {comment.createdByUser?.avatarUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={comment.createdByUser.avatarUrl}
+                                alt="Avatar"
+                                className="size-8 rounded-full shrink-0"
+                              />
+                            ) : (
+                              <UserCircle className="size-8 text-[#8b94a1] shrink-0" />
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-3">
+                                <p
+                                  className={`text-xs ${
+                                    isCurrentUserComment
+                                      ? 'font-black text-[#FFD369]'
+                                      : 'font-bold text-[#dce7f3]'
+                                  }`}
+                                >
+                                  {comment.createdByUser?.displayName ||
+                                    comment.createdByUser?.email ||
+                                    'Unknown User'}
+                                </p>
+                                <span className="text-[10px] font-bold text-[#4b535f]">
+                                  {new Date(comment.createdAt).toLocaleDateString()}{' '}
+                                  {new Date(comment.createdAt).toLocaleTimeString([], {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </span>
+                              </div>
+                              <p
+                                className={`mt-1 text-xs text-[#dce7f3] ${
+                                  isCurrentUserComment ? 'font-semibold' : 'font-medium'
+                                }`}
+                              >
+                                {renderCommentText(commentContent)}
+                              </p>
+                              <button
+                                className="mt-2 text-[10px] font-bold text-[#8b94a1] hover:text-white transition-colors"
+                                onClick={() => handleReply(comment.createdByUser?.displayName)}
+                              >
+                                Reply
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="mt-auto border-t border-[#303842] pt-4">
+                    <Textarea
+                      ref={commentInputRef}
+                      placeholder="Write a comment..."
+                      className="min-h-16 resize-none border-[#303842] bg-[#101820] text-xs font-medium text-white placeholder:text-[#4b535f] focus-visible:ring-[#FFD369]"
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                    />
+                    <div className="mt-3 flex justify-end">
+                      <Button
+                        className="h-8 rounded-[4px] bg-[#FFD369] px-4 text-[11px] font-black text-[#222831] hover:bg-[#eac04f]"
+                        onClick={() => void handleSendComment()}
+                        disabled={!newComment.trim() || isSendingComment}
+                      >
+                        <Check className="mr-1.5 size-3" />
+                        {isSendingComment ? 'Sending...' : 'Send'}
+                      </Button>
+                    </div>
                   </div>
                 </section>
 
@@ -460,7 +726,7 @@ export function ApplicationReviewDrawer({
             </div>
             <DialogTitle className="text-xl font-black text-white">Cancel Request</DialogTitle>
             <DialogDescription className="text-sm font-medium text-[#aeb7c2]">
-              Are you sure you want to cancel this request? This action will permanently remove it from the project and stop the review process.
+              Are you sure you want to cancel this request? This action will stop the review process and mark it as cancelled.
             </DialogDescription>
           </DialogHeader>
 
@@ -479,7 +745,7 @@ export function ApplicationReviewDrawer({
               disabled={isSubmitting}
               onClick={() => {
                 if (application) {
-                  onDeleteApplication(application);
+                  onUpdateStatus(application, 'CANCELLED');
                   setCancelDialogOpen(false);
                 }
               }}

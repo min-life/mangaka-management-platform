@@ -1,4 +1,5 @@
 import api from '@/lib/api';
+import { parseDecimal } from '@/lib/utils';
 import type { UserSummaryResponse } from './editor-board.service';
 
 export type FileResponse = {
@@ -168,10 +169,10 @@ export async function createFileFrame(
   return {
     id: frame.id,
     fileId: Number(fileId),
-    startX: Number(frame.startX),
-    startY: Number(frame.startY),
-    endX: Number(frame.endX),
-    endY: Number(frame.endY),
+    startX: parseDecimal(frame.startX),
+    startY: parseDecimal(frame.startY),
+    endX: parseDecimal(frame.endX),
+    endY: parseDecimal(frame.endY),
   };
 }
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { FileText, FolderOpen, Plus, Search, Trash2, UploadCloud } from 'lucide-react';
+import { FolderOpen, Plus, Search, Trash2, UploadCloud, FileText, ImageIcon, FileCode2, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -16,25 +16,30 @@ import {
 } from '@/components/ui/dialog';
 import type { ProjectFolderResponse } from '@/services/project.service';
 
+const labelClassName = 'text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]';
+const fieldClassName =
+  'mt-2 h-11 w-full rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 text-sm font-bold text-white outline-none placeholder:text-[#8b94a1] focus:border-[#FFD369]';
+
+export type CreateProductionFilePayload = {
+  description?: string;
+  folderId: number;
+  imageFile?: File;
+  sourceFile?: File;
+  textFile?: File;
+  title: string;
+};
+
 type CreateProductionItemDialogProps = {
   folders: ProjectFolderResponse[];
   isSubmitting: boolean;
-  onCreateFile: (input: {
-    description?: string;
-    folderId: number;
-    imageFile?: File;
-    textFile?: File;
-    sourceFile?: File;
-    title: string;
-  }) => Promise<void>;
-  selectedFolderId: number | null;
+  onCreateFile: (payload: CreateProductionFilePayload) => Promise<void>;
+  selectedFolderId?: number | string | null;
 };
 
-const fieldClassName =
-  'mt-2 h-10 w-full rounded-[4px] border border-[#39424f] bg-[#151c25] px-3 text-sm font-bold text-white outline-none placeholder:text-[#8b94a1] focus:border-[#FFD369]';
-
-const labelClassName =
-  'text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]';
+type FileSlot = {
+  file?: File;
+  previewUrl?: string;
+};
 
 function getFolderPath(folder: ProjectFolderResponse, folders: ProjectFolderResponse[]) {
   const parents: string[] = [];
@@ -50,15 +55,11 @@ function getFolderPath(folder: ProjectFolderResponse, folders: ProjectFolderResp
   return parents.length ? `${parents.join(' / ')} / ${folder.title}` : folder.title;
 }
 
-type FileSlot = {
-  file: File | undefined;
-  previewUrl: string;
-};
-
 function FileUploadSlot({
   accept,
   description,
   disabled,
+  icon,
   inputId,
   label,
   slot,
@@ -68,6 +69,7 @@ function FileUploadSlot({
   accept: string;
   description: string;
   disabled: boolean;
+  icon: React.ReactNode;
   inputId: string;
   label: string;
   slot: FileSlot;
@@ -81,44 +83,54 @@ function FileUploadSlot({
   };
 
   return (
-    <div>
-      <span className={labelClassName}>{label}</span>
-      <p className="mt-0.5 text-[11px] font-bold leading-4 text-[#8b94a1]">{description}</p>
-      <label
-        className={`mt-2 flex min-h-[72px] cursor-pointer items-center gap-3 overflow-hidden rounded-[5px] border border-dashed px-3 py-3 text-left transition-colors ${
-          disabled ? 'cursor-not-allowed opacity-50' : 'hover:border-[#FFD369]/70'
-        } ${slot.file ? 'border-[#FFD369]/40 bg-[#2a2414]' : 'border-[#4b535f] bg-[#151c25]'}`}
-        htmlFor={disabled ? undefined : inputId}
-      >
-        {slot.file ? (
-          <>
+    <div className="rounded-[4px] border border-[#39424f] bg-[#151c25] p-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-xs font-black text-white">
+          <span className="grid size-8 place-items-center rounded-[4px] border border-[#4b535f] bg-[#101820] text-[#FFD369]">
+            {icon}
+          </span>
+          <div>
+            <p>{label}</p>
+            <p className="mt-0.5 text-[9px] font-bold tracking-[0.05em] text-[#8b94a1]">{description}</p>
+          </div>
+        </div>
+        <label
+          className={`inline-flex h-8 items-center rounded-[4px] border border-[#4b535f] bg-[#101820] px-3 text-[10px] font-black text-white transition-colors ${
+            disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-[#303842]'
+          }`}
+          htmlFor={disabled ? undefined : inputId}
+        >
+          {slot.file ? 'Replace' : 'Choose'}
+        </label>
+        <input accept={accept} className="hidden" disabled={disabled} id={inputId} onChange={handleChange} type="file" />
+      </div>
+      
+      {slot.file ? (
+        <div className="flex items-center justify-between gap-3 rounded-[4px] border border-[#303842] bg-[#0d151e] px-3 py-2">
+          <div className="flex items-center gap-3 min-w-0">
             {slot.previewUrl ? (
-              <img alt="" className="size-10 shrink-0 rounded-[3px] object-cover" src={slot.previewUrl} />
-            ) : (
-              <FileText className="size-7 shrink-0 text-[#FFD369]" />
-            )}
+              <img alt="" className="size-8 shrink-0 rounded-[3px] object-cover" src={slot.previewUrl} />
+            ) : null}
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[11px] font-black text-white">{slot.file.name}</p>
-              <p className="mt-0.5 text-[10px] font-bold text-[#8b94a1]">
-                {(slot.file.size / 1024).toFixed(1)} KB
+              <p className="truncate text-xs font-black text-white">{slot.file.name}</p>
+              <p className="mt-1 text-[11px] font-bold text-[#8b94a1]">
+                {slot.file.type || 'Unknown type'} - {(slot.file.size / 1024 / 1024).toFixed(2)} MB
               </p>
             </div>
-            <button
-              className="shrink-0 text-red-300 hover:text-red-200"
-              onClick={(e) => { e.preventDefault(); onClear(); }}
-              type="button"
-            >
-              <Trash2 className="size-4" />
-            </button>
-          </>
-        ) : (
-          <span className="flex flex-1 items-center gap-3">
-            <UploadCloud className="size-5 shrink-0 text-[#8b94a1]" />
-            <span className="text-[11px] font-black text-[#8b94a1]">Click to upload</span>
-          </span>
-        )}
-        <input accept={accept} className="hidden" disabled={disabled} id={inputId} onChange={handleChange} type="file" />
-      </label>
+          </div>
+          <button
+            className="grid size-7 shrink-0 place-items-center rounded-[3px] text-[#aeb7c2] hover:bg-[#303842] hover:text-white"
+            onClick={(e) => { e.preventDefault(); onClear(); }}
+            type="button"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      ) : (
+        <p className="rounded-[4px] border border-dashed border-[#303842] bg-[#0d151e] px-3 py-3 text-[11px] font-bold text-[#8b94a1]">
+          No file selected.
+        </p>
+      )}
     </div>
   );
 }
@@ -200,7 +212,7 @@ export function CreateProductionItemDialog({
       <DialogTrigger asChild>
         <Button className="h-9 rounded-[4px] bg-[#FFD369] px-4 text-xs font-black text-[#222831] hover:bg-[#eac04f]">
           <Plus className="size-4" />
-          New File
+          New Resources
         </Button>
       </DialogTrigger>
       <DialogContent
@@ -299,6 +311,7 @@ export function CreateProductionItemDialog({
                 accept="image/*,.pdf"
                 description="PNG, JPG, GIF, PDF"
                 disabled={isSubmitting}
+                icon={<ImageIcon className="size-5" />}
                 inputId="upload_image"
                 label="Image"
                 slot={imageSlot}
@@ -310,6 +323,7 @@ export function CreateProductionItemDialog({
                 accept=".txt,.doc,.docx,text/*"
                 description="TXT, DOC, DOCX"
                 disabled={isSubmitting}
+                icon={<FileText className="size-5" />}
                 inputId="upload_text"
                 label="Text / Document"
                 slot={textSlot}
@@ -321,6 +335,7 @@ export function CreateProductionItemDialog({
                 accept=".psd,.clip,.zip,.ai,.csp"
                 description="PSD, CLIP, ZIP, AI, CSP"
                 disabled={isSubmitting}
+                icon={<FileCode2 className="size-5" />}
                 inputId="upload_source"
                 label="Source File"
                 slot={sourceSlot}

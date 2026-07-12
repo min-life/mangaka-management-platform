@@ -348,7 +348,7 @@ export default function ProjectDashboardPage() {
                   <article
                     className="rounded-[5px] border border-[#303842] bg-[#202832] p-4 hover:border-[#FFD369]/30 transition-all cursor-pointer relative overflow-hidden"
                     key={task.id}
-                    onClick={() => router.push(`/studio/projects/${slug}/tasks`)}
+                    onClick={() => router.push(`/studio/projects/${slug}/tasks/${task.id}`)}
                   >
                     {isOverdue && (
                       <div className="absolute top-0 left-0 w-1 h-full bg-[#ff6b6b]" />
@@ -411,7 +411,11 @@ export default function ProjectDashboardPage() {
                 const style = styles[idx % styles.length];
 
                 return (
-                  <div className="flex gap-4 p-3 rounded-[5px] hover:bg-[#202832] transition-colors" key={act.id}>
+                  <div 
+                    className="flex gap-4 p-3 rounded-[5px] hover:bg-[#202832] transition-colors cursor-pointer" 
+                    key={act.id}
+                    onClick={() => router.push(`/studio/projects/${slug}/files/${act.id}`)}
+                  >
                     <span
                       className="grid size-9 place-items-center rounded-full shrink-0"
                       style={{ backgroundColor: style.bg, color: style.color }}

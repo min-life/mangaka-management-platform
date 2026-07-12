@@ -22,7 +22,6 @@ export type FileTaskSidebarProps = {
   onSubmitTaskWork: (input: SubmitTaskWorkInput) => void;
   onMarkReadyForReview?: () => Promise<void>;
   onTaskChange: (task: TaskWorkspaceItem) => void;
-  selectedSubmissionId: string | null;
   selectedTaskId: string | null;
   selectedVersion: FileVersionItem | null;
   tasks: FileTaskItem[];

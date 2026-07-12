@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { AxiosError } from 'axios';
 import { toast } from '@/lib/toast';
@@ -89,6 +90,9 @@ function ApplicationListSkeleton() {
 
 export function ApplicationsClient() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
+  const autoOpenAppId = searchParams.get('applicationId');
+  const hasAutoOpened = useRef(false);
   const { numericId: projectId } = useProjectParams();
   const [applications, setApplications] = useState<ApplicationResponse[]>([]);
   const [permissions, setPermissions] = useState<string[]>([]);
@@ -99,6 +103,7 @@ export function ApplicationsClient() {
   const [error, setError] = useState<string | null>(null);
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
   const [selectedApplication, setSelectedApplication] = useState<ApplicationResponse | null>(null);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [selectedComments, setSelectedComments] = useState<ApplicationCommentResponse[]>([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -160,6 +165,23 @@ export function ApplicationsClient() {
       setIsLoading(false);
     }
   }, [projectId]);
+
+  // Handle auto-opening application from URL
+  useEffect(() => {
+    if (applications.length > 0 && autoOpenAppId && !hasAutoOpened.current) {
+      const targetApp = applications.find((app) => app.id === Number(autoOpenAppId));
+      if (targetApp) {
+        hasAutoOpened.current = true;
+        // Avoid state updates during render by wrapping in timeout/microtask
+        queueMicrotask(() => {
+          setSelectedApplication(targetApp);
+          getApplicationById(targetApp.id)
+            .then((detail: any) => setSelectedComments(detail.comments))
+            .catch((err: unknown) => console.error('Unable to load application detail:', err));
+        });
+      }
+    }
+  }, [applications, autoOpenAppId]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -317,6 +339,7 @@ export function ApplicationsClient() {
   const handleOpenApplication = async (application: ApplicationResponse) => {
     setSelectedApplication(application);
     setSelectedComments([]);
+    setIsLoadingDetail(true);
 
     try {
       const [detail, commentResult] = await Promise.all([
@@ -329,6 +352,8 @@ export function ApplicationsClient() {
       setSelectedComments(commentResult.comments);
     } catch (detailError) {
       console.error('Unable to load application detail:', detailError);
+    } finally {
+      setIsLoadingDetail(false);
     }
   };
 
@@ -558,12 +583,10 @@ export function ApplicationsClient() {
         canApprove={false}
         canCancel={
           selectedApplication
-            ? selectedApplication.createdByUser?.id === user?.id ||
-            permissions.includes('admin') ||
-            permissions.includes('project:owner') ||
-            permissions.includes('project:application.approve')
+            ? selectedApplication.createdByUser?.id === user?.id || selectedApplication.createdBy === user?.id
             : false
         }
+        isLoadingDetail={isLoadingDetail}
         isSubmitting={isSubmitting}
         onOpenChange={(open) => {
           if (!open) {
@@ -584,9 +607,6 @@ export function ApplicationsClient() {
         }
         onUpdateStatus={(application, status, options) =>
           void handleUpdateStatus(application, status, options)
-        }
-        onDeleteApplication={(application) =>
-          void handleDeleteApplication(application)
         }
       />
     </section>

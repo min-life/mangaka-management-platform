@@ -143,11 +143,6 @@ export function ArcGrid({
                         {arc.description || getArcSubtitle(arc.title, index)}
                       </p>
                     )}
-                    {/* Metrics */}
-                    <div className="mt-4 flex items-center gap-4">
-                      <MetricPill icon={<BookOpen className="size-3" />} label={`${chapterCounts[arc.id] ?? 0} ch`} />
-                      <MetricPill icon={<FileText className="size-3" />} label={`${countArcFiles(arc.id, folders, fileCounts)} files`} />
-                    </div>
                   </div>
 
                   {/* Footer */}

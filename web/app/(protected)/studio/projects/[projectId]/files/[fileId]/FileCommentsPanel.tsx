@@ -73,6 +73,17 @@ export function FileCommentsPanel({
     }
   }, [replyingFrameId]);
 
+  const frameDisplayIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    frameComments.forEach(fc => {
+      const fId = String(fc.frameId || fc.id);
+      if (!map.has(fId)) {
+        map.set(fId, map.size + 1);
+      }
+    });
+    return map;
+  }, [frameComments]);
+
   const displayComments = useMemo(() => {
     const frameCommentIds = new Set(frameComments.map(c => c.id));
     const filteredComments = comments.filter(c => !frameCommentIds.has(c.id));
@@ -128,9 +139,9 @@ export function FileCommentsPanel({
   return (
     <section data-context-key={contextKey}>
       <div className="flex flex-col gap-3 pr-1">
-        {/* All comments */}
         {displayComments.map((comment) => {
           const isFrameComment = 'frameId' in comment;
+          const displayIndex = isFrameComment ? frameDisplayIndexMap.get(String((comment as SubmissionFrameComment).frameId || comment.id)) : undefined;
           return (
             <article
               className={`group rounded-r-[4px] border-y border-r border-l-4 p-3 ${isFrameComment
@@ -157,7 +168,7 @@ export function FileCommentsPanel({
                           onClick={() => onSelectFrame?.(comment as SubmissionFrameComment)}
                           className="text-[10px] font-black text-[#ff9ab3] hover:underline"
                         >
-                          Frame {(comment as SubmissionFrameComment).frameId}
+                          Frame {displayIndex}
                         </button>
                       </>
                     )}
@@ -232,7 +243,7 @@ export function FileCommentsPanel({
       <div className={`mt-2 rounded-[4px] border transition-colors bg-[#151c25] p-3 ${replyingFrameId ? 'border-[#ff9ab3]' : 'border-[#39424f]'}`}>
         {replyingFrameId && (
           <div className="mb-2 flex items-center justify-between rounded bg-[#ff9ab3]/10 px-2 py-1 text-[10px] font-bold text-[#ff9ab3]">
-            <span className="flex items-center gap-1.5"><Reply className="size-3" /> Replying to Frame {replyingFrameId}</span>
+            <span className="flex items-center gap-1.5"><Reply className="size-3" /> Replying to Frame {frameDisplayIndexMap.get(String(replyingFrameId))}</span>
             <button
               onClick={() => setReplyingFrameId?.(null)}
               className="hover:text-white transition-colors"

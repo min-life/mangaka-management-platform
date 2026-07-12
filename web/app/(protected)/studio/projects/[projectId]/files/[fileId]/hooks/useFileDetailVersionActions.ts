@@ -16,7 +16,7 @@ type VersionActionsProps = {
   setIsLoading: (val: boolean) => void;
   setIsSubmittingReview: (val: boolean) => void;
   setSelectedVersion: (val: FileVersionItem | null) => void;
-  setSelectedSubmissionId: (val: string | null) => void;
+
   setDeletingVersionId: (val: string | null) => void;
   setSelectedVersionForDetails: (val: FileVersionItem | null) => void;
 
@@ -33,7 +33,7 @@ export function useFileDetailVersionActions({
   setIsLoading,
   setIsSubmittingReview,
   setSelectedVersion,
-  setSelectedSubmissionId,
+
   setDeletingVersionId,
   setSelectedVersionForDetails,
 

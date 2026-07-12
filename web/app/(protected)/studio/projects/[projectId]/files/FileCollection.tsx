@@ -90,15 +90,13 @@ export function FileCollection({
           /* ── LIST VIEW ── */
           <div className="overflow-x-auto">
             {/* Column headers */}
-            <div className="grid min-w-[700px] grid-cols-[minmax(280px,1fr)_130px_90px_110px] border-b border-[#1e2936] bg-[#0b1319] px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.08em] text-[#5d6878]">
+            <div className="grid min-w-[500px] grid-cols-[minmax(280px,1fr)_110px] border-b border-[#1e2936] bg-[#0b1319] px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.08em] text-[#5d6878]">
               <span>File</span>
-              <span>Status</span>
-              <span>Tasks</span>
               <span>Updated</span>
             </div>
             {files.map((file) => (
               <button
-                className={`group grid min-h-[72px] w-full min-w-[700px] grid-cols-[minmax(280px,1fr)_130px_90px_110px] items-center border-b border-[#1a2333]/60 px-4 text-left transition-all duration-150 hover:bg-[#14202e] ${
+                className={`group grid min-h-[72px] w-full min-w-[500px] grid-cols-[minmax(280px,1fr)_110px] items-center border-b border-[#1a2333]/60 px-4 text-left transition-all duration-150 hover:bg-[#14202e] ${
                   selectedFileId === file.id ? 'bg-[#14202e] border-l-2 border-l-[#FFD369] pl-[14px]' : ''
                 }`}
                 key={file.id}
@@ -116,15 +114,6 @@ export function FileCollection({
                       {file.category}
                     </span>
                   </span>
-                </span>
-                {/* Status */}
-                <Badge className={`w-fit rounded-[3px] border text-[10px] ${fileStatusClassName[file.status]}`}>
-                  {fileStatusLabels[file.status]}
-                </Badge>
-                {/* Tasks */}
-                <span className="flex items-center gap-1.5 text-xs font-bold text-[#aeb7c2]">
-                  <Tag className="size-3 text-[#5d6878]" />
-                  {file.taskCount}
                 </span>
                 {/* Updated */}
                 <span className="flex items-center gap-1.5 text-xs font-medium text-[#5d6878]">
@@ -158,15 +147,10 @@ export function FileCollection({
                   <span className="mt-0.5 block truncate text-[11px] font-medium text-[#5d6878]">
                     {file.category}
                   </span>
-                  <span className="mt-auto pt-3 flex items-center justify-between">
-                    <Badge className={`rounded-[3px] border text-[9px] py-0 ${fileStatusClassName[file.status]}`}>
-                      {fileStatusLabels[file.status]}
-                    </Badge>
-                    <span className="flex items-center gap-1 text-[10px] font-bold text-[#5d6878]">
+                  <span className="mt-auto pt-3 flex items-center gap-1 text-[10px] font-bold text-[#5d6878]">
                       <Clock className="size-2.5" />
                       {formatFileDate(file.updatedAt)}
                     </span>
-                  </span>
                 </span>
               </button>
             ))}

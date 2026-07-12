@@ -20,9 +20,9 @@ import {
 } from '@/services/project.service';
 import {
   getFileTasks,
-  createFileTask,
 } from '@/services/file.service';
-import { updateTask, createTaskComment } from '@/services/task.service';
+import { updateTask, createTaskComment, getTaskFrames } from '@/services/task.service';
+import { parseDecimal, getCleanTaskDescription } from '@/lib/utils';
 import { LoadingState } from '@/components/ui/loading-state';
 import { RefreshingIndicator } from '@/components/ui/refreshing-indicator';
 import { useAsyncResource } from '@/hooks/useAsyncResource';
@@ -31,7 +31,7 @@ import { usePermissions } from '@/hooks/use-permissions';
 
 import { useRealtimeProjectActivity } from '@/hooks/use-realtime-activity';
 
-import { CreateTaskDialog } from './CreateTaskDialog';
+
 import { TaskKanban } from './TaskKanban';
 import { TaskTable } from './TaskTable';
 import { Pagination } from '../../../components/Pagination';
@@ -105,10 +105,10 @@ export function TasksClient() {
           const frame = t.commentFrames?.[0];
           const region = frame
             ? {
-              startX: Number(frame.startX),
-              startY: Number(frame.startY),
-              endX: Number(frame.endX),
-              endY: Number(frame.endY),
+              startX: parseDecimal(frame.startX),
+              startY: parseDecimal(frame.startY),
+              endX: parseDecimal(frame.endX),
+              endY: parseDecimal(frame.endY),
             }
             : undefined;
 
@@ -117,7 +117,7 @@ export function TasksClient() {
           const versionMatch = t.description?.match(/\[version:(v\d+)\]/);
           const taskVersion = versionMatch ? versionMatch[1] : undefined;
 
-          const cleanDesc = t.description ? t.description.replace(/\s*\[version:v\d+\]/g, '') : '';
+          const cleanDesc = getCleanTaskDescription(t.description);
 
           return {
             assignee: assigneeName,
@@ -127,6 +127,7 @@ export function TasksClient() {
             fileTitle: file.title,
             id: String(t.id),
             isMine: user?.id != null && t.assignedByUser?.id === user.id,
+            assignedByUserId: t.createdByUser?.id || t.assignedByUserId, // Assuming createdByUser is the assigner if assignedByUserId is missing, but let's check API
             previewUrl: '', // Not used in UI
             priority: 'MEDIUM',
             region,
@@ -175,17 +176,24 @@ export function TasksClient() {
     }
   }, [activities.length, reload]);
 
-  // Determine reviewer permission for dragging cards (backend checks specific ownership details)
-  const canReview = canProject('project:task.update') || canProject('admin');
+  const isProjectOwner =
+    (user?.id != null && (data as any)?.project?.createdBy === user.id) ||
+    canProject('project:owner');
+
+  const canReviewTask = useCallback((task: TaskWorkspaceItem) => {
+    const isTaskAssigner = user?.id != null && task.assignedByUserId === user.id;
+    const isTaskAssignee = task.isMine === true;
+    return (isTaskAssigner && !isTaskAssignee) || canProject('admin') || isProjectOwner || canProject('project:task.update');
+  }, [user?.id, canProject, isProjectOwner]);
 
   const visibleTasks = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
-    return tasks.filter((task) => {
+    return localTasks.filter((task) => {
       const matchesQuery =
         !normalizedQuery ||
         [task.title, task.fileTitle, task.assignee, task.description].some((value) =>
-          value.toLowerCase().includes(normalizedQuery),
+          value?.toLowerCase().includes(normalizedQuery),
         );
       const matchesScope =
         scope === 'ALL' ||
@@ -195,7 +203,7 @@ export function TasksClient() {
 
       return matchesQuery && matchesScope;
     });
-  }, [query, scope, tasks]);
+  }, [query, scope, localTasks]);
 
   const paginatedTasks = useMemo(() => {
     const startIndex = (page - 1) * limit;
@@ -204,39 +212,6 @@ export function TasksClient() {
 
   const totalPages = Math.ceil(visibleTasks.length / limit);
 
-  const handleCreate = async (input: {
-    title: string;
-    description: string;
-    fileId: number;
-    assignedToId?: number;
-    status: TaskStatus;
-    dueDate: string;
-  }) => {
-    try {
-      let deadline: string | undefined = undefined;
-      if (input.dueDate) {
-        const dateObj = new Date(input.dueDate);
-        if (!isNaN(dateObj.getTime())) {
-          deadline = dateObj.toISOString();
-        }
-      }
-
-      await createFileTask(input.fileId, {
-        title: input.title,
-        description: input.description,
-        status: input.status,
-        deadline,
-        assignedBy: input.assignedToId,
-        cloneBaseMaterial: true,
-      });
-
-      await reload();
-      toast.success('Task created.');
-    } catch (err) {
-      console.error('Failed to create task:', err);
-      toast.error('Failed to create task. Please try again.');
-    }
-  };
 
   const openTask = (task: TaskWorkspaceItem) => {
     router.push(
@@ -247,11 +222,29 @@ export function TasksClient() {
   const handleStatusChange = async (taskId: string, newStatus: TaskStatus, comment?: string) => {
     // 1. Optimistic update immediately
     const prevTasks = localTasks;
+    const currentTask = localTasks.find(t => t.id === taskId);
+    
     setLocalTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)),
     );
     try {
-      await updateTask(taskId, { status: newStatus });
+      let newDescription = currentTask?.description || '';
+
+      if (newStatus === 'REVIEW' && currentTask?.status !== 'REVIEW') {
+        newDescription = `${newDescription}\n[Note: Marked as ready for review without file upload]`.trim();
+      } else if (newStatus === 'INPROGRESS' && currentTask?.status === 'REVIEW') {
+        const finalNote = comment?.trim() || '';
+        const reviewerTag = ` [Reviewer: ${finalNote}] [Result: CHANGES_REQUESTED]`;
+        newDescription = `${newDescription}${reviewerTag}`;
+      } else if (newStatus === 'DONE' && currentTask?.status === 'REVIEW') {
+        const reviewerTag = ` [Reviewer: Looks good!] [Result: APPROVED]`;
+        newDescription = `${newDescription}${reviewerTag}`;
+      }
+
+      await updateTask(taskId, { 
+        status: newStatus,
+        description: newDescription !== currentTask?.description ? newDescription : undefined
+      });
       // 2. Post revision comment if provided (request revision flow)
       if (comment?.trim()) {
         await createTaskComment(taskId, `[Revision requested] ${comment.trim()}`);
@@ -282,7 +275,7 @@ export function TasksClient() {
             Assign, produce, submit, and review work linked to manga files.
           </p>
         </div>
-        <CreateTaskDialog fileOptions={projectFiles} members={members} onCreate={handleCreate} />
+
       </header>
 
       {error ? (
@@ -346,25 +339,10 @@ export function TasksClient() {
             <TaskTable isLoading={isInitialLoading} onOpenTask={openTask} tasks={paginatedTasks} />
           ) : (
             <TaskKanban
-              canReview={canReview}
+              canReview={canReviewTask}
               onOpenTask={openTask}
               onStatusChange={handleStatusChange}
-              tasks={localTasks.filter((task) => {
-                const normalizedQuery = query.trim().toLowerCase();
-                const matchesQuery =
-                  !normalizedQuery ||
-                  [task.title, task.fileTitle, task.assignee, task.description].some((v) =>
-                    v.toLowerCase().includes(normalizedQuery),
-                  );
-                const matchesScope =
-                  scope === 'ALL' ||
-                  (scope === 'MINE' && task.isMine) ||
-                  (scope === 'REVIEW' && task.status === 'REVIEW') ||
-                  (scope === 'OVERDUE' &&
-                    task.dueDate !== 'No due date' &&
-                    new Date(task.dueDate) < new Date());
-                return matchesQuery && matchesScope;
-              })}
+              tasks={paginatedTasks}
             />
           )}
         </div>

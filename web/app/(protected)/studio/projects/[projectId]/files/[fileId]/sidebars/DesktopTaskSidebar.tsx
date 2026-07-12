@@ -26,7 +26,6 @@ export function DesktopTaskSidebar({
   onSubmitTaskWork,
   onMarkReadyForReview,
   onTaskChange,
-  selectedSubmissionId,
   selectedTaskId,
   selectedVersion,
   tasks,
@@ -194,7 +193,6 @@ export function DesktopTaskSidebar({
                 onSubmitTaskWork={onSubmitTaskWork}
                 onMarkReadyForReview={onMarkReadyForReview}
                 onTaskChange={onTaskChange}
-                selectedSubmissionId={selectedSubmissionId}
                 versions={versions}
                 members={members}
                 onRefresh={onRefresh}

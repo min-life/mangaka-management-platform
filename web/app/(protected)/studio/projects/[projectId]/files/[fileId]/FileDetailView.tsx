@@ -59,12 +59,13 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
     isSavingComment,
     isSubmittingReview,
     loadFile,
+    quietReload,
+    refreshFrameComments,
     members,
     mobileTasksOpen,
     pendingFrameRegion,
     projectId,
     resourceTab,
-    selectedSubmissionId,
     selectedTaskId,
     selectedVersion,
     selectedVersionForDetails,
@@ -79,7 +80,6 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
     setPendingFrameRegion,
     setPendingTaskRegion,
     setResourceTab,
-    setSelectedSubmissionId,
     setSelectedVersion,
     setSelectedVersionForDetails,
     setTaskDialogOpen,
@@ -103,18 +103,23 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
     if (activities.length > 0) {
       const latestActivity = activities[0];
       if (latestActivity?.fileId === Number(file.id)) {
-        void loadFile();
+        const metadata = latestActivity.metadata as any;
+        if (latestActivity.action === 'COMMENT_CREATED' && metadata?.frameId) {
+          void refreshFrameComments(metadata.frameId);
+        } else {
+          void quietReload();
+        }
       }
     }
-  }, [activities, activities.length, file?.id, loadFile]);
+  }, [activities, activities.length, file?.id, quietReload, refreshFrameComments]);
 
   // Reload file comments when there is a new direct file comment event
   useEffect(() => {
     if (!file?.id) return;
     if (createdComments.length > 0 || updatedComments.length > 0 || deletedCommentIds.length > 0) {
-      void loadFile();
+      void quietReload();
     }
-  }, [createdComments.length, updatedComments.length, deletedCommentIds.length, file?.id, loadFile]);
+  }, [createdComments.length, updatedComments.length, deletedCommentIds.length, file?.id, quietReload]);
 
   if (!file) {
     return null;
@@ -225,7 +230,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
                       if (nextVersion) {
                         setSelectedVersion(nextVersion.isCurrent ? null : nextVersion);
                       }
-                      setSelectedSubmissionId(null);
+
                       canvasRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }}
                   />
@@ -240,7 +245,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
 
 
                   canvasRef={canvasRef}
-                  setSelectedSubmissionId={setSelectedSubmissionId}
+
 
                   isLoading={isLoading}
                   isSubmittingReview={isSubmittingReview}
@@ -291,7 +296,6 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
           onSubmitTaskWork={handleSubmitTaskWork}
           onMarkReadyForReview={handleMarkReadyForReview}
           onTaskChange={handleFocusedTaskChange}
-          selectedSubmissionId={selectedSubmissionId}
           selectedTaskId={selectedTaskId}
           selectedVersion={selectedVersion}
           tasks={tasks}
@@ -336,7 +340,6 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
           onMarkReadyForReview={handleMarkReadyForReview}
           onTaskChange={handleFocusedTaskChange}
           open={mobileTasksOpen}
-          selectedSubmissionId={selectedSubmissionId}
           selectedTaskId={selectedTaskId}
           selectedVersion={selectedVersion}
           tasks={tasks}

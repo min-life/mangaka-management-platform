@@ -21,7 +21,7 @@ type FileVersionsTabProps = {
   selectedVersionForDetails: FileVersionItem | null;
   setSelectedVersionForDetails: (version: FileVersionItem | null) => void;
   canvasRef: React.RefObject<HTMLDivElement | null>;
-  setSelectedSubmissionId: (id: string | null) => void;
+
   isLoading: boolean;
   isSubmittingReview: boolean;
   setIsSubmittingReview: (loading: boolean) => void;
@@ -45,7 +45,7 @@ export function FileVersionsTab({
   selectedVersionForDetails,
   setSelectedVersionForDetails,
   canvasRef,
-  setSelectedSubmissionId,
+
   isLoading,
   isSubmittingReview,
   setIsSubmittingReview,
@@ -230,7 +230,7 @@ export function FileVersionsTab({
                 className="flex items-center justify-between gap-3 px-4 py-3 cursor-pointer group"
                 onClick={() => {
                   setSelectedVersion(version.isCurrent ? null : version);
-                  setSelectedSubmissionId(null);
+
                 }}
               >
                 {/* Left: Title & Info */}

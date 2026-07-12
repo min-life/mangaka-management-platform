@@ -20,6 +20,7 @@ import {
   UserRound,
   X,
 } from 'lucide-react';
+import { getCleanTaskDescription } from '@/lib/utils';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -431,7 +432,7 @@ export function TaskDetailClient({ taskId }: TaskDetailClientProps) {
                     <Badge className={`rounded-[3px] border ${taskStatusClassName[task.status]}`}>{taskStatusLabels[task.status]}</Badge>
                     <Badge className={`rounded-[3px] border ${taskPriorityClassName[task.priority]}`}>{task.priority} *</Badge>
                   </div>
-                  <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-[#dce7f3]">{task.description}</p>
+                  <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-[#dce7f3]">{getCleanTaskDescription(task.description)}</p>
                 </div>
                 {task.status !== 'DONE' && task.status !== 'REVIEW' ? (
                   task.parent && task.parent.status !== 'DONE' ? (

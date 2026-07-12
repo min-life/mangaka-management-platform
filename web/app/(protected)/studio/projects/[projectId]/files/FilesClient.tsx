@@ -303,7 +303,7 @@ export function FilesClient() {
       }
 
       toast.success(hasFiles ? 'File created with initial material.' : 'File created.');
-      await reload();
+      void reload();
     } catch {
       toast.error('Failed to create file. Please try again.');
     } finally {

@@ -26,7 +26,6 @@ export function MobileTaskDrawer({
   onMarkReadyForReview,
   onTaskChange,
   open,
-  selectedSubmissionId,
   selectedTaskId,
   tasks,
   versions,
@@ -124,7 +123,6 @@ export function MobileTaskDrawer({
                   onSubmitTaskWork={onSubmitTaskWork}
                   onMarkReadyForReview={onMarkReadyForReview}
                   onTaskChange={onTaskChange}
-                  selectedSubmissionId={selectedSubmissionId}
                   versions={versions}
                   members={members}
                   onRefresh={onRefresh}

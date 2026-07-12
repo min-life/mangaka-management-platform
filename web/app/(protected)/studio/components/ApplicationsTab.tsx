@@ -123,7 +123,7 @@ export function ApplicationsTab({
                 <TableCell className="px-5">
                   <Link
                     className="flex items-center gap-4 rounded-[4px] outline-none transition-opacity hover:opacity-85 focus-visible:ring-2 focus-visible:ring-[#FFD369]"
-                    href={`/studio/projects/${getProjectSlug(app.projectId, app.project || '')}/applications`}
+                    href={`/studio/projects/${getProjectSlug(app.projectId, app.project || '')}/applications?applicationId=${app.id}`}
                   >
                     <div>
                       <p className="text-sm font-black leading-5 text-white">{app.title}</p>
