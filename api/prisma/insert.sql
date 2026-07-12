@@ -101,3 +101,7 @@ WHERE r.code = 'TANTOU_EDITOR' AND p.name IN (
   'project:read', 'project:member.read', 'project:comment.create', 'project:comment.update', 'project:application.read', 'project:application.update', 'project:application.approve'
 )
 ON CONFLICT DO NOTHING;
+
+-- 4. Sync Sequences
+SELECT setval(pg_get_serial_sequence('permissions', 'id'), coalesce(max(id),0) + 1, false) FROM permissions;
+SELECT setval(pg_get_serial_sequence('roles', 'id'), coalesce(max(id),0) + 1, false) FROM roles;
