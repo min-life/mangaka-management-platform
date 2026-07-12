@@ -81,7 +81,6 @@ export class RolesService {
 
       return { data: serializeRole(role) };
     } catch (error) {
-      this.handleUniqueCodeConflict(error);
       throw error;
     }
   }
@@ -125,7 +124,6 @@ export class RolesService {
 
       return { data: serializeRole(role) };
     } catch (error) {
-      this.handleUniqueCodeConflict(error);
       throw error;
     }
   }
@@ -229,16 +227,6 @@ export class RolesService {
     };
   }
 
-  private handleUniqueCodeConflict(error: unknown) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === 'P2002' &&
-      Array.isArray(error.meta?.target) &&
-      error.meta.target.includes('code')
-    ) {
-      throw new ConflictException(ERROR.CFROLECODE);
-    }
-  }
 
   private buildPagination(pagination?: { page?: number; limit?: number }) {
     const page = pagination?.page || 1;
