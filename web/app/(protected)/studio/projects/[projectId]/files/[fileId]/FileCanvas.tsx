@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import {
   FileQuestion,
   Maximize2,
@@ -9,15 +9,20 @@ import {
   Minus,
   Plus,
   RotateCw,
-  ScanLine,
   Loader2,
+  Sparkles,
 } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { toast } from '@/lib/toast';
 
 import type { FileDetailController } from './hooks/useFileDetailController';
+import type { FileTaskRegion, SubmissionFrameComment } from '../file-ui';
+
+type CanvasFrameThread = {
+  comment: SubmissionFrameComment;
+  displayIndex: number;
+  frameId: string;
+};
 
 type FileCanvasProps = {
   controller: FileDetailController;
@@ -26,6 +31,9 @@ type FileCanvasProps = {
 export function FileCanvas({ controller }: FileCanvasProps) {
   const {
     annotationMode,
+    handleCancelAiFrame,
+    handleConfirmAiFrame,
+    handleOpenAiFrameDialog,
     canvasFrameComments,
     canvasRef,
     comparisonOpacity,
@@ -35,10 +43,12 @@ export function FileCanvas({ controller }: FileCanvasProps) {
     focusFileTask,
     focusedTask,
     frameAnnotationMode,
+    getCanvasPointFromClient,
     handleCanvasPointerDown,
     handleCanvasPointerMove,
     handleCanvasPointerUp,
     isPanning,
+    isAiFrameReviewing,
     isViewingHistoricalVersion,
     isLoading,
     isRefreshing,
@@ -50,6 +60,7 @@ export function FileCanvas({ controller }: FileCanvasProps) {
     selectedVersion,
     setAnnotationMode,
     setAnnotationStart,
+    setCanvasImageMetrics,
     setComparisonOpacity,
     setDraftRegion,
     setFrameAnnotationMode,
@@ -67,6 +78,115 @@ export function FileCanvas({ controller }: FileCanvasProps) {
   } = controller;
 
   const [loadedImageUrl, setLoadedImageUrl] = useState<string | null>(null);
+  const [editState, setEditState] = useState<{
+    initialPoint: { x: number; y: number };
+    initialRegion: FileTaskRegion;
+    mode: 'move' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw';
+  } | null>(null);
+
+  const updateAiDraftRegion = (nextRegion: FileTaskRegion) => {
+    setDraftRegion(nextRegion);
+    setPendingFrameRegion(nextRegion);
+  };
+
+  const getRegionEditPoint = (event: ReactPointerEvent<HTMLElement>) => {
+    const bounds = canvasRef.current?.getBoundingClientRect();
+    if (!bounds) {
+      return null;
+    }
+
+    return getCanvasPointFromClient(event.clientX, event.clientY, bounds);
+  };
+
+  const normalizeEditableRegion = (region: FileTaskRegion): FileTaskRegion => {
+    const nextRegion = {
+      endX: Math.min(1, Math.max(0, Math.max(region.startX, region.endX))),
+      endY: Math.min(1, Math.max(0, Math.max(region.startY, region.endY))),
+      startX: Math.min(1, Math.max(0, Math.min(region.startX, region.endX))),
+      startY: Math.min(1, Math.max(0, Math.min(region.startY, region.endY))),
+    };
+
+    if (nextRegion.endX - nextRegion.startX < 0.02) {
+      nextRegion.endX = Math.min(1, nextRegion.startX + 0.02);
+      nextRegion.startX = Math.max(0, nextRegion.endX - 0.02);
+    }
+
+    if (nextRegion.endY - nextRegion.startY < 0.02) {
+      nextRegion.endY = Math.min(1, nextRegion.startY + 0.02);
+      nextRegion.startY = Math.max(0, nextRegion.endY - 0.02);
+    }
+
+    return nextRegion;
+  };
+
+  const handleAiFrameEditStart = (
+    event: ReactPointerEvent<HTMLElement>,
+    mode: NonNullable<typeof editState>['mode'],
+  ) => {
+    if (!pendingFrameRegion) {
+      return;
+    }
+
+    const point = getRegionEditPoint(event);
+    if (!point) {
+      return;
+    }
+
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setEditState({
+      initialPoint: point,
+      initialRegion: pendingFrameRegion,
+      mode,
+    });
+  };
+
+  const handleAiFrameEditMove = (event: ReactPointerEvent<HTMLElement>) => {
+    if (!editState) {
+      return;
+    }
+
+    const point = getRegionEditPoint(event);
+    if (!point) {
+      return;
+    }
+
+    event.stopPropagation();
+    const deltaX = point.x - editState.initialPoint.x;
+    const deltaY = point.y - editState.initialPoint.y;
+    const region = { ...editState.initialRegion };
+
+    if (editState.mode === 'move') {
+      const width = region.endX - region.startX;
+      const height = region.endY - region.startY;
+      const startX = Math.min(1 - width, Math.max(0, region.startX + deltaX));
+      const startY = Math.min(1 - height, Math.max(0, region.startY + deltaY));
+      updateAiDraftRegion({
+        endX: startX + width,
+        endY: startY + height,
+        startX,
+        startY,
+      });
+      return;
+    }
+
+    if (editState.mode.includes('n')) region.startY += deltaY;
+    if (editState.mode.includes('s')) region.endY += deltaY;
+    if (editState.mode.includes('w')) region.startX += deltaX;
+    if (editState.mode.includes('e')) region.endX += deltaX;
+
+    updateAiDraftRegion(normalizeEditableRegion(region));
+  };
+
+  const handleAiFrameEditEnd = (event: ReactPointerEvent<HTMLElement>) => {
+    if (!editState) {
+      return;
+    }
+
+    event.stopPropagation();
+    event.currentTarget.releasePointerCapture(event.pointerId);
+    setEditState(null);
+  };
 
   return (
     <>
@@ -163,6 +283,9 @@ export function FileCanvas({ controller }: FileCanvasProps) {
           >
             <MessageSquare className="size-4 text-[#FFD369]" />
           </ToolbarButton>
+          <ToolbarButton label="AI Frame Detection" onClick={handleOpenAiFrameDialog}>
+            <Sparkles className="size-4 text-[#FFD369]" />
+          </ToolbarButton>
 
         </div>
       </div>
@@ -194,8 +317,18 @@ export function FileCanvas({ controller }: FileCanvasProps) {
               <img
                 src={displayedPreviewUrl}
                 className="hidden"
-                onLoad={() => setLoadedImageUrl(displayedPreviewUrl)}
-                onError={() => setLoadedImageUrl(displayedPreviewUrl)}
+                onLoad={(event) => {
+                  setLoadedImageUrl(displayedPreviewUrl);
+                  setCanvasImageMetrics({
+                    imageUrl: displayedPreviewUrl,
+                    naturalHeight: event.currentTarget.naturalHeight,
+                    naturalWidth: event.currentTarget.naturalWidth,
+                  });
+                }}
+                onError={() => {
+                  setLoadedImageUrl(displayedPreviewUrl);
+                  setCanvasImageMetrics(null);
+                }}
                 alt="preload"
               />
               
@@ -271,7 +404,7 @@ export function FileCanvas({ controller }: FileCanvasProps) {
 
           {(() => {
             // Match the exact thread generation logic from FileCommentsPanel
-            const frameThreadsMap = new Map<string, any>();
+            const frameThreadsMap = new Map<string, CanvasFrameThread>();
             discussionFrameComments.forEach(fc => {
               const fId = fc.frameId || fc.id;
               if (!frameThreadsMap.has(fId)) {
@@ -287,9 +420,7 @@ export function FileCanvas({ controller }: FileCanvasProps) {
             const canvasFrameIds = new Set(canvasFrameComments.map(c => c.frameId || c.id));
             const activeThreads = Array.from(frameThreadsMap.values()).filter(t => canvasFrameIds.has(t.frameId));
 
-            console.log('DEBUG ACTIVE_THREADS:', activeThreads.map(t => ({ id: t.comment.id, region: t.comment.region })));
-
-            return activeThreads.map(({ frameId, comment, displayIndex }) => (
+            return activeThreads.map(({ comment, displayIndex }) => (
               <button
                 aria-label={`Open frame comment ${displayIndex}`}
                 className="absolute z-30 border-2 border-[#ff9ab3] bg-[#6b2637]/20 text-left hover:bg-[#6b2637]/35"
@@ -326,17 +457,102 @@ export function FileCanvas({ controller }: FileCanvasProps) {
 
           {draftRegion ? (
             <div
-              className="pointer-events-none absolute z-30 border-2 border-dashed border-[#FFD369] bg-[#FFD369]/15"
+              className={`absolute z-30 border-2 border-dashed border-[#FFD369] bg-[#FFD369]/15 ${
+                isAiFrameReviewing ? 'pointer-events-auto' : 'pointer-events-none'
+              }`}
+              onPointerDown={
+                isAiFrameReviewing ? (event) => handleAiFrameEditStart(event, 'move') : undefined
+              }
+              onPointerMove={isAiFrameReviewing ? handleAiFrameEditMove : undefined}
+              onPointerUp={isAiFrameReviewing ? handleAiFrameEditEnd : undefined}
+              onPointerCancel={isAiFrameReviewing ? handleAiFrameEditEnd : undefined}
               style={{
                 height: `${(draftRegion.endY - draftRegion.startY) * 100}%`,
                 left: `${draftRegion.startX * 100}%`,
                 top: `${draftRegion.startY * 100}%`,
                 width: `${(draftRegion.endX - draftRegion.startX) * 100}%`,
               }}
-            />
+            >
+              {isAiFrameReviewing && pendingFrameRegion ? (
+                <AiDraftFrameControls
+                  onCancel={handleCancelAiFrame}
+                  onConfirm={handleConfirmAiFrame}
+                  onEditEnd={handleAiFrameEditEnd}
+                  onEditMove={handleAiFrameEditMove}
+                  onEditStart={handleAiFrameEditStart}
+                />
+              ) : null}
+            </div>
           ) : null}
         </div>
       </div>
+    </>
+  );
+}
+
+function AiDraftFrameControls({
+  onCancel,
+  onConfirm,
+  onEditEnd,
+  onEditMove,
+  onEditStart,
+}: {
+  onCancel: () => void;
+  onConfirm: () => void;
+  onEditEnd: (event: ReactPointerEvent<HTMLElement>) => void;
+  onEditMove: (event: ReactPointerEvent<HTMLElement>) => void;
+  onEditStart: (
+    event: ReactPointerEvent<HTMLElement>,
+    mode: 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw',
+  ) => void;
+}) {
+  const handles = [
+    ['nw', '-left-1.5 -top-1.5 cursor-nwse-resize'],
+    ['n', 'left-1/2 -top-1.5 -translate-x-1/2 cursor-ns-resize'],
+    ['ne', '-right-1.5 -top-1.5 cursor-nesw-resize'],
+    ['e', '-right-1.5 top-1/2 -translate-y-1/2 cursor-ew-resize'],
+    ['se', '-bottom-1.5 -right-1.5 cursor-nwse-resize'],
+    ['s', '-bottom-1.5 left-1/2 -translate-x-1/2 cursor-ns-resize'],
+    ['sw', '-bottom-1.5 -left-1.5 cursor-nesw-resize'],
+    ['w', '-left-1.5 top-1/2 -translate-y-1/2 cursor-ew-resize'],
+  ] as const;
+
+  return (
+    <>
+      <span className="absolute -left-3 -top-3 grid h-6 min-w-8 place-items-center rounded-full border-2 border-[#101820] bg-[#FFD369] px-2 text-[9px] font-black text-[#222831]">
+        AI
+      </span>
+      <div
+        className="absolute left-1/2 top-full z-40 mt-2 flex -translate-x-1/2 items-center gap-2 rounded-[4px] border border-[#39424f] bg-[#0d151e] p-1 shadow-xl"
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <button
+          className="h-7 rounded-[3px] px-2 text-[10px] font-black text-[#aeb7c2] hover:bg-[#26303b] hover:text-white"
+          onClick={onCancel}
+          type="button"
+        >
+          Cancel
+        </button>
+        <button
+          className="h-7 rounded-[3px] bg-[#FFD369] px-2 text-[10px] font-black text-[#222831] hover:brightness-110"
+          onClick={onConfirm}
+          type="button"
+        >
+          Confirm
+        </button>
+      </div>
+      {handles.map(([mode, className]) => (
+        <button
+          aria-label={`Resize AI frame ${mode}`}
+          className={`absolute size-3 rounded-full border border-[#101820] bg-[#FFD369] ${className}`}
+          key={mode}
+          onPointerCancel={onEditEnd}
+          onPointerDown={(event) => onEditStart(event, mode)}
+          onPointerMove={onEditMove}
+          onPointerUp={onEditEnd}
+          type="button"
+        />
+      ))}
     </>
   );
 }

@@ -10,9 +10,15 @@ import {
 
 import { useCanvasViewport } from './useCanvasViewport';
 import { useCanvasAnnotations } from './useCanvasAnnotations';
+import {
+  getContainedImageRect,
+  mapImageRegionToCanvas,
+  type CanvasImageMetrics,
+} from '../canvas-image-geometry';
 
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/use-permissions';
+import { toast } from '@/lib/toast';
 
 import { useFileDetailDataFetcher } from './useFileDetailDataFetcher';
 import { useTaskVersionResolver } from './useTaskVersionResolver';
@@ -22,19 +28,24 @@ import { useFileDetailTaskActions } from './useFileDetailTaskActions';
 import { useFileDetailCommentActions } from './useFileDetailCommentActions';
 
 import {
-  formatFileDate,
   type FileExplorerItem,
   type FileTaskItem,
-  type FileTaskRegion,
   type FileVersionItem,
   type SubmissionFrameComment,
 } from '../../file-ui';
 import type { TaskWorkspaceItem } from '../../../tasks/task-ui';
 
-import {
-  getCommentText,
-  type ResourceTab,
-} from '../file-detail-types';
+import { type FileDiscussionComment, type ResourceTab } from '../file-detail-types';
+import type { AiFrameDetectResponse } from '@/types/ai-frame';
+
+type StateUpdate<T> = T | ((current: T) => T);
+type FileDiscussionCommentWithContext = FileDiscussionComment & {
+  context?: string | null;
+};
+
+function resolveStateUpdate<T>(update: StateUpdate<T>, current: T) {
+  return typeof update === 'function' ? (update as (value: T) => T)(current) : update;
+}
 
 type UseFileDetailControllerProps = {
   fileId: number;
@@ -59,6 +70,10 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(focusedTaskId);
   const [focusedTask, setFocusedTask] = useState<TaskWorkspaceItem | null>(null); const viewport = useCanvasViewport();
+  const [aiFrameDialogOpen, setAiFrameDialogOpen] = useState(false);
+  const [isDetectingAiFrame, setIsDetectingAiFrame] = useState(false);
+  const [isAiFrameReviewing, setIsAiFrameReviewing] = useState(false);
+  const [canvasImageMetrics, setCanvasImageMetrics] = useState<CanvasImageMetrics | null>(null);
 
   const { user } = useAuth();
   const { can: canProject } = usePermissions({ resource: 'PROJECT', resourceId: projectId });
@@ -131,8 +146,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     setPendingTaskRegion,
     pendingFrameRegion,
     setPendingFrameRegion,
-    getCanvasPoint,
-    buildRegion,
+    getCanvasPointFromClient,
     handleCanvasPointerDown,
     handleCanvasPointerMove,
     handleCanvasPointerUp,
@@ -140,7 +154,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
 
   const versions = useMemo(() => {
     const rawVersions = data?.versions ?? [];
-    return rawVersions.filter((v: any) => {
+    return rawVersions.filter((v: FileVersionItem) => {
       if (!focusedTask) {
         return v.taskId === null || v.taskId === undefined;
       }
@@ -148,8 +162,12 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     });
   }, [data?.versions, focusedTask]);
   const frameComments = data?.frameComments ?? [];
-  const fileComments = (data?.comments ?? []).filter((c: any) => !c.context);
-  const taskComments = (data?.comments ?? []).filter((c: any) => c.context?.startsWith('task:'));
+  const fileComments = ((data?.comments ?? []) as FileDiscussionCommentWithContext[]).filter(
+    (comment) => !comment.context,
+  );
+  const taskComments = ((data?.comments ?? []) as FileDiscussionCommentWithContext[]).filter(
+    (comment) => comment.context?.startsWith('task:'),
+  );
   const members = data?.members ?? [];
   const isLoading = isInitialLoading || isRefreshing;
   const isTaskContextLoading = isRefreshing;
@@ -199,10 +217,10 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
 
   });
 
-  const setFileCustom = useCallback((update: any) => {
+  const setFileCustom = useCallback((update: StateUpdate<FileExplorerItem | null>) => {
     setData((currentData) => {
       if (!currentData) return null;
-      const nextFile = typeof update === 'function' ? update(currentData.file) : update;
+      const nextFile = resolveStateUpdate(update, currentData.file);
       return {
         ...currentData,
         file: nextFile,
@@ -210,10 +228,10 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     });
   }, [setData]);
 
-  const setTasksCustom = useCallback((update: any) => {
+  const setTasksCustom = useCallback((update: StateUpdate<FileTaskItem[]>) => {
     setData((currentData) => {
       if (!currentData) return null;
-      const nextTasks = typeof update === 'function' ? update(currentData.tasks) : update;
+      const nextTasks = resolveStateUpdate(update, currentData.tasks);
       return {
         ...currentData,
         tasks: nextTasks,
@@ -221,7 +239,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     });
   }, [setData]);
 
-  const setVersionsCustom = useCallback((nextVersions: any[]) => {
+  const setVersionsCustom = useCallback((nextVersions: FileVersionItem[]) => {
     setData((currentData) => {
       if (!currentData) return null;
       return {
@@ -231,10 +249,10 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     });
   }, [setData]);
 
-  const setFrameCommentsCustom = useCallback((update: any) => {
+  const setFrameCommentsCustom = useCallback((update: StateUpdate<SubmissionFrameComment[]>) => {
     setData((currentData) => {
       if (!currentData) return null;
-      const nextComments = typeof update === 'function' ? update(currentData.frameComments) : update;
+      const nextComments = resolveStateUpdate(update, currentData.frameComments);
       return {
         ...currentData,
         frameComments: nextComments,
@@ -242,10 +260,14 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     });
   }, [setData]);
 
-  const setCommentsCustom = useCallback((update: any) => {
+  const setCommentsCustom = useCallback(
+    (update: StateUpdate<FileDiscussionCommentWithContext[]>) => {
     setData((currentData) => {
       if (!currentData) return null;
-      const nextComments = typeof update === 'function' ? update(currentData.comments) : update;
+      const nextComments = resolveStateUpdate(
+        update,
+        currentData.comments as FileDiscussionCommentWithContext[],
+      );
       return {
         ...currentData,
         comments: nextComments,
@@ -326,6 +348,111 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
   const displayedPreviewUrl = focusedTask
     ? (currentVersion?.previewUrl || '')
     : (selectedVersion?.previewUrl || currentVersion?.previewUrl || file?.previewUrl || '');
+
+  const handleOpenAiFrameDialog = useCallback(() => {
+    if (!displayedPreviewUrl) {
+      toast.error('Preview image is not available for AI detection.');
+      return;
+    }
+
+    setPendingTaskRegion(null);
+    setPendingFrameRegion(null);
+    setDraftRegion(null);
+    setAnnotationStart(null);
+    setAnnotationMode(false);
+    setFrameAnnotationMode(false);
+    setIsAiFrameReviewing(false);
+    setAiFrameDialogOpen(true);
+  }, [
+    displayedPreviewUrl,
+    setAnnotationMode,
+    setAnnotationStart,
+    setDraftRegion,
+    setFrameAnnotationMode,
+    setPendingFrameRegion,
+    setPendingTaskRegion,
+  ]);
+
+  const handleCancelAiFrame = useCallback(() => {
+    setAiFrameDialogOpen(false);
+    setIsDetectingAiFrame(false);
+    setIsAiFrameReviewing(false);
+    setPendingFrameRegion(null);
+    setDraftRegion(null);
+  }, [setDraftRegion, setPendingFrameRegion]);
+
+  const handleDetectAiFrame = useCallback(
+    async (objectName: string) => {
+      if (!displayedPreviewUrl) {
+        toast.error('Preview image is not available for AI detection.');
+        return;
+      }
+
+      setIsDetectingAiFrame(true);
+      setError(null);
+
+      try {
+        const response = await fetch('/api/ai/frame-detect', {
+          body: JSON.stringify({
+            imageUrl: displayedPreviewUrl,
+            objectName,
+          }),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          method: 'POST',
+        });
+        const result = (await response.json()) as AiFrameDetectResponse;
+
+        if (!response.ok || !result.found || !result.region) {
+          toast.error(result.message || 'AI could not locate that object.');
+          return;
+        }
+
+        const canvasBounds = canvasRef.current?.getBoundingClientRect();
+        if (
+          !canvasBounds ||
+          !canvasImageMetrics ||
+          canvasImageMetrics.imageUrl !== displayedPreviewUrl
+        ) {
+          toast.error('Image preview is still loading. Please try AI detection again shortly.');
+          return;
+        }
+
+        const region = mapImageRegionToCanvas(
+          result.region,
+          getContainedImageRect(canvasBounds, canvasImageMetrics),
+          canvasBounds,
+        );
+
+        setPendingFrameRegion(region);
+        setDraftRegion(region);
+        setIsAiFrameReviewing(true);
+        setAiFrameDialogOpen(false);
+        setResourceTab('discussion');
+        toast.success('AI created a draft frame. Adjust it, then confirm.');
+        requestAnimationFrame(() =>
+          canvasRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+        );
+      } catch (error) {
+        console.error('AI frame detection failed:', error);
+        toast.error('AI frame detection failed. Please try again.');
+      } finally {
+        setIsDetectingAiFrame(false);
+      }
+    },
+    [canvasImageMetrics, displayedPreviewUrl, setDraftRegion, setError, setPendingFrameRegion],
+  );
+
+  const handleConfirmAiFrame = useCallback(() => {
+    if (!pendingFrameRegion) {
+      return;
+    }
+
+    setDraftRegion(pendingFrameRegion);
+    setIsAiFrameReviewing(false);
+  }, [pendingFrameRegion, setDraftRegion]);
+
   const isViewingHistoricalVersion = Boolean(selectedVersion && !selectedVersion.isCurrent);
   const currentVersionName = selectedVersion
     ? `v${selectedVersion.version}`
@@ -371,6 +498,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
   return {
     annotationMode,
     assignedToName,
+    aiFrameDialogOpen,
     canCreateTask,
     canReviewTask,
     canSubmitTask,
@@ -400,20 +528,27 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     focusFileTask,
     focusedTask,
     frameAnnotationMode,
+    getCanvasPointFromClient,
     handleCanvasPointerDown,
     handleCanvasPointerMove,
     handleCanvasPointerUp,
+    handleCancelAiFrame,
     handleCreateAnnotatedTask,
     handleCreateDiscussionComment,
     handleCreateFrameComment,
     handleReplyToFrame,
     handleCreateReview,
+    handleDetectAiFrame,
     handleDeleteDiscussionComment,
     handleFocusedTaskChange,
     handleSubmitTaskWork,
     handleMarkReadyForReview: canSubmitTask ? handleMarkReadyForReview : undefined,
+    handleConfirmAiFrame,
+    handleOpenAiFrameDialog,
     handleUpdateDiscussionComment,
     isLoading,
+    isAiFrameReviewing,
+    isDetectingAiFrame,
     isInitialLoading,
     isTaskContextLoading,
     isRefreshing,
@@ -438,6 +573,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     selectedVersionForDetails,
     setAnnotationMode,
     setAnnotationStart,
+    setCanvasImageMetrics,
     setComparisonOpacity,
     setDesktopSidebarOpen,
     setDraftRegion,

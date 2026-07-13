@@ -14,6 +14,7 @@ import {
 import { FileVersionsTab } from './FileVersionsTab';
 import { TaskFormDialog } from './TaskFormDialog';
 import { CreateFrameCommentDialog } from './CreateFrameCommentDialog';
+import { AiFrameDetectionDialog } from './AiFrameDetectionDialog';
 
 import { type FileVersionItem } from '../file-ui';
 import type { FileDetailController } from './hooks/useFileDetailController';
@@ -27,6 +28,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
   const {
     annotationMode,
     assignedToName,
+    aiFrameDialogOpen,
     canCreateTask,
     canReviewTask,
     canSubmitTask,
@@ -45,16 +47,20 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
     focusFileTask,
     focusedTask,
     handleCreateAnnotatedTask,
+    handleCancelAiFrame,
     handleCreateDiscussionComment,
     handleCreateFrameComment,
     handleReplyToFrame,
     handleCreateReview,
+    handleDetectAiFrame,
     handleDeleteDiscussionComment,
     handleFocusedTaskChange,
     handleSubmitTaskWork,
     handleMarkReadyForReview,
     handleUpdateDiscussionComment,
     isLoading,
+    isAiFrameReviewing,
+    isDetectingAiFrame,
     isTaskContextLoading,
     isSavingComment,
     isSubmittingReview,
@@ -103,9 +109,12 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
     if (activities.length > 0) {
       const latestActivity = activities[0];
       if (latestActivity?.fileId === Number(file.id)) {
-        const metadata = latestActivity.metadata as any;
+        const metadata = latestActivity.metadata as { frameId?: string | number } | null;
         if (latestActivity.action === 'COMMENT_CREATED' && metadata?.frameId) {
-          void refreshFrameComments(metadata.frameId);
+          const frameId = Number(metadata.frameId);
+          if (Number.isFinite(frameId)) {
+            void refreshFrameComments(frameId);
+          }
         } else {
           void quietReload();
         }
@@ -375,7 +384,13 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
           setFrameAnnotationMode(false);
         }}
         onCreate={handleCreateFrameComment}
-        region={pendingFrameRegion}
+        region={isAiFrameReviewing ? null : pendingFrameRegion}
+      />
+      <AiFrameDetectionDialog
+        isDetecting={isDetectingAiFrame}
+        onCancel={handleCancelAiFrame}
+        onDetect={handleDetectAiFrame}
+        open={aiFrameDialogOpen}
       />
     </section>
   );
