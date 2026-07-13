@@ -11,6 +11,11 @@ datasource db {
   provider = "postgresql"
 }
 
+enum SCOPE {
+  SYS
+  PRJ
+}
+
 enum PROGRESS_STATUS {
   PENDING
   INPROGRESS
@@ -18,111 +23,247 @@ enum PROGRESS_STATUS {
   DONE
 }
 
-enum SCOPE {
-  SYS
-  CO
-  PRJ
+enum APPLICATION_STATUS {
+  PENDING
+  SUBMITTED
+  APPROVE
+  REJECT
+  CANCELLED
+}
+
+enum APPLICATION_TYPE {
+  CREATE_ARC
+  CREATE_CHAPTER
+}
+
+enum VOTE_DECISION {
+  APPROVE
+  REJECT
+  ABSTAIN
+}
+
+enum ACTIVITY_ACTION {
+  MEMBER_INVITED
+  MEMBER_REMOVED
+  ROLE_CHANGED
+  TASK_CREATED
+  TASK_ASSIGNED
+  TASK_UPDATED
+  TASK_COMPLETED
+  TASK_DELETED
+  FOLDER_CREATED
+  FOLDER_MOVED
+  FOLDER_DELETED
+  FILE_CREATED
+  FILE_DELETED
+  MATERIAL_UPLOADED
+  MATERIAL_RESTORED
+  APPLICATION_CREATED
+  APPLICATION_SUBMITTED
+  APPLICATION_APPROVED
+  APPLICATION_REJECTED
+  COMMENT_CREATED
+  COMMENT_DELETED
+}
+
+enum ENTITY_TYPE {
+  PROJECT
+  EDITOR_BOARD
+  FOLDER
+  FILE
+  MATERIAL
+  TASK
+  FRAME
+  COMMENT
+  APPLICATION
 }
 
 model User {
-  id          BigInt    @id @default(autoincrement())
-  email       String    @unique
-  password    String
-  displayName String    @map("display_name")
-  avatarUrl   String?   @map("avatar_url")
-  isDeleted   Boolean   @default(false) @map("is_deleted")
-  createdBy   BigInt?   @map("created_by")
-  updatedBy   BigInt?   @map("updated_by")
-  deletedBy   BigInt?   @map("deleted_by")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  deletedAt   DateTime? @map("deleted_at")
+  id                     Int       @id @default(autoincrement())
+  displayName            String?   @map("display_name")
+  avatarUrl              String?   @map("avatar_url")
+  email                  String    @unique
+  password               String?
+  googleId               String?   @unique @map("google_id")
+  isActive               Boolean   @default(false) @map("is_active")
+  emailVerifyToken       String?   @unique @map("email_verify_token")
+  emailVerifyExpiresAt   DateTime? @map("email_verify_expires_at")
+  passwordResetToken     String?   @unique @map("password_reset_token")
+  passwordResetExpiresAt DateTime? @map("password_reset_expires_at")
+  createdBy              Int?      @map("created_by")
+  updatedBy              Int?      @map("updated_by")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @default(now()) @updatedAt @map("updated_at")
 
-  // Relations with itself for createdBy, updatedBy, deletedBy
-  createdByUser User?  @relation("createdByUser", fields: [createdBy], references: [id])
-  updatedByUser User?  @relation("updatedByUser", fields: [updatedBy], references: [id])
-  deletedByUser User?  @relation("deletedByUser", fields: [deletedBy], references: [id])
-  createdUsers  User[] @relation("createdByUser")
-  updatedUsers  User[] @relation("updatedByUser")
-  deletedUsers  User[] @relation("deletedByUser")
+  // Relations with itself
+  createdByUser User?  @relation("UserCreatedByUser", fields: [createdBy], references: [id])
+  updatedByUser User?  @relation("UserUpdatedByUser", fields: [updatedBy], references: [id])
+  createdUsers  User[] @relation("UserCreatedByUser")
+  updatedUsers  User[] @relation("UserUpdatedByUser")
 
-  // Relations with role model
-  createdRoles Role[] @relation("createdByUser")
-  updatedRoles Role[] @relation("updatedByUser")
-
-  // Relations with userRole model
-  userRoles UserRole[]
-
-  // Relations with company model
-  createdCompanies Company[] @relation("createdByUser")
-  updatedCompanies Company[] @relation("updatedByUser")
+  // Relations with role system
+  userRoles    UserRole[]
+  userProjects UserProject[]
+  createdRoles Role[]        @relation("RoleCreatedByUser")
+  updatedRoles Role[]        @relation("RoleUpdatedByUser")
 
   // Relations with project model
-  createdProjects Project[] @relation("createdByUser")
-  updatedProjects Project[] @relation("updatedByUser")
+  createdProjects Project[] @relation("ProjectCreatedByUser")
+  updatedProjects Project[] @relation("ProjectUpdatedByUser")
+
+  // Relations with editorBoard model
+  createdEditorBoards EditorBoard[]     @relation("EditorBoardCreatedByUser")
+  updatedEditorBoards EditorBoard[]     @relation("EditorBoardUpdatedByUser")
+  userEditorBoards    UserEditorBoard[]
 
   // Relations with folder model
-  createdFolders Folder[] @relation("createdByUser")
-  updatedFolders Folder[] @relation("updatedByUser")
+  createdFolders Folder[] @relation("FolderCreatedByUser")
+  updatedFolders Folder[] @relation("FolderUpdatedByUser")
 
   // Relations with file model
-  createdFiles File[] @relation("createdByUser")
-  updatedFiles File[] @relation("updatedByUser")
+  createdFiles File[] @relation("FileCreatedByUser")
+  updatedFiles File[] @relation("FileUpdatedByUser")
+
+  // Relations with fileMaterial model
+  createdFileMaterials FileMaterial[] @relation("FileMaterialCreatedByUser")
+  updatedFileMaterials FileMaterial[] @relation("FileMaterialUpdatedByUser")
 
   // Relations with task model
-  createdTasks Task[] @relation("createdByUser")
-  updatedTasks Task[] @relation("updatedByUser")
+  createdTasks  Task[] @relation("TaskCreatedByUser")
+  updatedTasks  Task[] @relation("TaskUpdatedByUser")
+  assignedTasks Task[] @relation("TaskAssignedByUser")
 
-  // Relations with taskCommentFrame model
-  createdTaskCommentFrames TaskCommentFrame[] @relation("createdByUser")
-  updatedTaskCommentFrames TaskCommentFrame[] @relation("updatedByUser")
+  // Relations with materialCommentFrame model
+  createdMaterialCommentFrames MaterialCommentFrame[] @relation("MaterialCommentFrameCreatedByUser")
+  updatedMaterialCommentFrames MaterialCommentFrame[] @relation("MaterialCommentFrameUpdatedByUser")
 
-  // Relations with taskComment model
-  createdTaskComments TaskComment[] @relation("createdByUser")
-  updatedTaskComments TaskComment[] @relation("updatedByUser")
+  // Relations with Comment model
+  createdComments Comment[] @relation("CommentCreatedByUser")
+
+  // Relations with application model
+  createdApplications  Application[] @relation("ApplicationCreatedByUser")
+  updatedApplications  Application[] @relation("ApplicationUpdatedByUser")
+  verifiedApplications Application[] @relation("ApplicationVerifiedByUser")
+  applicationVotes     ApplicationVote[]
 
   // Relations with refreshToken model
   refreshTokens RefreshToken[]
+
+  // Relations with activityLog model
+  activityLogs ActivityLog[]
+
+  // Relations with notification model
+  notifications Notification[]
 
   // Configs
   @@map("users")
 }
 
 model Role {
-  id        BigInt   @id @default(autoincrement())
-  name      String   @unique
-  code      String?
-  companyId BigInt?  @map("company_id")
-  projectId BigInt?  @map("project_id")
-  createdBy BigInt?  @map("created_by")
-  updatedBy BigInt?  @map("updated_by")
+  id        Int      @id @default(autoincrement())
+  code      String   @unique
+  scope     SCOPE    @default(SYS)
+  name      String
+  isDefault Boolean  @default(false) @map("is_default")
+  createdBy Int?     @map("created_by")
+  updatedBy Int?     @map("updated_by")
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   // Relations with user model
-  createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
-  updatedByUser User? @relation("updatedByUser", fields: [updatedBy], references: [id])
-
-  // Relations with rolePermission model
-  rolePermissions RolePermission[]
+  createdByUser User? @relation("RoleCreatedByUser", fields: [createdBy], references: [id])
+  updatedByUser User? @relation("RoleUpdatedByUser", fields: [updatedBy], references: [id])
 
   // Relations with userRole model
   userRoles UserRole[]
 
-  // Relations with company model
-  company Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  // Relations with userProject model
+  userProjects UserProject[]
 
-  // Relations with project model
-  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // Relations with rolePermission model
+  rolePermissions RolePermission[]
 
   // Configs
   @@map("roles")
 }
 
+model UserRole {
+  userId Int @map("user_id")
+  roleId Int @map("role_id")
+
+  // Relations with user and role models
+  user User @relation(fields: [userId], references: [id])
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+  // Configs
+  @@map("user_roles")
+}
+
+model UserProject {
+  userId    Int      @map("user_id")
+  projectId Int      @map("project_id")
+  roleId    Int      @map("role_id")
+  createdBy Int?     @map("created_by")
+  updatedBy Int?     @map("updated_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations with user, project and role models
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  role    Role    @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, projectId])
+  @@index([userId])
+  @@index([projectId])
+  @@index([roleId])
+  // Configs
+  @@map("user_projects")
+}
+
+model Project {
+  id            Int      @id @default(autoincrement())
+  name          String
+  description   String?
+  imageUrl      String?  @map("image_url")
+  editorBoardId Int?     @map("editor_board_id")
+  createdBy     Int?     @map("created_by")
+  updatedBy     Int?     @map("updated_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations with editorBoard model
+  editorBoard EditorBoard? @relation(fields: [editorBoardId], references: [id])
+
+  // Relations with user model
+  createdByUser User? @relation("ProjectCreatedByUser", fields: [createdBy], references: [id])
+  updatedByUser User? @relation("ProjectUpdatedByUser", fields: [updatedBy], references: [id])
+
+  // Relations with userProject model
+  userProjects UserProject[]
+
+  // Relations with folder model
+  folders Folder[]
+
+  // Relations with application model
+  applications Application[]
+
+  // Relations with projectStat model
+  projectStats ProjectStat[]
+
+  @@index([editorBoardId])
+  // Configs
+  @@map("projects")
+}
+
 model Permission {
-  id    BigInt @id @default(autoincrement())
-  name  String @unique
-  scope SCOPE
+  id          Int     @id @default(autoincrement())
+  name        String  @unique
+  scope       SCOPE   @default(SYS)
+  description String?
 
   // Relations with rolePermission model
   rolePermissions RolePermission[]
@@ -132,12 +273,12 @@ model Permission {
 }
 
 model RolePermission {
-  roleId       BigInt @map("role_id")
-  permissionId BigInt @map("permission_id")
+  roleId       Int @map("role_id")
+  permissionId Int @map("permission_id")
 
   // Relations with role and permission models
-  role       Role       @relation(fields: [roleId], references: [id])
-  permission Permission @relation(fields: [permissionId], references: [id])
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@id([roleId, permissionId])
   @@index([roleId])
@@ -146,88 +287,67 @@ model RolePermission {
   @@map("role_permissions")
 }
 
-model UserRole {
-  userId BigInt @map("user_id")
-  roleId BigInt @map("role_id")
-
-  // Relations with user and role models
-  user User @relation(fields: [userId], references: [id])
-  role Role @relation(fields: [roleId], references: [id])
-
-  @@id([userId, roleId])
-  @@index([userId])
-  @@index([roleId])
-  // Configs
-  @@map("user_roles")
-}
-
-model Company {
-  id        BigInt   @id @default(autoincrement())
-  name      String
-  createdBy BigInt?  @map("created_by")
-  updatedBy BigInt?  @map("updated_by")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+model EditorBoard {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  imageUrl    String?  @map("image_url")
+  createdBy   Int?     @map("created_by")
+  updatedBy   Int?     @map("updated_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
 
   // Relations with user model
-  createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
-  updatedByUser User? @relation("updatedByUser", fields: [updatedBy], references: [id])
+  createdByUser User? @relation("EditorBoardCreatedByUser", fields: [createdBy], references: [id])
+  updatedByUser User? @relation("EditorBoardUpdatedByUser", fields: [updatedBy], references: [id])
 
   // Relations with project model
   projects Project[]
 
-  // Relations with role model
-  roles Role[]
+  // Relations with userEditorBoard model
+  userEditorBoards UserEditorBoard[]
 
   // Configs
-  @@map("companies")
+  @@map("editor_boards")
 }
 
-model Project {
-  id        BigInt   @id @default(autoincrement())
-  name      String
-  companyId BigInt   @map("company_id")
-  createdBy BigInt?  @map("created_by")
-  updatedBy BigInt?  @map("updated_by")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+model UserEditorBoard {
+  userId        Int     @map("user_id")
+  editorBoardId Int     @map("editor_board_id")
+  isLead        Boolean  @default(false) @map("is_lead")
 
-  // Relations with company model
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
 
-  // Relations with user model
-  createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
-  updatedByUser User? @relation("updatedByUser", fields: [updatedBy], references: [id])
+  // Relations with user and editorBoard models
+  user        User        @relation(fields: [userId], references: [id])
+  editorBoard EditorBoard @relation(fields: [editorBoardId], references: [id], onDelete: Cascade)
 
-  // Relations with role model
-  roles Role[]
-
-  // Relations with folder model
-  folders Folder[]
-
-  @@index([companyId])
+  @@id([userId, editorBoardId])
+  @@index([userId])
+  @@index([editorBoardId])
   // Configs
-  @@map("projects")
+  @@map("user_editor_boards")
 }
 
 model Folder {
-  id          BigInt   @id @default(autoincrement())
-  name        String
+  id          Int      @id @default(autoincrement())
+  title       String
   description String?
-  index       Int      @default(autoincrement())
-  parentId    BigInt?  @map("parent_id")
-  projectId   BigInt   @map("project_id")
-  createdBy   BigInt?  @map("created_by")
-  updatedBy   BigInt?  @map("updated_by")
+  imageUrl    String?  @map("image_url")
+  parentId    Int?     @map("parent_id")
+  projectId   Int      @map("project_id")
+  createdBy   Int?     @map("created_by")
+  updatedBy   Int?     @map("updated_by")
   createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
 
   // Relations with project model
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   // Relations with user model
-  createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
-  updatedByUser User? @relation("updatedByUser", fields: [updatedBy], references: [id])
+  createdByUser User? @relation("FolderCreatedByUser", fields: [createdBy], references: [id])
+  updatedByUser User? @relation("FolderUpdatedByUser", fields: [updatedBy], references: [id])
 
   // Relations with itself for parent-child relationship
   parent   Folder?  @relation("FolderToFolder", fields: [parentId], references: [id], onDelete: Cascade)
@@ -236,6 +356,12 @@ model Folder {
   // Relations with file model
   files File[]
 
+  // Relations with application model
+  parentFolderApplications Application[] @relation("ApplicationParentFolder")
+
+  // Relations with project stat model
+  projectStats ProjectStat[]
+
   @@index([projectId])
   @@index([parentId])
   // Configs
@@ -243,21 +369,27 @@ model Folder {
 }
 
 model File {
-  id        BigInt   @id @default(autoincrement())
-  name      String
-  index     Int      @default(autoincrement())
-  folderId  BigInt   @map("folder_id")
-  createdBy BigInt?  @map("created_by")
-  updatedBy BigInt?  @map("updated_by")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  folderId    Int      @map("folder_id")
+  createdBy   Int?     @map("created_by")
+  updatedBy   Int?     @map("updated_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
 
   // Relations with folder model
   folder Folder @relation(fields: [folderId], references: [id], onDelete: Cascade)
 
   // Relations with user model
-  createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
-  updatedByUser User? @relation("updatedByUser", fields: [updatedBy], references: [id])
+  createdByUser User? @relation("FileCreatedByUser", fields: [createdBy], references: [id])
+  updatedByUser User? @relation("FileUpdatedByUser", fields: [updatedBy], references: [id])
+
+  // Relations with fileMaterial model
+  fileMaterials FileMaterial[]
+
+  // Relations with comment model
+  comments Comment[]
 
   // Relations with task model
   tasks Task[]
@@ -267,18 +399,48 @@ model File {
   @@map("files")
 }
 
+model FileMaterial {
+  id        Int      @id @default(autoincrement())
+  fileId    Int      @map("file_id")
+  name      String?
+  taskId    Int?     @map("task_id")
+  materials Json
+  createdBy Int?     @map("created_by")
+  updatedBy Int?     @map("updated_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations with file model
+  file File @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  // Relations with task model
+  task Task? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  // Relations with user model
+  createdByUser User? @relation("FileMaterialCreatedByUser", fields: [createdBy], references: [id])
+  updatedByUser User? @relation("FileMaterialUpdatedByUser", fields: [updatedBy], references: [id])
+
+  // Relations with materialCommentFrame model
+  commentFrames MaterialCommentFrame[]
+
+  @@index([fileId])
+  // Configs
+  @@map("file_materials")
+}
+
 model Task {
-  id          BigInt          @id @default(autoincrement())
+  id          Int             @id @default(autoincrement())
   title       String
   description String?
   status      PROGRESS_STATUS @default(PENDING)
-  index       Int             @default(autoincrement())
-  parentId    BigInt?         @map("parent_id")
-  fileId      BigInt          @map("file_id")
-  createdBy   BigInt?         @map("created_by")
-  updatedBy   BigInt?         @map("updated_by")
+  deadline    DateTime?
+  parentId    Int?            @map("parent_id")
+  fileId      Int             @map("file_id")
+  assignedBy  Int?            @map("assigned_by")
+  createdBy   Int?            @map("created_by")
+  updatedBy   Int?            @map("updated_by")
   createdAt   DateTime        @default(now()) @map("created_at")
-  updatedAt   DateTime        @updatedAt @map("updated_at")
+  updatedAt   DateTime        @default(now()) @updatedAt @map("updated_at")
 
   // Relations with itself for parent-child relationship
   parent   Task?  @relation("TaskToTask", fields: [parentId], references: [id], onDelete: Cascade)
@@ -288,74 +450,171 @@ model Task {
   file File @relation(fields: [fileId], references: [id], onDelete: Cascade)
 
   // Relations with user model
-  createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
-  updatedByUser User? @relation("updatedByUser", fields: [updatedBy], references: [id])
+  createdByUser  User? @relation("TaskCreatedByUser", fields: [createdBy], references: [id])
+  updatedByUser  User? @relation("TaskUpdatedByUser", fields: [updatedBy], references: [id])
+  assignedByUser User? @relation("TaskAssignedByUser", fields: [assignedBy], references: [id])
 
-  // Relations with taskCommentFrame model
-  commentFrames TaskCommentFrame[]
+  // Relations with comment model
+  comments Comment[]
+
+  // Relations with fileMaterial model
+  fileMaterials FileMaterial[]
 
   @@index([fileId])
   @@index([parentId])
+  @@index([assignedBy])
   // Configs
   @@map("tasks")
 }
 
-model TaskCommentFrame {
-  id        BigInt   @id @default(autoincrement())
-  startX    Decimal  @map("start_x") @db.Decimal(10, 4)
-  startY    Decimal  @map("start_y") @db.Decimal(10, 4)
-  endX      Decimal  @map("end_x") @db.Decimal(10, 4)
-  endY      Decimal  @map("end_y") @db.Decimal(10, 4)
-  taskId    BigInt   @map("task_id")
-  createdBy BigInt?  @map("created_by")
-  updatedBy BigInt?  @map("updated_by")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+model MaterialCommentFrame {
+  id         Int      @id @default(autoincrement())
+  name       String?
+  startX     Decimal  @map("start_x") @db.Decimal(10, 4)
+  startY     Decimal  @map("start_y") @db.Decimal(10, 4)
+  endX       Decimal  @map("end_x") @db.Decimal(10, 4)
+  endY       Decimal  @map("end_y") @db.Decimal(10, 4)
+  materialId Int      @map("material_id")
+  createdBy  Int?     @map("created_by")
+  updatedBy  Int?     @map("updated_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
 
-  // Relations with task model
-  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  // Relations with material model
+  material FileMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
 
   // Relations with user model
-  createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
-  updatedByUser User? @relation("updatedByUser", fields: [updatedBy], references: [id])
+  createdByUser User? @relation("MaterialCommentFrameCreatedByUser", fields: [createdBy], references: [id])
+  updatedByUser User? @relation("MaterialCommentFrameUpdatedByUser", fields: [updatedBy], references: [id])
 
-  // Relations with taskComment model
-  comments TaskComment[]
+  // Relations with comment model
+  comments Comment[]
 
-  @@index([taskId])
+  @@index([materialId])
   // Configs
-  @@map("task_comment_frames")
+  @@map("material_comment_frames")
 }
 
-model TaskComment {
-  id        BigInt   @id @default(autoincrement())
-  content   String
-  frameId   BigInt   @map("frame_id")
-  createdBy BigInt?  @map("created_by")
-  updatedBy BigInt?  @map("updated_by")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+model Comment {
+  id            Int      @id @default(autoincrement())
+  content       Json
+  fileId        Int?     @map("file_id")
+  taskId        Int?     @map("task_id")
+  frameId       Int?     @map("frame_id")
+  applicationId Int?     @map("application_id")
+  createdBy     Int?     @map("created_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
 
-  // Relations with frame model
-  frame TaskCommentFrame @relation(fields: [frameId], references: [id], onDelete: Cascade)
+  // Relations
+  file          File?                 @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  task          Task?                 @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  frame         MaterialCommentFrame? @relation(fields: [frameId], references: [id], onDelete: Cascade)
+  application   Application?      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  createdByUser User?             @relation("CommentCreatedByUser", fields: [createdBy], references: [id])
+
+  @@index([fileId])
+  @@index([taskId])
+  @@index([frameId])
+  @@index([applicationId])
+  // Configs
+  @@map("comments")
+}
+
+model Application {
+  id          Int                @id @default(autoincrement())
+  projectId   Int                @map("project_id")
+  title       String
+  description String?
+  materials   Json
+  type        APPLICATION_TYPE
+  status      APPLICATION_STATUS @default(PENDING)
+  verifyBy    Int?               @map("verify_by")
+  createdBy   Int?               @map("created_by")
+  updatedBy   Int?               @map("updated_by")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @default(now()) @updatedAt @map("updated_at")
+  voteDeadline DateTime?         @map("vote_deadline")
+
+  parentFolderId Int?               @map("parent_folder_id")
+  parentFolder   Folder?            @relation("ApplicationParentFolder", fields: [parentFolderId], references: [id], onDelete: SetNull)
+
+  folderImageUrl String?            @map("folder_image_url")
+
+  // Relations with project model
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   // Relations with user model
-  createdByUser User? @relation("createdByUser", fields: [createdBy], references: [id])
-  updatedByUser User? @relation("updatedByUser", fields: [updatedBy], references: [id])
+  verifiedByUser User? @relation("ApplicationVerifiedByUser", fields: [verifyBy], references: [id])
+  createdByUser  User? @relation("ApplicationCreatedByUser", fields: [createdBy], references: [id])
+  updatedByUser  User? @relation("ApplicationUpdatedByUser", fields: [updatedBy], references: [id])
 
-  @@index([frameId])
+  // Relations with applicationVote model
+  applicationVotes ApplicationVote[]
+
+  // Relations with comment model
+  comments Comment[]
+
+  @@index([projectId])
+  @@index([verifyBy])
   // Configs
-  @@map("task_comments")
+  @@map("applications")
+}
+
+model ApplicationVote {
+  applicationId Int           @map("application_id")
+  userId        Int           @map("user_id")
+  decision      VOTE_DECISION
+  comment       String?
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at")
+
+  // Relations with application and user models
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([applicationId, userId])
+  @@index([applicationId])
+  @@index([userId])
+  // Configs
+  @@map("application_votes")
+}
+
+model ProjectStat {
+  id        Int      @id @default(autoincrement())
+  projectId Int      @map("project_id")
+  folderId  Int      @map("folder_id")
+  year      Int
+  month     Int
+  
+  views     Int      @default(0)
+  sales     Int      @default(0)
+  revenue   Float    @default(0)
+  reviews   Int      @default(0)
+  rating    Float    @default(0)
+
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  // Relations with project model
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  folder  Folder  @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  @@unique([folderId, year, month])
+  @@index([projectId])
+  @@index([folderId])
+  // Configs
+  @@map("project_stats")
 }
 
 model RefreshToken {
   token     String   @id
-  userId    BigInt   @map("user_id")
+  userId    Int      @map("user_id")
   expiresAt DateTime @map("expires_at")
 
   // Relations with user model
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
   // Configs
   @@map("refresh_tokens")
 }
@@ -367,3 +626,52 @@ model BlacklistToken {
   // Configs
   @@map("blacklist_tokens")
 }
+
+model ActivityLog {
+  id            Int             @id @default(autoincrement())
+  action        ACTIVITY_ACTION
+  entityType    ENTITY_TYPE     @map("entity_type")
+  entityId      Int             @map("entity_id")
+  projectId     Int?            @map("project_id")
+  editorBoardId Int?            @map("editor_board_id")
+  fileId        Int?            @map("file_id")
+  actorId       Int             @map("actor_id")
+  metadata      Json?
+  createdAt     DateTime        @default(now()) @map("created_at")
+
+  // Relations
+  actor User @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  
+  // Note: We don't strictly bind projectId/editorBoardId with foreign keys 
+  // because we want logs to persist even if the project is deleted, 
+  // or we can use SetNull/Cascade depending on business needs.
+  // We'll leave them as just Int for weak references in the log.
+  
+  notifications Notification[]
+
+  @@index([projectId])
+  @@index([editorBoardId])
+  @@index([fileId])
+  @@index([actorId])
+  // Configs
+  @@map("activity_logs")
+}
+
+model Notification {
+  id            Int      @id @default(autoincrement())
+  userId        Int      @map("user_id")
+  activityLogId Int      @map("activity_log_id")
+  isRead        Boolean  @default(false) @map("is_read")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activityLog ActivityLog @relation(fields: [activityLogId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([activityLogId])
+  // Configs
+  @@map("notifications")
+}
+

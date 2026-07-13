@@ -1,6 +1,6 @@
 @import 'tailwindcss';
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -126,5 +126,109 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+* {
+  scrollbar-color: #4b535f transparent;
+  scrollbar-width: thin;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: #4b535f;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6b7480;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-button {
+  display: none;
+}
+
+/* ================================================
+   Inkly Toast — Dark Theme Override
+   ================================================ */
+
+/* Container */
+[data-sonner-toaster] {
+  --width: 380px !important;
+  --toast-bg: #20242c !important;
+  --toast-border: #323846 !important;
+  --toast-text: #ffffff !important;
+}
+
+/*
+  Sonner is only the portal/positioning layer.
+  The actual visual card is rendered by ToastCard via toast.custom().
+*/
+[data-sonner-toaster] [data-sonner-toast] {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  color: inherit !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  width: fit-content !important;
+  max-width: 92vw !important;
+  overflow: visible !important;
+  font-family: inherit !important;
+}
+
+/* Toast title */
+[data-sonner-toaster] [data-sonner-toast] [data-title] {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  line-height: 1.4 !important;
+}
+
+/* Toast description */
+[data-sonner-toaster] [data-sonner-toast] [data-description] {
+  font-size: 12px !important;
+  color: #aeb7c2 !important;
+  margin-top: 2px !important;
+  line-height: 1.5 !important;
+}
+
+/* Close button — let Sonner position it, only override appearance */
+[data-sonner-toaster] [data-sonner-toast] [data-close-button] {
+  background: #1e2430 !important;
+  border: 1px solid #323846 !important;
+  color: #6b7480 !important;
+  width: 20px !important;
+  height: 20px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 4px !important;
+  transition:
+    color 150ms,
+    background 150ms !important;
+  padding: 0 !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast] [data-close-button]:hover {
+  color: #ffffff !important;
+  background: #323846 !important;
+  border-color: #4b535f !important;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
   }
 }
