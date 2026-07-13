@@ -3,17 +3,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
+import { toast } from '@/lib/toast';
+
 import {
   createAdminUser,
   forceResetAdminUserPassword,
-  getAdminRoles,
-  getAdminUserRoles,
-  getAdminUsers,
   replaceAdminUserRoles,
-  type AdminRoleResponse,
   type AdminUserResponse,
 } from '../../admin-api';
+import { AdminLoadingOverlay } from '../../components/AdminLoadingOverlay';
 import { PageHeader } from '../../components/PageHeader';
+import { useAdminStore } from '../../store/admin-store';
+import { getApiErrorMessage } from '../../utils/api-error';
 import { CreateUserDialog } from './UserDialogs';
 import { UserFilters } from './UserFilters';
 import { UsersTable } from './UsersTable';
@@ -22,44 +23,36 @@ export default function AdminUsersClient() {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [users, setUsers] = useState<AdminUserResponse[]>([]);
-  const [roles, setRoles] = useState<AdminRoleResponse[]>([]);
-  const [userRolesById, setUserRolesById] = useState<Record<number, AdminRoleResponse[]>>({});
+  const users = useAdminStore((state) => state.users);
+  const roles = useAdminStore((state) => state.sysRoles);
+  const userRolesById = useAdminStore((state) => state.userRolesById);
+  const usersLoaded = useAdminStore((state) => state.usersLoaded);
+  const isUsersLoading = useAdminStore((state) => state.isUsersLoading);
+  const usersError = useAdminStore((state) => state.usersError);
+  const loadSysRoles = useAdminStore((state) => state.loadSysRoles);
+  const loadUsersPageData = useAdminStore((state) => state.loadUsersPageData);
+  const loadUserRolesFromStore = useAdminStore((state) => state.loadUserRoles);
+  const setUserRolesForUser = useAdminStore((state) => state.setUserRolesForUser);
+  const upsertUser = useAdminStore((state) => state.upsertUser);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const loadAdminUsers = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const [usersResult, sysRoles] = await Promise.all([
-        getAdminUsers({ limit: 100 }),
-        getAdminRoles('SYS'),
-      ]);
-
-      setUsers(usersResult.users);
-      setRoles(sysRoles);
-    } catch {
-      setError('Unable to load admin users.');
-      setUsers([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const isLoading = isUsersLoading || !usersLoaded;
 
   useEffect(() => {
     queueMicrotask(() => {
-      void loadAdminUsers();
+      void loadUsersPageData();
     });
-  }, [loadAdminUsers]);
+  }, [loadUsersPageData]);
+
+  useEffect(() => {
+    if (usersError) {
+      toast.error(usersError);
+    }
+  }, [usersError]);
 
   useEffect(() => {
     const createMode = searchParams.get('create');
@@ -91,18 +84,22 @@ export default function AdminUsersClient() {
     });
   }, [roleFilter, searchQuery, userRolesById, users]);
 
-  const creatableRoles = useMemo(
-    () =>
-      roles.filter((role) => {
-        const normalizedRole = `${role.code} ${role.name}`.toLowerCase();
+  const filterRoles = useMemo(() => {
+    const rolesById = new Map<number, (typeof roles)[number]>();
 
-        return (
-          (normalizedRole.includes('admin') || normalizedRole.includes('staff')) &&
-          !normalizedRole.includes('member')
-        );
-      }),
-    [roles],
-  );
+    users.forEach((user) => {
+      user.roles?.forEach((role) => {
+        rolesById.set(role.id, role);
+      });
+    });
+    roles.forEach((role) => {
+      rolesById.set(role.id, role);
+    });
+
+    return Array.from(rolesById.values()).sort((firstRole, secondRole) =>
+      firstRole.name.localeCompare(secondRole.name),
+    );
+  }, [roles, users]);
 
   const totalPages = Math.max(1, Math.ceil(visibleUsers.length / limit));
   const safePage = Math.min(page, totalPages);
@@ -123,11 +120,6 @@ export default function AdminUsersClient() {
     setLimit(nextLimit);
   };
 
-  const refreshWithMessage = async (nextMessage: string) => {
-    setMessage(nextMessage);
-    await loadAdminUsers();
-  };
-
   const getCachedUserRoles = useCallback(
     (userId: number) => userRolesById[userId],
     [userRolesById],
@@ -135,20 +127,24 @@ export default function AdminUsersClient() {
 
   const loadUserRoles = useCallback(
     async (userId: number) => {
-      const cachedRoles = userRolesById[userId];
-      if (cachedRoles) {
-        return cachedRoles;
+      try {
+        return await loadUserRolesFromStore(userId);
+      } catch (error) {
+        toast.error(getApiErrorMessage(error, 'Unable to load current roles.'));
+        throw error;
       }
-
-      const nextRoles = await getAdminUserRoles(userId);
-      setUserRolesById((currentRoles) =>
-        currentRoles[userId] ? currentRoles : { ...currentRoles, [userId]: nextRoles },
-      );
-
-      return nextRoles;
     },
-    [userRolesById],
+    [loadUserRolesFromStore],
   );
+
+  const loadAvailableRoles = useCallback(async () => {
+    try {
+      return await loadSysRoles();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, 'Unable to load roles.'));
+      throw error;
+    }
+  }, [loadSysRoles]);
 
   const handleCreateUser = async (payload: {
     displayName?: string;
@@ -157,8 +153,10 @@ export default function AdminUsersClient() {
   }) => {
     await runMutation('Unable to create user.', async () => {
       const createdUser = await createAdminUser(payload);
-      await forceResetAdminUserPassword(createdUser.id);
-      await refreshWithMessage('User created. A temporary password was sent by email.');
+      const nextRoles = roles.filter((role) => payload.roleIds.includes(Number(role.id)));
+      upsertUser({ ...createdUser, roles: nextRoles });
+      setUserRolesForUser(createdUser.id, nextRoles);
+      toast.success(`User created. Password was sent to ${payload.email}.`);
     });
   };
 
@@ -166,29 +164,25 @@ export default function AdminUsersClient() {
     await runMutation('Unable to update user roles.', async () => {
       await replaceAdminUserRoles(userId, roleIds);
       const nextRoles = roles.filter((role) => roleIds.includes(Number(role.id)));
-      setUserRolesById((currentRoles) => ({ ...currentRoles, [userId]: nextRoles }));
-      setUsers((currentUsers) =>
-        currentUsers.map((user) => (user.id === userId ? { ...user, roles: nextRoles } : user)),
-      );
-      await refreshWithMessage('User roles updated successfully.');
+      setUserRolesForUser(userId, nextRoles);
+      toast.success('User roles updated successfully.');
     });
   };
 
   const handleForceResetPassword = async (user: AdminUserResponse) => {
     await runMutation('Unable to force reset password.', async () => {
       await forceResetAdminUserPassword(user.id);
-      setMessage(`Temporary password was sent to ${user.email}.`);
+      toast.success(`Temporary password was sent to ${user.email}.`);
     });
   };
 
   const runMutation = async (errorMessage: string, mutation: () => Promise<void>) => {
     setIsSubmitting(true);
-    setError(null);
 
     try {
       await mutation();
-    } catch {
-      setError(errorMessage);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, errorMessage));
     } finally {
       setIsSubmitting(false);
     }
@@ -196,34 +190,25 @@ export default function AdminUsersClient() {
 
   return (
     <>
+      <AdminLoadingOverlay isVisible={isSubmitting} />
       <PageHeader
         action={
           <CreateUserDialog
             isOpen={isCreateUserOpen}
             isSubmitting={isSubmitting}
+            onLoadRoles={loadAvailableRoles}
             onOpenChange={setIsCreateUserOpen}
             onSubmit={handleCreateUser}
-            roles={creatableRoles}
+            roles={roles}
           />
         }
         description="Search, filter, and manage user accounts with system roles."
         title="Users"
       />
 
-      {message ? (
-        <p className="rounded-lg border border-[#FFD369]/40 bg-[#FFD369]/15 px-4 py-3 text-sm font-medium text-[#FFD369]">
-          {message}
-        </p>
-      ) : null}
-      {error ? (
-        <p className="rounded-lg border border-red-400/40 bg-red-950/30 px-4 py-3 text-sm font-medium text-red-200">
-          {error}
-        </p>
-      ) : null}
-
       <UserFilters
         roleFilter={roleFilter}
-        roles={roles}
+        roles={filterRoles}
         searchQuery={searchQuery}
         setRoleFilter={handleRoleFilterChange}
         setSearchQuery={handleSearchChange}
@@ -236,6 +221,7 @@ export default function AdminUsersClient() {
         isLoading={isLoading}
         isSubmitting={isSubmitting}
         limit={limit}
+        loadAvailableRoles={loadAvailableRoles}
         loadUserRoles={loadUserRoles}
         onLimitChange={handleLimitChange}
         onPageChange={setPage}

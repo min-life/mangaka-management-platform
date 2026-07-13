@@ -45,7 +45,13 @@ export function UserFilters({
           <SelectTrigger className="h-10 w-full border-[#4A5260] bg-[#393E46] text-[#EEEEEE] focus-visible:border-[#FFD369] focus-visible:ring-[#FFD369]/20">
             <SelectValue placeholder="Role" />
           </SelectTrigger>
-          <SelectContent className="border-[#4A5260] bg-[#393E46] text-[#EEEEEE]">
+          <SelectContent
+            align="start"
+            className="w-[var(--radix-select-trigger-width)] min-w-0 border-[#4A5260] bg-[#393E46] text-[#EEEEEE]"
+            position="popper"
+            side="bottom"
+            sideOffset={4}
+          >
             <SelectItem value="all">All Roles</SelectItem>
             {roles.map((role) => (
               <SelectItem key={role.id} value={String(role.id)}>

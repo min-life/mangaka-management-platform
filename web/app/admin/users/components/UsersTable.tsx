@@ -26,6 +26,7 @@ type UsersTableProps = {
   isLoading: boolean;
   isSubmitting: boolean;
   limit: number;
+  loadAvailableRoles: () => Promise<AdminRoleResponse[]>;
   loadUserRoles: (userId: number) => Promise<AdminRoleResponse[]>;
   onLimitChange: (limit: number) => void;
   onPageChange: (page: number) => void;
@@ -43,6 +44,7 @@ export function UsersTable({
   isLoading,
   isSubmitting,
   limit,
+  loadAvailableRoles,
   loadUserRoles,
   onLimitChange,
   onPageChange,
@@ -58,92 +60,102 @@ export function UsersTable({
         <CardTitle className="text-lg text-[#EEEEEE]">Users Table</CardTitle>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader className="bg-[#1d242d]">
-            <TableRow className="border-[#4b535f] hover:bg-[#1d242d]">
-              <TableHead className="text-[#dce7f3]">Avatar</TableHead>
-              <TableHead className="text-[#dce7f3]">Name</TableHead>
-              <TableHead className="text-[#dce7f3]">Email</TableHead>
-              <TableHead className="text-[#dce7f3]">Roles</TableHead>
-              <TableHead className="text-[#dce7f3]">Created Date</TableHead>
-              <TableHead className="text-right text-[#dce7f3]">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell className="h-24 text-center text-[#aeb7c2]" colSpan={6}>
-                  Loading users...
-                </TableCell>
+        <div className="overflow-x-auto">
+          <Table className="w-full table-auto">
+            <TableHeader className="bg-[#1d242d]">
+              <TableRow className="border-[#4b535f] hover:bg-[#1d242d]">
+                <TableHead className="text-[#dce7f3]">Avatar</TableHead>
+                <TableHead className="text-[#dce7f3]">Name</TableHead>
+                <TableHead className="text-[#dce7f3]">Email</TableHead>
+                <TableHead className="text-[#dce7f3]">Roles</TableHead>
+                <TableHead className="text-[#dce7f3]">Created Date</TableHead>
+                <TableHead className="text-[#dce7f3]">Updated Date</TableHead>
+                <TableHead className="text-right text-[#dce7f3]">Actions</TableHead>
               </TableRow>
-            ) : users.length === 0 ? (
-              <TableRow>
-                <TableCell className="h-24 text-center text-[#aeb7c2]" colSpan={6}>
-                  No users found.
-                </TableCell>
-              </TableRow>
-            ) : (
-              users.map((user) => {
-                const cachedRoles = getCachedUserRoles(user.id);
-                const currentRoles = cachedRoles ?? user.roles ?? [];
-                const tableUser = cachedRoles ? { ...user, roles: cachedRoles } : user;
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell className="h-24 text-center text-[#aeb7c2]" colSpan={7}>
+                    Loading users...
+                  </TableCell>
+                </TableRow>
+              ) : users.length === 0 ? (
+                <TableRow>
+                  <TableCell className="h-24 text-center text-[#aeb7c2]" colSpan={7}>
+                    No users found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                users.map((user) => {
+                  const cachedRoles = getCachedUserRoles(user.id);
+                  const currentRoles = cachedRoles ?? user.roles ?? [];
+                  const tableUser = cachedRoles ? { ...user, roles: cachedRoles } : user;
 
-                return (
-                  <TableRow
-                    className="border-[#4b535f] bg-[#0b1118] hover:bg-[#202832]"
-                    key={user.id}
-                  >
-                    <TableCell>
-                      <Avatar>
-                        {user.avatarUrl ? (
-                          <AvatarImage alt={user.displayName || user.email} src={user.avatarUrl} />
-                        ) : null}
-                        <AvatarFallback className="bg-[#393E46] text-[#EEEEEE]">
-                          {getInitials(user)}
-                        </AvatarFallback>
-                      </Avatar>
-                    </TableCell>
-                    <TableCell className="font-medium text-[#EEEEEE]">
-                      {user.displayName || 'Unknown'}
-                    </TableCell>
-                    <TableCell className="text-[#aeb7c2]">{user.email}</TableCell>
-                    <TableCell className="max-w-[220px] truncate text-[#aeb7c2]">
-                      {cachedRoles || user.roles ? getUserRoleNames(tableUser) : 'Open roles'}
-                    </TableCell>
-                    <TableCell className="text-[#aeb7c2]">
-                      {new Date(user.createdAt).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end">
-                        <div className="inline-flex flex-wrap justify-end gap-1 rounded-lg border border-[#4A5260] bg-[#101820] p-1">
-                          <ManageRolesDialog
-                            currentRoles={currentRoles}
-                            hasLoadedCurrentRoles={Boolean(cachedRoles || user.roles)}
-                            isSubmitting={isSubmitting}
-                            onLoadRoles={() => loadUserRoles(user.id)}
-                            onSubmit={(roleIds) => handleReplaceRoles(user.id, roleIds)}
-                            roles={roles}
-                            user={user}
-                          />
-                          <Button
-                            className="border-transparent bg-[#1d242d] text-[#dce7f3] hover:border-[#FFD369] hover:bg-[#303640] disabled:opacity-60"
-                            disabled={isSubmitting}
-                            onClick={() => void handleForceResetPassword(user)}
-                            size="sm"
-                            variant="outline"
-                          >
-                            <KeyRound className="size-3.5" />
-                            Reset
-                          </Button>
+                  return (
+                    <TableRow
+                      className="border-[#4b535f] bg-[#0b1118] hover:bg-[#202832]"
+                      key={user.id}
+                    >
+                      <TableCell>
+                        <Avatar>
+                          {user.avatarUrl ? (
+                            <AvatarImage
+                              alt={user.displayName || user.email}
+                              src={user.avatarUrl}
+                            />
+                          ) : null}
+                          <AvatarFallback className="bg-[#393E46] text-[#EEEEEE]">
+                            {getInitials(user)}
+                          </AvatarFallback>
+                        </Avatar>
+                      </TableCell>
+                      <TableCell className="font-medium text-[#EEEEEE]">
+                        {user.displayName || 'Unknown'}
+                      </TableCell>
+                      <TableCell className="break-all text-[#aeb7c2]">{user.email}</TableCell>
+                      <TableCell className="whitespace-normal text-[#aeb7c2]">
+                        {cachedRoles || user.roles ? getUserRoleNames(tableUser) : 'Open roles'}
+                      </TableCell>
+                      <TableCell className="text-[#aeb7c2]">
+                        {new Date(user.createdAt).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="text-[#aeb7c2]">
+                        {new Date(user.updatedAt).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex justify-end">
+                          <div className="inline-flex flex-wrap justify-end gap-1 rounded-lg border border-[#4A5260] bg-[#101820] p-1">
+                            <ManageRolesDialog
+                              currentRoles={currentRoles}
+                              hasLoadedCurrentRoles={Boolean(cachedRoles || user.roles)}
+                              isSubmitting={isSubmitting}
+                              onLoadAvailableRoles={loadAvailableRoles}
+                              onLoadRoles={() => loadUserRoles(user.id)}
+                              onSubmit={(roleIds) => handleReplaceRoles(user.id, roleIds)}
+                              roles={roles}
+                              user={user}
+                            />
+                            <Button
+                              className="border-transparent bg-[#1d242d] text-[#dce7f3] hover:border-[#FFD369] hover:bg-[#303640] disabled:opacity-60"
+                              disabled={isSubmitting}
+                              onClick={() => void handleForceResetPassword(user)}
+                              size="sm"
+                              variant="outline"
+                            >
+                              <KeyRound className="size-3.5" />
+                              Reset
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </CardContent>
       <Pagination
         limit={limit}

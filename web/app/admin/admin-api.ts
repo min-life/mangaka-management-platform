@@ -8,6 +8,7 @@ export type AdminRoleResponse = {
   id: number;
   isDefault: boolean;
   name: string;
+  permissions?: AdminPermissionResponse[];
   scope: AdminRoleScope;
   updatedAt: string;
 };
@@ -202,6 +203,7 @@ export async function createAdminRole(payload: {
   code: string;
   isDefault?: boolean;
   name: string;
+  permissionIds?: number[];
   scope: AdminRoleScope;
 }) {
   const response = await api.post<ApiEnvelope<AdminRoleResponse>, ApiEnvelope<AdminRoleResponse>>(
@@ -218,7 +220,7 @@ export async function updateAdminRole(
     code?: string;
     isDefault?: boolean;
     name?: string;
-    permissionIds?: string[];
+    permissionIds?: number[];
     scope?: AdminRoleScope;
   },
 ) {
