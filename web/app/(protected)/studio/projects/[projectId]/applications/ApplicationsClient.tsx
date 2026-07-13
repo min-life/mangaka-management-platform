@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { AxiosError } from 'axios';
 import { toast } from '@/lib/toast';
@@ -46,9 +47,7 @@ import {
   readMaterialSummary,
 } from './application-ui';
 
-type ApplicationsClientProps = {
-  projectId: number;
-};
+import { useProjectParams } from '@/hooks/useProjectParams';
 
 type ApplicationStatusFilter = 'ALL' | ApplicationStatus;
 
@@ -89,8 +88,12 @@ function ApplicationListSkeleton() {
   );
 }
 
-export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
+export function ApplicationsClient() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
+  const autoOpenAppId = searchParams.get('applicationId');
+  const hasAutoOpened = useRef(false);
+  const { numericId: projectId } = useProjectParams();
   const [applications, setApplications] = useState<ApplicationResponse[]>([]);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -100,6 +103,7 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
   const [error, setError] = useState<string | null>(null);
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
   const [selectedApplication, setSelectedApplication] = useState<ApplicationResponse | null>(null);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [selectedComments, setSelectedComments] = useState<ApplicationCommentResponse[]>([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -162,6 +166,23 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
     }
   }, [projectId]);
 
+  // Handle auto-opening application from URL
+  useEffect(() => {
+    if (applications.length > 0 && autoOpenAppId && !hasAutoOpened.current) {
+      const targetApp = applications.find((app) => app.id === Number(autoOpenAppId));
+      if (targetApp) {
+        hasAutoOpened.current = true;
+        // Avoid state updates during render by wrapping in timeout/microtask
+        queueMicrotask(() => {
+          setSelectedApplication(targetApp);
+          getApplicationById(targetApp.id)
+            .then((detail: any) => setSelectedComments(detail.comments))
+            .catch((err: unknown) => console.error('Unable to load application detail:', err));
+        });
+      }
+    }
+  }, [applications, autoOpenAppId]);
+
   useEffect(() => {
     queueMicrotask(() => {
       void loadApplications();
@@ -193,9 +214,7 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
     });
   }, [applications, searchQuery, statusFilter]);
 
-  const pendingCount = applications.filter((application) => application.status === 'PENDING').length;
-  const approvedCount = applications.filter((application) => application.status === 'APPROVE').length;
-  const rejectedCount = applications.filter((application) => application.status === 'REJECT').length;
+
 
   const resetCreateForm = () => {
     setTitle('');
@@ -320,6 +339,7 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
   const handleOpenApplication = async (application: ApplicationResponse) => {
     setSelectedApplication(application);
     setSelectedComments([]);
+    setIsLoadingDetail(true);
 
     try {
       const [detail, commentResult] = await Promise.all([
@@ -332,6 +352,8 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
       setSelectedComments(commentResult.comments);
     } catch (detailError) {
       console.error('Unable to load application detail:', detailError);
+    } finally {
+      setIsLoadingDetail(false);
     }
   };
 
@@ -466,29 +488,6 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
 
 
 
-      <div className="mt-5 grid grid-cols-3 gap-4">
-        <article className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-4">
-          <p className="text-xs font-black uppercase tracking-[0.08em] text-[#aeb7c2]">
-            Pending Review
-          </p>
-          <p className="mt-3 text-2xl font-black text-white">{pendingCount}</p>
-          <p className="mt-1 text-[11px] font-bold text-[#FFD369]">Need attention</p>
-        </article>
-        <article className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-4">
-          <p className="text-xs font-black uppercase tracking-[0.08em] text-[#aeb7c2]">
-            Approved Requests
-          </p>
-          <p className="mt-3 text-2xl font-black text-white">{approvedCount}</p>
-          <p className="mt-1 text-[11px] font-bold text-[#9df2c7]">Cleared for production</p>
-        </article>
-        <article className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-4">
-          <p className="text-xs font-black uppercase tracking-[0.08em] text-[#aeb7c2]">
-            Rejected Requests
-          </p>
-          <p className="mt-3 text-2xl font-black text-white">{rejectedCount}</p>
-          <p className="mt-1 text-[11px] font-bold text-[#ff9ab3]">Needs revision</p>
-        </article>
-      </div>
 
       <div className="mt-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <div className="flex h-10 min-w-0 flex-1 items-center gap-3 rounded-[4px] border border-[#39424f] bg-[#151c25] px-4 text-[#8b94a1]">
@@ -584,12 +583,10 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
         canApprove={false}
         canCancel={
           selectedApplication
-            ? selectedApplication.createdByUser?.id === user?.id ||
-            permissions.includes('admin') ||
-            permissions.includes('project:owner') ||
-            permissions.includes('project:application.approve')
+            ? selectedApplication.createdByUser?.id === user?.id || selectedApplication.createdBy === user?.id
             : false
         }
+        isLoadingDetail={isLoadingDetail}
         isSubmitting={isSubmitting}
         onOpenChange={(open) => {
           if (!open) {
@@ -610,9 +607,6 @@ export function ApplicationsClient({ projectId }: ApplicationsClientProps) {
         }
         onUpdateStatus={(application, status, options) =>
           void handleUpdateStatus(application, status, options)
-        }
-        onDeleteApplication={(application) =>
-          void handleDeleteApplication(application)
         }
       />
     </section>

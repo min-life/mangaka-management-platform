@@ -148,7 +148,7 @@ export function AuthForm({
     <section className={authPanelClassName}>
       <div className="mb-8">
         <AuthBackLink />
-        <div className="mb-5">
+        <div className="mb-8">
           <AuthBrand />
         </div>
         <h2 className="mb-2 text-[28px] font-bold leading-9 text-[#eeeeee]">{title}</h2>

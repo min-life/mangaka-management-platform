@@ -1,11 +1,7 @@
 import { TaskDetailClient } from './TaskDetailClient';
 
-type TaskDetailPageProps = {
-  params: Promise<{ projectId: string; taskId: string }>;
-};
+export default async function TaskDetailPage({ params }: { params: Promise<{ taskId: string }> }) {
+  const { taskId } = await params;
 
-export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
-  const { projectId, taskId } = await params;
-
-  return <TaskDetailClient projectId={Number(projectId)} taskId={taskId} />;
+  return <TaskDetailClient taskId={taskId} />;
 }

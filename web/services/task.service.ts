@@ -1,4 +1,5 @@
 import api from '@/lib/api';
+import { parseDecimal } from '@/lib/utils';
 import { deleteMaterial } from './material.service';
 
 export type TaskStatus = 'DONE' | 'INPROGRESS' | 'PENDING' | 'REVIEW';
@@ -105,10 +106,10 @@ export async function createTaskFrame(
   return {
     id: frame.id,
     materialId: Number(materialId),
-    startX: Number(frame.startX),
-    startY: Number(frame.startY),
-    endX: Number(frame.endX),
-    endY: Number(frame.endY),
+    startX: parseDecimal(frame.startX),
+    startY: parseDecimal(frame.startY),
+    endX: parseDecimal(frame.endX),
+    endY: parseDecimal(frame.endY),
   };
 }
 
@@ -121,10 +122,10 @@ export async function getTaskFrames(taskId: number | string): Promise<TaskFrameR
       id: f.id,
       taskId: Number(taskId),
       materialId: f.materialId ? Number(f.materialId) : undefined,
-      startX: Number(f.startX),
-      startY: Number(f.startY),
-      endX: Number(f.endX),
-      endY: Number(f.endY),
+      startX: parseDecimal(f.startX),
+      startY: parseDecimal(f.startY),
+      endX: parseDecimal(f.endX),
+      endY: parseDecimal(f.endY),
     }));
   } catch (err) {
     console.error('Failed to get task frames:', err);

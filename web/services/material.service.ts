@@ -15,6 +15,8 @@ export type UpdateMaterialOptions = {
   deleteImage?: boolean;
   deleteSource?: boolean;
   deleteText?: boolean;
+  taskId?: number;
+  name?: string;
 };
 
 type MaterialItemResponse = {

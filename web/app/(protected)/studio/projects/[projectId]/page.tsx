@@ -1,18 +1,20 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
+import { useProjectParams } from '@/hooks/useProjectParams';
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import {
   CheckCircle2,
-  ChevronRight,
   Clock3,
-  FileText,
   Upload,
-  Users,
   ImageIcon,
   ListChecks,
+  AlertCircle,
+  FileWarning,
+  Clock,
+  Activity,
 } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,13 +23,10 @@ import { LoadingState } from '@/components/ui/loading-state';
 
 import {
   getProjectById,
-  getProjectMembers,
-  getProjectFolders,
-  getFolderFiles,
+  getProjectDashboard,
   type ProjectResponse,
+  type ProjectDashboardResponse,
 } from '@/services/project.service';
-import { getFileTasks } from '@/services/file.service';
-import { getProjectApplications } from '@/services/application.service';
 import { useRealtimeProjectActivity } from '@/hooks/use-realtime-activity';
 
 function formatUpdatedAt(dateStr: string) {
@@ -48,78 +47,29 @@ function formatUpdatedAt(dateStr: string) {
 
 export default function ProjectDashboardPage() {
   const router = useRouter();
-  const params = useParams();
-  const projectId = params.projectId ? String(params.projectId) : '';
+  const { slug, numericId } = useProjectParams();
 
-  const { activities } = useRealtimeProjectActivity(projectId);
+  const { activities } = useRealtimeProjectActivity(numericId);
 
   const [project, setProject] = useState<ProjectResponse | null>(null);
-  const [membersCount, setMembersCount] = useState(0);
-  const [tasks, setTasks] = useState<any[]>([]);
-  const [filesCount, setFilesCount] = useState(0);
-  const [applicationsCount, setApplicationsCount] = useState(0);
-  const [publishingRequestsCount, setPublishingRequestsCount] = useState(0);
+  const [dashboard, setDashboard] = useState<ProjectDashboardResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!projectId) return;
+    if (!numericId) return;
 
     let isMounted = true;
 
     async function loadDashboardData() {
       try {
-        const [proj, membersRes, appsRes, foldersRes] = await Promise.all([
-          getProjectById(Number(projectId)),
-          getProjectMembers(Number(projectId)),
-          getProjectApplications(projectId),
-          getProjectFolders(Number(projectId)),
+        const [proj, dash] = await Promise.all([
+          getProjectById(numericId),
+          getProjectDashboard(numericId),
         ]);
         if (!isMounted) return;
 
         setProject(proj);
-        
-        const membersList = membersRes.members || [];
-        setMembersCount(membersList.length);
-
-        const appsList = appsRes.applications || [];
-        setApplicationsCount(appsList.length);
-        const publishingReqs = appsList.filter((app: any) => app.type === 'PUBLISH_REQUEST');
-        setPublishingRequestsCount(publishingReqs.length);
-
-        const foldersList = foldersRes.folders || [];
-
-        // Parallelize fetching files for folders
-        const filesByFolder = await Promise.all(
-          foldersList.map(async (folder) => {
-            const filesRes = await getFolderFiles(folder.id);
-            return { folder, files: filesRes.files || [] };
-          })
-        );
-
-        let tempFilesCount = 0;
-        const filePromises: Promise<any[]>[] = [];
-
-        for (const { folder, files } of filesByFolder) {
-          tempFilesCount += files.length;
-          for (const file of files) {
-            filePromises.push(
-              getFileTasks(file.id).then((fileTasks) =>
-                fileTasks.map((t: any) => ({
-                  ...t,
-                  fileName: file.title,
-                  folderName: folder.title,
-                }))
-              )
-            );
-          }
-        }
-
-        const tasksNested = await Promise.all(filePromises);
-        const loadedTasks = tasksNested.flat();
-
-        if (!isMounted) return;
-        setFilesCount(tempFilesCount);
-        setTasks(loadedTasks);
+        setDashboard(dash ?? null);
       } catch (err) {
         console.error('Failed to load project dashboard details:', err);
       } finally {
@@ -134,13 +84,13 @@ export default function ProjectDashboardPage() {
     return () => {
       isMounted = false;
     };
-  }, [projectId, activities.length]);
+  }, [numericId, activities.length]);
 
   if (isLoading) {
     return <LoadingState message="Loading project workspace..." minHeight="70vh" />;
   }
 
-  if (!project) {
+  if (!project || !dashboard) {
     return (
       <div className="flex h-[60vh] flex-col items-center justify-center space-y-4">
         <p className="text-sm font-bold text-[#8b94a1]">Project not found or access denied.</p>
@@ -154,31 +104,59 @@ export default function ProjectDashboardPage() {
     );
   }
 
-  const statCards = [
-    { label: 'Active Applications', value: String(applicationsCount), meta: 'Review pipeline' },
+  // Tier 1: Action Bar
+  const actionCards = [
     {
-      label: 'Open Tasks',
-      value: String(tasks.filter((t) => t.status !== 'DONE').length),
-      meta: 'In production',
+      label: 'Pending Applications',
+      value: dashboard.actionNeeded.pendingApplications.length,
+      meta: 'Action needed',
+      icon: FileWarning,
+      highlight: dashboard.actionNeeded.pendingApplications.length > 0,
+      isDanger: false,
     },
-    { label: 'Active Members', value: String(membersCount), meta: 'Contributors' },
     {
-      label: 'Publishing Requests',
-      value: String(publishingRequestsCount),
-      meta: 'Ready for review',
+      label: 'Overdue Tasks',
+      value: dashboard.actionNeeded.overdueTasks.length,
+      meta: 'Needs attention',
+      icon: AlertCircle,
+      highlight: dashboard.actionNeeded.overdueTasks.length > 0,
+      isDanger: true,
+    },
+    {
+      label: 'Due Soon Tasks',
+      value: dashboard.actionNeeded.dueSoonTasks.length,
+      meta: 'Upcoming deadlines',
+      icon: Clock,
+      highlight: dashboard.actionNeeded.dueSoonTasks.length > 0,
+      isDanger: false,
     },
   ];
 
-  // Map tasks to "deadlines" card lists or show empty state
-  const openTasks = tasks.filter((t) => t.status !== 'DONE').slice(0, 3);
+  // Tier 2: Overview Stats
+  const overviewCards = [
+    { label: 'Active Members', value: dashboard.overview.totalMembers, meta: 'Contributors' },
+    { label: 'Total Files', value: dashboard.overview.totalFiles, meta: 'Managed files' },
+    {
+      label: 'Open Tasks',
+      value: dashboard.progressStats.pendingTasks + dashboard.progressStats.inProgressTasks + dashboard.progressStats.reviewTasks,
+      meta: 'In production',
+    },
+  ];
 
-  // Map recent activities using tasks list or mock entries if empty
-  const recentActivities = tasks
-    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-    .slice(0, 3);
+  // Chart Data
+  const chartData = [
+    { name: 'Done', value: dashboard.progressStats.completedTasks, color: '#9df2c7' },
+    { name: 'In Review', value: dashboard.progressStats.reviewTasks, color: '#ffd35b' },
+    { name: 'In Progress', value: dashboard.progressStats.inProgressTasks, color: '#9ddde8' },
+    { name: 'Pending', value: dashboard.progressStats.pendingTasks, color: '#dce7f3' },
+  ].filter((d) => d.value > 0);
+
+  const openTasks = dashboard.myWorkspace.activeTasks || [];
+  const recentActivities = dashboard.recentFiles || [];
 
   return (
-    <section className="px-5 py-6">
+    <section className="px-5 py-6 space-y-6">
+      {/* Header */}
       <div className="flex items-start justify-between gap-6">
         <div className="flex items-center gap-4">
           {project.imageUrl && project.imageUrl.trim() !== '' ? (
@@ -201,6 +179,9 @@ export default function ProjectDashboardPage() {
               >
                 Active
               </Badge>
+              <span className="ml-2 text-xs font-bold text-[#8b94a1]">
+                Created: {new Date(project.createdAt).toLocaleDateString()}
+              </span>
             </div>
             <p className="mt-1 text-xs font-bold text-[#aeb7c2]">
               Editor Board: {project.editorBoard?.name ?? 'No board assigned'}
@@ -209,206 +190,255 @@ export default function ProjectDashboardPage() {
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-4 gap-4">
-        {statCards.map((stat) => (
+      {/* Tier 1: Action Bar */}
+      <div className="grid grid-cols-3 gap-4">
+        {actionCards.map((stat) => {
+          const isHighlight = stat.highlight;
+          const bgClass = isHighlight
+            ? stat.isDanger
+              ? 'bg-[#3b1d1d] border-[#ff6b6b]/40'
+              : 'bg-[#30270d] border-[#FFD369]/40'
+            : 'bg-[#1a222d] border-[#39424f]';
+          const textClass = isHighlight
+            ? stat.isDanger
+              ? 'text-[#ff6b6b]'
+              : 'text-[#FFD369]'
+            : 'text-[#aeb7c2]';
+          const valueClass = isHighlight
+            ? stat.isDanger
+              ? 'text-[#ff6b6b]'
+              : 'text-[#FFD369]'
+            : 'text-white';
+          const metaClass = isHighlight
+            ? stat.isDanger
+              ? 'text-[#ff6b6b]/80'
+              : 'text-[#FFD369]/80'
+            : 'text-[#5b626d]';
+
+          return (
+            <article
+              className={`group rounded-[5px] border p-4 cursor-pointer transition-colors ${bgClass} hover:opacity-90`}
+              key={stat.label}
+              onClick={() => {
+                if (stat.label === 'Pending Applications') {
+                  router.push(`/studio/projects/${slug}/applications`);
+                } else {
+                  router.push(`/studio/projects/${slug}/tasks`);
+                }
+              }}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                {(() => {
+                  const Icon = stat.icon;
+                  return <Icon className={`size-4 ${textClass}`} />;
+                })()}
+                <p className={`text-[11px] font-black uppercase tracking-[0.04em] ${textClass}`}>
+                  {stat.label}
+                </p>
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className={`text-3xl font-black ${valueClass}`}>{stat.value}</span>
+                <span className={`text-xs font-bold ${metaClass}`}>{stat.meta}</span>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
+      {/* Tier 2: Overview Stats */}
+      <div className="grid grid-cols-3 gap-4">
+        {overviewCards.map((stat) => (
           <article
-            className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-4"
+            className="rounded-[5px] border border-[#303842] bg-[#161d26] p-4"
             key={stat.label}
           >
-            <p className="text-[11px] font-black uppercase tracking-[0.04em] text-[#aeb7c2]">
+            <p className="text-[11px] font-black uppercase tracking-[0.04em] text-[#8b94a1]">
               {stat.label}
             </p>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="text-2xl font-black text-white">{stat.value}</span>
-              <span className="text-xs font-bold text-[#FFD369]">{stat.meta}</span>
+              <span className="text-xs font-bold text-[#5b626d]">{stat.meta}</span>
             </div>
           </article>
         ))}
       </div>
 
-      <div className="mt-5 grid grid-cols-[minmax(0,1fr)_320px] gap-5">
+      {/* Tier 3: Main Columns */}
+      <div className="grid grid-cols-[minmax(0,1fr)_340px] gap-5">
+        {/* Left: Task Status Overview */}
         <section className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-5">
-          <div className="mb-5 flex items-center justify-between">
+          <div className="mb-6 flex items-center justify-between">
             <h2 className="text-sm font-black text-white">Task Status Overview</h2>
             <div className="flex items-center gap-2 text-[#aeb7c2]">
               <ListChecks className="size-4" />
               <CheckCircle2 className="size-4" />
             </div>
           </div>
-          {tasks.length === 0 ? (
-            <div className="flex h-[190px] flex-col items-center justify-center gap-3 rounded-[5px] border border-dashed border-[#303842]">
+          {dashboard.overview.totalTasks === 0 ? (
+            <div className="flex h-[200px] flex-col items-center justify-center gap-3 rounded-[5px] border border-dashed border-[#303842]">
               <ListChecks className="size-7 text-[#5b626d]" />
               <p className="text-xs font-bold text-[#8b94a1]">No tasks in this project yet.</p>
             </div>
           ) : (
-            <div className="grid gap-3">
-              {[
-                {
-                  label: 'Done',
-                  count: tasks.filter((t) => t.status === 'DONE').length,
-                  color: '#9df2c7',
-                  bg: '#14291f',
-                  border: '#315846',
-                },
-                {
-                  label: 'In Review',
-                  count: tasks.filter((t) => t.status === 'REVIEW').length,
-                  color: '#ffd35b',
-                  bg: '#30270d',
-                  border: '#6c5516',
-                },
-                {
-                  label: 'In Progress',
-                  count: tasks.filter((t) => t.status === 'INPROGRESS').length,
-                  color: '#9ddde8',
-                  bg: '#2a454a',
-                  border: '#4f6e73',
-                },
-                {
-                  label: 'Pending',
-                  count: tasks.filter((t) => t.status === 'PENDING').length,
-                  color: '#dce7f3',
-                  bg: '#20282b',
-                  border: '#4a4f55',
-                },
-              ].map(({ label, count, color, bg, border }) => {
-                const pct = tasks.length > 0 ? Math.round((count / tasks.length) * 100) : 0;
-                return (
-                  <div className="flex items-center gap-3" key={label}>
-                    <span className="w-24 shrink-0 text-[11px] font-bold text-[#aeb7c2]">
-                      {label}
-                    </span>
-                    <div
-                      className="flex-1 overflow-hidden rounded-full bg-[#303842]"
-                      style={{ height: 8 }}
+            <div className="flex h-[200px] items-center">
+              <div className="flex-1 h-full relative min-h-0 min-w-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={chartData}
+                      innerRadius={65}
+                      outerRadius={85}
+                      paddingAngle={5}
+                      dataKey="value"
+                      stroke="none"
                     >
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{ width: `${pct}%`, backgroundColor: color }}
+                      {chartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+                {/* Center text for total */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-3xl font-black text-white">{dashboard.overview.totalTasks}</span>
+                  <span className="text-[10px] font-bold text-[#8b94a1] mt-1">TASKS</span>
+                </div>
+              </div>
+              <div className="w-[130px] shrink-0 grid gap-4 pl-4 border-l border-[#303842]">
+                {chartData.map((d) => {
+                  const pct = Math.round((d.value / dashboard.overview.totalTasks) * 100);
+                  return (
+                    <div key={d.name} className="flex items-center gap-3">
+                      <span
+                        className="size-3 rounded-full shrink-0 shadow-sm"
+                        style={{ backgroundColor: d.color }}
                       />
+                      <div className="flex flex-col">
+                        <span className="text-[11px] font-bold text-[#aeb7c2]">{d.name}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-black text-white">{d.value}</span>
+                          <span className="text-[10px] font-bold text-[#5b626d]">({pct}%)</span>
+                        </div>
+                      </div>
                     </div>
-                    <span
-                      className="w-16 shrink-0 rounded-[4px] border px-2 py-0.5 text-center text-[10px] font-black"
-                      style={{ color, backgroundColor: bg, borderColor: border }}
-                    >
-                      {count} ({pct}%)
-                    </span>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           )}
-          <div className="mt-5 border-t border-[#303842] pt-4 text-[11px] font-bold text-[#8b94a1]">
-            {tasks.length} total tasks &bull; {filesCount} files managed
-          </div>
         </section>
 
-        <aside className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-black text-white">Active Tasks</h2>
+        {/* Right: Active Tasks Widget */}
+        <aside className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-5 flex flex-col">
+          <div className="mb-5 flex items-center justify-between">
+            <h2 className="text-sm font-black text-white">My Active Tasks</h2>
             <Clock3 className="size-4 text-[#dce7f3]" />
           </div>
-          <div className="grid gap-3">
+          <div className="grid gap-3 flex-1">
             {openTasks.length === 0 ? (
-              <div className="flex h-36 flex-col items-center justify-center rounded-[5px] border border-dashed border-[#303842] p-4 text-center">
-                <CheckCircle2 className="size-6 text-[#aeb7c2]/40" />
-                <p className="mt-2 text-xs font-bold text-[#aeb7c2]">All caught up!</p>
+              <div className="flex h-full flex-col items-center justify-center rounded-[5px] border border-dashed border-[#303842] p-4 text-center min-h-[160px]">
+                <CheckCircle2 className="size-8 text-[#aeb7c2]/30 mb-3" />
+                <p className="text-xs font-bold text-[#8b94a1]">All caught up!</p>
+                <p className="text-[10px] text-[#5b626d] mt-1">No pending tasks assigned to you.</p>
               </div>
             ) : (
-              openTasks.map((task) => (
-                <article
-                  className="rounded-[5px] border border-[#303842] bg-[#202832] p-4 hover:border-[#FFD369]/30 transition-all cursor-pointer"
-                  key={task.id}
-                  onClick={() => router.push(`/studio/projects/${projectId}/tasks`)}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <p
-                      className="text-xs font-black leading-5 text-white truncate max-w-[170px]"
-                      title={task.title}
-                    >
-                      {task.title}
-                    </p>
-                    <span className="text-[10px] font-black text-[#FFD369] shrink-0 uppercase tracking-wider">
-                      {task.status}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[10px] font-bold text-[#aeb7c2]">
-                    File: {task.fileName || 'General'}
-                  </p>
-                  <Progress
-                    className="mt-3 h-1.5 rounded-none bg-[#39424f] [&_[data-slot=progress-indicator]]:bg-[#FFD369]"
-                    value={
-                      task.status === 'DONE'
-                        ? 100
-                        : task.status === 'REVIEW'
-                          ? 75
-                          : task.status === 'INPROGRESS'
-                            ? 40
-                            : 10
-                    }
-                  />
-                </article>
-              ))
+              openTasks.map((task: any) => {
+                const isOverdue = task.deadline && new Date(task.deadline) < new Date();
+                return (
+                  <article
+                    className="rounded-[5px] border border-[#303842] bg-[#202832] p-4 hover:border-[#FFD369]/30 transition-all cursor-pointer relative overflow-hidden"
+                    key={task.id}
+                    onClick={() => router.push(`/studio/projects/${slug}/tasks/${task.id}`)}
+                  >
+                    {isOverdue && (
+                      <div className="absolute top-0 left-0 w-1 h-full bg-[#ff6b6b]" />
+                    )}
+                    <div className="flex items-start justify-between gap-3">
+                      <p
+                        className="text-xs font-black leading-5 text-white truncate max-w-[170px]"
+                        title={task.title}
+                      >
+                        {task.title}
+                      </p>
+                      <span className="text-[9px] font-black text-[#101820] bg-[#FFD369] px-1.5 py-0.5 rounded-[3px] shrink-0 uppercase tracking-wider">
+                        {task.status}
+                      </span>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-[#8b94a1]">
+                        File ID: {task.fileId || 'General'}
+                      </span>
+                      <span className={`text-[10px] font-bold flex items-center gap-1 ${isOverdue ? 'text-[#ff6b6b]' : 'text-[#aeb7c2]'}`}>
+                        <Clock className="size-3" />
+                        {task.deadline ? new Date(task.deadline).toLocaleDateString() : 'No deadline'}
+                      </span>
+                    </div>
+                  </article>
+                );
+              })
             )}
           </div>
         </aside>
       </div>
 
-      <div className="mt-5 grid grid-cols-[minmax(0,1fr)_360px] gap-5">
+      {/* Bottom: Recent Activity */}
+      <div className="mt-5">
         <section className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-5">
           <div className="mb-5 flex items-center justify-between">
             <h2 className="text-sm font-black text-white">Recent Activity</h2>
             <button
-              onClick={() => router.push(`/studio/projects/${projectId}/files`)}
-              className="text-xs font-black text-[#FFD369]"
+              onClick={() => router.push(`/studio/projects/${slug}/files`)}
+              className="text-xs font-black text-[#FFD369] hover:underline"
               type="button"
             >
               View Files
             </button>
           </div>
-          <div className="grid gap-5">
+          <div className="grid gap-4">
             {recentActivities.length === 0 ? (
               <p className="text-xs font-bold text-[#8b94a1] py-4 text-center">
                 No recent activities found.
               </p>
             ) : (
-              recentActivities.map((act, index) => (
-                <div className="flex gap-4" key={act.id}>
-                  <span className="grid size-8 place-items-center rounded-full bg-[#303842] text-[#dce7f3] shrink-0">
-                    <Upload className="size-4" />
-                  </span>
-                  <div>
-                    <p className="text-xs font-black text-white">
-                      Task: &ldquo;{act.title}&rdquo; updated
-                    </p>
-                    <p className="mt-1 text-[11px] font-bold leading-5 text-[#aeb7c2]">
-                      Chapter folder: {act.folderName} &bull; File: {act.fileName}
-                    </p>
-                    <p className="mt-1 text-[10px] font-black text-[#8b94a1]">
-                      {formatUpdatedAt(act.updatedAt)}
-                    </p>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </section>
+              recentActivities.map((act: any, idx: number) => {
+                // Determine icon color based on index to give varied visual scanning
+                const styles = [
+                  { color: '#dce7f3', bg: '#303842' },
+                  { color: '#9ddde8', bg: '#2a454a' },
+                  { color: '#ffd35b', bg: '#30270d' },
+                  { color: '#9df2c7', bg: '#14291f' },
+                ];
+                const style = styles[idx % styles.length];
 
-        <section className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-5">
-          <h2 className="mb-5 text-sm font-black text-white">Project Specs</h2>
-          <div className="grid gap-3">
-            <div className="flex items-center justify-between rounded-[5px] border border-[#303842] bg-[#202832] p-3 text-xs font-bold">
-              <span className="text-[#aeb7c2]">Project ID</span>
-              <span className="text-white font-mono">{project.id}</span>
-            </div>
-            <div className="flex items-center justify-between rounded-[5px] border border-[#303842] bg-[#202832] p-3 text-xs font-bold">
-              <span className="text-[#aeb7c2]">Total Chapters</span>
-              <span className="text-white">{filesCount} pages managed</span>
-            </div>
-            <div className="flex items-center justify-between rounded-[5px] border border-[#303842] bg-[#202832] p-3 text-xs font-bold">
-              <span className="text-[#aeb7c2]">Created Date</span>
-              <span className="text-white">{new Date(project.createdAt).toLocaleDateString()}</span>
-            </div>
+                return (
+                  <div 
+                    className="flex gap-4 p-3 rounded-[5px] hover:bg-[#202832] transition-colors cursor-pointer" 
+                    key={act.id}
+                    onClick={() => router.push(`/studio/projects/${slug}/files/${act.id}`)}
+                  >
+                    <span
+                      className="grid size-9 place-items-center rounded-full shrink-0"
+                      style={{ backgroundColor: style.bg, color: style.color }}
+                    >
+                      <Activity className="size-4" />
+                    </span>
+                    <div className="flex flex-col justify-center">
+                      <p className="text-xs font-black text-white">
+                        File: &ldquo;{act.title}&rdquo; updated
+                      </p>
+                      <div className="mt-1 flex items-center gap-2 text-[11px] font-bold text-[#aeb7c2]">
+                        <span>Chapter: {act.folder?.title || 'Unknown'}</span>
+                        <span className="text-[#39424f]">&bull;</span>
+                        <span className="text-[#8b94a1] flex items-center gap-1">
+                          <Clock3 className="size-3" />
+                          {formatUpdatedAt(act.updatedAt)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </section>
       </div>

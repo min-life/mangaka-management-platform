@@ -45,7 +45,7 @@ type PendingDrop = {
 type ModalKind = 'submit-review' | 'request-revision' | 'approve' | null;
 
 type TaskKanbanProps = {
-  canReview: boolean;
+  canReview: (task: TaskWorkspaceItem) => boolean;
   onOpenTask: (task: TaskWorkspaceItem) => void;
   onStatusChange: (taskId: string, newStatus: TaskStatus, comment?: string) => Promise<void>;
   tasks: TaskWorkspaceItem[];
@@ -402,8 +402,9 @@ export function TaskKanban({ canReview, onOpenTask, onStatusChange, tasks }: Tas
 
   const isColumnDisabled = (status: TaskStatus): boolean => {
     if (!isDragging || !activeTask) return false;
-    if (status === 'DONE' && !canReview) return true;
-    if (status === 'INPROGRESS' && activeTask.status === 'REVIEW' && !canReview) return true;
+    const userCanReview = canReview(activeTask);
+    if (status === 'DONE' && !userCanReview) return true;
+    if (status === 'INPROGRESS' && activeTask.status === 'REVIEW' && !userCanReview) return true;
     return false;
   };
 

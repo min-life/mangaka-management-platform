@@ -24,12 +24,11 @@ import { RemoveMemberDialog } from './RemoveMemberDialog';
 import { usePermissions } from '@/hooks/use-permissions';
 import { useAuth } from '@/hooks/useAuth';
 
-type ProjectMembersClientProps = {
-  projectId: number;
-};
+import { useProjectParams } from '@/hooks/useProjectParams';
 
-export function ProjectMembersClient({ projectId }: ProjectMembersClientProps) {
+export function ProjectMembersClient() {
   const { user: currentUser } = useAuth();
+  const { numericId: projectId } = useProjectParams();
   const { can: canProject } = usePermissions({ resource: 'PROJECT', resourceId: projectId });
   
   const [members, setMembers] = useState<ProjectMemberResponse[]>([]);
@@ -184,9 +183,7 @@ export function ProjectMembersClient({ projectId }: ProjectMembersClientProps) {
     }
   };
 
-  if (isLoading) {
-    return <LoadingState message="Loading project members..." minHeight="70vh" />;
-  }
+
 
   return (
     <section className="px-5 py-6">

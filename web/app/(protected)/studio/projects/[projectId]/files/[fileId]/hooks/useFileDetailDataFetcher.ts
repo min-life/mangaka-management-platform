@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getProjectFolders, getProjectMembers, getProjectById, type ProjectFolderResponse, type ProjectResponse } from '@/services/project.service';
+import { parseDecimal } from '@/lib/utils';
 import { getFileById, getFileComments, getFileMaterials, getFileTasks } from '@/services/file.service';
 import { getTaskFrames, getTaskComments, getTaskMaterials } from '@/services/task.service';
-import { getFrameComments } from '@/services/frame.service';
+import { getFrameComments, getFrameById } from '@/services/frame.service';
 import { getMaterialById, getMaterialFrames } from '@/services/material.service';
+import pLimit from 'p-limit';
 import {
   formatFileDate,
   type FileTaskItem,
@@ -45,14 +47,17 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
   const [hasLoaded, setHasLoaded] = useState(false);
   const activeLoadRef = useRef<number>(0);
   const reloadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingResolvesRef = useRef<(() => void)[]>([]);
 
-  const loadData = useCallback(async (isRefresh = false, signal?: AbortSignal) => {
+  const loadData = useCallback(async (isRefresh = false, quiet = false, signal?: AbortSignal) => {
     const currentLoadId = ++activeLoadRef.current;
-    
-    if (isRefresh) {
-      setIsRefreshing(true);
-    } else {
-      setIsInitialLoading(true);
+
+    if (!quiet) {
+      if (isRefresh) {
+        setIsRefreshing(true);
+      } else {
+        setIsInitialLoading(true);
+      }
     }
     setError(null);
 
@@ -98,24 +103,16 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
       // 3. Fetch Versions/Materials
       let dbVersions: FileVersionItem[] = [];
       try {
-        // ALWAYS Fetch File Materials
         const materialsRes = await getFileMaterials(fileId);
-        const versionsArray = (materialsRes || []) as FileMaterialVersionRecord[];
-        if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
+        let versionsArray = (materialsRes || []) as FileMaterialVersionRecord[];
+        
+        // Strip data wrappers if they exist
+        if (!Array.isArray(versionsArray) && (materialsRes as any).data) {
+          versionsArray = (materialsRes as any).data;
+        }
 
-        const fullMaterials = await Promise.all(
-          versionsArray.map(async (m: any) => {
-            try {
-              const res = await getMaterialById(m.id);
-              const full = (res as any)?.data ?? res;
-              return full ?? m;
-            } catch {
-              return m;
-            }
-          })
-        );
         if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
-        dbVersions = buildStableMaterialVersions(fullMaterials);
+        dbVersions = buildStableMaterialVersions(versionsArray);
 
         // Fetch Task Materials if a task is selected
         if (selectedTaskId) {
@@ -128,21 +125,8 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
               ? taskMaterials
               : (taskMaterials?.data ?? (taskMaterials ?? []));
 
-            const fullTaskMaterials = await Promise.all(
-              rawList.map(async (m: any) => {
-                try {
-                  const res = await getMaterialById(m.id);
-                  const full = (res as any)?.data ?? res;
-                  return full ?? m;
-                } catch {
-                  return m;
-                }
-              })
-            );
-            if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
-
             const isFileName = (name: string) => /\.[a-zA-Z0-9]+$/.test(name);
-            const sortedMaterials = [...fullTaskMaterials].sort(
+            const sortedMaterials = [...rawList].sort(
               (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
             );
             const newestId = sortedMaterials.at(-1)?.id;
@@ -185,10 +169,10 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
             const taskFrame = frames[frames.length - 1];
             if (taskFrame) {
               region = {
-                endX: Number(taskFrame.endX),
-                endY: Number(taskFrame.endY),
-                startX: Number(taskFrame.startX),
-                startY: Number(taskFrame.startY),
+                endX: parseDecimal(taskFrame.endX),
+                endY: parseDecimal(taskFrame.endY),
+                startX: parseDecimal(taskFrame.startX),
+                startY: parseDecimal(taskFrame.startY),
               };
             }
           } catch (frameErr) {
@@ -232,9 +216,9 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
                 assetName = (thumbnailMaterial as any)?.name || (thumbnailMaterial as any)?.originalName || `submission-${versionTag}.png`;
               }
             } else {
-              const currentV = dbVersions.filter(v => v.taskId === t.id).find(v => v.isCurrent) 
-                || dbVersions.find(v => v.taskId === t.id) 
-                || dbVersions.find(v => v.isCurrent && !v.taskId) 
+              const currentV = dbVersions.filter(v => v.taskId === t.id).find(v => v.isCurrent)
+                || dbVersions.find(v => v.taskId === t.id)
+                || dbVersions.find(v => v.isCurrent && !v.taskId)
                 || dbVersions[dbVersions.length - 1];
               if (currentV) {
                 previewUrl = currentV.previewUrl;
@@ -298,63 +282,74 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
       let dbTaskComments: SubmissionFrameComment[] = [];
 
       try {
-        const fileCommentsRes = await getFileComments(fileId);
-        if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
-
-        dbComments = (fileCommentsRes || []).map((c: any) => ({
-          author: c.createdByUser?.displayName || c.createdByUser?.email || `User #${c.createdByUser?.id || c.createdBy || c.userId}`,
-          content: getCommentText(c.content),
-          id: String(c.id),
-          time: c.createdAt ? formatFileDate(c.createdAt) : '',
-        }));
-      } catch (err) {
-        console.error('Failed to load file comments:', err);
-      }
-
-      try {
         if (selectedTaskId) {
           const taskCommentsRes = await getTaskComments(selectedTaskId);
           if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
 
-          dbComments = dbComments.concat(
-            (taskCommentsRes || []).map((c: any) => ({
-              author: c.createdByUser?.displayName || c.createdByUser?.email || `User #${c.createdByUser?.id || c.createdBy || c.userId}`,
-              content: getCommentText(c.content),
-              id: String(c.id),
-              time: c.createdAt ? formatFileDate(c.createdAt) : '',
-              context: `task:${selectedTaskId}`,
-            }))
-          );
+          dbComments = (taskCommentsRes || []).map((c: any) => ({
+            author: c.createdByUser?.displayName || c.createdByUser?.email || `User #${c.createdByUser?.id || c.createdBy || c.userId}`,
+            content: getCommentText(c.content),
+            id: String(c.id),
+            time: c.createdAt ? formatFileDate(c.createdAt) : '',
+            context: `task:${selectedTaskId}`,
+          }));
+        } else {
+          const fileCommentsRes = await getFileComments(fileId);
+          if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
+
+          dbComments = (fileCommentsRes || []).map((c: any) => ({
+            author: c.createdByUser?.displayName || c.createdByUser?.email || `User #${c.createdByUser?.id || c.createdBy || c.userId}`,
+            content: getCommentText(c.content),
+            id: String(c.id),
+            time: c.createdAt ? formatFileDate(c.createdAt) : '',
+          }));
         }
       } catch (err) {
-        console.error('Failed to load task comments:', err);
+        console.error('Failed to load comments:', err);
       }
 
       try {
-        let allFrameComments: SubmissionFrameComment[] = [];
+        const limit = pLimit(10);
+        let allFrames: any[] = [];
 
-        const materialIds = [...new Set(dbVersions.map(v => v.id).filter(id => id && id !== ''))];
-
-        const allFramesPromises = materialIds.map(async (matId) => {
+        if (selectedTaskId) {
           try {
-            const frames = await getMaterialFrames(matId);
-            const material = dbVersions.find(v => String(v.id) === String(matId));
-            return frames.map((f: any) => ({ 
-              ...f, 
-              injectedMaterialId: matId,
-              injectedTaskId: material?.taskId,
+            const frames = await getTaskFrames(selectedTaskId);
+            allFrames = frames.map(f => ({
+              ...f,
+              injectedMaterialId: f.materialId,
+              injectedTaskId: selectedTaskId,
             }));
           } catch (e) {
-            return [];
+            console.error('Failed to load task frames:', e);
           }
-        });
-        const nestedFrames = await Promise.all(allFramesPromises);
-        const allFrames = nestedFrames.flat();
+        } else {
+          const materialIds = [...new Set(dbVersions.map(v => String(v.id)).filter(id => id && id !== ''))];
+          const allFramesResults = await Promise.allSettled(
+            materialIds.map(matId => limit(async () => {
+              const frames = await getMaterialFrames(matId);
+              const material = dbVersions.find(v => String(v.id) === String(matId));
+              return frames.map((f: any) => ({
+                ...f,
+                injectedMaterialId: matId,
+                injectedTaskId: material?.taskId,
+              }));
+            }))
+          );
+
+          allFrames = allFramesResults.flatMap((result, idx) => {
+            if (result.status === 'rejected') {
+              console.error(`Failed to load frames for material ${materialIds[idx]}`, result.reason);
+              return [];
+            }
+            return result.value;
+          });
+        }
 
         if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
 
-        const frameCommentsPromises = allFrames.map(async (frame: any) => {
-          try {
+        const allFrameCommentsResults = await Promise.allSettled(
+          allFrames.map(frame => limit(async () => {
             const commentsRes = await getFrameComments(frame.id);
             return commentsRes.map((c: any) => ({
               id: String(c.id),
@@ -362,24 +357,27 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
               content: getCommentText(c.content),
               time: c.createdAt ? formatFileDate(c.createdAt) : '',
               region: {
-                startX: Number(frame.startX),
-                startY: Number(frame.startY),
-                endX: Number(frame.endX),
-                endY: Number(frame.endY),
+                startX: parseDecimal(frame.startX),
+                startY: parseDecimal(frame.startY),
+                endX: parseDecimal(frame.endX),
+                endY: parseDecimal(frame.endY),
               },
               taskId: frame.injectedTaskId ? String(frame.injectedTaskId) : undefined,
               targetVersion: undefined,
               frameId: String(frame.id),
-              materialId: String(frame.injectedMaterialId),
-              materialName: c.material?.name || undefined,
+              materialId: frame.injectedMaterialId ? String(frame.injectedMaterialId) : undefined,
+              materialName: undefined,
             } as SubmissionFrameComment));
-          } catch (e) {
+          }))
+        );
+
+        dbTaskComments = allFrameCommentsResults.flatMap((result, idx) => {
+          if (result.status === 'rejected') {
+            console.error(`Failed to load comments for frame ${allFrames[idx].id}`, result.reason);
             return [];
           }
+          return result.value;
         });
-
-        const nestedComments = await Promise.all(frameCommentsPromises);
-        dbTaskComments = nestedComments.flat();
 
       } catch (err) {
         console.error('Failed to load frame comments:', err);
@@ -401,6 +399,7 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
           createdBy: createdByLabel,
           createdAt: response.createdAt ? formatFileDate(response.createdAt) : '',
           status: (response as any).status || 'DRAFT',
+          folderId: (response as any).folder?.id,
         } as unknown) as FileExplorerItem,
         versions: dbVersions,
         tasks: dbTasks,
@@ -428,14 +427,14 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
     const controller = new AbortController();
     setHasLoaded(false);
     setData(null);
-    void loadData(false, controller.signal).catch(() => { });
+    void loadData(false, false, controller.signal).catch(() => { });
     return () => controller.abort();
   }, [projectId, fileId]);
 
   useEffect(() => {
     if (hasLoaded) {
       const controller = new AbortController();
-      void loadData(true, controller.signal).catch(() => { });
+      void loadData(true, false, controller.signal).catch(() => { });
       return () => controller.abort();
     }
   }, [selectedTaskId]);
@@ -449,11 +448,103 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
     isRefreshing,
     reload: useCallback(() => {
       return new Promise<void>((resolve) => {
+        pendingResolvesRef.current.push(resolve);
         if (reloadTimeoutRef.current) clearTimeout(reloadTimeoutRef.current);
         reloadTimeoutRef.current = setTimeout(() => {
-          loadData(true).finally(resolve);
+          const resolves = [...pendingResolvesRef.current];
+          pendingResolvesRef.current = [];
+          loadData(true, false).finally(() => {
+            resolves.forEach(r => r());
+          });
         }, 100);
       });
     }, [loadData]),
+    quietReload: useCallback(() => {
+      return new Promise<void>((resolve) => {
+        pendingResolvesRef.current.push(resolve);
+        if (reloadTimeoutRef.current) clearTimeout(reloadTimeoutRef.current);
+        reloadTimeoutRef.current = setTimeout(() => {
+          const resolves = [...pendingResolvesRef.current];
+          pendingResolvesRef.current = [];
+          loadData(true, true).finally(() => {
+            resolves.forEach(r => r());
+          });
+        }, 100);
+      });
+    }, [loadData]),
+    refreshFrameComments: useCallback(async (frameId: number) => {
+      try {
+        const commentsRes = await getFrameComments(frameId);
+        setData((currentData) => {
+          if (!currentData) return currentData;
+          const existing = currentData.frameComments.find((c) => c.frameId === String(frameId));
+          if (!existing) {
+            // New frame: we need to fetch its details so we can place its comments correctly
+            getFrameById(frameId).then((frameDetails: any) => {
+              if (!frameDetails) return;
+              setData((latestData) => {
+                if (!latestData) return latestData;
+
+                // Find material to get its taskId
+                const materialObj = latestData.versions.find(v => String(v.id) === String(frameDetails.materialId));
+
+                const newComments = commentsRes.map((c: any) => ({
+                  id: String(c.id),
+                  author: c.createdByUser?.displayName || c.createdByUser?.email || `User #${c.createdByUser?.id || c.userId}`,
+                  content: getCommentText(c.content),
+                  time: c.createdAt ? formatFileDate(c.createdAt) : '',
+                  region: {
+                    startX: parseDecimal(frameDetails.startX),
+                    startY: parseDecimal(frameDetails.startY),
+                    endX: parseDecimal(frameDetails.endX),
+                    endY: parseDecimal(frameDetails.endY),
+                  },
+                  taskId: materialObj?.taskId ? String(materialObj.taskId) : undefined,
+                  targetVersion: undefined,
+                  frameId: String(frameId),
+                  materialId: String(frameDetails.materialId),
+                  materialName: (materialObj as any)?.name || undefined,
+                } as SubmissionFrameComment));
+
+                const otherComments = latestData.frameComments.filter((c) => c.frameId !== String(frameId));
+                return {
+                  ...latestData,
+                  frameComments: [...otherComments, ...newComments],
+                };
+              });
+            }).catch((err) => {
+              console.error('Failed to get frame details', err);
+              // Fallback to full reload if we fail to get frame details
+              if (reloadTimeoutRef.current) clearTimeout(reloadTimeoutRef.current);
+              reloadTimeoutRef.current = setTimeout(() => {
+                loadData(true, true).catch(() => { });
+              }, 100);
+            });
+            return currentData;
+          }
+
+          const newComments = commentsRes.map((c: any) => ({
+            id: String(c.id),
+            author: c.createdByUser?.displayName || c.createdByUser?.email || `User #${c.createdByUser?.id || c.userId}`,
+            content: getCommentText(c.content),
+            time: c.createdAt ? formatFileDate(c.createdAt) : '',
+            region: existing.region,
+            taskId: existing.taskId,
+            targetVersion: undefined,
+            frameId: String(frameId),
+            materialId: existing.materialId,
+            materialName: existing.materialName,
+          } as SubmissionFrameComment));
+
+          const otherComments = currentData.frameComments.filter((c) => c.frameId !== String(frameId));
+          return {
+            ...currentData,
+            frameComments: [...otherComments, ...newComments],
+          };
+        });
+      } catch (err) {
+        console.error('Failed to refresh frame comments', err);
+      }
+    }, [loadData, setData]),
   };
 }

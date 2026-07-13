@@ -46,7 +46,6 @@ export function FileCanvas({ controller }: FileCanvasProps) {
     pendingFrameRegion,
     pendingTaskRegion,
     rotation,
-    selectedSubmissionId,
     selectedTaskId,
     selectedVersion,
     setAnnotationMode,
@@ -60,7 +59,6 @@ export function FileCanvas({ controller }: FileCanvasProps) {
     setReplyingFrameId,
     setResourceTab,
     setRotation,
-    setSelectedSubmissionId,
     setSelectedVersion,
     setZoom,
     tasks,
@@ -73,43 +71,6 @@ export function FileCanvas({ controller }: FileCanvasProps) {
   return (
     <>
       {/* Status & Review Banners */}
-      {focusedTask && selectedSubmissionId ? (
-        <div className="mb-3 flex items-center justify-between gap-3 rounded-[4px] border border-[#303842] bg-[#151c25] px-4 py-2.5">
-          <div>
-            <p className="text-xs font-black text-[#FFD369]">
-              Review Mode: Previewing Submission for &ldquo;{focusedTask.title}&rdquo;
-            </p>
-            <p className="mt-1 text-[10px] font-bold text-[#8b94a1]">
-              Submitted by{' '}
-              {focusedTask.submissions.find((s) => s.id === selectedSubmissionId)?.submittedBy ||
-                'Assignee'}
-            </p>
-          </div>
-          <Badge className="rounded-[3px] border border-[#FFD369]/30 bg-[#2b2413] text-[9px] text-[#FFD369] font-black uppercase tracking-wider">
-            Reviewing Submission
-          </Badge>
-        </div>
-      ) : selectedVersion && isViewingHistoricalVersion ? (
-        <div className="mb-3 flex items-center justify-between gap-3 rounded-[4px] border border-[#6c5516] bg-[#30270d] px-4 py-3">
-          <div>
-            <p className="text-xs font-black text-[#ffd35b]">
-              Viewing v{selectedVersion.version} · Read only *
-            </p>
-            <p className="mt-1 text-[10px] font-bold text-[#d9bd70]">{selectedVersion.note}</p>
-          </div>
-          <Button
-            className="h-8 rounded-[4px] border-[#806719] bg-[#101820] px-3 text-[10px] font-black text-white hover:bg-[#303842]"
-            onClick={() => {
-              setSelectedVersion(null);
-              setSelectedSubmissionId(null);
-            }}
-            variant="outline"
-          >
-            Back to Current
-          </Button>
-        </div>
-      ) : null}
-
       {frameAnnotationMode ? (
         <p className="mb-3 border border-[#6c5516] bg-[#30270d] px-3 py-2 text-[10px] font-bold text-[#ffd35b]">
           Drag a rectangle on the submission to place a review comment.
@@ -202,22 +163,7 @@ export function FileCanvas({ controller }: FileCanvasProps) {
           >
             <MessageSquare className="size-4 text-[#FFD369]" />
           </ToolbarButton>
-          <ToolbarButton
-            active={annotationMode}
-            label="Annotate"
-            onClick={() => {
-              setSelectedVersion(null);
-              setSelectedSubmissionId(null);
-              setFrameAnnotationMode(false);
-              setPendingFrameRegion(null);
-              setPendingTaskRegion(null);
-              setDraftRegion(null);
-              setAnnotationStart(null);
-              setAnnotationMode((current) => !current);
-            }}
-          >
-            <ScanLine className="size-4" />
-          </ToolbarButton>
+
         </div>
       </div>
 
@@ -341,6 +287,8 @@ export function FileCanvas({ controller }: FileCanvasProps) {
             const canvasFrameIds = new Set(canvasFrameComments.map(c => c.frameId || c.id));
             const activeThreads = Array.from(frameThreadsMap.values()).filter(t => canvasFrameIds.has(t.frameId));
 
+            console.log('DEBUG ACTIVE_THREADS:', activeThreads.map(t => ({ id: t.comment.id, region: t.comment.region })));
+
             return activeThreads.map(({ frameId, comment, displayIndex }) => (
               <button
                 aria-label={`Open frame comment ${displayIndex}`}
@@ -362,10 +310,10 @@ export function FileCanvas({ controller }: FileCanvasProps) {
                 }}
                 onPointerDown={(event) => event.stopPropagation()}
                 style={{
-                  height: `${(comment.region.endY - comment.region.startY) * 100}%`,
+                  height: `${Math.max(comment.region.endY - comment.region.startY, 0.04) * 100}%`,
                   left: `${comment.region.startX * 100}%`,
                   top: `${comment.region.startY * 100}%`,
-                  width: `${(comment.region.endX - comment.region.startX) * 100}%`,
+                  width: `${Math.max(comment.region.endX - comment.region.startX, 0.04) * 100}%`,
                 }}
                 type="button"
               >

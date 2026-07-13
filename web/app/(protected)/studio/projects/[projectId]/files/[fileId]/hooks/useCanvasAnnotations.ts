@@ -2,6 +2,7 @@
 
 import { useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { type FileTaskRegion } from '../../file-ui';
+import { toast } from '@/lib/toast';
 import { type NormalizedPoint } from '../file-detail-types';
 
 type UseCanvasAnnotationsProps = {
@@ -13,6 +14,8 @@ type UseCanvasAnnotationsProps = {
   setPanStart: (val: { x: number; y: number }) => void;
   setSelectedTaskId: (val: string | null) => void;
   setTaskDialogOpen: (val: boolean) => void;
+  zoom: number;
+  rotation: number;
 };
 
 export function useCanvasAnnotations({
@@ -24,6 +27,8 @@ export function useCanvasAnnotations({
   setPanStart,
   setSelectedTaskId,
   setTaskDialogOpen,
+  zoom,
+  rotation,
 }: UseCanvasAnnotationsProps) {
   const [annotationMode, setAnnotationMode] = useState(false);
   const [frameAnnotationMode, setFrameAnnotationMode] = useState(false);
@@ -35,9 +40,29 @@ export function useCanvasAnnotations({
   const getCanvasPoint = (event: ReactPointerEvent<HTMLDivElement>): NormalizedPoint => {
     const bounds = event.currentTarget.getBoundingClientRect();
 
+    const clientX = event.clientX;
+    const clientY = event.clientY;
+
+    const centerX = bounds.left + bounds.width / 2;
+    const centerY = bounds.top + bounds.height / 2;
+
+    const cx = clientX - centerX - panOffset.x;
+    const cy = clientY - centerY - panOffset.y;
+
+    const scale = zoom / 100;
+    const ux = cx / scale;
+    const uy = cy / scale;
+
+    const angle = -rotation * (Math.PI / 180);
+    const rx = ux * Math.cos(angle) - uy * Math.sin(angle);
+    const ry = ux * Math.sin(angle) + uy * Math.cos(angle);
+
+    const finalX = rx + bounds.width / 2;
+    const finalY = ry + bounds.height / 2;
+
     return {
-      x: Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width)),
-      y: Math.min(1, Math.max(0, (event.clientY - bounds.top) / bounds.height)),
+      x: Math.min(1, Math.max(0, finalX / bounds.width)),
+      y: Math.min(1, Math.max(0, finalY / bounds.height)),
     };
   };
 
@@ -97,6 +122,7 @@ export function useCanvasAnnotations({
 
     if (region.endX - region.startX < 0.02 || region.endY - region.startY < 0.02) {
       setDraftRegion(null);
+      toast.error('Vui lòng kéo chuột để tạo một vùng chọn đủ lớn.');
       return;
     }
 

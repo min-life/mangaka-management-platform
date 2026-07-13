@@ -24,12 +24,12 @@ import { parseCsvStats, mergeProjectStats, StatRow } from '@/lib/project-stats';
 import { getProjectStats, importProjectStats } from '@/services/project.service';
 
 type UploadStatsDialogProps = {
-  projectId: number;
+  numericId: number;
   folders: any[]; // Project folders
   onUploadSuccess: () => void;
 };
 
-export function UploadStatsDialog({ projectId, folders, onUploadSuccess }: UploadStatsDialogProps) {
+export function UploadStatsDialog({ numericId, folders, onUploadSuccess }: UploadStatsDialogProps) {
   const [open, setOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -55,14 +55,14 @@ export function UploadStatsDialog({ projectId, folders, onUploadSuccess }: Uploa
       const parsedData = await parseCsvStats(file);
       
       // 2. Fetch existing stats
-      const existingStatsResponse = await getProjectStats(projectId);
+      const existingStatsResponse = await getProjectStats(numericId);
       const existingMetrics = existingStatsResponse?.metrics;
 
       // 3. Merge parsed data into existing metrics for the specific chapter
       const newMetrics = mergeProjectStats(existingMetrics, selectedChapterId, parsedData);
 
       // 4. Save merged stats to backend
-      await importProjectStats(projectId, newMetrics);
+      await importProjectStats(numericId, newMetrics);
 
       toast.success('Project statistics uploaded successfully.');
       setOpen(false);

@@ -46,13 +46,13 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const [resourceTab, setResourceTab] = useState<ResourceTab>('versions');
-  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
+
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
-  const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
+  const [commentFilterMode, setCommentFilterMode] = useState<string>('all');
   const [isSavingComment, setIsSavingComment] = useState(false);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [replyingFrameId, setReplyingFrameId] = useState<string | null>(null);
-  const [versionTabMode, setVersionTabMode] = useState<'list' | 'detail'>('list');
+
   const [selectedVersionForDetails, setSelectedVersionForDetails] = useState<FileVersionItem | null>(null);
   const [deletingVersionId, setDeletingVersionId] = useState<string | null>(null);
   const [mobileTasksOpen, setMobileTasksOpen] = useState(false);
@@ -63,7 +63,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
   const { user } = useAuth();
   const { can: canProject } = usePermissions({ resource: 'PROJECT', resourceId: projectId });
 
-  const { data, error, isInitialLoading, isRefreshing, reload, setData, setError } = useFileDetailDataFetcher({
+  const { data, error, isInitialLoading, isRefreshing, reload, quietReload, refreshFrameComments, setData, setError } = useFileDetailDataFetcher({
     projectId,
     fileId,
     selectedTaskId,
@@ -115,6 +115,8 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     setPanStart,
     setSelectedTaskId,
     setTaskDialogOpen,
+    zoom,
+    rotation,
   });
   const {
     annotationMode,
@@ -180,8 +182,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
 
   const {
     handleCreateReview,
-    handleRestoreVersion,
-    handleDeleteVersion,
+
   } = useFileDetailVersionActions({
     projectId,
     file,
@@ -193,10 +194,9 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     setIsLoading,
     setIsSubmittingReview,
     setSelectedVersion,
-    setSelectedSubmissionId,
     setDeletingVersionId,
     setSelectedVersionForDetails,
-    setVersionTabMode,
+
   });
 
   const setFileCustom = useCallback((update: any) => {
@@ -242,6 +242,17 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     });
   }, [setData]);
 
+  const setCommentsCustom = useCallback((update: any) => {
+    setData((currentData) => {
+      if (!currentData) return null;
+      const nextComments = typeof update === 'function' ? update(currentData.comments) : update;
+      return {
+        ...currentData,
+        comments: nextComments,
+      };
+    });
+  }, [setData]);
+
   const {
     handleCreateAnnotatedTask,
     focusFileTask,
@@ -264,7 +275,6 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     setDraftRegion,
     setTaskDialogOpen,
     setSelectedTaskId,
-    setSelectedSubmissionId,
     setFrameAnnotationMode,
     setFocusedTask,
     setFile: setFileCustom,
@@ -287,7 +297,9 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     file,
     user,
     setFrameComments: setFrameCommentsCustom,
+    setComments: setCommentsCustom,
     loadFile,
+    quietReload,
     setError,
     setIsSavingComment,
     setPendingFrameRegion,
@@ -298,7 +310,6 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
   const startTaskFrameSelection = () => {
     setTaskDialogOpen(false);
     setSelectedVersion(null);
-    setSelectedSubmissionId(null);
     setFrameAnnotationMode(false);
     setPendingFrameRegion(null);
     setPendingTaskRegion(null);
@@ -311,8 +322,6 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
   };
 
   const folder = file ? folders.find((candidate) => candidate.id === file.folderId) : undefined;
-  const selectedSubmission =
-    focusedTask?.submissions.find((submission) => submission.id === selectedSubmissionId) ?? null;
   const currentVersion = versions.find((v) => v.isCurrent) ?? versions[0] ?? null;
   const displayedPreviewUrl = focusedTask
     ? (currentVersion?.previewUrl || '')
@@ -328,18 +337,21 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     ? frameComments.filter((comment) => comment.materialId === currentMaterialId)
     : [];
   const canvasFrameComments = currentMaterialFrameComments;
-  const discussionFrameComments = frameComments;
-  const selectedSubmissionIndex = selectedSubmission
-    ? focusedTask?.submissions.findIndex((submission) => submission.id === selectedSubmission.id) ?? -1
-    : -1;
-  const discussionContextKey = selectedSubmission
-    ? `submission:${selectedSubmission.id}`
-    : focusedTask
-      ? `task:${focusedTask.id}`
-      : 'file';
-  const discussionContextLabel = selectedSubmission
-    ? `Review: Submission #${(focusedTask?.submissions.length ?? 0) - selectedSubmissionIndex}`
-    : focusedTask
+  const discussionContextKey = focusedTask
+    ? `task:${focusedTask.id}`
+    : 'file';
+
+  const discussionFrameComments = useMemo(() => {
+    if (discussionContextKey === 'file') {
+      return frameComments.filter((c) => !c.taskId);
+    }
+    if (discussionContextKey.startsWith('task:')) {
+      const taskId = discussionContextKey.replace('task:', '');
+      return frameComments.filter((c) => String(c.taskId) === taskId);
+    }
+    return frameComments;
+  }, [frameComments, discussionContextKey]);
+  const discussionContextLabel = focusedTask
       ? `Task: ${focusedTask.title}`
       : `File: ${file?.title ?? 'Untitled file'}`;
   const assignedToName = tasks.find((t) => t.assignedTo && t.assignedTo !== 'Unassigned')?.assignedTo || 'Unassigned';
@@ -353,11 +365,8 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
       if (matchedTask) {
         focusFileTask(matchedTask);
       }
-    } else if (key.startsWith('submission:')) {
-      const sid = key.split(':')[1];
-      setSelectedSubmissionId(sid);
     }
-  }, [tasks, focusFileTask, setSelectedSubmissionId]);
+  }, [tasks, focusFileTask]);
 
   return {
     annotationMode,
@@ -377,6 +386,8 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     discussionContextKey,
     discussionContextLabel,
     discussionFrameComments,
+    commentFilterMode,
+    setCommentFilterMode,
     displayedPreviewUrl,
     draftRegion,
     error,
@@ -384,6 +395,8 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     fileComments,
     taskComments,
     folder,
+    folders,
+    project,
     focusFileTask,
     focusedTask,
     frameAnnotationMode,
@@ -396,9 +409,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     handleReplyToFrame,
     handleCreateReview,
     handleDeleteDiscussionComment,
-    handleDeleteVersion,
     handleFocusedTaskChange,
-    handleRestoreVersion,
     handleSubmitTaskWork,
     handleMarkReadyForReview: canSubmitTask ? handleMarkReadyForReview : undefined,
     handleUpdateDiscussionComment,
@@ -411,6 +422,8 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     isSubmittingReview,
     isViewingHistoricalVersion,
     loadFile,
+    quietReload,
+    refreshFrameComments,
     members,
     mobileTasksOpen,
     panOffset,
@@ -420,8 +433,6 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     replyingFrameId,
     resourceTab,
     rotation,
-    selectedSubmission,
-    selectedSubmissionId,
     selectedTaskId,
     selectedVersion,
     selectedVersionForDetails,
@@ -440,20 +451,19 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     setReplyingFrameId,
     setResourceTab,
     setRotation,
-    setSelectedSubmissionId,
     setSelectedTaskId,
     setSelectedVersion,
     setSelectedVersionForDetails,
     setTaskDialogOpen,
-    setVersionHistoryOpen,
-    setVersionTabMode,
+
+
     setZoom,
     setDiscussionContext,
     startTaskFrameSelection,
     taskDialogOpen,
     tasks,
-    versionHistoryOpen,
-    versionTabMode,
+
+
     versions,
     zoom,
   };

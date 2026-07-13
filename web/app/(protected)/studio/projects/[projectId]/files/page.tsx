@@ -8,8 +8,6 @@ type ProjectFilesPageProps = {
   }>;
 };
 
-export default async function ProjectFilesPage({ params }: ProjectFilesPageProps) {
-  const { projectId } = await params;
-
-  return <FilesClient projectId={Number(projectId)} />;
+export default async function ProjectFilesPage() {
+  return <FilesClient />;
 }

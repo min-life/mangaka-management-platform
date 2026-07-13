@@ -18,9 +18,7 @@ import { getProjectStats, getProjectFolders, type ProjectFolderResponse } from '
 import { aggregateStats } from '@/lib/project-stats';
 import { UploadStatsDialog } from './UploadStatsDialog';
 
-type StatisticsClientProps = {
-  projectId: number;
-};
+import { useProjectParams } from '@/hooks/useProjectParams';
 
 function getYearOptions() {
   const currentYear = new Date().getFullYear();
@@ -94,7 +92,8 @@ function StatisticsLineChart({
   );
 }
 
-export function StatisticsClient({ projectId }: StatisticsClientProps) {
+export function StatisticsClient() {
+  const { numericId } = useProjectParams();
   const [year, setYear] = useState(new Date().getFullYear());
   const [arcId, setArcId] = useState<string>('all');
   const [chapterId, setChapterId] = useState<string>('all');
@@ -110,8 +109,8 @@ export function StatisticsClient({ projectId }: StatisticsClientProps) {
     setError(null);
     try {
       const [statsRes, foldersRes] = await Promise.all([
-        getProjectStats(projectId),
-        getProjectFolders(projectId)
+        getProjectStats(numericId),
+        getProjectFolders(numericId)
       ]);
       setRawMetrics(statsRes?.metrics || null);
       setFolders(foldersRes.folders || []);
@@ -125,7 +124,7 @@ export function StatisticsClient({ projectId }: StatisticsClientProps) {
 
   useEffect(() => {
     void loadData();
-  }, [projectId]);
+  }, [numericId]);
 
   const arcs = folders.filter((f) => f.type === 'ARC');
   const chapters = folders.filter((f) => f.type === 'CHAPTER' && (arcId === 'all' || String(f.parentId) === arcId));
@@ -152,7 +151,7 @@ export function StatisticsClient({ projectId }: StatisticsClientProps) {
         </div>
 
         <div className="flex items-center gap-3">
-          <UploadStatsDialog projectId={projectId} folders={folders} onUploadSuccess={() => { void loadData(); }} />
+          <UploadStatsDialog numericId={numericId} folders={folders} onUploadSuccess={() => { void loadData(); }} />
         </div>
       </div>
 

@@ -42,6 +42,7 @@ import {
   getEditorBoardProjects,
   type EditorBoardProject,
 } from '../services/editor-board-projects-service';
+import { getProjectSlug } from '@/utils/slug';
 import { Pagination } from '../../../../components/Pagination';
 
 function formatDate(value: string) {
@@ -154,13 +155,13 @@ function ProjectDrawer({
             className="h-11 rounded-[4px] border-[#50555D] bg-[#2f353e] text-[13px] font-medium text-white hover:bg-[#50555D]"
             variant="outline"
           >
-            <Link href={`/studio/projects/${project.id}/tasks`}>Project Logs</Link>
+            <Link href={`/studio/projects/${getProjectSlug(project.id, project.name)}/tasks`}>Project Logs</Link>
           </Button>
           <Button
             asChild
             className="h-11 rounded-[4px] bg-white text-[13px] font-medium text-[#2f3131] hover:bg-[#c6c6c7]"
           >
-            <Link href={`/studio/projects/${project.id}`}>Open Editor</Link>
+            <Link href={`/studio/projects/${getProjectSlug(project.id, project.name)}`}>Open Editor</Link>
           </Button>
         </SheetFooter>
       </SheetContent>
