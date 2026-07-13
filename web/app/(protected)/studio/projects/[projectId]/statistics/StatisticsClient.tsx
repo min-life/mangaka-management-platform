@@ -89,15 +89,27 @@ function chartData(months: ProjectStatMonth[], key: MetricKey) {
   });
 }
 
-function KpiCard({ label, value }: { label: string; value: string }) {
+function KpiCard({
+  icon,
+  label,
+  meta,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  meta: string;
+  value: string;
+}) {
   return (
     <article className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-4">
       <div className="flex items-center gap-2 text-[#8b94a1]">
+        {icon}
         <p className="text-[11px] font-black uppercase tracking-[0.04em] text-[#aeb7c2]">{label}</p>
       </div>
       <div className="mt-2 flex items-baseline gap-2">
         <span className="text-2xl font-black text-white">{value}</span>
       </div>
+      <p className="mt-1 text-[10px] font-semibold text-[#5b626d]">{meta}</p>
     </article>
   );
 }
@@ -105,17 +117,20 @@ function KpiCard({ label, value }: { label: string; value: string }) {
 function StatsLineChart({
   color,
   data,
+  icon,
   title,
+  valueFormatter,
 }: {
   color: string;
   data: { label: string; value: number | null }[];
   icon: React.ReactNode;
   title: string;
+  valueFormatter: (value: number) => string;
 }) {
   return (
     <div className="rounded-[5px] border border-[#39424f] bg-[#0e141c] p-4">
       <div className="flex items-center gap-2 text-[#8b94a1]">
-        <TrendingUp className="size-4" />
+        {icon}
         <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#aeb7c2]">
           {title}
         </p>
@@ -130,7 +145,7 @@ function StatsLineChart({
           <YAxis
             fontSize={11}
             stroke="#5b626d"
-            tickFormatter={(value) => value.toLocaleString()}
+            tickFormatter={(value) => valueFormatter(value)}
             tickLine={false}
             width={56}
           />
