@@ -100,7 +100,13 @@ export function RoleFormDialog({
               <SelectTrigger className="border-[#4A5260] bg-[#393E46] text-[#EEEEEE]">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="border-[#4A5260] bg-[#393E46] text-[#EEEEEE]">
+              <SelectContent
+                align="start"
+                className="w-[var(--radix-select-trigger-width)] min-w-0 border-[#4A5260] bg-[#393E46] text-[#EEEEEE]"
+                position="popper"
+                side="bottom"
+                sideOffset={4}
+              >
                 {SCOPE_OPTIONS.map((scopeOption) => (
                   <SelectItem key={scopeOption} value={scopeOption}>
                     {scopeOption}

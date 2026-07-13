@@ -1,40 +1,42 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpen, FileText, FolderPlus, Search, Send, type LucideIcon } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import api from '@/lib/api';
+import { toast } from '@/lib/toast';
 import {
   type ApplicationResponse,
   type ApplicationStatus,
   updateApplicationStatus,
 } from '@/services/application.service';
-import { getEditorBoardApplications } from '@/services/editor-board.service';
-import { getMyBoardPermissions } from '@/services/permission.service';
+
+import {
+  getEditorBoardApplicationsCacheKey,
+  useEditorBoardStore,
+} from '../../store/editor-board-store';
+import { getEditorBoardApiErrorMessage } from '../../utils/api-error';
 
 import { ApplicationReviewDrawer } from './ApplicationReviewDrawer';
-import {
-  getApplicationTypeLabel,
-  getStatusLabel,
-  getStatusStyle,
-  isBoardReviewableStatus,
-} from './application-ui';
+import { getApplicationTypeLabel, getStatusLabel, getStatusStyle } from './application-ui';
 
 type ApplicationsClientProps = {
   editorBoardId: number;
 };
 
-export type EditorBoardApplicationStatus =
-  | ApplicationStatus
-  | 'SUBMITTED';
+export type EditorBoardApplicationStatus = ApplicationStatus | 'SUBMITTED';
 
 export type EditorBoardApplicationType =
-  | 'CREATE_ARC'
-  | 'CREATE_CHAPTER'
-  | 'MANUSCRIPT_REVIEW'
-  | 'PUBLISH_REQUEST';
+  'CREATE_ARC' | 'CREATE_CHAPTER' | 'MANUSCRIPT_REVIEW' | 'PUBLISH_REQUEST';
 
 export type EditorBoardApplicationResponse = Omit<ApplicationResponse, 'status' | 'type'> & {
   parentFolderId?: number | null;
@@ -43,12 +45,13 @@ export type EditorBoardApplicationResponse = Omit<ApplicationResponse, 'status' 
   type: EditorBoardApplicationType;
 };
 
-const STATUS_FILTERS = [
-  'ALL',
-  'SUBMITTED',
-  'APPROVE',
-  'REJECT',
-] as const;
+const STATUS_FILTERS = ['ALL', 'SUBMITTED', 'APPROVE', 'REJECT'] as const;
+
+const TYPE_FILTERS = ['ALL', 'CREATE_ARC', 'CREATE_CHAPTER'] as const;
+
+const APPLICATION_PAGE_SIZE = 10;
+
+const EMPTY_PERMISSIONS: string[] = [];
 
 const APPLICATION_TYPE_ICONS: Record<EditorBoardApplicationType, LucideIcon> = {
   CREATE_ARC: FolderPlus,
@@ -71,15 +74,30 @@ async function getApplicationDetails(applicationId: number | string) {
 
 // PhucTD #editor-board start
 export function ApplicationsClient({ editorBoardId }: ApplicationsClientProps) {
-  const [applications, setApplications] = useState<EditorBoardApplicationResponse[]>([]);
-  const [permissions, setPermissions] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
-  const [isLoading, setIsLoading] = useState(true);
+  const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const [selectedApplication, setSelectedApplication] =
     useState<EditorBoardApplicationResponse | null>(null);
+  const applicationsCacheKey = getEditorBoardApplicationsCacheKey(editorBoardId, searchQuery);
+  const applicationPage = useEditorBoardStore(
+    (state) => state.applicationPages[applicationsCacheKey],
+  );
+  const loadApplicationsPage = useEditorBoardStore((state) => state.loadApplicationsPage);
+  const loadBoardPermissions = useEditorBoardStore((state) => state.loadBoardPermissions);
+  const permissions = useEditorBoardStore(
+    (state) => state.boardPermissions[String(editorBoardId)] ?? EMPTY_PERMISSIONS,
+  );
+  const applications = useMemo(
+    () => (applicationPage?.applications ?? []) as EditorBoardApplicationResponse[],
+    [applicationPage?.applications],
+  );
+  const error = applicationPage?.error ?? null;
+  const isLoading = applicationPage?.isLoading ?? !applicationPage?.loaded;
+  const isLoadingMore = applicationPage?.isLoadingMore ?? false;
+  const pagination = applicationPage?.pagination ?? null;
 
   // Derived permission flags
   const canApprove =
@@ -89,55 +107,93 @@ export function ApplicationsClient({ editorBoardId }: ApplicationsClientProps) {
     permissions.includes('board:application.approve');
 
   const loadApplications = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const [response, permissionResult] = await Promise.all([
-        getEditorBoardApplications<EditorBoardApplicationResponse>(editorBoardId),
-        getMyBoardPermissions(editorBoardId),
-      ]);
-      setApplications(response.applications);
-      setPermissions(permissionResult);
-    } catch {
-      setError('Unable to load applications.');
-      setApplications([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [editorBoardId]);
+    await loadApplicationsPage(editorBoardId, {
+      limit: APPLICATION_PAGE_SIZE,
+      mode: 'replace',
+      page: 1,
+      search: searchQuery,
+    });
+  }, [editorBoardId, loadApplicationsPage, searchQuery]);
 
   useEffect(() => {
     queueMicrotask(() => {
-      void loadApplications();
+      void loadBoardPermissions(editorBoardId);
     });
+  }, [editorBoardId, loadBoardPermissions]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadApplications();
+    }, 250);
+
+    return () => window.clearTimeout(timeoutId);
   }, [loadApplications]);
+
+  const hasMoreApplications = Boolean(pagination && pagination.page < pagination.totalPages);
+
+  const loadNextApplicationsPage = useCallback(() => {
+    if (isLoading || isLoadingMore || !hasMoreApplications || !pagination) {
+      return;
+    }
+
+    void loadApplicationsPage(editorBoardId, {
+      limit: APPLICATION_PAGE_SIZE,
+      mode: 'append',
+      page: pagination.page + 1,
+      search: searchQuery,
+    });
+  }, [
+    editorBoardId,
+    hasMoreApplications,
+    isLoading,
+    isLoadingMore,
+    loadApplicationsPage,
+    pagination,
+    searchQuery,
+  ]);
+
+  useEffect(() => {
+    const target = loadMoreRef.current;
+
+    if (!target) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          loadNextApplicationsPage();
+        }
+      },
+      { rootMargin: '240px 0px' },
+    );
+
+    observer.observe(target);
+
+    return () => observer.disconnect();
+  }, [loadNextApplicationsPage]);
 
   const filteredApplications = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
 
     return applications.filter((application) => {
       const matchesStatus = statusFilter === 'ALL' || application.status === statusFilter;
+      const matchesType = typeFilter === 'ALL' || application.type === typeFilter;
       const matchesSearch =
         !normalizedQuery ||
         [application.title, application.project?.name, application.status]
           .filter(Boolean)
           .some((value) => value?.toLowerCase().includes(normalizedQuery));
 
-      return matchesStatus && matchesSearch;
+      return matchesStatus && matchesType && matchesSearch;
     });
-  }, [applications, searchQuery, statusFilter]);
-
-  const pendingCount = applications.filter((app) => isBoardReviewableStatus(app.status)).length;
-  const approvedCount = applications.filter((app) => app.status === 'APPROVE').length;
-  const rejectedCount = applications.filter((app) => app.status === 'REJECT').length;
+  }, [applications, searchQuery, statusFilter, typeFilter]);
 
   const handleUpdateStatus = async (
     application: EditorBoardApplicationResponse,
     status: ApplicationStatus,
   ) => {
     setIsSubmitting(true);
-    setError(null);
 
     try {
       await updateApplicationStatus(application.id, status);
@@ -146,9 +202,22 @@ export function ApplicationsClient({ editorBoardId }: ApplicationsClientProps) {
           ? { ...current, status, updatedAt: new Date().toISOString() }
           : current,
       );
-      await loadApplications();
-    } catch {
-      setError('Unable to update application status.');
+      await loadApplicationsPage(editorBoardId, {
+        force: true,
+        limit: APPLICATION_PAGE_SIZE,
+        mode: 'replace',
+        page: 1,
+        search: searchQuery,
+      });
+    } catch (error) {
+      toast.error(getEditorBoardApiErrorMessage(error, 'Unable to update application status.'));
+      await loadApplicationsPage(editorBoardId, {
+        force: true,
+        limit: APPLICATION_PAGE_SIZE,
+        mode: 'replace',
+        page: 1,
+        search: searchQuery,
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -160,7 +229,8 @@ export function ApplicationsClient({ editorBoardId }: ApplicationsClientProps) {
     try {
       const details = await getApplicationDetails(application.id);
       setSelectedApplication((current) => (current?.id === application.id ? details : current));
-    } catch {
+    } catch (error) {
+      toast.error(getEditorBoardApiErrorMessage(error, 'Unable to load application details.'));
       setSelectedApplication((current) => current ?? application);
     }
   };
@@ -182,31 +252,7 @@ export function ApplicationsClient({ editorBoardId }: ApplicationsClientProps) {
         </p>
       ) : null}
 
-      <div className="mt-5 grid grid-cols-3 gap-4">
-        <article className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-4">
-          <p className="text-xs font-black uppercase tracking-[0.08em] text-[#aeb7c2]">
-            Board Queue
-          </p>
-          <p className="mt-3 text-2xl font-black text-white">{pendingCount}</p>
-          <p className="mt-1 text-[11px] font-bold text-[#FFD369]">Need attention</p>
-        </article>
-        <article className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-4">
-          <p className="text-xs font-black uppercase tracking-[0.08em] text-[#aeb7c2]">
-            Approved
-          </p>
-          <p className="mt-3 text-2xl font-black text-white">{approvedCount}</p>
-          <p className="mt-1 text-[11px] font-bold text-[#9df2c7]">Cleared for production</p>
-        </article>
-        <article className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-4">
-          <p className="text-xs font-black uppercase tracking-[0.08em] text-[#aeb7c2]">
-            Rejected
-          </p>
-          <p className="mt-3 text-2xl font-black text-white">{rejectedCount}</p>
-          <p className="mt-1 text-[11px] font-bold text-[#ff9ab3]">Needs revision</p>
-        </article>
-      </div>
-
-      <div className="mt-5 flex items-center justify-between gap-4">
+      <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(220px,260px)_minmax(220px,260px)]">
         <div className="flex h-10 min-w-0 flex-1 items-center gap-3 rounded-[4px] border border-[#39424f] bg-[#151c25] px-4 text-[#8b94a1]">
           <Search className="size-4 text-[#dce7f3]" />
           <input
@@ -216,24 +262,42 @@ export function ApplicationsClient({ editorBoardId }: ApplicationsClientProps) {
             value={searchQuery}
           />
         </div>
-      </div>
-
-      <div className="mt-4 flex h-10 items-center gap-2 border-b border-[#26303b]">
-        {STATUS_FILTERS.map((status) => (
-          <button
-            className={`relative h-full px-2 text-xs font-black ${
-              statusFilter === status ? 'text-[#FFD369]' : 'text-[#aeb7c2] hover:text-white'
-            }`}
-            key={status}
-            onClick={() => setStatusFilter(status)}
-            type="button"
+        <Select onValueChange={setStatusFilter} value={statusFilter}>
+          <SelectTrigger className="h-10 w-full border-[#39424f] bg-[#151c25] text-xs font-bold text-white focus:ring-[#FFD369]/30">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent
+            align="start"
+            className="w-[var(--radix-select-trigger-width)] min-w-0 border-[#39424f] bg-[#151c25] text-white"
+            position="popper"
+            side="bottom"
+            sideOffset={4}
           >
-            {status === 'ALL' ? 'All' : getStatusLabel(status)}
-            {statusFilter === status ? (
-              <span className="absolute inset-x-0 bottom-[-1px] h-[2px] bg-[#FFD369]" />
-            ) : null}
-          </button>
-        ))}
+            {STATUS_FILTERS.map((status) => (
+              <SelectItem key={status} value={status}>
+                {status === 'ALL' ? 'All statuses' : getStatusLabel(status)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select onValueChange={setTypeFilter} value={typeFilter}>
+          <SelectTrigger className="h-10 w-full border-[#39424f] bg-[#151c25] text-xs font-bold text-white focus:ring-[#FFD369]/30">
+            <SelectValue placeholder="Type" />
+          </SelectTrigger>
+          <SelectContent
+            align="start"
+            className="w-[var(--radix-select-trigger-width)] min-w-0 border-[#39424f] bg-[#151c25] text-white"
+            position="popper"
+            side="bottom"
+            sideOffset={4}
+          >
+            {TYPE_FILTERS.map((type) => (
+              <SelectItem key={type} value={type}>
+                {type === 'ALL' ? 'All types' : getApplicationTypeLabel(type)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <section className="mt-4 space-y-3">
@@ -299,6 +363,12 @@ export function ApplicationsClient({ editorBoardId }: ApplicationsClientProps) {
             No applications found.
           </article>
         )}
+        <div ref={loadMoreRef} />
+        {isLoadingMore ? (
+          <article className="rounded-[5px] border border-[#39424f] bg-[#101820] px-5 py-4 text-center text-xs font-bold text-[#aeb7c2]">
+            Loading more applications...
+          </article>
+        ) : null}
       </section>
 
       <ApplicationReviewDrawer
@@ -310,9 +380,7 @@ export function ApplicationsClient({ editorBoardId }: ApplicationsClientProps) {
             setSelectedApplication(null);
           }
         }}
-        onUpdateStatus={(application, status) =>
-          void handleUpdateStatus(application, status)
-        }
+        onUpdateStatus={(application, status) => void handleUpdateStatus(application, status)}
       />
     </section>
   );
