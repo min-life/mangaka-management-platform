@@ -39,8 +39,14 @@ export class FrameResDto {
   @Transform(({ value }) => (value ? Number(value) : value))
   endY!: number;
 
-  @ApiProperty({ example: 10 })
-  taskId!: number;
+  @ApiPropertyOptional({ example: 10, nullable: true })
+  taskId?: number | null;
+
+  @ApiPropertyOptional({ example: 5, nullable: true })
+  materialId?: number | null;
+
+  @ApiPropertyOptional({ example: 1, nullable: true })
+  fileId?: number | null;
 
   @ApiPropertyOptional({ type: () => UserResDto, nullable: true })
   createdByUser?: UserResDto | null;

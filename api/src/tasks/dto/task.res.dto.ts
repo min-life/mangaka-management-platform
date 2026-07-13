@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PROGRESS_STATUS } from '@prisma/client';
 import { UserResDto } from '../../share/dto';
+import { MaterialResDto } from '../../files/dto';
 
 export class PaginationResDto {
   @ApiProperty({ example: 25 })
@@ -77,6 +78,9 @@ export class TaskResDto {
 
   @ApiProperty({ example: '2026-06-18T03:00:00.000Z' })
   updatedAt!: Date;
+
+  @ApiPropertyOptional({ type: () => MaterialResDto, nullable: true })
+  latestMaterial?: MaterialResDto | null;
 }
 
 export class TaskSummaryResDto {

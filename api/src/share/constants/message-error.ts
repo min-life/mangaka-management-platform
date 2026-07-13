@@ -81,6 +81,7 @@ export const ERROR = {
   SVUPDATEFILE: 'Server is not available to update file.',
   SVDELETEFILE: 'Server is not available to delete file.',
   SVGETFILEMATERIALS: 'Server is not available to get file materials.',
+  SVGETFILEFRAMES: 'Server is not available to get file frames.',
   SVCREATEMATERIAL: 'Server is not available to create material.',
   SVGETFILETASKS: 'Server is not available to get file tasks.',
   SVCREATETASK: 'Server is not available to create task.',

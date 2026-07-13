@@ -81,12 +81,24 @@ export class TasksService {
     try {
       const task = await this.prisma.task.findUnique({
         where: { id },
-        select: TASK_SELECT,
+        select: {
+          ...TASK_SELECT,
+          fileMaterials: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: MATERIAL_LIST_SELECT,
+          },
+        },
       });
       if (!task) {
         throw new NotFoundException(ERROR.NFTASK);
       }
-      return task;
+      
+      const { fileMaterials, ...rest } = task;
+      return {
+        ...rest,
+        latestMaterial: fileMaterials?.[0] || null,
+      };
     } catch (error) {
       this.handleError(error, 'Get task fail', ERROR.SVGETTASK);
     }

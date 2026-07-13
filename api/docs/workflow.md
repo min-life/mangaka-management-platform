@@ -2058,7 +2058,8 @@ Upload ảnh bìa cho folder. Ảnh sẽ được đẩy lên AWS S3 và hệ th
   **Response Schema:**
   | Field | Type | Description |
   |-------|------|-------------|
-  | `data` | `string` |  |
+  | `data` | `object` | Đối tượng File, chứa thông tin cơ bản của file |
+  | `data.latestMaterial` | `object` | Phiên bản Material mới nhất của file (không dính tới task nào) |
 
 
 ---
@@ -2419,7 +2420,8 @@ Upload ảnh bìa cho folder. Ảnh sẽ được đẩy lên AWS S3 và hệ th
   **Response Schema:**
   | Field | Type | Description |
   |-------|------|-------------|
-  | `data` | `string` |  |
+  | `data` | `object` | Đối tượng Task, chứa thông tin cơ bản của task |
+  | `data.latestMaterial` | `object` | Phiên bản Material mới nhất tương ứng với task này |
 
 #### Ràng buộc
 - Yêu cầu xác thực JWT. Người dùng phải có quyền `project:owner`.
