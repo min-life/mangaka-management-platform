@@ -87,6 +87,10 @@ export type UpdatePasswordPayload = {
   newPassword: string;
 };
 
+export type CreatePasswordPayload = {
+  newPassword: string;
+};
+
 type ApiResponse<T> = {
   data: T;
 };
@@ -276,6 +280,24 @@ export async function updateCurrentUserProfile(payload: UpdateProfilePayload) {
 
 export async function updateCurrentUserPassword(payload: UpdatePasswordPayload) {
   const response = await api.patch<
+    ApiResponse<{ success: boolean }>,
+    ApiResponse<{ success: boolean }>
+  >('/users/me/password', payload);
+
+  return unwrapData<{ success: boolean }>(response);
+}
+
+export async function hasCurrentUserPassword() {
+  const response = await api.get<
+    ApiResponse<{ hasPassword: boolean }>,
+    ApiResponse<{ hasPassword: boolean }>
+  >('/users/me/has-password');
+
+  return unwrapData<{ hasPassword: boolean }>(response).hasPassword ?? false;
+}
+
+export async function createCurrentUserPassword(payload: CreatePasswordPayload) {
+  const response = await api.post<
     ApiResponse<{ success: boolean }>,
     ApiResponse<{ success: boolean }>
   >('/users/me/password', payload);

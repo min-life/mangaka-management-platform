@@ -35,14 +35,17 @@ import { useRealtimeNotifications } from '@/hooks/use-realtime-notifications';
 import { clearAccessToken, getAccessToken } from '@/lib/auth-storage';
 import { cn } from '@/lib/utils';
 import {
+  createCurrentUserPassword,
   getCurrentUserContextActivities,
   getCurrentUserProfile,
   getApiErrorMessage,
   getGoogleLinkAccountUrl,
+  hasCurrentUserPassword,
   mapActivityLogToUserActivity,
   updateCurrentUserPassword,
   updateCurrentUserProfile,
   uploadAvatarImage,
+  type CreatePasswordPayload,
   type UpdatePasswordPayload,
   type UserActivity,
   type UserProfile,
@@ -350,6 +353,97 @@ function ChangePasswordDialog({
   );
 }
 
+function SetPasswordDialog({
+  open,
+  isSubmitting,
+  onOpenChange,
+  onSubmit,
+}: {
+  open: boolean;
+  isSubmitting: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (values: CreatePasswordPayload) => Promise<void>;
+}) {
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!newPassword || !confirmPassword) {
+      toast.error('All password fields are required.');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast.error('New password must be at least 6 characters.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error('New password and confirmation must match.');
+      return;
+    }
+
+    await onSubmit({ newPassword });
+    setNewPassword('');
+    setConfirmPassword('');
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="w-[480px] max-w-[calc(100vw-32px)] overflow-hidden rounded-2xl border border-white/[0.12] bg-[#151b24] p-0 text-[#eef3fb] shadow-[0_24px_80px_rgba(0,0,0,0.55)]">
+        <form onSubmit={handleSubmit}>
+          <DialogHeader className="border-b border-white/[0.08] bg-[#18202c] px-6 py-5">
+            <DialogTitle className="text-[22px] text-white">Set Password</DialogTitle>
+            <DialogDescription className="text-[#b8c3d2]">
+              Your account doesn&apos;t have a password yet. Set one so you can also sign in with email.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 p-6">
+            <Input
+              autoFocus
+              className="h-10 border-white/[0.14] bg-[#0f1620] text-[#eef3fb]"
+              disabled={isSubmitting}
+              placeholder="New password"
+              type="password"
+              value={newPassword}
+              onChange={(event) => setNewPassword(event.target.value)}
+            />
+            <Input
+              className="h-10 border-white/[0.14] bg-[#0f1620] text-[#eef3fb]"
+              disabled={isSubmitting}
+              placeholder="Confirm new password"
+              type="password"
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+            />
+          </div>
+          <DialogFooter className="mx-0 mb-0 rounded-none border-t border-white/[0.08] bg-[#101722] px-6 py-4">
+            <Button
+              className="border-black bg-black px-5 text-white hover:border-black hover:bg-black/85 hover:text-white"
+              disabled={isSubmitting}
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="border-black bg-black px-5 text-white hover:border-black hover:bg-black/85 hover:text-white"
+              disabled={isSubmitting}
+              type="submit"
+              variant="outline"
+            >
+              {isSubmitting ? 'Saving...' : 'Set Password'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function UserProfilePage() {
   const router = useRouter();
   const { user: authUser, updateUser: updateAuthUser } = useAuth();
@@ -362,7 +456,8 @@ export function UserProfilePage() {
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [isActivitiesLoading, setIsActivitiesLoading] = useState(true);
   const [error, setError] = useState('');
-  const [isPasswordOpen, setIsPasswordOpen] = useState(false);
+  const [passwordDialogMode, setPasswordDialogMode] = useState<'change' | 'set' | null>(null);
+  const [isCheckingPasswordStatus, setIsCheckingPasswordStatus] = useState(false);
   const [isProfileSubmitting, setIsProfileSubmitting] = useState(false);
   const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
   const [isEditingDisplayName, setIsEditingDisplayName] = useState(false);
@@ -565,12 +660,43 @@ export function UserProfilePage() {
 
     try {
       await updateCurrentUserPassword(values);
-      setIsPasswordOpen(false);
+      setPasswordDialogMode(null);
       toast.success('Password updated successfully');
     } catch (passwordError) {
       toast.error(getApiErrorMessage(passwordError, 'Unable to update password.'));
     } finally {
       setIsPasswordSubmitting(false);
+    }
+  }
+
+  async function handleCreatePassword(values: CreatePasswordPayload) {
+    setIsPasswordSubmitting(true);
+
+    try {
+      await createCurrentUserPassword(values);
+      setPasswordDialogMode(null);
+      toast.success('Password set successfully');
+    } catch (passwordError) {
+      toast.error(getApiErrorMessage(passwordError, 'Unable to set password.'));
+    } finally {
+      setIsPasswordSubmitting(false);
+    }
+  }
+
+  async function handleOpenPasswordDialog() {
+    if (isCheckingPasswordStatus) {
+      return;
+    }
+
+    setIsCheckingPasswordStatus(true);
+
+    try {
+      const hasPwd = await hasCurrentUserPassword();
+      setPasswordDialogMode(hasPwd ? 'change' : 'set');
+    } catch (checkError) {
+      toast.error(getApiErrorMessage(checkError, 'Unable to check password status.'));
+    } finally {
+      setIsCheckingPasswordStatus(false);
     }
   }
 
@@ -581,9 +707,15 @@ export function UserProfilePage() {
     >
       <ChangePasswordDialog
         isSubmitting={isPasswordSubmitting}
-        open={isPasswordOpen}
-        onOpenChange={setIsPasswordOpen}
+        open={passwordDialogMode === 'change'}
+        onOpenChange={(open) => setPasswordDialogMode(open ? 'change' : null)}
         onSubmit={handleUpdatePassword}
+      />
+      <SetPasswordDialog
+        isSubmitting={isPasswordSubmitting}
+        open={passwordDialogMode === 'set'}
+        onOpenChange={(open) => setPasswordDialogMode(open ? 'set' : null)}
+        onSubmit={handleCreatePassword}
       />
 
       <WorkspaceHeader title="Profile" />
@@ -749,7 +881,7 @@ export function UserProfilePage() {
                 <SettingsButton
                   icon={ShieldCheck}
                   label={text.securityPassword}
-                  onClick={() => setIsPasswordOpen(true)}
+                  onClick={() => void handleOpenPasswordDialog()}
                 />
               </div>
             </Card>
