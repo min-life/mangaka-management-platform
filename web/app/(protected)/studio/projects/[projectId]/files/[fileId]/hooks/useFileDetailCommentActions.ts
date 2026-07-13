@@ -15,7 +15,9 @@ type CommentActionsProps = {
   file: FileExplorerItem | null;
   user: any | null;
   setFrameComments: (update: any) => void;
+  setComments: (update: any) => void;
   loadFile: () => Promise<void>;
+  quietReload: () => Promise<void>;
   setError: (err: string | null) => void;
   setIsSavingComment: (val: boolean) => void;
   setPendingFrameRegion: (val: any) => void;
@@ -31,7 +33,9 @@ export function useFileDetailCommentActions({
   file,
   user,
   setFrameComments,
+  setComments,
   loadFile,
+  quietReload,
   setError,
   setIsSavingComment,
   setPendingFrameRegion,
@@ -61,13 +65,14 @@ export function useFileDetailCommentActions({
             id: `temp-${Date.now()}`,
             frameId: String(frame.id),
             materialId: String(material.id),
+            taskId: selectedTaskId || undefined,
             author: user?.displayName || user?.email || 'You',
             time: 'Just now',
           }
         ]);
 
         toast.success('Frame comment added.');
-        await loadFile();
+        void quietReload();
       }
     } catch (err) {
       console.error('Failed to create frame comment:', err);
@@ -87,7 +92,7 @@ export function useFileDetailCommentActions({
         text: commentContent,
       });
       toast.success('Reply posted.');
-      await loadFile();
+      void quietReload();
     } catch (err) {
       console.error('Failed to reply to frame:', err);
       toast.error('Failed to post reply.');
@@ -102,13 +107,26 @@ export function useFileDetailCommentActions({
     setIsSavingComment(true);
     setError(null);
     try {
+      let createdComment;
       if (selectedTaskId) {
-        await createTaskComment(selectedTaskId, commentContent);
+        createdComment = await createTaskComment(selectedTaskId, commentContent);
       } else {
-        await createFileComment(file.id, commentContent);
+        createdComment = await createFileComment(file.id, commentContent);
       }
+
+      setComments((prev: any[]) => [
+        ...prev,
+        {
+          id: String(createdComment?.id || `temp-${Date.now()}`),
+          author: user?.displayName || user?.email || 'You',
+          content: commentContent,
+          time: 'Just now',
+          context: selectedTaskId ? `task:${selectedTaskId}` : null,
+        }
+      ]);
+
       toast.success('Comment posted.');
-      await loadFile();
+      void quietReload();
     } catch (err) {
       console.error('Failed to create comment:', err);
       toast.error('Failed to post comment.');
@@ -124,7 +142,7 @@ export function useFileDetailCommentActions({
     try {
       await updateComment(commentId, commentContent);
       toast.success('Comment updated.');
-      await loadFile();
+      void quietReload();
     } catch (err) {
       console.error('Failed to update comment:', err);
       toast.error('Failed to update comment.');
@@ -140,7 +158,7 @@ export function useFileDetailCommentActions({
     try {
       await deleteComment(commentId);
       toast.success('Comment deleted.');
-      await loadFile();
+      void quietReload();
     } catch (err) {
       console.error('Failed to delete comment:', err);
       toast.error('Failed to delete comment.');

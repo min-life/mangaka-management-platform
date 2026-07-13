@@ -4,6 +4,7 @@ import { Eye, MoreVertical, Trash2, UserCog } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -90,27 +91,11 @@ export function DirectoryMembersTable({
                 className="h-[72px] border-l-4 border-l-transparent border-r-0 border-t-0 border-b-[#303842] bg-[#101820]"
                 key={index}
               >
-                <TableCell className="px-5">
-                  <div className="flex items-center gap-4">
-                    <div className="size-10 animate-pulse rounded-[4px] bg-[#1f2937]" />
-                    <div className="space-y-2">
-                      <div className="h-4 w-40 animate-pulse rounded-[4px] bg-[#1f2937]" />
-                      <div className="h-3 w-52 animate-pulse rounded-[4px] bg-[#1f2937]" />
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="h-6 w-28 animate-pulse rounded-[3px] bg-[#1f2937]" />
-                </TableCell>
-                <TableCell>
-                  <div className="h-4 w-24 animate-pulse rounded-[4px] bg-[#1f2937]" />
-                </TableCell>
-                <TableCell>
-                  <div className="h-4 w-24 animate-pulse rounded-[4px] bg-[#1f2937]" />
-                </TableCell>
-                <TableCell className="pr-5">
-                  <div className="ml-auto size-7 animate-pulse rounded-[4px] bg-[#1f2937]" />
-                </TableCell>
+                {Array.from({ length: 5 }).map((__, cellIndex) => (
+                  <TableCell className="px-4 py-4" key={cellIndex}>
+                    <Skeleton className="h-8 rounded-[4px] bg-[#2f353e]" />
+                  </TableCell>
+                ))}
               </TableRow>
             ))
           ) : filteredMembers.length ? (

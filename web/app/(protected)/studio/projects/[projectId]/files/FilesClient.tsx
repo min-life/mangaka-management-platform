@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from '@/lib/toast';
 import {
@@ -63,9 +63,12 @@ function mapApiFileToExplorerItem(file: ProjectFileResponse, folderId: number): 
   };
 }
 
-export function FilesClient({ projectId }: FilesClientProps) {
+import { useProjectParams } from '@/hooks/useProjectParams';
+
+export function FilesClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { slug, numericId: projectId } = useProjectParams();
 
   const [selectedArcId, setSelectedArcId] = useState<number | null>(() => {
     const val = searchParams.get('arcId');
@@ -78,6 +81,11 @@ export function FilesClient({ projectId }: FilesClientProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<FileViewMode>('table');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+  const [isLoadingChapters, setIsLoadingChapters] = useState(false);
+
+  const loadedFolderIdsRef = React.useRef<Set<number>>(new Set());
+  const loadedFileFolderIdsRef = React.useRef<Set<number>>(new Set());
 
   const { data, setData, error, isInitialLoading, isRefreshing, reload } = useAsyncResource(async () => {
     let projName = '';
@@ -91,36 +99,14 @@ export function FilesClient({ projectId }: FilesClientProps) {
       ...normalizeFolder(folder, projectId),
       parentId: null,
     }));
-    const childFolderGroups = await Promise.all(
-      rootFolders.map(async (folder) => {
-        try {
-          const childResult = await getFolderChildren(folder.id);
-          return childResult.folders.map((child) => ({
-            ...normalizeFolder(child, projectId),
-            parentId: folder.id,
-          }));
-        } catch {
-          return [];
-        }
-      }),
-    );
-    const apiFolders = [...rootFolders, ...childFolderGroups.flat()];
-    const apiFilesByFolder = await Promise.all(
-      apiFolders.map(async (folder) => {
-        try {
-          const folderFiles = await getFolderFiles(folder.id);
-          return folderFiles.files.map((file) => mapApiFileToExplorerItem(file, folder.id));
-        } catch {
-          return [];
-        }
-      }),
-    );
-    const apiFiles = apiFilesByFolder.flat();
+
+    loadedFolderIdsRef.current.clear();
+    loadedFileFolderIdsRef.current.clear();
 
     return {
       projectName: projName,
-      folders: apiFolders,
-      files: apiFiles,
+      folders: rootFolders as ProjectFolderResponse[],
+      files: [] as FileExplorerItem[],
       folderCovers: readStoredFolderCovers(projectId)
     };
   }, [projectId]);
@@ -130,12 +116,76 @@ export function FilesClient({ projectId }: FilesClientProps) {
   const projectName = data?.projectName ?? '';
   const folderCovers = data?.folderCovers ?? {};
 
+  // Lazy load children folders when an arc is selected
+  useEffect(() => {
+    if (!selectedArcId || !data) return;
+    if (loadedFolderIdsRef.current.has(selectedArcId)) return;
+
+    let isMounted = true;
+    setIsLoadingChapters(true);
+    getFolderChildren(selectedArcId).then(childResult => {
+       if (!isMounted) return;
+       const children = childResult.folders.map((child) => ({
+         ...normalizeFolder(child, projectId),
+         parentId: selectedArcId,
+       }));
+       
+       setData(prev => {
+         if (!prev) return prev;
+         // Avoid duplicates if multiple requests fire
+         const existingIds = new Set(prev.folders.map(f => f.id));
+         const newFolders = children.filter(c => !existingIds.has(c.id));
+         return {
+           ...prev,
+           folders: [...prev.folders, ...newFolders]
+         };
+       });
+       loadedFolderIdsRef.current.add(selectedArcId);
+    }).catch(console.error).finally(() => {
+       if (isMounted) setIsLoadingChapters(false);
+    });
+
+    return () => { isMounted = false; };
+  }, [selectedArcId, data, projectId, setData]);
+
+  // Lazy load files when a chapter or arc is selected
+  useEffect(() => {
+    const targetFolderId = selectedChapterId || selectedArcId;
+    if (!targetFolderId || !data) return;
+    if (loadedFileFolderIdsRef.current.has(targetFolderId)) return;
+
+    let isMounted = true;
+    setIsLoadingFiles(true);
+    getFolderFiles(targetFolderId).then(folderFiles => {
+       if (!isMounted) return;
+       const newFiles = folderFiles.files.map((file) => mapApiFileToExplorerItem(file, targetFolderId));
+       
+       setData(prev => {
+         if (!prev) return prev;
+         const existingIds = new Set(prev.files.map(f => f.id));
+         const filteredNewFiles = newFiles.filter(f => !existingIds.has(f.id));
+         return {
+           ...prev,
+           files: [...prev.files, ...filteredNewFiles]
+         };
+       });
+       loadedFileFolderIdsRef.current.add(targetFolderId);
+    }).catch(console.error).finally(() => {
+       if (isMounted) setIsLoadingFiles(false);
+    });
+
+    return () => { isMounted = false; };
+  }, [selectedChapterId, selectedArcId, data, setData]);
+
   useEffect(() => {
     if (selectedArcId && !selectedChapterId && folders.length > 0) {
-      const hasChapters = folders.some((folder) => folder.parentId === selectedArcId);
-      if (!hasChapters) {
-        setSelectedChapterId(selectedArcId);
-        updateUrlParams(selectedArcId, selectedArcId);
+      // We only auto-select chapter if we've already loaded the children for this arc
+      if (loadedFolderIdsRef.current.has(selectedArcId)) {
+        const hasChapters = folders.some((folder) => folder.parentId === selectedArcId);
+        if (!hasChapters) {
+          setSelectedChapterId(selectedArcId);
+          updateUrlParams(selectedArcId, selectedArcId);
+        }
       }
     }
   }, [selectedArcId, selectedChapterId, folders]);
@@ -179,8 +229,16 @@ export function FilesClient({ projectId }: FilesClientProps) {
       return [];
     }
 
-    return folders.filter((folder) => folder.parentId === selectedArc.id);
-  }, [folders, selectedArc]);
+    const allChapters = folders.filter((folder) => folder.parentId === selectedArc.id);
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    
+    if (!normalizedQuery) return allChapters;
+    
+    return allChapters.filter(ch => 
+      ch.title.toLowerCase().includes(normalizedQuery) ||
+      (ch.description || '').toLowerCase().includes(normalizedQuery)
+    );
+  }, [folders, selectedArc, searchQuery]);
   const chapterFileCounts = useMemo(
     () =>
       folders.reduce<Record<number, number>>((counts, folder) => {
@@ -245,7 +303,7 @@ export function FilesClient({ projectId }: FilesClientProps) {
       }
 
       toast.success(hasFiles ? 'File created with initial material.' : 'File created.');
-      await reload();
+      void reload();
     } catch {
       toast.error('Failed to create file. Please try again.');
     } finally {
@@ -271,18 +329,12 @@ export function FilesClient({ projectId }: FilesClientProps) {
   };
 
   const handleSelectArc = (arcId: number) => {
-    const hasChapters = folders.some((folder) => folder.parentId === arcId);
-    if (!hasChapters) {
-      setSelectedArcId(arcId);
-      setSelectedChapterId(arcId);
-      setSearchQuery('');
-      updateUrlParams(arcId, arcId);
-    } else {
-      setSelectedArcId(arcId);
-      setSelectedChapterId(null);
-      setSearchQuery('');
-      updateUrlParams(arcId, null);
-    }
+    // We set the selected arc and let the useEffect auto-forward to chapter 
+    // if it turns out there are no child folders after fetching.
+    setSelectedArcId(arcId);
+    setSelectedChapterId(null);
+    setSearchQuery('');
+    updateUrlParams(arcId, null);
   };
 
   const handleSelectChapter = (chapterId: number) => {
@@ -314,7 +366,7 @@ export function FilesClient({ projectId }: FilesClientProps) {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-[24px] font-black leading-8 text-white">Files</h1>
+            <h1 className="text-[24px] font-black leading-8 text-white">Resources</h1>
             <RefreshingIndicator isRefreshing={isRefreshing} />
           </div>
           <p className="mt-1 text-sm font-medium text-[#aeb7c2]">
@@ -332,18 +384,34 @@ export function FilesClient({ projectId }: FilesClientProps) {
       </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-2 text-xs font-bold text-[#8b94a1]">
-        <span>{projectName || `Project #${projectId}`}</span>
+        {isInitialLoading && !projectName ? (
+          <div className="h-4 w-24 animate-pulse rounded bg-[#26303b]" />
+        ) : (
+          <span>{projectName || `Project #${projectId}`}</span>
+        )}
         <ChevronRight className="size-3.5" />
-        <span className="text-white">Files</span>
+        {selectedArc || selectedChapter ? (
+          <button onClick={handleBackToArcs} className="text-[#aeb7c2] hover:text-white transition-colors">
+            Resources
+          </button>
+        ) : (
+          <span className="text-white">Resources</span>
+        )}
+        
         {selectedArc ? (
           <>
             <ChevronRight className="size-3.5" />
-            <span className={selectedChapter ? 'text-white' : 'text-[#FFD369]'}>
-              {selectedArc.title}
-            </span>
+            {selectedChapter && selectedChapter.id !== selectedArc.id ? (
+              <button onClick={handleBackToChapters} className="text-[#aeb7c2] hover:text-white transition-colors">
+                {selectedArc.title}
+              </button>
+            ) : (
+              <span className="text-[#FFD369]">{selectedArc.title}</span>
+            )}
           </>
         ) : null}
-        {selectedChapter ? (
+        
+        {selectedChapter && selectedChapter.id !== selectedArc?.id ? (
           <>
             <ChevronRight className="size-3.5" />
             <span className="text-[#FFD369]">{selectedChapter.title}</span>
@@ -388,15 +456,16 @@ export function FilesClient({ projectId }: FilesClientProps) {
                       files={visibleFiles}
                       onSearchChange={setSearchQuery}
                       onSelectFile={(file) => {
-                        const currentUrl = `/studio/projects/${projectId}/files${window.location.search}`;
+                        const currentUrl = `/studio/projects/${slug}/files${window.location.search}`;
                         router.push(
-                          `/studio/projects/${projectId}/files/${file.id}?back=${encodeURIComponent(currentUrl)}`
+                          `/studio/projects/${slug}/files/${file.id}?back=${encodeURIComponent(currentUrl)}`
                         );
                       }}
                       onViewModeChange={setViewMode}
                       searchQuery={searchQuery}
                       selectedFileId={null}
                       viewMode={viewMode}
+                      isLoading={isLoadingFiles}
                     />
                   </div>
                 </div>
@@ -413,13 +482,15 @@ export function FilesClient({ projectId }: FilesClientProps) {
                   arcSearchQuery={searchQuery}
                   onArcSearchChange={setSearchQuery}
                   onSelectFile={(file) => {
-                    const currentUrl = `/studio/projects/${projectId}/files${window.location.search}`;
+                    const currentUrl = `/studio/projects/${slug}/files${window.location.search}`;
                     router.push(
-                      `/studio/projects/${projectId}/files/${file.id}?back=${encodeURIComponent(currentUrl)}`
+                      `/studio/projects/${slug}/files/${file.id}?back=${encodeURIComponent(currentUrl)}`
                     );
                   }}
                   arcViewMode={viewMode}
                   onArcViewModeChange={setViewMode}
+                  isLoadingArcFiles={isLoadingFiles}
+                  isLoadingChapters={isLoadingChapters}
                 />
               ) : (
                 <ArcGrid

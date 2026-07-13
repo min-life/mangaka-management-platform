@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Clock, FileText, Grid2X2, List, Search, Tag } from 'lucide-react';
+import { Clock, FileText, Grid2X2, List, Search, Tag, Loader2 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,8 @@ type FileCollectionProps = {
   searchQuery: string;
   selectedFileId: number | null;
   viewMode: FileViewMode;
+  hideSearch?: boolean;
+  isLoading?: boolean;
 };
 
 export function FileCollection({
@@ -33,21 +35,25 @@ export function FileCollection({
   searchQuery,
   selectedFileId,
   viewMode,
+  hideSearch,
+  isLoading,
 }: FileCollectionProps) {
   return (
     <section className="min-w-0 bg-[#0d151e]">
       {/* Toolbar */}
-      <div className="flex h-12 items-center justify-between gap-3 border-b border-[#1e2936] px-4">
+      <div className={`flex h-12 items-center gap-3 border-b border-[#1e2936] px-4 ${hideSearch ? 'justify-end' : 'justify-between'}`}>
         {/* Search */}
-        <div className="flex h-8 min-w-0 max-w-sm flex-1 items-center gap-2 rounded-[5px] border border-[#2a3444] bg-[#111923] px-3 transition-colors focus-within:border-[#FFD369]/40 focus-within:bg-[#141e2a]">
-          <Search className="size-3.5 shrink-0 text-[#5d6878]" />
-          <input
-            className="min-w-0 flex-1 bg-transparent text-xs font-medium text-white outline-none placeholder:text-[#5d6878]"
-            onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Search files..."
-            value={searchQuery}
-          />
-        </div>
+        {!hideSearch && (
+          <div className="flex h-8 min-w-0 max-w-sm flex-1 items-center gap-2 rounded-[5px] border border-[#2a3444] bg-[#111923] px-3 transition-colors focus-within:border-[#FFD369]/40 focus-within:bg-[#141e2a]">
+            <Search className="size-3.5 shrink-0 text-[#5d6878]" />
+            <input
+              className="min-w-0 flex-1 bg-transparent text-xs font-medium text-white outline-none placeholder:text-[#5d6878]"
+              onChange={(event) => onSearchChange(event.target.value)}
+              placeholder="Search files..."
+              value={searchQuery}
+            />
+          </div>
+        )}
         {/* File count */}
         <span className="shrink-0 text-[11px] font-bold text-[#5d6878]">
           {files.length} {files.length === 1 ? 'file' : 'files'}
@@ -75,20 +81,22 @@ export function FileCollection({
         </div>
       </div>
 
-      {files.length ? (
+      {isLoading ? (
+        <div className="grid min-h-[300px] place-items-center px-6">
+          <Loader2 className="size-8 animate-spin text-[#FFD369]" />
+        </div>
+      ) : files.length ? (
         viewMode === 'table' ? (
           /* ── LIST VIEW ── */
           <div className="overflow-x-auto">
             {/* Column headers */}
-            <div className="grid min-w-[700px] grid-cols-[minmax(280px,1fr)_130px_90px_110px] border-b border-[#1e2936] bg-[#0b1319] px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.08em] text-[#5d6878]">
+            <div className="grid min-w-[500px] grid-cols-[minmax(280px,1fr)_110px] border-b border-[#1e2936] bg-[#0b1319] px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.08em] text-[#5d6878]">
               <span>File</span>
-              <span>Status</span>
-              <span>Tasks</span>
               <span>Updated</span>
             </div>
             {files.map((file) => (
               <button
-                className={`group grid min-h-[72px] w-full min-w-[700px] grid-cols-[minmax(280px,1fr)_130px_90px_110px] items-center border-b border-[#1a2333]/60 px-4 text-left transition-all duration-150 hover:bg-[#14202e] ${
+                className={`group grid min-h-[72px] w-full min-w-[500px] grid-cols-[minmax(280px,1fr)_110px] items-center border-b border-[#1a2333]/60 px-4 text-left transition-all duration-150 hover:bg-[#14202e] ${
                   selectedFileId === file.id ? 'bg-[#14202e] border-l-2 border-l-[#FFD369] pl-[14px]' : ''
                 }`}
                 key={file.id}
@@ -106,15 +114,6 @@ export function FileCollection({
                       {file.category}
                     </span>
                   </span>
-                </span>
-                {/* Status */}
-                <Badge className={`w-fit rounded-[3px] border text-[10px] ${fileStatusClassName[file.status]}`}>
-                  {fileStatusLabels[file.status]}
-                </Badge>
-                {/* Tasks */}
-                <span className="flex items-center gap-1.5 text-xs font-bold text-[#aeb7c2]">
-                  <Tag className="size-3 text-[#5d6878]" />
-                  {file.taskCount}
                 </span>
                 {/* Updated */}
                 <span className="flex items-center gap-1.5 text-xs font-medium text-[#5d6878]">
@@ -148,15 +147,10 @@ export function FileCollection({
                   <span className="mt-0.5 block truncate text-[11px] font-medium text-[#5d6878]">
                     {file.category}
                   </span>
-                  <span className="mt-auto pt-3 flex items-center justify-between">
-                    <Badge className={`rounded-[3px] border text-[9px] py-0 ${fileStatusClassName[file.status]}`}>
-                      {fileStatusLabels[file.status]}
-                    </Badge>
-                    <span className="flex items-center gap-1 text-[10px] font-bold text-[#5d6878]">
+                  <span className="mt-auto pt-3 flex items-center gap-1 text-[10px] font-bold text-[#5d6878]">
                       <Clock className="size-2.5" />
                       {formatFileDate(file.updatedAt)}
                     </span>
-                  </span>
                 </span>
               </button>
             ))}

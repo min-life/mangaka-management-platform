@@ -24,7 +24,7 @@ type TaskActionsProps = {
   setDraftRegion: (val: any) => void;
   setTaskDialogOpen: (val: boolean) => void;
   setSelectedTaskId: (val: string | null) => void;
-  setSelectedSubmissionId: (val: string | null) => void;
+
   setFrameAnnotationMode: (val: boolean) => void;
   setFocusedTask: (val: TaskWorkspaceItem | null) => void;
   setFile: React.Dispatch<React.SetStateAction<FileExplorerItem | null>>;
@@ -49,7 +49,7 @@ export function useFileDetailTaskActions({
   setDraftRegion,
   setTaskDialogOpen,
   setSelectedTaskId,
-  setSelectedSubmissionId,
+
   setFrameAnnotationMode,
   setFocusedTask,
   setFile,
@@ -58,11 +58,11 @@ export function useFileDetailTaskActions({
   setVersions,
 }: TaskActionsProps) {
   const handleCreateAnnotatedTask = async (
-    task: FileTaskItem,
+    task: Partial<FileTaskItem>,
     options?: { assignedBy?: number; parentId?: number },
   ) => {
     try {
-      const statusValue = task.status;
+      const statusValue = task.status || 'PENDING';
       let deadline: string | undefined = undefined;
       if (task.dueDate) {
         const cleanedDate = task.dueDate.replace(/\s*\*$/, '');
@@ -78,10 +78,10 @@ export function useFileDetailTaskActions({
           ? `v${versions[0].version}`
           : 'v1';
 
-      const description = `${task.description.replace(/\s*\*$/, '')}\n[version:${targetVersionTag}]`;
+      const description = `${(task.description || '').replace(/\s*\*$/, '')}\n[version:${targetVersionTag}]`;
 
       const createdTaskRes = await createFileTask(fileId, {
-        title: task.title.replace(/\s*\*$/, ''),
+        title: (task.title || '').replace(/\s*\*$/, ''),
         description,
         status: statusValue,
         deadline: deadline,
@@ -91,21 +91,21 @@ export function useFileDetailTaskActions({
         cloneMaterialFromTaskId: options?.parentId,
       });
 
-      await loadFile();
+      setPendingTaskRegion(null);
+      setDraftRegion(null);
+      setTaskDialogOpen(false);
       toast.success('Task created successfully.');
+      void loadFile();
     } catch (err) {
       console.error('Failed to create task:', err);
       toast.error('Failed to create task.');
       setError('Failed to create task on the server.');
     }
-    setPendingTaskRegion(null);
-    setDraftRegion(null);
-    setTaskDialogOpen(false);
   };
 
   const focusFileTask = (task: FileTaskItem | null) => {
     setSelectedTaskId(task?.id ?? null);
-    setSelectedSubmissionId(null);
+
     setFrameAnnotationMode(false);
     // Clear stale versions immediately so canvas shows blank/loading
     // instead of the previous task's (or file-level) materials while
@@ -153,11 +153,6 @@ export function useFileDetailTaskActions({
     };
 
     setFocusedTask(workspaceTask);
-    if (workspaceTask.submissions.length > 0 && workspaceTask.submissions[0].status === 'PENDING_REVIEW') {
-      setSelectedSubmissionId(workspaceTask.submissions[0].id);
-    } else {
-      setSelectedSubmissionId(null);
-    }
   };
 
   const handleFocusedTaskChange = async (nextTask: TaskWorkspaceItem) => {
@@ -171,9 +166,6 @@ export function useFileDetailTaskActions({
     );
 
     setFocusedTask(nextTask);
-    if (addedSubmission) {
-      setSelectedSubmissionId(addedSubmission.id);
-    }
     if (newlyApprovedSubmission) {
       setFile((currentFile) =>
         currentFile
@@ -185,7 +177,6 @@ export function useFileDetailTaskActions({
           }
           : currentFile,
       );
-      setSelectedSubmissionId(null);
       toast.success('Submission approved.', {
         description: 'It is now displayed as the current file in UI preview mode.',
       });
@@ -208,6 +199,7 @@ export function useFileDetailTaskActions({
     try {
       await updateTask(nextTask.id, {
         status: nextTask.status,
+        description: nextTask.description,
       });
     } catch (err) {
       console.error('Failed to update task status:', err);
@@ -243,8 +235,8 @@ export function useFileDetailTaskActions({
       toast.success('Files uploaded.', {
         description: `Version ${targetVersionTag} saved. Mark as ready when you want to submit for review.`,
       });
-      await loadFile();
-      setSelectedSubmissionId(null);
+
+      void loadFile();
     } catch (err: any) {
       console.error('Failed to submit task work:', err);
       if (err.response?.status === 401) {
@@ -261,11 +253,14 @@ export function useFileDetailTaskActions({
     if (!focusedTask) return;
     setIsLoading(true);
     try {
-      await updateTask(focusedTask.id, { status: 'REVIEW' });
-      await loadFile();
+      await updateTask(focusedTask.id, { 
+        status: 'REVIEW',
+        description: `${focusedTask.description || ''}\n[Note: Marked as ready for review without file upload]`.trim()
+      });
       toast.success('Task submitted for review.', {
         description: 'The task is now in the review queue.',
       });
+      void loadFile();
     } catch (err) {
       console.error('Failed to mark task as ready for review:', err);
       toast.error('Failed to submit for review. Please try again.');

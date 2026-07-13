@@ -1,5 +1,7 @@
 'use client';
 
+import { parseId, getProjectSlug } from '@/utils/slug';
+
 import Link from 'next/link';
 import { ChevronDown, FolderKanban, LogOut, User } from 'lucide-react';
 
@@ -30,7 +32,7 @@ export function ProjectAppHeader({ projectId, projectName }: ProjectAppHeaderPro
 
   useEffect(() => {
     if (projectId) {
-      void getProjectById(Number(projectId))
+      void getProjectById(parseId(projectId))
         .then(setActiveProject)
         .catch(() => {});
     }
@@ -83,7 +85,7 @@ export function ProjectAppHeader({ projectId, projectName }: ProjectAppHeaderPro
                 <DropdownMenuItem
                   className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold focus:bg-[#303842] focus:text-white"
                   key={p.id}
-                  onSelect={() => router.push(`/studio/projects/${p.id}`)}
+                  onSelect={() => router.push(`/studio/projects/${getProjectSlug(p.id, p.name)}`)}
                 >
                   <FolderKanban className="size-3.5 text-[#8b94a1] mr-1.5" />
                   {p.name}

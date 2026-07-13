@@ -35,7 +35,7 @@ export type EditorBoardRow = {
   boardId: number;
   created: string;
   createdBy: string;
-  createdByUser?: { id?: number | null } | null;
+  createdByUser?: { id?: number | null; avatarUrl?: string | null; displayName?: string | null; email?: string } | null;
   description: string;
   id: string;
   image?: string | null;
@@ -68,6 +68,7 @@ type EditorBoardsTabProps = {
   onRenameBoard: (board: EditorBoardRow) => void;
   onDeleteBoard: (board: EditorBoardRow) => void;
   onLeaveBoard: (board: EditorBoardRow) => void;
+  formatUserName: (user?: any) => string;
   page: number;
   limit: number;
   total: number;
@@ -85,6 +86,7 @@ export function EditorBoardsTab({
   onRenameBoard,
   onDeleteBoard,
   onLeaveBoard,
+  formatUserName,
   page,
   limit,
   total,
@@ -188,7 +190,22 @@ export function EditorBoardsTab({
                     </div>
                   </Link>
                 </TableCell>
-                <TableCell className="text-xs font-bold text-white">{board.createdBy}</TableCell>
+                <TableCell className="text-xs font-bold text-white">
+                  <div className="flex items-center gap-2">
+                    {board.createdByUser?.avatarUrl && board.createdByUser.avatarUrl.trim() !== '' ? (
+                      <img
+                        src={board.createdByUser.avatarUrl || undefined}
+                        alt=""
+                        className="size-7 rounded-full border border-[#393E46] object-cover"
+                      />
+                    ) : (
+                      <span className="grid size-7 place-items-center rounded-full border border-[#26303b] bg-[#393E46] text-[9px] font-black text-white">
+                        {formatUserName(board.createdByUser).charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                    <span>{board.createdBy}</span>
+                  </div>
+                </TableCell>
                 <TableCell className="text-xs font-bold text-white">
                   {board.projectCount} {board.projectCount === 1 ? 'project' : 'projects'}
                 </TableCell>

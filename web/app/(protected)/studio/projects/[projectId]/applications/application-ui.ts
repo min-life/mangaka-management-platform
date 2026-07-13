@@ -5,6 +5,7 @@ export type UploadedMaterialFile = {
   mimeType?: string;
   name: string;
   sizeBytes?: number;
+  url?: string;
 };
 
 export const applicationTypeLabels: Record<ApplicationType, string> = {
@@ -86,6 +87,10 @@ export function readUploadedFiles(materials: unknown): UploadedMaterialFile[] {
             : 'sizeBytes' in material && typeof material.sizeBytes === 'number'
               ? material.sizeBytes
               : undefined,
+        url:
+          'url' in material && typeof material.url === 'string'
+            ? material.url
+            : undefined,
       };
     });
   }
@@ -112,6 +117,8 @@ export function readUploadedFiles(materials: unknown): UploadedMaterialFile[] {
         name: file.name,
         sizeBytes:
           'sizeBytes' in file && typeof file.sizeBytes === 'number' ? file.sizeBytes : undefined,
+        url:
+          'url' in file && typeof file.url === 'string' ? file.url : undefined,
       });
     });
 

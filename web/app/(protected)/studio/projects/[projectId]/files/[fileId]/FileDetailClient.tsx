@@ -12,14 +12,16 @@ import { useFileDetailController } from './hooks/useFileDetailController';
 type FileDetailClientProps = {
   fileId: number;
   focusedTaskId: string | null;
-  projectId: number;
 };
 
-export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetailClientProps) {
+import { useProjectParams } from '@/hooks/useProjectParams';
+
+export function FileDetailClient({ fileId, focusedTaskId }: FileDetailClientProps) {
+  const { slug, numericId: projectId } = useProjectParams();
   const controller = useFileDetailController({ fileId, focusedTaskId, projectId });
   const searchParams = useSearchParams();
   const backParam = searchParams.get('back');
-  const backHref = backParam ? decodeURIComponent(backParam) : `/studio/projects/${projectId}/files`;
+  const backHref = backParam ? decodeURIComponent(backParam) : `/studio/projects/${slug}/files`;
 
   if (controller.isInitialLoading) {
     return (
@@ -45,7 +47,7 @@ export function FileDetailClient({ fileId, focusedTaskId, projectId }: FileDetai
             href={backHref}
           >
             <ArrowLeft className="size-4" />
-            Back to Files
+            Back to Resources
           </Link>
         </div>
       </div>
