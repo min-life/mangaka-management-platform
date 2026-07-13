@@ -20,6 +20,7 @@ import {
   UserRound,
   X,
 } from 'lucide-react';
+import { getCleanTaskDescription } from '@/lib/utils';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -51,7 +52,6 @@ import { SubmitWorkDialog } from './SubmitWorkDialog';
 type DetailTab = 'ACTIVITY' | 'DISCUSSION' | 'SUBMISSIONS';
 
 type TaskDetailClientProps = {
-  projectId: number;
   taskId: string;
 };
 
@@ -77,8 +77,11 @@ const initialComments: CommentItem[] = [
   },
 ];
 
-export function TaskDetailClient({ projectId, taskId }: TaskDetailClientProps) {
+import { useProjectParams } from '@/hooks/useProjectParams';
+
+export function TaskDetailClient({ taskId }: TaskDetailClientProps) {
   const router = useRouter();
+  const { slug, numericId: projectId } = useProjectParams();
   const [activeTab, setActiveTab] = useState<DetailTab>('DISCUSSION');
   const [comments, setComments] = useState(initialComments);
   const [comment, setComment] = useState('');
@@ -281,7 +284,7 @@ export function TaskDetailClient({ projectId, taskId }: TaskDetailClientProps) {
     try {
       await deleteTask(task.id);
       toast.success('Task deleted successfully.');
-      router.push(`/studio/projects/${projectId}/tasks`);
+      router.push(`/studio/projects/${slug}/tasks`);
     } catch (err) {
       console.error('Failed to delete task:', err);
       toast.error('Failed to delete task. Please try again.');
@@ -378,7 +381,7 @@ export function TaskDetailClient({ projectId, taskId }: TaskDetailClientProps) {
         <div>
           <p className="text-base font-black text-white">Task unavailable</p>
           <p className="mt-2 text-sm text-[#aeb7c2]">{error}</p>
-          <Link className="mt-5 inline-flex h-9 items-center gap-2 border border-[#4b535f] px-4 text-xs font-black text-white" href={`/studio/projects/${projectId}/tasks`}>
+          <Link className="mt-5 inline-flex h-9 items-center gap-2 border border-[#4b535f] px-4 text-xs font-black text-white" href={`/studio/projects/${slug}/tasks`}>
             <ArrowLeft className="size-4" /> Back to Tasks
           </Link>
         </div>
@@ -390,7 +393,7 @@ export function TaskDetailClient({ projectId, taskId }: TaskDetailClientProps) {
     <section className="min-h-full bg-[#091018]">
       <header className="flex min-h-12 flex-wrap items-center justify-between gap-2 border-b border-[#26303b] bg-[#151c25] px-5 py-2 text-xs font-bold text-[#8b94a1]">
         <div className="flex flex-wrap items-center gap-2">
-          <Link className="flex items-center gap-2 text-[#dce7f3] hover:text-white" href={`/studio/projects/${projectId}/tasks`}>
+          <Link className="flex items-center gap-2 text-[#dce7f3] hover:text-white" href={`/studio/projects/${slug}/tasks`}>
             <ArrowLeft className="size-4" /> Tasks
           </Link>
           <span>/</span>
@@ -429,7 +432,7 @@ export function TaskDetailClient({ projectId, taskId }: TaskDetailClientProps) {
                     <Badge className={`rounded-[3px] border ${taskStatusClassName[task.status]}`}>{taskStatusLabels[task.status]}</Badge>
                     <Badge className={`rounded-[3px] border ${taskPriorityClassName[task.priority]}`}>{task.priority} *</Badge>
                   </div>
-                  <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-[#dce7f3]">{task.description}</p>
+                  <p className="mt-2 max-w-3xl text-sm font-medium leading-6 text-[#dce7f3]">{getCleanTaskDescription(task.description)}</p>
                 </div>
                 {task.status !== 'DONE' && task.status !== 'REVIEW' ? (
                   task.parent && task.parent.status !== 'DONE' ? (
@@ -553,7 +556,7 @@ export function TaskDetailClient({ projectId, taskId }: TaskDetailClientProps) {
           <section className="border-b border-[#26303b] p-5">
             <h2 className="text-xs font-black uppercase tracking-[0.08em] text-white">Production Scope</h2>
             <p className="mt-3 text-xs font-medium leading-5 text-[#aeb7c2]">Work only inside the highlighted region unless the discussion explicitly expands the scope. *</p>
-            <Link className="mt-4 inline-flex h-9 items-center gap-2 border border-[#4b535f] px-3 text-xs font-black text-white hover:bg-[#303842]" href={`/studio/projects/${projectId}/files/${task.fileId}`}>
+            <Link className="mt-4 inline-flex h-9 items-center gap-2 border border-[#4b535f] px-3 text-xs font-black text-white hover:bg-[#303842]" href={`/studio/projects/${slug}/files/${task.fileId}?taskId=${encodeURIComponent(task.id)}&from=tasks`}>
               <ExternalLink className="size-4" /> Open Source File
             </Link>
           </section>

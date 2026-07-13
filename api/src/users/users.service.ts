@@ -95,6 +95,7 @@ export class UsersService {
         this.prisma.user.count({ where }),
         this.prisma.user.findMany({
           where,
+          include: { userRoles: { include: { role: true }, orderBy: { roleId: 'asc' } } },
           orderBy: { [field]: order },
           skip,
           take: limit,
@@ -106,6 +107,7 @@ export class UsersService {
           ...this.serializeUser(user),
           isActive: user.isActive,
           googleLinked: !!user.googleId,
+          roles: user.userRoles.map((userRole) => serializeRole(userRole.role)),
         })),
         pagination: this.buildPaginationMeta(total, page, limit),
       };
@@ -150,9 +152,10 @@ export class UsersService {
       const email = dto.email.trim().toLowerCase();
 
       const roleIds = await this.validateSysRoles(dto.roleIds);
-      const password = dto.password
-        ? await bcrypt.hash(dto.password, BCRYPT_SALT_ROUNDS)
-        : undefined;
+      
+      const isRandomPassword = !dto.password;
+      const rawPassword = dto.password || randomUUID().slice(0, 10);
+      const password = await bcrypt.hash(rawPassword, BCRYPT_SALT_ROUNDS);
 
       const user = await this.prisma.$transaction(async (tx) => {
         const createdUser = await tx.user.create({
@@ -175,12 +178,15 @@ export class UsersService {
         return createdUser;
       });
 
+      if (isRandomPassword) {
+        this.mailService
+          .sendForceResetPasswordEmail(email, rawPassword)
+          .catch((error) => this.logger.error('Failed to send force reset password email', error));
+      }
+
       return { data: this.serializeUser(user) };
     } catch (error: any) {
-      if (error?.code === 'P2002') {
-        throw new ConflictException(ERROR.CFLEMAIL);
-      }
-      this.handleError(error, 'Create staff user fail', ERROR.SVCREATEUSER);
+      throw error;
     }
   }
 
@@ -205,8 +211,7 @@ export class UsersService {
 
       return { data: this.serializeUser(user) };
     } catch (error) {
-      this.handleUserUniqueConflict(error);
-      this.handleError(error, 'Update user fail', ERROR.SVUPDATEUSER);
+      throw error;
     }
   }
 
@@ -1063,21 +1068,6 @@ export class UsersService {
     return permissions;
   }
 
-  private handleUserUniqueConflict(error: unknown) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === 'P2002' &&
-      Array.isArray(error.meta?.target)
-    ) {
-      if (error.meta.target.includes('email')) {
-        throw new ConflictException(ERROR.CFLEMAIL);
-      }
-
-      if (error.meta.target.includes('google_id')) {
-        throw new ConflictException(ERROR.CFLGOOGLEACCOUNT);
-      }
-    }
-  }
 
   private buildPagination(pagination?: Pagination) {
     const page = pagination?.page || 1;

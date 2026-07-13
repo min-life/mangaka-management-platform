@@ -4,6 +4,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import 'dotenv/config';
 import { AppModule } from './app.module';
+import { PrismaExceptionFilter } from './share/filters/prisma-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -24,7 +25,9 @@ async function bootstrap() {
       const isLanDevOrigin =
         /^https?:\/\/(10|172\.(1[6-9]|2\d|3[0-1])|192\.168)\.\d+\.\d+\.\d+(:\d+)?$/.test(origin);
 
-      callback(null, isConfiguredOrigin || isLocalDevOrigin || isLanDevOrigin);
+      const isVercelOrigin = /^https:\/\/mangaka-management-platform-fe.*\.vercel\.app$/.test(origin);
+
+      callback(null, isConfiguredOrigin || isLocalDevOrigin || isLanDevOrigin || isVercelOrigin);
     },
     credentials: true,
   });
@@ -35,6 +38,7 @@ async function bootstrap() {
       transform: true,
     }),
   );
+  app.useGlobalFilters(new PrismaExceptionFilter());
   app.setGlobalPrefix('api');
   app.use(cookieParser());
   const config = new DocumentBuilder()

@@ -172,23 +172,25 @@ export function AddMemberDialog({ onAdded, projectId, roles }: AddMemberDialogPr
 
         <form className="flex max-h-[calc(88dvh-124px)] flex-col" onSubmit={handleSubmit}>
           <div className="min-h-0 overflow-y-auto px-6 py-5">
-            <div className="grid gap-5 md:grid-cols-[1fr_280px]">
-              <div className="space-y-2">
-                <label className={labelClassName} htmlFor="member_search">
-                  Search User
-                </label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#8b94a1]" />
-                  <Input
-                    className={`${fieldClassName} pl-10`}
-                    id="member_search"
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    placeholder="Search by name or email..."
-                    value={searchQuery}
-                  />
+            <div className="flex h-[400px] gap-6 md:grid-cols-[1fr_280px] md:grid">
+              <div className="flex min-h-0 flex-col">
+                <div className="space-y-2 mb-4">
+                  <label className={labelClassName} htmlFor="member_search">
+                    Search User
+                  </label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#8b94a1]" />
+                    <Input
+                      className={`${fieldClassName} pl-10`}
+                      id="member_search"
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                      placeholder="Search by name or email..."
+                      value={searchQuery}
+                    />
+                  </div>
                 </div>
 
-                <div className="h-[292px] overflow-y-auto rounded-[4px] border border-[#39424f] bg-[#101820] p-1">
+                <div className="flex-1 min-h-0 overflow-y-auto pr-2 space-y-1">
                   {isLoadingUsers ? (
                     <div className="space-y-1 px-2 py-2">
                       {Array.from({ length: 5 }).map((_, index) => (
@@ -202,13 +204,15 @@ export function AddMemberDialog({ onAdded, projectId, roles }: AddMemberDialogPr
                       ))}
                     </div>
                   ) : !searchQuery.trim() ? (
-                    <p className="px-3 py-3 text-xs font-bold text-[#8b94a1]">
-                      Type name or email to search...
-                    </p>
+                    <div className="flex h-full items-center justify-center text-center">
+                      <p className="text-xs font-bold text-[#8b94a1]">
+                        Type name or email to search users...
+                      </p>
+                    </div>
                   ) : filteredUsers.length ? (
                     filteredUsers.map((user) => (
                       <button
-                        className="group flex w-full items-center gap-3 rounded-[3px] px-3 py-2.5 text-left hover:bg-[#202832]"
+                        className="group flex w-full items-center gap-3 rounded-[4px] border border-[#39424f] bg-[#101820] px-3 py-2.5 text-left transition-colors hover:border-[#FFD369]/50 hover:bg-[#1a232e]"
                         key={user.id}
                         onClick={() => {
                           setSelectedUsers((currentUsers) => [...currentUsers, user]);
@@ -223,11 +227,11 @@ export function AddMemberDialog({ onAdded, projectId, roles }: AddMemberDialogPr
                             src={user.avatarUrl}
                           />
                         ) : (
-                          <span className="grid size-8 place-items-center rounded-full border border-[#39424f] bg-[#202832] text-[10px] font-black text-[#FFD369]">
+                          <span className="grid size-8 shrink-0 place-items-center rounded-full border border-[#39424f] bg-[#202832] text-[10px] font-black text-[#FFD369]">
                             {(user.displayName ?? user.email).charAt(0).toUpperCase()}
                           </span>
                         )}
-                        <span className="min-w-0">
+                        <span className="min-w-0 flex-1">
                           <span className="block truncate text-xs font-black text-white">
                             {user.displayName ?? user.email}
                           </span>
@@ -235,27 +239,29 @@ export function AddMemberDialog({ onAdded, projectId, roles }: AddMemberDialogPr
                             {user.email}
                           </span>
                         </span>
-                        <span className="ml-auto grid size-7 shrink-0 place-items-center rounded-[3px] border border-transparent text-[#8b94a1] opacity-0 transition-opacity group-hover:border-[#39424f] group-hover:opacity-100">
+                        <span className="ml-auto grid size-7 shrink-0 place-items-center rounded-[3px] border border-transparent text-[#8b94a1] opacity-0 transition-opacity group-hover:border-[#39424f] group-hover:opacity-100 group-hover:text-white">
                           <Plus className="size-4" />
                         </span>
                       </button>
                     ))
                   ) : (
-                    <p className="px-3 py-3 text-xs font-bold text-[#8b94a1]">
-                      No users found.
-                    </p>
+                    <div className="flex h-full items-center justify-center text-center">
+                      <p className="text-xs font-bold text-[#8b94a1]">
+                        No users found.
+                      </p>
+                    </div>
                   )}
                 </div>
               </div>
 
-              <div className="grid content-start gap-4">
+              <div className="flex min-h-0 flex-col gap-4 border-l border-[#39424f] pl-6">
                 <div className="space-y-2">
                   <label className={labelClassName}>Role for selected members</label>
                   <Select onValueChange={setRoleId} value={selectedRoleId}>
                     <SelectTrigger className={`${fieldClassName} w-full`}>
                       <SelectValue placeholder="Select role..." />
                     </SelectTrigger>
-                    <SelectContent className="border-[#4b535f] bg-[#151c25] text-white">
+                    <SelectContent className="border-[#4b535f] bg-[#151c25] text-white" position="popper">
                       {roles.map((role) => (
                         <SelectItem key={role.id} value={String(role.id)}>
                           {role.name}
@@ -263,19 +269,16 @@ export function AddMemberDialog({ onAdded, projectId, roles }: AddMemberDialogPr
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="text-[11px] font-bold text-[#8b94a1]">
-                    This role will be assigned to every selected member.
-                  </p>
                 </div>
 
-                <div className="space-y-2">
+                <div className="flex min-h-0 flex-1 flex-col space-y-2">
                   <div className="flex items-center justify-between">
                     <p className={labelClassName}>Selected Members</p>
                     <span className="text-[10px] font-black text-[#8b94a1]">
                       {selectedUsers.length}
                     </span>
                   </div>
-                  <div className="min-h-[184px] rounded-[4px] border border-[#39424f] bg-[#111922] p-2">
+                  <div className="flex-1 min-h-0 overflow-y-auto rounded-[4px] border border-[#39424f] bg-[#111922] p-2">
                     {selectedUsers.length ? (
                       <div className="grid gap-2">
                         {selectedUsers.map((user) => (
@@ -303,7 +306,7 @@ export function AddMemberDialog({ onAdded, projectId, roles }: AddMemberDialogPr
                               </span>
                             </span>
                             <button
-                              className="grid size-5 shrink-0 place-items-center rounded-full text-[#aeb7c2] hover:bg-[#303842] hover:text-white"
+                              className="grid size-5 shrink-0 place-items-center rounded-[3px] text-[#aeb7c2] hover:bg-[#303842] hover:text-white"
                               onClick={() =>
                                 setSelectedUsers((currentUsers) =>
                                   currentUsers.filter((currentUser) => currentUser.id !== user.id),
@@ -317,10 +320,10 @@ export function AddMemberDialog({ onAdded, projectId, roles }: AddMemberDialogPr
                         ))}
                       </div>
                     ) : (
-                      <div className="grid min-h-[168px] place-items-center px-4 text-center">
+                      <div className="flex h-full items-center justify-center text-center px-4">
                         <div>
                           <p className="text-xs font-black text-[#dce7f3]">No members selected.</p>
-                          <p className="mt-2 text-xs font-bold leading-5 text-[#8b94a1]">
+                          <p className="mt-1 text-[11px] font-bold leading-5 text-[#8b94a1]">
                             Search users on the left to add them.
                           </p>
                         </div>
@@ -328,6 +331,10 @@ export function AddMemberDialog({ onAdded, projectId, roles }: AddMemberDialogPr
                     )}
                   </div>
                 </div>
+
+                <p className="text-[10px] font-bold text-[#8b94a1]">
+                  This role will be assigned to every selected member.
+                </p>
               </div>
 
               {error ? <p className="md:col-span-2 text-xs font-bold text-red-300">{error}</p> : null}

@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/table';
 import type { ProjectResponse } from '@/services/project.service';
 import { Pagination } from './Pagination';
+import { getProjectSlug } from '@/utils/slug';
 
 function SortIcon({
   activeField,
@@ -116,7 +117,7 @@ export function ProjectsTab({
             <div className="relative">
               <Link
                 className="relative block aspect-[3/4] w-full overflow-hidden bg-[#101820]"
-                href={`/studio/projects/${project.projectId}`}
+                href={`/studio/projects/${getProjectSlug(project.projectId, project.name || '')}`}
               >
                 <ProjectCoverImage imageUrl={project.image} />
                 <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#0c1219] to-transparent" />
@@ -175,7 +176,7 @@ export function ProjectsTab({
             </div>
 
             <div className="p-3.5">
-              <Link href={`/studio/projects/${project.projectId}`}>
+              <Link href={`/studio/projects/${getProjectSlug(project.projectId, project.name || '')}`}>
                 <h2 className="truncate text-sm font-black leading-5 text-white hover:text-[#FFD369]">
                   {project.name}
                 </h2>
@@ -269,7 +270,7 @@ export function ProjectsTab({
               <TableRow
                 className="h-[86px] cursor-pointer border-l-4 border-l-transparent border-r-0 border-t-0 border-b-[#393E46] bg-[#0b1118] transition-colors duration-150 hover:border-l-[#FFD369] hover:bg-[#202832]"
                 key={project.id}
-                onClick={() => router.push(`/studio/projects/${project.projectId}`)}
+                onClick={() => router.push(`/studio/projects/${getProjectSlug(project.projectId, project.name || '')}`)}
               >
                 <TableCell className="px-5 py-3">
                   <div className="flex w-fit items-center gap-3">

@@ -28,9 +28,7 @@ import {
 
 import { ImportProjectStatsDialog, type ChapterOption } from './ImportProjectStatsDialog';
 
-type StatisticsClientProps = {
-  projectId: number;
-};
+import { useProjectParams } from '@/hooks/useProjectParams';
 
 const MONTH_LABELS = [
   'Jan',
@@ -177,7 +175,13 @@ function EmptyStatsState() {
   );
 }
 
-export function StatisticsClient({ projectId }: StatisticsClientProps) {
+type StatisticsClientProps = {
+  projectId?: number;
+};
+
+export function StatisticsClient({ projectId: projectIdProp }: StatisticsClientProps) {
+  const { numericId } = useProjectParams();
+  const projectId = projectIdProp ?? numericId;
   const [selectedArcId, setSelectedArcId] = useState<number | null>(null);
   const [selectedChapterId, setSelectedChapterId] = useState<number | null>(null);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);

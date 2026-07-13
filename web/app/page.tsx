@@ -300,7 +300,7 @@ function LandingNavActions() {
           className="rounded-[6px] bg-[#FFD369] px-4 py-2 text-sm font-black text-[#222831] transition hover:brightness-110"
           href="/register"
         >
-          Get Started
+          Sign Up
         </Link>
       </div>
     );

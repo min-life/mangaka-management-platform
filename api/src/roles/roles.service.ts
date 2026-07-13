@@ -30,6 +30,7 @@ export class RolesService {
     try {
       const roles = await this.prisma.role.findMany({
         where: scope ? { scope } : undefined,
+        include: { rolePermissions: { include: { permission: true } } },
         orderBy: { id: 'asc' },
       });
 
@@ -42,7 +43,7 @@ export class RolesService {
   @UseCache((args) => `role:${args[0]}`)
   async findOne(roleId: number) {
     try {
-      const role = await this.ensureRole(roleId);
+      const role = await this.ensureRole(roleId, true);
       return { data: serializeRole(role) };
     } catch (error) {
       this.handleError(error, 'Get role fail', ERROR.SVGETROLE);
@@ -72,9 +73,16 @@ export class RolesService {
         });
       });
 
-      return { data: serializeRole(role) };
+      if (dto.permissionIds !== undefined) {
+        await this.replacePermissions(
+          role.id,
+          dto.permissionIds,
+        );
+      }
+
+      const finalRole = await this.ensureRole(role.id, true);
+      return { data: serializeRole(finalRole) };
     } catch (error) {
-      this.handleUniqueCodeConflict(error);
       throw error;
     }
   }
@@ -112,13 +120,13 @@ export class RolesService {
       if (dto.permissionIds !== undefined) {
         await this.replacePermissions(
           roleId,
-          dto.permissionIds.map((id) => Number(id)),
+          dto.permissionIds,
         );
       }
 
-      return { data: serializeRole(role) };
+      const finalRole = await this.ensureRole(roleId, true);
+      return { data: serializeRole(finalRole) };
     } catch (error) {
-      this.handleUniqueCodeConflict(error);
       throw error;
     }
   }
@@ -204,8 +212,11 @@ export class RolesService {
     }
   }
 
-  private async ensureRole(roleId: number) {
-    const role = await this.prisma.role.findUnique({ where: { id: roleId } });
+  private async ensureRole(roleId: number, includePermissions = false) {
+    const role = await this.prisma.role.findUnique({
+      where: { id: roleId },
+      include: includePermissions ? { rolePermissions: { include: { permission: true } } } : undefined,
+    });
 
     if (!role) {
       throw new NotFoundException(ERROR.NFROLE);
@@ -222,16 +233,6 @@ export class RolesService {
     };
   }
 
-  private handleUniqueCodeConflict(error: unknown) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === 'P2002' &&
-      Array.isArray(error.meta?.target) &&
-      error.meta.target.includes('code')
-    ) {
-      throw new ConflictException(ERROR.CFROLECODE);
-    }
-  }
 
   private buildPagination(pagination?: { page?: number; limit?: number }) {
     const page = pagination?.page || 1;

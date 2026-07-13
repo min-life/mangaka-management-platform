@@ -12,6 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getFileById } from '@/services/file.service';
+import { getProjectSlug } from '@/utils/slug';
 import { toast } from '@/lib/toast';
 
 const taskStatusClassName: Record<string, string> = {
@@ -40,6 +41,7 @@ import { Pagination } from './Pagination';
 type MyTasksTabProps = {
   mappedTasks: any[];
   isLoadingTasks: boolean;
+  formatUserName: (user?: any) => string;
   page: number;
   limit: number;
   total: number;
@@ -51,6 +53,7 @@ type MyTasksTabProps = {
 export function MyTasksTab({
   mappedTasks,
   isLoadingTasks,
+  formatUserName,
   page,
   limit,
   total,
@@ -114,7 +117,7 @@ export function MyTasksTab({
                       projectId = (file as any).folder?.project?.id;
                     }
                     if (projectId) {
-                      router.push(`/studio/projects/${projectId}/files/${task.fileId}?taskId=${task.id}&from=tasks`);
+                      router.push(`/studio/projects/${getProjectSlug(projectId, task.project || '')}/files/${task.fileId}?taskId=${task.id}&from=tasks`);
                     } else {
                       toast.error('Could not find project for this task.');
                     }
@@ -135,12 +138,17 @@ export function MyTasksTab({
                 <TableCell className="text-xs font-bold text-white">{task.project}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
-                    <span
-                      className="grid size-7 place-items-center rounded-full border border-[#121820] text-[9px] font-black text-white"
-                      style={{ backgroundColor: task.assignee.color }}
-                    >
-                      {task.assignee.initials}
-                    </span>
+                    {task.assignee.user?.avatarUrl && task.assignee.user.avatarUrl.trim() !== '' ? (
+                      <img
+                        src={task.assignee.user.avatarUrl || undefined}
+                        alt=""
+                        className="size-7 rounded-full border border-[#393E46] object-cover"
+                      />
+                    ) : (
+                      <span className="grid size-7 place-items-center rounded-full border border-[#26303b] bg-[#393E46] text-[9px] font-black text-white">
+                        {formatUserName(task.assignee.user).charAt(0).toUpperCase()}
+                      </span>
+                    )}
                     <span className="text-xs font-bold text-white">{task.assignee.name}</span>
                   </div>
                 </TableCell>

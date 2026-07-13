@@ -200,13 +200,16 @@ export async function createProjectApplication(
   const response = await api.post<ApplicationItemResponse, ApplicationItemResponse>(
     `/projects/${projectId}/applications`,
     body,
-    body instanceof FormData
-      ? {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }
-      : undefined,
+    {
+      timeout: 300000, // 5 minutes for file uploads
+      ...(body instanceof FormData
+        ? {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          }
+        : {}),
+    }
   );
 
   return response.data;

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Circle, CircleCheck, Crosshair, FileText, Plus } from 'lucide-react';
+import { Circle, CircleCheck, Crosshair, FileText, Plus, Edit3, Trash2 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,8 @@ type FileTasksPanelProps = {
   canCreateTask: boolean;
   onCreateTask: () => void;
   onSelectTask: (taskId: string | null) => void;
+  onEditTask?: (task: FileTaskItem) => void;
+  onDeleteTask?: (task: FileTaskItem) => void;
   selectedTaskId: string | null;
   tasks: FileTaskItem[];
 };
@@ -25,6 +27,8 @@ export function FileTasksPanel({
   canCreateTask,
   onCreateTask,
   onSelectTask,
+  onEditTask,
+  onDeleteTask,
   selectedTaskId,
   tasks,
 }: FileTasksPanelProps) {
@@ -76,15 +80,22 @@ export function FileTasksPanel({
       <div className="mt-3 space-y-2 pr-1">
         {visibleTasks.length ? (
           visibleTasks.map((task) => (
-            <button
-              className={`w-full rounded-[4px] border p-3 text-left transition-colors ${
+            <div
+              className={`w-full rounded-[4px] border p-3 text-left transition-colors cursor-pointer ${
                 selectedTaskId === task.id
                   ? 'border-[#FFD369] bg-[#16202b]'
                   : 'border-[#303842] bg-[#151c25] hover:border-[#4b535f] hover:bg-[#1b2530]'
               }`}
               key={task.id}
               onClick={() => onSelectTask(selectedTaskId === task.id ? null : task.id)}
-              type="button"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onSelectTask(selectedTaskId === task.id ? null : task.id);
+                }
+              }}
+              role="button"
+              tabIndex={0}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex min-w-0 items-start gap-2">
@@ -107,9 +118,38 @@ export function FileTasksPanel({
                   <Badge className={`rounded-[3px] border text-[9px] ${fileStatusClassName[task.status]}`}>
                     {fileStatusLabels[task.status]}
                   </Badge>
+                  <div className="flex items-center gap-1">
+                    {onEditTask && (
+                      <button
+                        type="button"
+                        className="p-1 rounded text-[#8b94a1] hover:text-white hover:bg-[#202832] transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditTask(task);
+                        }}
+                        title="Edit Task"
+                      >
+                        <Edit3 className="size-3.5" />
+                      </button>
+                    )}
+                    {onDeleteTask && (
+                      <button
+                        type="button"
+                        className="p-1 rounded text-[#8b94a1] hover:text-red-400 hover:bg-[#451a1a] transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteTask(task);
+                        }}
+                        title="Delete Task"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
-            </button>
+            </div>
+
           ))
         ) : (
           <p className="border border-[#303842] bg-[#151c25] px-3 py-5 text-center text-[10px] font-bold text-[#8b94a1]">

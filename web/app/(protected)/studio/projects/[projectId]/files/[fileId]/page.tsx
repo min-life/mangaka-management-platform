@@ -18,7 +18,6 @@ export default async function FileDetailPage({ params, searchParams }: FileDetai
     <FileDetailClient
       fileId={Number(fileId)}
       focusedTaskId={taskId ?? null}
-      projectId={Number(projectId)}
     />
   );
 }
