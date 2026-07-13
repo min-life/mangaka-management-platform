@@ -25,7 +25,9 @@ async function bootstrap() {
       const isLanDevOrigin =
         /^https?:\/\/(10|172\.(1[6-9]|2\d|3[0-1])|192\.168)\.\d+\.\d+\.\d+(:\d+)?$/.test(origin);
 
-      callback(null, isConfiguredOrigin || isLocalDevOrigin || isLanDevOrigin);
+      const isVercelOrigin = /^https:\/\/mangaka-management-platform-fe.*\.vercel\.app$/.test(origin);
+
+      callback(null, isConfiguredOrigin || isLocalDevOrigin || isLanDevOrigin || isVercelOrigin);
     },
     credentials: true,
   });
