@@ -31,12 +31,19 @@ export function SetupPasswordModal() {
     let isMounted = true;
 
     if (status === 'authenticated' && user) {
+      const promptKey = `password_prompt_${user.id}`;
+      if (sessionStorage.getItem(promptKey)) {
+        setIsLoadingCheck(false);
+        return;
+      }
+
       hasPassword()
         .then((hasPwd) => {
           if (isMounted) {
             setIsLoadingCheck(false);
             if (!hasPwd) {
               setOpen(true);
+              sessionStorage.setItem(promptKey, 'true');
             }
           }
         })

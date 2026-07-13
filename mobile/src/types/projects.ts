@@ -67,6 +67,7 @@ export interface ProjectMemberItem {
   name: string;
   numberOfTasks: number;
   roleCode: string;
+  roleId?: number;
   roleName: string;
   taskOverview?: {
     done?: number;

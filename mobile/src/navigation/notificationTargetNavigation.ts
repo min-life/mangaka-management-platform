@@ -1,6 +1,34 @@
 import { NotificationItem } from '@/src/types/notifications';
+import { fetchTaskResourceTarget } from '@/src/services/taskApi';
 
 import { RootStackNavProp } from './types';
+
+function navigateToResourceFileTaskTarget(
+  navigation: RootStackNavProp,
+  target: NonNullable<NotificationItem['target']>,
+) {
+  void (async () => {
+    if (!target.taskId) return;
+
+    const resourceTarget =
+      target.fileId && target.projectId
+        ? { fileId: target.fileId, projectId: target.projectId }
+        : await fetchTaskResourceTarget(target.taskId);
+
+    navigation.navigate('ResourceFile', {
+      fileId: resourceTarget.fileId,
+      initialCommentId: target.commentId,
+      initialDiscussionScope: target.initialDiscussionScope,
+      initialFrameId: target.frameId,
+      initialTab: target.initialTab ?? (target.commentId ? 'Discussion' : 'Tasks'),
+      initialTaskId: target.taskId,
+      parentFolderId: target.parentFolderId,
+      projectId: resourceTarget.projectId,
+    });
+  })().catch((error) => {
+    console.warn('[navigateToNotificationTarget] Open task target failed.', error);
+  });
+}
 
 export function navigateToNotificationTarget(
   navigation: RootStackNavProp,
@@ -14,13 +42,7 @@ export function navigateToNotificationTarget(
   }
 
   if (target.type === 'task' && target.taskId) {
-    navigation.navigate('TaskDetail', {
-      taskId: target.taskId,
-      initialCommentId: target.commentId,
-      initialDiscussionScope: target.initialDiscussionScope,
-      initialFrameId: target.frameId,
-      initialTab: target.initialTab,
-    });
+    navigateToResourceFileTaskTarget(navigation, target);
     return;
   }
 

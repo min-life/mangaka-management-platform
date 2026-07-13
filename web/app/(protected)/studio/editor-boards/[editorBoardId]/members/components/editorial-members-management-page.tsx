@@ -3,15 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import {
-  CircleGauge,
+  Eye,
   MoreVertical,
   Plus,
   Search,
   ShieldCheck,
   Trash2,
-  User,
   UserPlus,
-  Users,
   X,
 } from 'lucide-react';
 
@@ -58,11 +56,9 @@ import {
   addEditorialMembers,
   getAvailableEditorialUsers,
   getEditorialMembers,
-  getEditorialMembersSummary,
   removeEditorialMember,
   setEditorialMemberAsLead,
   type EditorialMember,
-  type EditorialMembersSummary,
 } from '../services/editorial-members-service';
 
 function getInitials(name?: string | null, email?: string) {
@@ -460,7 +456,6 @@ export function EditorialMembersManagementPage() {
   const params = useParams<{ editorBoardId?: string }>();
   const editorBoardId = params.editorBoardId ?? '1';
   const [members, setMembers] = useState<EditorialMember[]>([]);
-  const [summary, setSummary] = useState<EditorialMembersSummary | null>(null);
   const [selectedMember, setSelectedMember] = useState<EditorialMember | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -478,12 +473,8 @@ export function EditorialMembersManagementPage() {
     setError(null);
 
     try {
-      const [nextMembers, nextSummary] = await Promise.all([
-        getEditorialMembers(editorBoardId),
-        getEditorialMembersSummary(editorBoardId),
-      ]);
+      const nextMembers = await getEditorialMembers(editorBoardId);
       setMembers(nextMembers);
-      setSummary(nextSummary);
     } catch {
       setError('Unable to load editorial members.');
     } finally {
@@ -610,27 +601,6 @@ export function EditorialMembersManagementPage() {
           />
         </div>
 
-        <section className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-          {[
-            { icon: Users, label: 'Total Members', value: summary?.totalMembers ?? 0 },
-            { icon: ShieldCheck, label: 'Board Leads', value: summary?.leadMembers ?? 0 },
-            { icon: CircleGauge, label: 'Review Load', value: summary?.reviewLoad ?? 0 },
-          ].map((item) => (
-            <article
-              className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-4"
-              key={item.label}
-            >
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] font-black uppercase tracking-[0.04em] text-[#aeb7c2]">
-                  {item.label}
-                </p>
-                <item.icon className="size-4 text-[#FFD369]" />
-              </div>
-              <p className="mt-2 text-2xl font-black text-white">{item.value}</p>
-            </article>
-          ))}
-        </section>
-
         <section>
           <div className="overflow-hidden rounded-[5px] border border-[#39424f] bg-[#101820]">
             <Table>
@@ -642,11 +612,11 @@ export function EditorialMembersManagementPage() {
                   <TableHead className="w-[20%] text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
                     Board Role
                   </TableHead>
-                  <TableHead className="w-[12%] text-right text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
-                    Projects
+                  <TableHead className="w-[18%] text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
+                    Joined
                   </TableHead>
-                  <TableHead className="w-[16%] text-right text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
-                    Reviews
+                  <TableHead className="w-[18%] text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
+                    Last Updated
                   </TableHead>
                   <TableHead className="w-[72px] pr-5 text-right text-[10px] font-black uppercase tracking-[0.08em] text-[#dce7f3]">
                     Actions
@@ -700,37 +670,38 @@ export function EditorialMembersManagementPage() {
                           ) : null}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right font-mono text-sm text-[#dde3ef]">
-                        {member.activeProjects}
+                      <TableCell className="text-xs font-bold text-[#dce7f3]">
+                        {formatDate(member.joinedAt)}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-sm text-[#FFD369]">
-                        {member.reviewLoad}
+                      <TableCell className="text-xs font-bold text-[#aeb7c2]">
+                        {formatDate(member.lastActiveAt)}
                       </TableCell>
                       <TableCell className="pr-5 text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <button
+                            <Button
                               aria-label={`Open actions for ${member.displayName ?? member.email}`}
-                              className="text-[#C8C8C8] hover:text-white"
+                              className="size-7 text-white hover:bg-[#303842]"
                               onClick={(event) => event.stopPropagation()}
-                              type="button"
+                              size="icon"
+                              variant="ghost"
                             >
-                              <MoreVertical className="size-5" />
-                            </button>
+                              <MoreVertical className="size-4" />
+                            </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent
                             align="end"
-                            className="min-w-44 border-[#39424f] bg-[#151c25] text-white"
+                            className="min-w-44 rounded-[5px] border-[#39424f] bg-[#151c25] p-1 text-white"
                           >
                             <DropdownMenuItem
-                              className="gap-2 focus:bg-[#303842] focus:text-white"
+                              className="gap-2 rounded-[3px] text-xs font-bold focus:bg-[#303842] focus:text-white"
                               onClick={() => setSelectedMember(member)}
                             >
-                              <User className="size-4" />
+                              <Eye className="size-4" />
                               View Details
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              className="gap-2 focus:bg-[#303842] focus:text-white"
+                              className="gap-2 rounded-[3px] text-xs font-bold focus:bg-[#303842] focus:text-white"
                               disabled={member.isLead || isSubmitting}
                               onClick={() => void handleSetLead(member)}
                             >
@@ -738,7 +709,7 @@ export function EditorialMembersManagementPage() {
                               Set as Lead
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              className="gap-2 text-red-300 focus:bg-red-950/30 focus:text-red-200"
+                              className="gap-2 rounded-[3px] text-xs font-bold text-red-300 focus:bg-red-950/30 focus:text-red-200"
                               disabled={isSubmitting}
                               onClick={() => void handleRemove(member)}
                             >

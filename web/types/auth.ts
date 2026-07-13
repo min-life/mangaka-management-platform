@@ -29,5 +29,8 @@ export type AuthContextType = {
   status: AuthStatus;
   error: string | null;
   refreshUser: () => Promise<void>;
+  // Patches the cached user in place (e.g. after a profile/avatar edit) without
+  // flipping status back to 'loading', so AuthWrapper doesn't unmount protected pages.
+  updateUser: (patch: Partial<AuthUser>) => void;
   logout: () => void;
 };

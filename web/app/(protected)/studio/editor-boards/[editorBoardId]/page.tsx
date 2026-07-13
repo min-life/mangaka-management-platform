@@ -2,11 +2,13 @@
 
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ChevronRight, CircleGauge, FileCheck2, Users } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatActionTitle, formatActivityLogText } from '@/lib/activity-message';
+import { resolveActivityRoute } from '@/lib/activity-route';
 import {
   getEditorBoardDashboard,
   type BoardMemberResponse,
@@ -44,6 +46,7 @@ const EMPTY_DASHBOARD_STATS: EditorBoardDashboardStats = {
 // PhucTD #editor-board start
 export default function EditorBoardDashboardPage({ params }: PageProps) {
   const { editorBoardId } = use(params);
+  const router = useRouter();
 
   const [board, setBoard] = useState<EditorBoardResponse | null>(null);
   const [members, setMembers] = useState<BoardMemberResponse[]>([]);
@@ -381,6 +384,56 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
               ))}
               {members.length === 0 ? (
                 <p className="text-center text-xs text-[#aeb7c2]">No members found.</p>
+              ) : null}
+            </div>
+          </aside>
+
+          <aside className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-black text-white">Recent Activity</h2>
+            </div>
+            <div className="grid gap-3">
+              {activities.map((activity) => {
+                const route = resolveActivityRoute(activity);
+
+                return (
+                  <article
+                    className={`rounded-[5px] border border-[#303842] bg-[#202832] p-3 ${
+                      route
+                        ? 'cursor-pointer transition-colors hover:border-[#FFD369]/50 hover:bg-[#242e3a]'
+                        : ''
+                    }`}
+                    key={activity.id}
+                    onClick={route ? () => router.push(route) : undefined}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-[4px] bg-[#101820] text-[#FFD369]">
+                        <CircleGauge className="size-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-black text-white">
+                          {formatActionTitle(activity.action)}
+                        </p>
+                        <p className="mt-1 text-[11px] leading-5 text-[#aeb7c2]">
+                          {formatActivityLogText(activity)}
+                        </p>
+                        <p className="mt-2 text-[10px] font-black uppercase tracking-[0.08em] text-[#8b94a1]">
+                          By{' '}
+                          {activity.actor?.displayName ??
+                            activity.actor?.email ??
+                            `User #${activity.actorId}`}{' '}
+                          / {formatActivityDate(activity.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+              {activityError ? (
+                <p className="text-center text-xs text-red-300">{activityError}</p>
+              ) : null}
+              {!activityError && activities.length === 0 ? (
+                <p className="text-center text-xs text-[#aeb7c2]">No recent activity found.</p>
               ) : null}
             </div>
           </aside>

@@ -1,5 +1,9 @@
 import { Colors } from '@/src/constants/colors';
-import { ApplicationItem, ApplicationStatus } from '@/src/types/applications';
+import {
+  ApplicationItem,
+  ApplicationMaterialPage,
+  ApplicationStatus,
+} from '@/src/types/applications';
 import { EditorBoardItem, EditorBoardMember } from '@/src/types/editorBoards';
 import {
   ProjectItem,
@@ -186,28 +190,39 @@ export function mapProjectMember(member: ApiProjectMember): ProjectMemberItem {
     name,
     numberOfTasks: member.numberOfTasks ?? member.taskOverview?.total ?? 0,
     roleCode: member.role?.code ?? '',
+    roleId: member.role?.id,
     roleName: member.role?.name ?? 'Member',
     taskOverview: member.taskOverview ?? null,
   };
 }
 
-export function mapEditorBoard(board: ApiEditorBoard): EditorBoardItem {
+export function mapEditorBoard(
+  board: ApiEditorBoard,
+  extras: { currentUserRole?: EditorBoardItem['currentUserRole'] } = {},
+): EditorBoardItem {
   if (!board) {
     throw new Error('Editor board response is missing.');
   }
 
+  const creator = displayName(creatorUser(board));
+  const imageUrl = board.imageUrl ?? board.image_url ?? undefined;
+  const projectCount = board.numberOfProjects ?? board._count?.projects ?? 0;
+  const updatedByName = board.updatedByUser ? displayName(board.updatedByUser) : creator;
+
   return {
     createdBy: creatorId(board),
-    currentUserRole: 'Member',
+    createdByName: creator,
+    createdAtLabel: absoluteDate(board.createdAt),
+    currentUserRole: extras.currentUserRole ?? 'Member',
     description: board.description ?? 'Editor board workspace.',
     id: String(board.id),
+    imageUrl,
     leadMemberId: creatorId(board),
     memberIds: Array.from({ length: board._count?.members ?? 0 }, (_, index) => `member-${index}`),
     name: board.name,
-    projectIds: Array.from(
-      { length: board._count?.projects ?? 0 },
-      (_, index) => `project-${index}`,
-    ),
+    projectCount,
+    projectIds: Array.from({ length: projectCount }, (_, index) => `project-${index}`),
+    updatedByName,
     updatedAtLabel: `Updated ${relativeDate(board.updatedAt)}`,
   };
 }
@@ -215,6 +230,7 @@ export function mapEditorBoard(board: ApiEditorBoard): EditorBoardItem {
 export function mapBoardMember(item: {
   user?: ApiUserSummary;
   isLead?: boolean;
+  joinedAt?: string;
 }): EditorBoardMember {
   const user = item.user;
   const name = displayName(user);
@@ -223,7 +239,9 @@ export function mapBoardMember(item: {
     email: user?.email ?? '',
     id: String(user?.id ?? name),
     initials: initials(name),
-    joinedAtLabel: item.isLead ? 'Lead member' : 'Board member',
+    joinedAtLabel: item.joinedAt
+      ? `Joined ${absoluteDate(item.joinedAt)}`
+      : 'Joined date unavailable',
     name,
     role: item.isLead ? 'Lead' : 'Member',
   };
@@ -234,6 +252,32 @@ function normalizeApplicationStatus(status: ApiApplication['status']): Applicati
   if (status === 'REJECT') return 'REJECT';
   if (status === 'CANCELLED') return 'CANCELLED';
   return 'PENDING';
+}
+
+function mapApplicationMaterial(
+  applicationId: number,
+  item: unknown,
+  index: number,
+): ApplicationMaterialPage {
+  const material = isRecord(item) ? item : {};
+  const originalName =
+    stringValue(material.originalName) ??
+    stringValue(material.url)?.split('/').pop() ??
+    `Untitled material ${index + 1}`;
+  const type = stringValue(material.type);
+
+  return {
+    height: numberValue(material.height),
+    id: `${applicationId}-material-${index}`,
+    isThumbnail: material.isThumbnail === true,
+    mimeType: stringValue(material.mimeType),
+    originalName,
+    size: numberValue(material.size),
+    title: originalName,
+    type,
+    url: stringValue(material.url),
+    width: numberValue(material.width),
+  };
 }
 
 export function mapApplication(application: ApiApplication): ApplicationItem {
@@ -250,20 +294,14 @@ export function mapApplication(application: ApiApplication): ApplicationItem {
     id: String(application.id),
     materials: {
       note: rawMaterials.length > 0 ? `${rawMaterials.length} linked material item(s).` : '',
-      pages: rawMaterials.map((item, index) => ({
-        fileName: `Material ${index + 1}`,
-        id: `${application.id}-material-${index}`,
-        status: 'Ready',
-        title:
-          typeof item === 'object' && item && 'title' in item
-            ? String((item as { title?: unknown }).title)
-            : `Material ${index + 1}`,
-      })),
+      pages: rawMaterials.map((item, index) => mapApplicationMaterial(application.id, item, index)),
     },
     projectId: String(
       application.projectId ??
         (application.project && 'id' in application.project ? application.project.id : ''),
     ),
+    projectName:
+      application.project && 'name' in application.project ? application.project.name : undefined,
     status: normalizeApplicationStatus(application.status),
     title: application.title,
     type: application.type,
@@ -312,6 +350,10 @@ function stringValue(value: unknown) {
   return typeof value === 'string' && value.trim() ? value : undefined;
 }
 
+function numberValue(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
 export function materialImage(material?: Record<string, unknown> | Array<Record<string, unknown>>) {
   if (Array.isArray(material)) {
     const thumbnail =
@@ -332,12 +374,15 @@ export function materialImage(material?: Record<string, unknown> | Array<Record<
 
 export function mapMaterialVersion(material: ApiMaterial): ResourceFileMaterialVersion {
   const raw = material.materials ?? {};
+  const rawSources = Array.isArray(raw) ? raw : [];
+  const taskId = material.taskId ?? material.task?.id;
 
   return {
     createdAt: material.createdAt,
     createdBy: creatorId(material),
     createdByName: displayName(creatorUser(material)),
     fileId: String(material.fileId ?? material.file?.id ?? ''),
+    hasDetail: material.materials !== undefined,
     id: String(material.id),
     materials: {
       editorState:
@@ -355,6 +400,9 @@ export function mapMaterialVersion(material: ApiMaterial): ResourceFileMaterialV
         material.name ??
         (isRecord(raw) && typeof raw.title === 'string' ? raw.title : `Material ${material.id}`),
     },
+    sourceCount: rawSources.length || undefined,
+    taskId: taskId === undefined || taskId === null ? undefined : String(taskId),
+    taskTitle: material.task?.title ?? undefined,
     updatedAt: material.updatedAt,
     updatedBy: String(material.updatedBy ?? material.updatedByUser?.id ?? ''),
     updatedByName: displayName(material.updatedByUser),
@@ -405,14 +453,18 @@ export function mapTaskCard(task: ApiTask): Task {
   const assignees = [task.assignedByUser?.avatarUrl, creatorUser(task)?.avatarUrl].filter(
     (uri): uri is string => Boolean(uri?.trim()),
   );
+  const fileId = String(task.fileId ?? task.file?.id ?? '');
+  const projectId = String(task.file?.folder?.projectId ?? task.file?.folder?.project?.id ?? '');
 
   return {
     assignees,
     dueLabel: task.deadline ? relativeDate(task.deadline) : 'No due date',
+    fileId,
     id: String(task.id),
     priority: task.status === 'REVIEW' ? 'HIGH' : task.status === 'INPROGRESS' ? 'MEDIUM' : 'LOW',
-    project: task.file?.folder?.title ?? 'Project',
-    projectId: String(task.file?.folder?.id ?? ''),
+    project:
+      task.file?.folder?.project?.name ?? task.file?.folder?.title ?? task.file?.title ?? 'Project',
+    projectId,
     status: mapTaskStatus(task.status),
     title: task.title,
   };
@@ -563,7 +615,15 @@ export function mapActivityLogTarget(
 
   if (entityType === 'PROJECT' && entityId) return { projectId: entityId, type: 'project' };
   if (entityType === 'EDITOR_BOARD' && entityId) return { boardId: entityId, type: 'board' };
-  if (entityType === 'TASK' && entityId) return { taskId: entityId, type: 'task' };
+  if (entityType === 'TASK' && entityId) {
+    return {
+      fileId,
+      initialTab: 'Tasks',
+      projectId,
+      taskId: entityId,
+      type: 'task',
+    };
+  }
   if (entityType === 'APPLICATION' && entityId) {
     return { applicationId: entityId, projectId, type: 'application' };
   }

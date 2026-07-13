@@ -1,13 +1,14 @@
 export function AuthBrand() {
   return (
-    <div className="flex flex-col items-start gap-1">
+    <div className="flex items-center gap-3 -ml-1">
       <img
-        src="/brand/1.png"
         alt="Inkly"
-        className="h-24 w-auto object-contain"
+        className="h-20 w-auto object-contain"
+        src="/brand/1.png"
+        style={{ width: 'auto' }}
       />
 
-      <p className="pl-1 text-[11px] font-bold uppercase tracking-[0.12em] text-[#b7c0ce]">
+      <p className="text-[9px] font-bold uppercase tracking-[0.05em] text-[#8b94a1] border-l border-[#5b626d] pl-3 py-1 -translate-y-[4px]">
         Create / Review / Publish
       </p>
     </div>

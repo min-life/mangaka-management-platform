@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, Text, TextInput, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import ApiStateView from '@/src/components/shared/ApiStateView';
@@ -15,6 +15,7 @@ import { ApplicationItem } from '@/src/types/applications';
 import {
   ApplicationCard,
   ApplicationFilterSelect,
+  ApplicationSearchBar,
   getApplicationStatusLabel,
   getApplicationTypeLabel,
 } from './components';
@@ -23,7 +24,6 @@ import ApplicationTopBar from './components/ApplicationTopBar';
 type ApplicationsScreenProps = NativeStackScreenProps<RootStackParamList, 'Applications'>;
 type StatusFilter = ApplicationStatus | 'ALL';
 type TypeFilter = ApplicationType | 'ALL';
-type OpenFilter = 'status' | 'type' | null;
 
 const APPLICATION_STATUS_FILTERS: StatusFilter[] = [
   'ALL',
@@ -33,19 +33,17 @@ const APPLICATION_STATUS_FILTERS: StatusFilter[] = [
   'CANCELLED',
 ];
 
-const APPLICATION_TYPE_FILTERS: TypeFilter[] = [
-  'ALL',
-  'MANUSCRIPT_REVIEW',
-  'PUBLISH_REQUEST',
-];
+const APPLICATION_TYPE_FILTERS: TypeFilter[] = ['ALL', 'CREATE_ARC', 'CREATE_CHAPTER'];
 
 const statusOptions = APPLICATION_STATUS_FILTERS.map((status) => ({
   label: status === 'ALL' ? 'All status' : getApplicationStatusLabel(status),
+  shortLabel: status === 'ALL' ? 'All' : getApplicationStatusLabel(status),
   value: status,
 }));
 
 const typeOptions = APPLICATION_TYPE_FILTERS.map((type) => ({
   label: type === 'ALL' ? 'All type' : getApplicationTypeLabel(type),
+  shortLabel: type === 'ALL' ? 'All' : type === 'CREATE_ARC' ? 'Arc' : 'Chapter',
   value: type,
 }));
 
@@ -55,38 +53,40 @@ export default function ApplicationsScreen({ navigation, route }: ApplicationsSc
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('ALL');
-  const [openFilter, setOpenFilter] = useState<OpenFilter>(null);
   const [applications, setApplications] = useState<ApplicationItem[]>([]);
   const [projectName, setProjectName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const loadApplications = useCallback(async (options: { showLoading?: boolean } = {}) => {
-    const showLoading = options.showLoading ?? true;
-    if (showLoading) setIsLoading(true);
-    else setIsRefreshing(true);
-    setErrorMessage('');
+  const loadApplications = useCallback(
+    async (options: { showLoading?: boolean } = {}) => {
+      const showLoading = options.showLoading ?? true;
+      if (showLoading) setIsLoading(true);
+      else setIsRefreshing(true);
+      setErrorMessage('');
 
-    try {
-      const [applicationsResult, projectResult] = await Promise.all([
-        fetchApplications({
-          projectId,
-          search: search.trim() || undefined,
-          status: statusFilter,
-          type: typeFilter,
-        }),
-        projectId ? fetchProjectBundle(projectId).catch(() => null) : Promise.resolve(null),
-      ]);
-      setApplications(applicationsResult.applications);
-      setProjectName(projectResult?.project.name ?? null);
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải applications.');
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, [projectId, search, statusFilter, typeFilter]);
+      try {
+        const [applicationsResult, projectResult] = await Promise.all([
+          fetchApplications({
+            projectId,
+            search: search.trim() || undefined,
+            status: statusFilter,
+            type: typeFilter,
+          }),
+          projectId ? fetchProjectBundle(projectId).catch(() => null) : Promise.resolve(null),
+        ]);
+        setApplications(applicationsResult.applications);
+        setProjectName(projectResult?.project.name ?? null);
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : 'Unable to load applications.');
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
+    },
+    [projectId, search, statusFilter, typeFilter],
+  );
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -117,55 +117,22 @@ export default function ApplicationsScreen({ navigation, route }: ApplicationsSc
         showsVerticalScrollIndicator={false}
       >
         <View className="px-4 pt-4" style={{ zIndex: 20 }}>
-          <View className="flex-row items-start gap-3">
-            <View className="relative flex-1">
-              <View className="absolute bottom-0 left-4 top-0 z-10 justify-center">
-                <MaterialIcon name="search" color={Colors.textPlaceholder} size={18} />
-              </View>
-              <TextInput
-                value={search}
-                onChangeText={setSearch}
-                placeholder="Search applications"
-                placeholderTextColor={Colors.textPlaceholder}
-                accessibilityLabel="Search applications"
-                className="h-12 rounded-xl pl-10 pr-4 text-[15px]"
-                style={{ backgroundColor: Colors.surface, color: Colors.text }}
-              />
-            </View>
+          <View>
+            <ApplicationSearchBar search={search} onSearchChange={setSearch} />
+          </View>
+          <View className="relative z-20 mt-3">
             <ApplicationFilterSelect
-              activeValue={statusFilter}
-              accessibilityLabel="Select application status"
-              icon="filter"
-              isOpen={openFilter === 'status'}
-              options={statusOptions}
-              onChange={setStatusFilter}
-              onOpenChange={(isOpen) => setOpenFilter(isOpen ? 'status' : null)}
-            />
-            <ApplicationFilterSelect
-              activeValue={typeFilter}
-              accessibilityLabel="Select application type"
-              icon="filter"
-              isOpen={openFilter === 'type'}
-              options={typeOptions}
-              onChange={setTypeFilter}
-              onOpenChange={(isOpen) => setOpenFilter(isOpen ? 'type' : null)}
+              statusValue={statusFilter}
+              typeValue={typeFilter}
+              statusOptions={statusOptions}
+              typeOptions={typeOptions}
+              onStatusChange={setStatusFilter}
+              onTypeChange={setTypeFilter}
             />
           </View>
         </View>
 
-        <View className="px-4 pt-4" style={{ zIndex: 0 }}>
-          <View className="mb-3 flex-row items-center justify-between">
-            <Text
-              className="text-[12px] font-bold uppercase"
-              style={{ color: Colors.textMuted, letterSpacing: 1 }}
-            >
-              {isProjectScoped ? 'Project applications' : 'My project applications'}
-            </Text>
-            <Text className="text-[12px]" style={{ color: Colors.textFaint }}>
-              {applications.length} shown
-            </Text>
-          </View>
-
+        <View className="px-4 pt-3" style={{ zIndex: 0 }}>
           {isLoading ? (
             <ApiStateView type="loading" />
           ) : errorMessage ? (
@@ -174,17 +141,17 @@ export default function ApplicationsScreen({ navigation, route }: ApplicationsSc
             <View className="gap-3">
               {applications.length > 0 ? (
                 applications.map((application) => (
-                <ApplicationCard
-                  key={application.id}
-                  application={application}
-                  contextLabel={isProjectScoped ? undefined : `Project ${application.projectId}`}
-                  onPress={() =>
-                    navigation.navigate('ApplicationDetail', {
-                      applicationId: application.id,
-                      projectId: application.projectId,
-                    })
-                  }
-                />
+                  <ApplicationCard
+                    key={application.id}
+                    application={application}
+                    contextLabel={isProjectScoped ? undefined : application.projectName}
+                    onPress={() =>
+                      navigation.navigate('ApplicationDetail', {
+                        applicationId: application.id,
+                        projectId: application.projectId,
+                      })
+                    }
+                  />
                 ))
               ) : (
                 <View
@@ -199,7 +166,10 @@ export default function ApplicationsScreen({ navigation, route }: ApplicationsSc
                   <Text className="mt-3 text-[15px] font-bold" style={{ color: Colors.text }}>
                     No applications found
                   </Text>
-                  <Text className="mt-1 text-center text-[13px]" style={{ color: Colors.textMuted }}>
+                  <Text
+                    className="mt-1 text-center text-[13px]"
+                    style={{ color: Colors.textMuted }}
+                  >
                     Try another status, type, or search term.
                   </Text>
                 </View>

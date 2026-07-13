@@ -6,6 +6,7 @@ import {
   ApiListResponse,
   ApiProject,
   ApiProjectMember,
+  ApiProjectStat,
   ApiRoleSummary,
   ApiTask,
 } from './apiTypes';
@@ -36,10 +37,17 @@ export async function fetchProjects(params: { me?: boolean; name?: string } = {}
   };
 }
 
-export async function updateProject(
-  projectId: string,
-  data: { imageUrl?: string; name?: string },
-) {
+export async function fetchProjectById(projectId: string) {
+  const response = await apiRequest<ApiDataResponse<ApiProject>>(`/projects/${projectId}`);
+
+  if (!response.data) {
+    throw new Error('Project not found');
+  }
+
+  return mapProject(response.data);
+}
+
+export async function updateProject(projectId: string, data: { imageUrl?: string; name?: string }) {
   const response = await apiRequest<ApiDataResponse<ApiProject>>(`/projects/${projectId}`, {
     body: data,
     method: 'PATCH',
@@ -50,6 +58,47 @@ export async function updateProject(
   }
 
   return response.data;
+}
+
+export async function deleteProject(projectId: string) {
+  return apiRequest<void>(`/projects/${projectId}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function leaveProject(projectId: string) {
+  return apiRequest<void>(`/projects/${projectId}/members/me`, {
+    method: 'DELETE',
+  });
+}
+
+export async function fetchProjectStats(projectId: string) {
+  const response = await apiRequest<ApiDataResponse<ApiProjectStat | null>>(
+    `/projects/${projectId}/stats`,
+  );
+
+  return response.data ?? null;
+}
+
+export async function fetchProjectFolders(
+  projectId: string,
+  options: { limit?: number; page?: number; parentId?: string; type?: 'ARC' | 'CHAPTER' } = {},
+) {
+  const response = await apiRequest<ApiListResponse<ApiFolder>>(`/projects/${projectId}/folders`, {
+    params: {
+      field: 'createdAt',
+      limit: options.limit ?? 100,
+      order: 'desc',
+      page: options.page ?? 1,
+      parentId: options.parentId,
+      type: options.type,
+    },
+  });
+
+  return {
+    folders: response.data ?? [],
+    pagination: response.pagination,
+  };
 }
 
 export async function fetchProjectBundle(
@@ -162,6 +211,18 @@ export async function removeProjectMember(projectId: string, userId: string) {
   return apiRequest<void>(`/projects/${projectId}/members/${userId}`, {
     method: 'DELETE',
   });
+}
+
+export async function updateProjectMemberRole(projectId: string, userId: string, roleId: number) {
+  const response = await apiRequest<ApiDataResponse<ApiProjectMember>>(
+    `/projects/${projectId}/members/${userId}`,
+    {
+      body: { roleId },
+      method: 'PATCH',
+    },
+  );
+
+  return response.data ? mapProjectMember(response.data) : null;
 }
 
 export async function fetchDefaultProjectRoleId(): Promise<number> {

@@ -10,11 +10,11 @@ import {
   DesktopTaskSidebar,
   ExpandTaskSidebarButton,
   MobileTaskDrawer,
-} from './FileTaskSidebars';
+} from './sidebars';
 import { FileVersionsTab } from './FileVersionsTab';
-import { CreateAnnotatedTaskDialog } from './CreateAnnotatedTaskDialog';
+import { TaskFormDialog } from './TaskFormDialog';
 import { CreateFrameCommentDialog } from './CreateFrameCommentDialog';
-import { VersionHistoryDrawer } from './VersionHistoryDrawer';
+
 import { type FileVersionItem } from '../file-ui';
 import type { FileDetailController } from './hooks/useFileDetailController';
 import { useRealtimeProjectActivity, useRealtimeComments } from '@/hooks/use-realtime-activity';
@@ -30,20 +30,13 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
     canCreateTask,
     canReviewTask,
     canSubmitTask,
-    canRestoreVersion,
-    canDeleteVersion,
-    canvasFrameComments,
     canvasRef,
-    comparisonOpacity,
-    currentMaterialId,
-    currentVersionName,
-    deletingVersionId,
     desktopSidebarOpen,
     discussionContextKey,
     discussionContextLabel,
     discussionFrameComments,
-    displayedPreviewUrl,
-    draftRegion,
+    commentFilterMode,
+    setCommentFilterMode,
     error,
     file,
     fileComments,
@@ -51,73 +44,51 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
     folder,
     focusFileTask,
     focusedTask,
-    frameAnnotationMode,
-    handleCanvasPointerDown,
-    handleCanvasPointerMove,
-    handleCanvasPointerUp,
     handleCreateAnnotatedTask,
     handleCreateDiscussionComment,
     handleCreateFrameComment,
     handleReplyToFrame,
     handleCreateReview,
     handleDeleteDiscussionComment,
-    handleDeleteVersion,
     handleFocusedTaskChange,
-    handleRestoreVersion,
     handleSubmitTaskWork,
     handleMarkReadyForReview,
     handleUpdateDiscussionComment,
     isLoading,
     isTaskContextLoading,
-    isPanning,
     isSavingComment,
     isSubmittingReview,
-    isViewingHistoricalVersion,
     loadFile,
+    quietReload,
+    refreshFrameComments,
     members,
     mobileTasksOpen,
-    panOffset,
     pendingFrameRegion,
-    pendingTaskRegion,
     projectId,
     resourceTab,
-    rotation,
-    selectedSubmission,
-    selectedSubmissionId,
     selectedTaskId,
     selectedVersion,
     selectedVersionForDetails,
     setAnnotationMode,
     setAnnotationStart,
-    setComparisonOpacity,
     setDesktopSidebarOpen,
     setDraftRegion,
     setError,
     setFrameAnnotationMode,
     setIsSubmittingReview,
     setMobileTasksOpen,
-    setPanOffset,
     setPendingFrameRegion,
     setPendingTaskRegion,
-    setReplyingFrameId,
     setResourceTab,
-    setRotation,
-    setSelectedSubmissionId,
-    setSelectedTaskId,
     setSelectedVersion,
     setSelectedVersionForDetails,
     setTaskDialogOpen,
-    setVersionHistoryOpen,
-    setVersionTabMode,
-    setZoom,
+
     setDiscussionContext,
-    startTaskFrameSelection,
+
     taskDialogOpen,
     tasks,
-    versionHistoryOpen,
-    versionTabMode,
     versions,
-    zoom,
   } = controller;
 
   const { activities } = useRealtimeProjectActivity(projectId);
@@ -132,18 +103,23 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
     if (activities.length > 0) {
       const latestActivity = activities[0];
       if (latestActivity?.fileId === Number(file.id)) {
-        void loadFile();
+        const metadata = latestActivity.metadata as any;
+        if (latestActivity.action === 'COMMENT_CREATED' && metadata?.frameId) {
+          void refreshFrameComments(metadata.frameId);
+        } else {
+          void quietReload();
+        }
       }
     }
-  }, [activities.length, file?.id, loadFile]);
+  }, [activities, activities.length, file?.id, quietReload, refreshFrameComments]);
 
   // Reload file comments when there is a new direct file comment event
   useEffect(() => {
     if (!file?.id) return;
     if (createdComments.length > 0 || updatedComments.length > 0 || deletedCommentIds.length > 0) {
-      void loadFile();
+      void quietReload();
     }
-  }, [createdComments.length, updatedComments.length, deletedCommentIds.length, file?.id, loadFile]);
+  }, [createdComments.length, updatedComments.length, deletedCommentIds.length, file?.id, quietReload]);
 
   if (!file) {
     return null;
@@ -155,10 +131,13 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
         assignedToName={assignedToName}
         file={file}
         folderTitle={folder?.title}
+        project={controller.project}
+        folders={controller.folders}
+        folder={folder}
         isSubmittingReview={isSubmittingReview}
         onCreateReview={handleCreateReview}
         onOpenMobileTasks={() => setMobileTasksOpen(true)}
-        projectId={projectId}
+
         taskCount={tasks.length}
         versions={versions}
       />
@@ -226,8 +205,8 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
                     taskId={focusedTask?.id ? Number(focusedTask.id) : null}
                     contextKey={discussionContextKey}
                     contextLabel={discussionContextLabel}
-                    currentMaterialId={currentMaterialId}
                     frameComments={discussionFrameComments}
+                    filterMode={commentFilterMode}
                     isSaving={isSavingComment}
                     onCreateComment={handleCreateDiscussionComment}
                     onUpdateComment={handleUpdateDiscussionComment}
@@ -251,7 +230,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
                       if (nextVersion) {
                         setSelectedVersion(nextVersion.isCurrent ? null : nextVersion);
                       }
-                      setSelectedSubmissionId(null);
+
                       canvasRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }}
                   />
@@ -263,14 +242,11 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
                   setSelectedVersion={setSelectedVersion}
                   selectedVersionForDetails={selectedVersionForDetails}
                   setSelectedVersionForDetails={setSelectedVersionForDetails}
-                  versionTabMode={versionTabMode}
-                  setVersionTabMode={setVersionTabMode}
-                  setVersionHistoryOpen={setVersionHistoryOpen}
+
+
                   canvasRef={canvasRef}
-                  setSelectedSubmissionId={setSelectedSubmissionId}
-                  handleRestoreVersion={handleRestoreVersion}
-                  handleDeleteVersion={handleDeleteVersion}
-                  deletingVersionId={deletingVersionId}
+
+
                   isLoading={isLoading}
                   isSubmittingReview={isSubmittingReview}
                   setIsSubmittingReview={setIsSubmittingReview}
@@ -278,8 +254,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
                   loadFile={loadFile}
                   file={file}
                   setError={setError}
-                  canRestore={canRestoreVersion}
-                  canDelete={canDeleteVersion}
+
                 />
               ) : resourceTab === 'activity' ? (
                 <FileActivityPanel fileId={file.id} projectId={projectId} />
@@ -321,7 +296,6 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
           onSubmitTaskWork={handleSubmitTaskWork}
           onMarkReadyForReview={handleMarkReadyForReview}
           onTaskChange={handleFocusedTaskChange}
-          selectedSubmissionId={selectedSubmissionId}
           selectedTaskId={selectedTaskId}
           selectedVersion={selectedVersion}
           tasks={tasks}
@@ -330,6 +304,9 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
           onRefresh={loadFile}
           discussionContextKey={discussionContextKey}
           setDiscussionContext={setDiscussionContext}
+          commentFilterMode={commentFilterMode}
+          setCommentFilterMode={setCommentFilterMode}
+          discussionFrameComments={discussionFrameComments}
         />
 
         <MobileTaskDrawer
@@ -363,7 +340,6 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
           onMarkReadyForReview={handleMarkReadyForReview}
           onTaskChange={handleFocusedTaskChange}
           open={mobileTasksOpen}
-          selectedSubmissionId={selectedSubmissionId}
           selectedTaskId={selectedTaskId}
           selectedVersion={selectedVersion}
           tasks={tasks}
@@ -372,17 +348,15 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
           onRefresh={loadFile}
           discussionContextKey={discussionContextKey}
           setDiscussionContext={setDiscussionContext}
+          commentFilterMode={commentFilterMode}
+          setCommentFilterMode={setCommentFilterMode}
+          discussionFrameComments={discussionFrameComments}
         />
       </div>
 
-      <VersionHistoryDrawer
-        onOpenChange={setVersionHistoryOpen}
-        onViewVersion={setSelectedVersion}
-        onRestoreVersion={handleRestoreVersion}
-        open={versionHistoryOpen}
-        versions={versions}
-      />
-      <CreateAnnotatedTaskDialog
+
+      <TaskFormDialog
+        mode="create"
         members={members}
         tasks={tasks}
         onCancel={() => {
@@ -391,7 +365,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
           setAnnotationMode(false);
           setTaskDialogOpen(false);
         }}
-        onCreate={handleCreateAnnotatedTask}
+        onSubmit={handleCreateAnnotatedTask}
         open={taskDialogOpen}
       />
       <CreateFrameCommentDialog

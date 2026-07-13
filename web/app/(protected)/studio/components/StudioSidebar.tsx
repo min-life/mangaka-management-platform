@@ -70,11 +70,13 @@ export function StudioSidebar({
         <div
           className={`flex h-14 items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}
         >
-          <img
-            alt={logoAlt}
-            className={`w-auto object-contain ${isCollapsed ? 'max-h-9 max-w-[44px]' : 'max-h-[68px] max-w-[170px]'}`}
-            src={isCollapsed ? collapsedLogoSrc : logoSrc}
-          />
+          <Link href="/studio">
+            <img
+              alt={logoAlt}
+              className={`w-auto object-contain hover:opacity-80 transition-opacity ${isCollapsed ? 'max-h-9 max-w-[44px]' : 'max-h-[68px] max-w-[170px]'}`}
+              src={isCollapsed ? collapsedLogoSrc : logoSrc}
+            />
+          </Link>
           {isCollapsed ? null : (
             <button
               aria-label="Collapse sidebar"

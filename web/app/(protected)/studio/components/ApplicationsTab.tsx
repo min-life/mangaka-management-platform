@@ -11,6 +11,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
+import { getProjectSlug } from '@/utils/slug';
 import { Pagination } from './Pagination';
 
 function SortIcon({
@@ -34,6 +35,7 @@ function SortIcon({
 type ApplicationsTabProps = {
   applicationRows: any[];
   isLoading: boolean;
+  formatUserName: (user?: any) => string;
   page: number;
   limit: number;
   total: number;
@@ -48,6 +50,7 @@ type ApplicationsTabProps = {
 export function ApplicationsTab({
   applicationRows,
   isLoading,
+  formatUserName,
   page,
   limit,
   total,
@@ -120,7 +123,7 @@ export function ApplicationsTab({
                 <TableCell className="px-5">
                   <Link
                     className="flex items-center gap-4 rounded-[4px] outline-none transition-opacity hover:opacity-85 focus-visible:ring-2 focus-visible:ring-[#FFD369]"
-                    href={`/studio/projects/${app.projectId}/applications`}
+                    href={`/studio/projects/${getProjectSlug(app.projectId, app.project || '')}/applications?applicationId=${app.id}`}
                   >
                     <div>
                       <p className="text-sm font-black leading-5 text-white">{app.title}</p>
@@ -138,9 +141,15 @@ export function ApplicationsTab({
                 </TableCell>
                 <TableCell className="text-xs font-bold text-white">
                   <div className="flex items-center gap-2">
-                    {app.assignee?.initials && (
-                      <span className="grid size-6 place-items-center rounded-full bg-[#151c25] text-[10px] font-black text-white ring-1 ring-[#393E46]">
-                        {app.assignee.initials}
+                    {app.createdByUser?.avatarUrl && app.createdByUser.avatarUrl.trim() !== '' ? (
+                      <img
+                        src={app.createdByUser.avatarUrl || undefined}
+                        alt=""
+                        className="size-7 rounded-full border border-[#393E46] object-cover"
+                      />
+                    ) : (
+                      <span className="grid size-7 place-items-center rounded-full border border-[#26303b] bg-[#393E46] text-[9px] font-black text-white">
+                        {formatUserName(app.createdByUser).charAt(0).toUpperCase()}
                       </span>
                     )}
                     <span>{app.createdBy}</span>

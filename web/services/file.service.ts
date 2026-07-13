@@ -1,4 +1,5 @@
 import api from '@/lib/api';
+import { parseDecimal } from '@/lib/utils';
 import type { UserSummaryResponse } from './editor-board.service';
 
 export type FileResponse = {
@@ -168,15 +169,25 @@ export async function createFileFrame(
   return {
     id: frame.id,
     fileId: Number(fileId),
-    startX: Number(frame.startX),
-    startY: Number(frame.startY),
-    endX: Number(frame.endX),
-    endY: Number(frame.endY),
+    startX: parseDecimal(frame.startX),
+    startY: parseDecimal(frame.startY),
+    endX: parseDecimal(frame.endX),
+    endY: parseDecimal(frame.endY),
   };
 }
 
 export async function getFileComments(fileId: number | string) {
   const response = await api.get<{ data: unknown[] }, { data: unknown[] }>(`/files/${fileId}/comments`);
+  return response.data ?? [];
+}
+
+export async function getFileAllFrames(fileId: number | string) {
+  const response = await api.get<{ data: unknown[] }, { data: unknown[] }>(`/files/${fileId}/frames`);
+  return response.data ?? [];
+}
+
+export async function getFileAllFrameComments(fileId: number | string) {
+  const response = await api.get<{ data: unknown[] }, { data: unknown[] }>(`/files/${fileId}/frame-comments`);
   return response.data ?? [];
 }
 

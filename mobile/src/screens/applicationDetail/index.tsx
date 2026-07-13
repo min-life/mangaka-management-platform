@@ -18,9 +18,11 @@ import { Colors } from '@/src/constants/colors';
 import { RootStackParamList } from '@/src/navigation/types';
 import { ApiComment } from '@/src/services/apiTypes';
 import {
+  ApplicationVoteSummary,
   createApplicationComment,
   fetchApplication,
   fetchApplicationComments,
+  fetchApplicationVoteSummary,
 } from '@/src/services/applicationApi';
 import { mapComment } from '@/src/services/mappers';
 import { subscribeToComments } from '@/src/services/realtimeClient';
@@ -54,7 +56,22 @@ function visibleCountForHighlight(comments: ResourceTaskComment[], highlightedCo
   return Math.max(INITIAL_COMMENT_COUNT, comments.length - highlightedIndex);
 }
 
-function ApplicationOverview({ application }: { application: ApplicationItem }) {
+function ApplicationOverview({
+  application,
+  isVoteSummaryLoading,
+  voteSummary,
+  voteSummaryErrorMessage,
+}: {
+  application: ApplicationItem;
+  isVoteSummaryLoading: boolean;
+  voteSummary: ApplicationVoteSummary | null;
+  voteSummaryErrorMessage: string;
+}) {
+  const totalVotes = voteSummary?.total ?? 0;
+  const approveFlex = voteSummary?.approve ?? 0;
+  const rejectFlex = voteSummary?.reject ?? 0;
+  const abstainFlex = voteSummary?.abstain ?? 0;
+
   return (
     <View
       className="mt-6 rounded-2xl p-5"
@@ -92,20 +109,141 @@ function ApplicationOverview({ application }: { application: ApplicationItem }) 
           </Text>
         </View>
       </View>
+
+      <View
+        className="mt-5 rounded-xl p-4"
+        style={{
+          backgroundColor: Colors.surfaceContainer,
+          borderWidth: 1,
+          borderColor: Colors.borderSubtle,
+        }}
+      >
+        <View className="flex-row items-center justify-between gap-3">
+          <View className="flex-row items-center gap-3">
+            <View
+              className="h-10 w-10 items-center justify-center rounded-lg"
+              style={{ backgroundColor: Colors.iconBg }}
+            >
+              <MaterialIcon name="how_to_vote" color={Colors.accent} size={19} />
+            </View>
+            <View>
+              <Text
+                className="text-[11px] font-bold uppercase"
+                style={{ color: Colors.textFaint }}
+              >
+                Voting
+              </Text>
+              <Text className="mt-0.5 text-[13px] font-semibold" style={{ color: Colors.text }}>
+                Application decision
+              </Text>
+            </View>
+          </View>
+
+          {isVoteSummaryLoading ? (
+            <ActivityIndicator color={Colors.accent} size="small" />
+          ) : voteSummaryErrorMessage ? (
+            <Text
+              className="text-right text-[12px] font-semibold"
+              style={{ color: Colors.textMuted }}
+            >
+              Unavailable
+            </Text>
+          ) : (
+            <View className="items-end">
+              <Text className="text-[24px] font-black" style={{ color: Colors.text }}>
+                {totalVotes}
+              </Text>
+              <Text className="text-[11px] font-bold uppercase" style={{ color: Colors.textFaint }}>
+                Votes
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {!isVoteSummaryLoading && !voteSummaryErrorMessage ? (
+          <>
+            <View
+              className="mt-4 h-2 flex-row overflow-hidden rounded-full"
+              style={{ backgroundColor: Colors.iconBg }}
+            >
+              <View style={{ flex: approveFlex, backgroundColor: Colors.statusDone }} />
+              <View style={{ flex: rejectFlex, backgroundColor: '#EF4444' }} />
+              <View style={{ flex: abstainFlex, backgroundColor: Colors.statusPending }} />
+            </View>
+
+            <View className="mt-4 flex-row gap-2">
+              {[
+                { color: Colors.statusDone, label: 'Approve', value: voteSummary?.approve ?? 0 },
+                { color: '#EF4444', label: 'Reject', value: voteSummary?.reject ?? 0 },
+                { color: Colors.statusPending, label: 'Abstain', value: voteSummary?.abstain ?? 0 },
+              ].map((item) => (
+                <View
+                  key={item.label}
+                  className="flex-1 rounded-lg px-3 py-2"
+                  style={{
+                    backgroundColor: Colors.overlayLight,
+                    borderWidth: 1,
+                    borderColor: Colors.borderSubtle,
+                  }}
+                >
+                  <View className="flex-row items-center gap-1.5">
+                    <View className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
+                    <Text
+                      className="text-[10px] font-bold uppercase"
+                      numberOfLines={1}
+                      style={{ color: Colors.textFaint }}
+                    >
+                      {item.label}
+                    </Text>
+                  </View>
+                  <Text className="mt-1 text-[16px] font-black" style={{ color: Colors.text }}>
+                    {item.value}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </>
+        ) : null}
+
+        {voteSummaryErrorMessage ? (
+          <Text className="mt-3 text-[12px] leading-5" style={{ color: Colors.textFaint }}>
+            {voteSummaryErrorMessage}
+          </Text>
+        ) : null}
+      </View>
+
     </View>
   );
 }
 
 function ApplicationMaterials({ application }: { application: ApplicationItem }) {
+  const materialCount = application.materials.pages.length;
+
   return (
     <View className="mt-6 gap-3">
-      <Text
-        className="text-[12px] font-bold uppercase"
-        style={{ color: Colors.textMuted, letterSpacing: 1 }}
-      >
-        Materials
-      </Text>
-      {application.materials.pages.length > 0 ? (
+      <View className="flex-row items-center justify-between">
+        <View>
+          <Text
+            className="text-[12px] font-bold uppercase"
+            style={{ color: Colors.textMuted, letterSpacing: 1 }}
+          >
+            Materials
+          </Text>
+          <Text className="mt-1 text-[13px]" style={{ color: Colors.textFaint }}>
+            {materialCount > 0 ? application.materials.note : 'No linked files for this request.'}
+          </Text>
+        </View>
+        <View
+          className="rounded-full px-3 py-1"
+          style={{ backgroundColor: Colors.surfaceContainer }}
+        >
+          <Text className="text-[12px] font-bold" style={{ color: Colors.text }}>
+            {materialCount}
+          </Text>
+        </View>
+      </View>
+
+      {materialCount > 0 ? (
         application.materials.pages.map((material) => (
           <ApplicationMaterialRow key={material.id} material={material} />
         ))
@@ -201,7 +339,7 @@ function ApplicationDiscussion({
         style={{ backgroundColor: C.surface, borderWidth: 1, borderColor: C.border }}
       >
         <Text className="text-center text-[14px] font-semibold" style={{ color: C.text }}>
-          Không thể tải bình luận
+          Unable to load comments
         </Text>
         <Text className="mt-2 text-center text-[12px] leading-5" style={{ color: C.textMuted }}>
           {errorMessage}
@@ -213,7 +351,7 @@ function ApplicationDiscussion({
           style={{ backgroundColor: C.surfaceHighest }}
         >
           <Text className="text-[12px] font-bold" style={{ color: C.text }}>
-            Thử lại
+            Try again
           </Text>
         </TouchableOpacity>
       </View>
@@ -274,8 +412,8 @@ function ApplicationDiscussion({
                 }}
               >
                 <Text className="text-[12px] font-semibold" style={{ color: C.textMuted }}>
-                  Kéo lên hoặc chạm để xem {Math.min(hiddenCommentCount, COMMENT_BATCH_COUNT)} bình
-                  luận cũ
+                  Pull up or tap to view {Math.min(hiddenCommentCount, COMMENT_BATCH_COUNT)} older
+                  comments
                 </Text>
               </TouchableOpacity>
             ) : null}
@@ -331,7 +469,7 @@ function ApplicationDiscussionComposer({
       await onCreateComment(comment);
       setComment('');
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể gửi bình luận.');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to send comment.');
     } finally {
       setIsSubmitting(false);
     }
@@ -358,7 +496,7 @@ function ApplicationDiscussionComposer({
         <TextInput
           value={comment}
           onChangeText={setComment}
-          placeholder="Trao đổi với team về application này..."
+          placeholder="Discuss this application with the team..."
           placeholderTextColor={C.textFaint}
           className="flex-1 py-2 text-sm"
           editable={!isSubmitting}
@@ -403,6 +541,9 @@ export default function ApplicationDetailScreen({
   const [isCommentsLoading, setIsCommentsLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
+  const [voteSummary, setVoteSummary] = useState<ApplicationVoteSummary | null>(null);
+  const [isVoteSummaryLoading, setIsVoteSummaryLoading] = useState(false);
+  const [voteSummaryErrorMessage, setVoteSummaryErrorMessage] = useState('');
   const scrollViewRef = useRef<ScrollView | null>(null);
   const didScrollToInitialCommentRef = useRef(false);
   const didScrollToLatestDiscussionRef = useRef(false);
@@ -417,7 +558,7 @@ export default function ApplicationDetailScreen({
       const result = await fetchApplication(route.params.applicationId);
       setApplication(result);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải application.');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load application.');
     } finally {
       setIsLoading(false);
     }
@@ -426,6 +567,41 @@ export default function ApplicationDetailScreen({
   useEffect(() => {
     void loadApplication();
   }, [loadApplication]);
+
+  useEffect(() => {
+    if (!application?.id) {
+      setVoteSummary(null);
+      setVoteSummaryErrorMessage('');
+      setIsVoteSummaryLoading(false);
+      return undefined;
+    }
+
+    let isActive = true;
+    setVoteSummary(null);
+    setVoteSummaryErrorMessage('');
+    setIsVoteSummaryLoading(true);
+
+    void fetchApplicationVoteSummary(application.id)
+      .then((result) => {
+        if (!isActive) return;
+        setVoteSummary(result);
+        setVoteSummaryErrorMessage('');
+      })
+      .catch((error) => {
+        if (!isActive) return;
+        setVoteSummary(null);
+        setVoteSummaryErrorMessage(
+          error instanceof Error ? error.message : 'Unable to load votes.',
+        );
+      })
+      .finally(() => {
+        if (isActive) setIsVoteSummaryLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [application?.id]);
 
   const addDiscussionComment = useCallback((comment: ApiComment) => {
     const nextComment = mapComment(comment);
@@ -449,7 +625,7 @@ export default function ApplicationDetailScreen({
     } catch (error) {
       setComments([]);
       setCommentsErrorMessage(
-        error instanceof Error ? error.message : 'Không thể tải application comments.',
+        error instanceof Error ? error.message : 'Unable to load application comments.',
       );
     } finally {
       setIsCommentsLoading(false);
@@ -557,7 +733,14 @@ export default function ApplicationDetailScreen({
             tabs={APPLICATION_DETAIL_TABS}
           />
 
-          {activeTab === 'Overview' ? <ApplicationOverview application={application} /> : null}
+          {activeTab === 'Overview' ? (
+            <ApplicationOverview
+              application={application}
+              isVoteSummaryLoading={isVoteSummaryLoading}
+              voteSummary={voteSummary}
+              voteSummaryErrorMessage={voteSummaryErrorMessage}
+            />
+          ) : null}
 
           {activeTab === 'Discussion' ? (
             <ApplicationDiscussion

@@ -6,8 +6,6 @@ type ProjectMembersPageProps = {
   }>;
 };
 
-export default async function ProjectMembersPage({ params }: ProjectMembersPageProps) {
-  const { projectId } = await params;
-
-  return <ProjectMembersClient projectId={Number(projectId)} />;
+export default async function ProjectMembersPage() {
+  return <ProjectMembersClient />;
 }
