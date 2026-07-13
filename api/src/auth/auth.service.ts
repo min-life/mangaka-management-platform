@@ -277,7 +277,7 @@ export class AuthService {
         audience: requireEnv('GOOGLE_CLIENT_ID'),
       });
       const payload = ticket.getPayload();
-      
+
       if (!payload) {
         throw new UnauthorizedException('Invalid Google token');
       }
@@ -289,7 +289,8 @@ export class AuthService {
         avatarUrl: payload.picture ?? null,
       };
 
-      const { accessToken, refreshToken, refreshTokenExpiresAt } = await this.googleLogin(googleUser);
+      const { accessToken, refreshToken, refreshTokenExpiresAt } =
+        await this.googleLogin(googleUser);
 
       return {
         accessToken,

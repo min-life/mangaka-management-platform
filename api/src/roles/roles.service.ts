@@ -74,10 +74,7 @@ export class RolesService {
       });
 
       if (dto.permissionIds !== undefined) {
-        await this.replacePermissions(
-          role.id,
-          dto.permissionIds,
-        );
+        await this.replacePermissions(role.id, dto.permissionIds);
       }
 
       const finalRole = await this.ensureRole(role.id, true);
@@ -118,10 +115,7 @@ export class RolesService {
       });
 
       if (dto.permissionIds !== undefined) {
-        await this.replacePermissions(
-          roleId,
-          dto.permissionIds,
-        );
+        await this.replacePermissions(roleId, dto.permissionIds);
       }
 
       const finalRole = await this.ensureRole(roleId, true);
@@ -215,7 +209,9 @@ export class RolesService {
   private async ensureRole(roleId: number, includePermissions = false) {
     const role = await this.prisma.role.findUnique({
       where: { id: roleId },
-      include: includePermissions ? { rolePermissions: { include: { permission: true } } } : undefined,
+      include: includePermissions
+        ? { rolePermissions: { include: { permission: true } } }
+        : undefined,
     });
 
     if (!role) {
@@ -232,7 +228,6 @@ export class RolesService {
       scope: permission.scope,
     };
   }
-
 
   private buildPagination(pagination?: { page?: number; limit?: number }) {
     const page = pagination?.page || 1;

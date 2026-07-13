@@ -24,19 +24,19 @@ export class FrameResDto {
   name?: string | null;
 
   @ApiProperty({ example: 10.5, type: Number })
-  @Transform(({ value }) => value ? Number(value) : value)
+  @Transform(({ value }) => (value ? Number(value) : value))
   startX!: number;
 
   @ApiProperty({ example: 20.3, type: Number })
-  @Transform(({ value }) => value ? Number(value) : value)
+  @Transform(({ value }) => (value ? Number(value) : value))
   startY!: number;
 
   @ApiProperty({ example: 100.7, type: Number })
-  @Transform(({ value }) => value ? Number(value) : value)
+  @Transform(({ value }) => (value ? Number(value) : value))
   endX!: number;
 
   @ApiProperty({ example: 150.2, type: Number })
-  @Transform(({ value }) => value ? Number(value) : value)
+  @Transform(({ value }) => (value ? Number(value) : value))
   endY!: number;
 
   @ApiProperty({ example: 10 })
