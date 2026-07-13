@@ -39,7 +39,7 @@ export default function EditorBoardsScreen({ navigation }: EditorBoardsScreenPro
       const result = await fetchEditorBoards({ name: search.trim() || undefined });
       setBoards(result.boards);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải editor boards.');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load editor boards.');
     } finally {
       setIsLoading(false);
     }
@@ -78,10 +78,10 @@ export default function EditorBoardsScreen({ navigation }: EditorBoardsScreenPro
         showsVerticalScrollIndicator={false}
       >
         <View className="px-4" style={{ zIndex: 20 }}>
-          <View className="flex-row items-center gap-2 pb-4 pt-3" style={{ zIndex: 30 }}>
-            <View className="flex-1">
-              <EditorBoardSearchBar search={search} onSearchChange={setSearch} />
-            </View>
+          <View className="pt-3">
+            <EditorBoardSearchBar search={search} onSearchChange={setSearch} />
+          </View>
+          <View className="relative z-20 mt-3" style={{ zIndex: 30 }}>
             <EditorBoardRoleFilter activeRole={roleFilter} onRoleChange={setRoleFilter} />
           </View>
         </View>
@@ -95,7 +95,7 @@ export default function EditorBoardsScreen({ navigation }: EditorBoardsScreenPro
             className={viewMode === 'card' ? 'gap-4 px-4 pt-1' : undefined}
             style={
               viewMode === 'list'
-                ? { borderTopWidth: 1, borderTopColor: Colors.borderFaint }
+                ? { borderTopWidth: 0, borderTopColor: Colors.borderFaint }
                 : undefined
             }
           >

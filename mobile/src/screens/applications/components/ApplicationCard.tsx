@@ -14,6 +14,21 @@ interface ApplicationCardProps {
   onPress: () => void;
 }
 
+function ApplicationMetaItem({ icon, label }: { icon: string; label: string }) {
+  return (
+    <View className="min-w-0 flex-row items-center">
+      <MaterialIcon name={icon} color={Colors.textMuted} size={15} />
+      <Text
+        className="ml-1.5 text-[12px] font-medium"
+        style={{ color: Colors.textMuted }}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
 export default function ApplicationCard({
   application,
   contextLabel,
@@ -42,31 +57,26 @@ export default function ApplicationCard({
         <ApplicationStatusBadge status={application.status} />
       </View>
 
-      <Text
-        className="mt-3 text-[13px] leading-5"
-        style={{ color: Colors.textMuted }}
-        numberOfLines={2}
-      >
-        {application.description}
-      </Text>
+      {application.description ? (
+        <Text
+          className="mt-3 text-[13px] leading-5"
+          style={{ color: Colors.textMuted }}
+          numberOfLines={2}
+        >
+          {application.description}
+        </Text>
+      ) : null}
 
-      {contextLabel && (
-        <View className="mt-3 flex-row items-center gap-2">
-          <MaterialIcon name="folder" color={Colors.iconFolder} size={15} />
-          <Text className="text-[12px] font-semibold" style={{ color: Colors.textMuted }}>
-            {contextLabel}
-          </Text>
-        </View>
-      )}
+      <View className="mt-4 flex-row flex-wrap gap-x-4 gap-y-2">
+        {contextLabel ? <ApplicationMetaItem icon="folder" label={contextLabel} /> : null}
+        <ApplicationMetaItem icon="person" label={application.createdBy || 'Unknown creator'} />
+        <ApplicationMetaItem icon="calendar_today" label={application.createdAtLabel} />
+        {application.verifyBy ? (
+          <ApplicationMetaItem icon="verified" label={application.verifyBy} />
+        ) : null}
+      </View>
 
-      <View className="mt-4 flex-row items-center justify-between">
-        <View className="flex-row items-center gap-2">
-          <MaterialIcon name="attach" color={Colors.textMuted} size={16} />
-          <Text className="text-[12px] font-medium" style={{ color: Colors.textMuted }}>
-            {application.materials.pages.length} material
-            {application.materials.pages.length === 1 ? '' : 's'}
-          </Text>
-        </View>
+      <View className="mt-4 flex-row justify-end">
         <Text className="text-[12px]" style={{ color: Colors.textFaint }}>
           {application.updatedAtLabel}
         </Text>

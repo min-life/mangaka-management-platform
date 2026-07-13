@@ -1,16 +1,23 @@
-export type ApplicationType = 'MANUSCRIPT_REVIEW' | 'PUBLISH_REQUEST';
+export type ApplicationType = 'CREATE_ARC' | 'CREATE_CHAPTER';
 export type ApplicationStatus = 'PENDING' | 'APPROVE' | 'REJECT' | 'CANCELLED';
 
 export interface ApplicationMaterialPage {
+  height?: number;
   id: string;
+  isThumbnail?: boolean;
+  mimeType?: string;
+  originalName: string;
+  size?: number;
   title: string;
-  fileName: string;
-  status: 'Ready' | 'Needs review' | 'Blocked';
+  type?: string;
+  url?: string;
+  width?: number;
 }
 
 export interface ApplicationItem {
   id: string;
   projectId: string;
+  projectName?: string;
   title: string;
   description: string;
   type: ApplicationType;
@@ -24,4 +31,3 @@ export interface ApplicationItem {
     note: string;
   };
 }
-

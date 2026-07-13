@@ -1,5 +1,13 @@
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -8,7 +16,11 @@ import BottomNavBar from '@/src/components/shared/BottomNavBar';
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
 import { RootStackParamList } from '@/src/navigation/types';
-import { fetchEditorBoardBundle, leaveEditorBoard } from '@/src/services/editorBoardApi';
+import {
+  deleteEditorBoard,
+  fetchEditorBoardBundle,
+  leaveEditorBoard,
+} from '@/src/services/editorBoardApi';
 import { ProjectDetailMenuItem, ProjectDetailTopBar } from '@/src/screens/projectDetail/components';
 import { ApplicationItem } from '@/src/types/applications';
 import { EditorBoardItem, EditorBoardMember } from '@/src/types/editorBoards';
@@ -27,18 +39,22 @@ function getBoardInitials(name: string) {
 
 function EditorBoardDetailHero({
   description,
+  imageUrl,
   leadName,
   name,
   role,
   updatedAtLabel,
 }: {
   description: string;
+  imageUrl?: string | null;
   leadName?: string;
   name: string;
   role: string;
   updatedAtLabel: string;
 }) {
+  const [hasImageError, setHasImageError] = useState(false);
   const subtitle = leadName ? `${role} - Lead: ${leadName}` : role;
+  const shouldShowImage = Boolean(imageUrl && !hasImageError);
 
   return (
     <View className="pb-6">
@@ -46,19 +62,30 @@ function EditorBoardDetailHero({
         className="h-[260px] items-center justify-center overflow-hidden"
         style={{ backgroundColor: Colors.iconBg }}
       >
-        <View
-          className="h-28 w-28 items-center justify-center rounded-3xl"
-          style={{
-            backgroundColor: Colors.overlayLight,
-            borderWidth: 1,
-            borderColor: Colors.borderFaint,
-          }}
-        >
-          <MaterialIcon name="groups" color={Colors.accent} size={54} />
-        </View>
-        <Text className="mt-4 text-[22px] font-black" style={{ color: Colors.text }}>
-          {getBoardInitials(name)}
-        </Text>
+        {shouldShowImage ? (
+          <Image
+            source={{ uri: imageUrl! }}
+            className="h-full w-full"
+            onError={() => setHasImageError(true)}
+            resizeMode="cover"
+          />
+        ) : (
+          <>
+            <View
+              className="h-28 w-28 items-center justify-center rounded-3xl"
+              style={{
+                backgroundColor: Colors.overlayLight,
+                borderWidth: 1,
+                borderColor: Colors.borderFaint,
+              }}
+            >
+              <MaterialIcon name="groups" color={Colors.accent} size={54} />
+            </View>
+            <Text className="mt-4 text-[22px] font-black" style={{ color: Colors.text }}>
+              {getBoardInitials(name)}
+            </Text>
+          </>
+        )}
       </View>
 
       <View className="px-4">
@@ -91,7 +118,7 @@ export default function EditorBoardDetailScreen({
   const [boardProjects, setBoardProjects] = useState<ProjectItem[]>([]);
   const [publishRequests, setPublishRequests] = useState<ApplicationItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isLeavingBoard, setIsLeavingBoard] = useState(false);
+  const [isBoardActionPending, setIsBoardActionPending] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -106,7 +133,7 @@ export default function EditorBoardDetailScreen({
       setBoardProjects(bundle.projects);
       setPublishRequests(bundle.applications);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải editor board.');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load editor board.');
     } finally {
       setIsLoading(false);
     }
@@ -142,22 +169,41 @@ export default function EditorBoardDetailScreen({
 
   const lead = members.find((member) => member.role === 'Lead');
   const primaryProject = boardProjects[0];
+  const isOwner = board.currentUserRole === 'Owner';
 
   const performLeaveBoard = async () => {
-    if (isLeavingBoard) return;
+    if (isBoardActionPending) return;
 
     setIsMoreMenuOpen(false);
-    setIsLeavingBoard(true);
+    setIsBoardActionPending(true);
     try {
       await leaveEditorBoard(route.params.boardId);
       navigation.navigate('EditorBoards');
     } catch (error) {
       Alert.alert(
         'Cannot leave board',
-        error instanceof Error ? error.message : 'Không thể rời editor board.',
+        error instanceof Error ? error.message : 'Unable to leave editor board.',
       );
     } finally {
-      setIsLeavingBoard(false);
+      setIsBoardActionPending(false);
+    }
+  };
+
+  const performDeleteBoard = async () => {
+    if (isBoardActionPending) return;
+
+    setIsMoreMenuOpen(false);
+    setIsBoardActionPending(true);
+    try {
+      await deleteEditorBoard(route.params.boardId);
+      navigation.navigate('EditorBoards');
+    } catch (error) {
+      Alert.alert(
+        'Cannot delete board',
+        error instanceof Error ? error.message : 'Unable to delete editor board.',
+      );
+    } finally {
+      setIsBoardActionPending(false);
     }
   };
 
@@ -166,6 +212,14 @@ export default function EditorBoardDetailScreen({
     Alert.alert('Out', `Leave ${board.name}?`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Out', style: 'destructive', onPress: performLeaveBoard },
+    ]);
+  };
+
+  const handleDeletePress = () => {
+    setIsMoreMenuOpen(false);
+    Alert.alert('Delete board', `Delete ${board.name}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: performDeleteBoard },
     ]);
   };
 
@@ -219,18 +273,18 @@ export default function EditorBoardDetailScreen({
           <TouchableOpacity
             activeOpacity={0.76}
             accessibilityRole="button"
-            disabled={isLeavingBoard}
+            disabled={isBoardActionPending}
             className="min-w-[132px] flex-row items-center rounded-lg px-3 py-3"
-            onPress={handleOutPress}
-            style={{ opacity: isLeavingBoard ? 0.56 : 1 }}
+            onPress={isOwner ? handleDeletePress : handleOutPress}
+            style={{ opacity: isBoardActionPending ? 0.56 : 1 }}
           >
-            {isLeavingBoard ? (
+            {isBoardActionPending ? (
               <ActivityIndicator color="#EF4444" size="small" />
             ) : (
-              <MaterialIcon name="logout" color="#EF4444" size={18} />
+              <MaterialIcon name={isOwner ? 'delete' : 'logout'} color="#EF4444" size={18} />
             )}
             <Text className="ml-2 text-[14px] font-semibold" style={{ color: '#EF4444' }}>
-              Out
+              {isOwner ? 'Delete board' : 'Out'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -243,6 +297,7 @@ export default function EditorBoardDetailScreen({
       >
         <EditorBoardDetailHero
           description={board.description}
+          imageUrl={board.imageUrl}
           leadName={lead?.name}
           name={board.name}
           role={board.currentUserRole}

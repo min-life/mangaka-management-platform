@@ -11,6 +11,7 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import HeaderBackButton from '@/src/components/shared/HeaderBackButton';
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
 import { RootStackParamList } from '@/src/navigation/types';
@@ -20,12 +21,9 @@ import LoginTextField from '@/src/screens/login/components/LoginTextField';
 type ForgotPasswordScreenProps = NativeStackScreenProps<RootStackParamList, 'ForgotPassword'>;
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const FORGOT_SUCCESS_MESSAGE = 'Nếu email tồn tại, hướng dẫn đặt lại mật khẩu đã được gửi.';
+const FORGOT_SUCCESS_MESSAGE = 'If the email exists, reset instructions have been sent.';
 
-export default function ForgotPasswordScreen({
-  navigation,
-  route,
-}: ForgotPasswordScreenProps) {
+export default function ForgotPasswordScreen({ navigation, route }: ForgotPasswordScreenProps) {
   const [email, setEmail] = useState(route.params?.email ?? '');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -45,13 +43,13 @@ export default function ForgotPasswordScreen({
 
     if (!normalizedEmail) {
       setSuccessMessage('');
-      setErrorMessage('Vui lòng nhập email để đặt lại mật khẩu.');
+      setErrorMessage('Please enter your email to reset your password.');
       return;
     }
 
     if (!EMAIL_PATTERN.test(normalizedEmail)) {
       setSuccessMessage('');
-      setErrorMessage('Email không hợp lệ.');
+      setErrorMessage('Invalid email address.');
       return;
     }
 
@@ -65,8 +63,8 @@ export default function ForgotPasswordScreen({
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
       if (
-        message === 'Không thể kết nối tới API. Vui lòng kiểm tra server hoặc cấu hình URL.' ||
-        message === 'Máy chủ đang gặp sự cố. Vui lòng thử lại sau.'
+        message === 'Unable to connect to the API. Please check the server or URL config.' ||
+        message === 'The server is having an issue. Please try again later.'
       ) {
         setErrorMessage(message);
       } else {
@@ -105,20 +103,11 @@ export default function ForgotPasswordScreen({
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <TouchableOpacity
-            activeOpacity={0.75}
-            accessibilityRole="button"
+          <HeaderBackButton
             accessibilityLabel="Back to login"
-            className="mb-6 h-11 w-11 items-center justify-center rounded-full"
+            className="mb-6"
             onPress={() => navigation.goBack()}
-            style={{
-              backgroundColor: Colors.surface,
-              borderColor: Colors.borderFaint,
-              borderWidth: 1,
-            }}
-          >
-            <MaterialIcon name="arrow_back" color={Colors.text} size={22} />
-          </TouchableOpacity>
+          />
 
           <View
             className="rounded-[20px] p-5"
@@ -133,7 +122,8 @@ export default function ForgotPasswordScreen({
                 Reset password
               </Text>
               <Text className="mt-2 text-[13px] leading-5" style={{ color: Colors.textMuted }}>
-                Enter your account email. We will send password reset instructions if the account exists.
+                Enter your account email. We will send password reset instructions if the account
+                exists.
               </Text>
             </View>
 
@@ -205,7 +195,9 @@ export default function ForgotPasswordScreen({
                   >
                     Send reset link
                   </Text>
-                  {isFormValid ? <MaterialIcon name="arrow_forward" color={Colors.bg} size={17} /> : null}
+                  {isFormValid ? (
+                    <MaterialIcon name="arrow_forward" color={Colors.bg} size={17} />
+                  ) : null}
                 </>
               )}
             </TouchableOpacity>

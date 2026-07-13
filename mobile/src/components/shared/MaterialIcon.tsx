@@ -18,85 +18,85 @@ export type MaterialIconName = ComponentProps<typeof MaterialIcons>['name'];
  */
 const ICON_MAP: Record<string, MaterialIconName> = {
   // ── Navigation ─────────────────────────────────────────────
-  mail:          'mail-outline',
-  dashboard:     'dashboard',
-  home:          'home',
-  lock:          'lock-outline',
+  mail: 'mail-outline',
+  dashboard: 'dashboard',
+  home: 'home',
+  lock: 'lock-outline',
 
   // ── Work Items ─────────────────────────────────────────────
-  checklist:     'checklist',
-  folder:        'folder-open',
-  send:          'send',
-  groups:        'groups',
+  checklist: 'checklist',
+  folder: 'folder-open',
+  send: 'send',
+  groups: 'groups',
 
   // ── Activity Feed ──────────────────────────────────────────
-  assignment:    'assignment',
-  comment:       'comment',
-  cloud_upload:  'cloud-upload',
+  assignment: 'assignment',
+  comment: 'comment',
+  cloud_upload: 'cloud-upload',
 
   // ── Header / Actions ──────────────────────────────────────
-  search:        'search',
-  add:           'add',
-  link:          'link',
-  fork:          'call-split',
-  bell:          'notifications-none',
-  code:          'code',
-  file:          'insert-drive-file',
-  article:       'article',
-  image:         'image',
-  close:         'close',
-  check:         'check',
+  search: 'search',
+  add: 'add',
+  link: 'link',
+  fork: 'call-split',
+  bell: 'notifications-none',
+  code: 'code',
+  file: 'insert-drive-file',
+  article: 'article',
+  image: 'image',
+  close: 'close',
+  check: 'check',
 
   // ── Tasks Screen ──────────────────────────────────────────
-  calendar_today:'calendar-today',
-  filter_list:   'filter-list',
+  calendar_today: 'calendar-today',
+  filter_list: 'filter-list',
 
   // ── Task Detail & Review Screen ────────────────────────────
-  share:         'share',
-  visibility:    'visibility',
-  visibility_off:'visibility-off',
-  zoom_in:       'zoom-in',
-  check_circle:  'check-circle',
-  cancel:        'cancel',
-  edit_note:     'edit',
-  expand_more:   'expand-more',
-  expand_less:   'expand-less',
-  frame_person:  'crop-free',
+  share: 'share',
+  visibility: 'visibility',
+  visibility_off: 'visibility-off',
+  zoom_in: 'zoom-in',
+  check_circle: 'check-circle',
+  cancel: 'cancel',
+  edit_note: 'edit',
+  expand_more: 'expand-more',
+  expand_less: 'expand-less',
+  frame_person: 'crop-free',
 
   // ── Common ────────────────────────────────────────────────
-  person:        'person-outline',
-  settings:      'settings',
+  person: 'person-outline',
+  settings: 'settings',
   notifications: 'notifications',
   chevron_right: 'chevron-right',
-  apps:          'apps',
-  group_add:     'group-add',
+  apps: 'apps',
+  group_add: 'group-add',
 
   // ── Profile Screen ──────────────────────────────────────
-  apartment:     'apartment',
-  forum:         'forum',
-  description:   'description',
-  security:      'security',
-  palette:       'palette',
-  help:          'help-outline',
-  logout:        'logout',
+  apartment: 'apartment',
+  forum: 'forum',
+  description: 'description',
+  security: 'security',
+  palette: 'palette',
+  help: 'help-outline',
+  logout: 'logout',
 
   // ── Notifications Screen ────────────────────────────────
-  done_all:      'done-all',
+  done_all: 'done-all',
   arrow_forward: 'arrow-forward-ios',
-  arrow_back:    'arrow-back-ios',
-  more_vert:     'more-vert',
-  edit:          'edit',
-  delete:        'delete-outline',
-  filter:        'filter-list',
-  sort:          'sort',
-  attach:        'attach-file',
-  star:          'star-outline',
-  info:          'info-outline',
-  warning:       'warning-amber',
-  error:         'error-outline',
-  assessment:    'assessment',
-  view_list:     'view-list',
-  view_module:   'view-module',
+  arrow_back: 'arrow-back-ios',
+  more_vert: 'more-vert',
+  edit: 'edit',
+  delete: 'delete-outline',
+  filter: 'filter-list',
+  sort: 'sort',
+  attach: 'attach-file',
+  star: 'star-outline',
+  info: 'info-outline',
+  warning: 'warning-amber',
+  error: 'error-outline',
+  assessment: 'assessment',
+  view_list: 'view-list',
+  view_module: 'view-module',
 };
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -126,10 +126,8 @@ export default function MaterialIcon({ name, color, size = 24 }: MaterialIconPro
 
   if (!iconName) {
     // Fallback khi icon chưa được map — dễ phát hiện khi dev
-    console.warn(`[MaterialIcon] Icon "${name}" chưa được định nghĩa trong ICON_MAP.`);
-    return (
-      <MaterialIcons name="help-outline" size={size} color={color ?? '#EDF1FB'} />
-    );
+    console.warn(`[MaterialIcon] Icon "${name}" is not defined in ICON_MAP.`);
+    return <MaterialIcons name="help-outline" size={size} color={color ?? '#EDF1FB'} />;
   }
 
   return <MaterialIcons name={iconName} size={size} color={color ?? '#EDF1FB'} />;

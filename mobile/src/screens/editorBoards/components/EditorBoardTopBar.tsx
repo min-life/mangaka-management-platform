@@ -2,6 +2,7 @@ import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import HeaderBackButton from '@/src/components/shared/HeaderBackButton';
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
 
@@ -26,18 +27,7 @@ export default function EditorBoardTopBar({
     return (
       <SafeAreaView edges={['top']} style={{ backgroundColor: Colors.bg }}>
         <View className="h-16 justify-center px-4">
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={onBack}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-            className="absolute left-3 z-10 flex-row items-center rounded-full py-2 pr-3"
-          >
-            <MaterialIcon name="arrow_back" color={Colors.statusProgress} size={22} />
-            <Text className="ml-1 text-[15px] font-medium" style={{ color: Colors.statusProgress }}>
-              Back
-            </Text>
-          </TouchableOpacity>
+          <HeaderBackButton className="absolute left-3 z-10" onPress={onBack} />
 
           {rightAction ? <View className="absolute right-3 top-2 z-10">{rightAction}</View> : null}
 
@@ -59,15 +49,7 @@ export default function EditorBoardTopBar({
         className="flex-row items-center px-4 h-16"
         style={{ borderBottomWidth: 1, borderBottomColor: Colors.borderSubtle }}
       >
-        <TouchableOpacity
-          activeOpacity={0.72}
-          onPress={onBack}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          className="h-10 w-10 items-center justify-center rounded-full"
-        >
-          <MaterialIcon name="arrow_back" color={Colors.text} size={21} />
-        </TouchableOpacity>
+        <HeaderBackButton onPress={onBack} />
         <View className="flex-1 px-2">
           {subtitle && (
             <Text

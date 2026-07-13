@@ -2,6 +2,7 @@ import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import HeaderBackButton from '@/src/components/shared/HeaderBackButton';
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
 
@@ -26,18 +27,10 @@ export default function ApplicationTopBar({
         className="flex-row items-center px-4 h-16"
         style={{ borderBottomWidth: 1, borderBottomColor: Colors.borderSubtle }}
       >
-        <TouchableOpacity
-          activeOpacity={0.72}
-          onPress={onBack}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          className="w-10 h-10 items-center justify-center rounded-full"
-        >
-          <MaterialIcon name="arrow_back" color={Colors.text} size={21} />
-        </TouchableOpacity>
+        <HeaderBackButton onPress={onBack} />
 
         <View className="flex-1 px-2">
-          {subtitle && (
+          {/* {subtitle && (
             <Text
               className="text-[11px] font-bold uppercase"
               style={{ color: Colors.textMuted, letterSpacing: 1.1 }}
@@ -45,7 +38,7 @@ export default function ApplicationTopBar({
             >
               {subtitle}
             </Text>
-          )}
+          )} */}
           <Text className="text-[20px] font-bold" style={{ color: Colors.text }} numberOfLines={1}>
             {title}
           </Text>
@@ -69,4 +62,3 @@ export default function ApplicationTopBar({
     </SafeAreaView>
   );
 }
-

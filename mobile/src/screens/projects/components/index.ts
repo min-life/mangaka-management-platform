@@ -1,4 +1,5 @@
 export { default as ProjectCardItem } from './ProjectCardItem';
+export { default as ProjectFilterSelect } from './ProjectFilterSelect';
 export { default as ProjectListItem } from './ProjectListItem';
 export { default as ProjectsEmptyState } from './ProjectsEmptyState';
 export { default as ProjectsSearchBar } from './ProjectsSearchBar';

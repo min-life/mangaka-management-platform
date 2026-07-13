@@ -2,7 +2,7 @@ import { Colors } from '@/src/constants/colors';
 import { ApplicationStatus, ApplicationType } from '@/src/types/applications';
 
 export function getApplicationTypeLabel(type: ApplicationType) {
-  return type === 'MANUSCRIPT_REVIEW' ? 'Manuscript Review' : 'Publish Request';
+  return type === 'CREATE_ARC' ? 'Create Arc' : 'Create Chapter';
 }
 
 export function getApplicationStatusLabel(status: ApplicationStatus) {
@@ -32,6 +32,5 @@ export function getApplicationStatusColor(status: ApplicationStatus) {
 }
 
 export function getApplicationTypeColor(type: ApplicationType) {
-  return type === 'MANUSCRIPT_REVIEW' ? Colors.statusProgress : Colors.iconApp;
+  return type === 'CREATE_ARC' ? Colors.statusProgress : Colors.iconApp;
 }
-

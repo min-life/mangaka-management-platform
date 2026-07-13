@@ -36,11 +36,7 @@ export default function ProjectCardItem({ project, onPress }: ProjectCardItemPro
         }}
       >
         {project.coverUri ? (
-          <Image
-            source={{ uri: project.coverUri }}
-            className="h-full w-full"
-            resizeMode="cover"
-          />
+          <Image source={{ uri: project.coverUri }} className="h-full w-full" resizeMode="cover" />
         ) : (
           <Text className="text-[34px] font-black" style={{ color: Colors.text }}>
             {project.avatarInitials}
@@ -60,7 +56,7 @@ export default function ProjectCardItem({ project, onPress }: ProjectCardItemPro
           >
             {project.createdByName}
           </Text>
-          <View className="flex-row items-center gap-1">
+          {/* <View className="flex-row items-center gap-1">
             <MaterialIcon name="star" color={Colors.accent} size={14} />
             <Text
               className="text-[12px] font-semibold"
@@ -69,7 +65,7 @@ export default function ProjectCardItem({ project, onPress }: ProjectCardItemPro
             >
               {project.stars}
             </Text>
-          </View>
+          </View> */}
         </View>
         <Text className="mt-1 text-[11px]" style={{ color: Colors.textMuted }} numberOfLines={1}>
           {dateRange}

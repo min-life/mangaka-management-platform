@@ -2,7 +2,13 @@ import { Platform } from 'react-native';
 
 import { resetToLogin } from '@/src/navigation/navigationRef';
 
-import { clearSession, getAccessToken, saveAccessToken } from './tokenStorage';
+import {
+  clearSession,
+  getAccessToken,
+  getRefreshToken,
+  saveAccessToken,
+  saveRefreshToken,
+} from './tokenStorage';
 
 interface ApiErrorBody {
   error?: string;
@@ -22,6 +28,7 @@ interface ApiFetchResult {
 
 interface RefreshResponse {
   accessToken?: unknown;
+  refreshToken?: unknown;
 }
 
 export class ApiClientError extends Error {
@@ -112,6 +119,10 @@ function getErrorMessage(status: number, body?: ApiErrorBody) {
   return 'Unable to load data. Please try again.';
 }
 
+function isMissingCurrentUserError(status: number, body?: ApiErrorBody) {
+  return (status === 401 || status === 404) && getErrorMessage(status, body) === 'User is not exist';
+}
+
 async function performApiFetch(
   path: string,
   options: RequestOptions = {},
@@ -160,7 +171,9 @@ async function handleSessionExpired() {
   if (!sessionExpirationPromise) {
     sessionExpirationPromise = (async () => {
       try {
+        const refreshToken = await getRefreshToken();
         await performApiFetch(AUTH_LOGOUT_PATH, {
+          body: refreshToken ? { refreshToken } : undefined,
           method: 'POST',
           skipAuthRefresh: true,
         });
@@ -177,7 +190,9 @@ async function handleSessionExpired() {
 }
 
 async function requestFreshAccessToken() {
+  const refreshToken = await getRefreshToken();
   const body = await apiRequest<RefreshResponse>(AUTH_REFRESH_PATH, {
+    body: refreshToken ? { refreshToken } : undefined,
     method: 'POST',
     skipAuthRefresh: true,
   });
@@ -188,6 +203,9 @@ async function requestFreshAccessToken() {
   }
 
   await saveAccessToken(accessToken);
+  if (typeof body.refreshToken === 'string' && body.refreshToken.trim()) {
+    await saveRefreshToken(body.refreshToken);
+  }
   return accessToken;
 }
 
@@ -208,6 +226,7 @@ async function requestWithAuth<T>(
   accessTokenOverride?: string | null,
 ): Promise<T> {
   const { body, response } = await performApiFetch(path, options, accessTokenOverride);
+  const errorBody = body as ApiErrorBody | undefined;
 
   if (response.ok) {
     if (
@@ -220,6 +239,11 @@ async function requestWithAuth<T>(
     return body as T;
   }
 
+  if (isMissingCurrentUserError(response.status, errorBody)) {
+    await handleSessionExpired();
+    throw new ApiClientError(getErrorMessage(response.status, errorBody), response.status);
+  }
+
   if (isPostEndpoint(path, options, AUTH_REFRESH_PATH)) {
     await handleSessionExpired();
   }
@@ -230,7 +254,7 @@ async function requestWithAuth<T>(
       return requestWithAuth<T>(path, options, true, refreshedAccessToken);
     } catch {
       await handleSessionExpired();
-      throw new ApiClientError(getErrorMessage(response.status, body as ApiErrorBody), response.status);
+      throw new ApiClientError(getErrorMessage(response.status, errorBody), response.status);
     }
   }
 
@@ -238,7 +262,7 @@ async function requestWithAuth<T>(
     await handleSessionExpired();
   }
 
-  throw new ApiClientError(getErrorMessage(response.status, body as ApiErrorBody), response.status);
+  throw new ApiClientError(getErrorMessage(response.status, errorBody), response.status);
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {

@@ -94,7 +94,7 @@ export default function DiscussionTab({
                   }}
                 >
                   <Text className="text-[12px] font-semibold" style={{ color: C.textMuted }}>
-                    Xem {Math.min(hiddenCommentCount, COMMENT_BATCH_COUNT)} bình luận cũ
+                    View {Math.min(hiddenCommentCount, COMMENT_BATCH_COUNT)} older comments
                   </Text>
                 </TouchableOpacity>
               ) : null}
@@ -112,7 +112,7 @@ export default function DiscussionTab({
               }}
             >
               <Text style={{ color: Colors.textFaint, fontSize: 14 }}>
-                Chưa có comment nào cho frame này
+                No comments for this frame yet
               </Text>
             </View>
           )}

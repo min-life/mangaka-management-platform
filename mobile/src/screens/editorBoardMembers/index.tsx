@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { Alert, ScrollView, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import ApiStateView from '@/src/components/shared/ApiStateView';
@@ -8,7 +8,11 @@ import { Colors } from '@/src/constants/colors';
 import { RootStackParamList } from '@/src/navigation/types';
 import EditorBoardTopBar from '@/src/screens/editorBoards/components/EditorBoardTopBar';
 import { BoardMemberRow } from '@/src/screens/editorBoards/components';
-import { fetchEditorBoardBundle } from '@/src/services/editorBoardApi';
+import {
+  fetchEditorBoardBundle,
+  removeEditorBoardMember,
+  setEditorBoardMemberLead,
+} from '@/src/services/editorBoardApi';
 import { EditorBoardItem, EditorBoardMember } from '@/src/types/editorBoards';
 
 type EditorBoardMembersScreenProps = NativeStackScreenProps<
@@ -34,7 +38,7 @@ export default function EditorBoardMembersScreen({
       setBoard(bundle.board);
       setMembers(bundle.members);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải members.');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load members.');
     } finally {
       setIsLoading(false);
     }
@@ -43,6 +47,58 @@ export default function EditorBoardMembersScreen({
   useEffect(() => {
     void loadMembers();
   }, [loadMembers]);
+
+  const handleChangeRole = useCallback(
+    (member: EditorBoardMember) => {
+      if (member.role === 'Lead') {
+        Alert.alert('Change role', `${member.name} is already the lead member.`);
+        return;
+      }
+
+      Alert.alert('Change role', `Set ${member.name} as lead member?`, [
+        { style: 'cancel', text: 'Cancel' },
+        {
+          text: 'Set lead',
+          onPress: async () => {
+            try {
+              await setEditorBoardMemberLead(route.params.boardId, member.id);
+              await loadMembers();
+            } catch (error) {
+              Alert.alert(
+                'Cannot change role',
+                error instanceof Error ? error.message : 'Unable to update this member role.',
+              );
+            }
+          },
+        },
+      ]);
+    },
+    [loadMembers, route.params.boardId],
+  );
+
+  const handleDeleteMember = useCallback(
+    (member: EditorBoardMember) => {
+      Alert.alert('Delete member', `Remove ${member.name} from this editor board?`, [
+        { style: 'cancel', text: 'Cancel' },
+        {
+          style: 'destructive',
+          text: 'Delete',
+          onPress: async () => {
+            try {
+              await removeEditorBoardMember(route.params.boardId, member.id);
+              await loadMembers();
+            } catch (error) {
+              Alert.alert(
+                'Cannot delete member',
+                error instanceof Error ? error.message : 'Unable to remove this member.',
+              );
+            }
+          },
+        },
+      ]);
+    },
+    [loadMembers, route.params.boardId],
+  );
 
   return (
     <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
@@ -63,14 +119,19 @@ export default function EditorBoardMembersScreen({
           showsVerticalScrollIndicator={false}
         >
           {members.map((member) => (
-            <BoardMemberRow key={member.id} member={member} />
+            <BoardMemberRow
+              key={member.id}
+              member={member}
+              onChangeRole={handleChangeRole}
+              onDelete={handleDeleteMember}
+            />
           ))}
         </ScrollView>
       ) : (
         <ApiStateView
           type="empty"
-          title="Không có member"
-          message="Editor board này chưa có member nào."
+          title="No members"
+          message="This editor board does not have any members yet."
         />
       )}
 

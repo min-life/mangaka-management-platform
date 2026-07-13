@@ -36,7 +36,7 @@ export default function EditorBoardProjectsScreen({
       setBoard(bundle.board);
       setProjects(bundle.projects);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải projects.');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load projects.');
     } finally {
       setIsLoading(false);
     }
@@ -77,8 +77,8 @@ export default function EditorBoardProjectsScreen({
       ) : (
         <ApiStateView
           type="empty"
-          title="Không có project"
-          message="Editor board này chưa gắn project nào."
+          title="No projects"
+          message="This editor board is not linked to any projects yet."
         />
       )}
 

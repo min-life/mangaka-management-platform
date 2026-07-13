@@ -8,7 +8,7 @@ import { navigateToNotificationTarget } from '@/src/navigation/notificationTarge
 import { RootStackNavProp } from '@/src/navigation/types';
 import { Colors } from '@/src/constants/colors';
 import BottomNavBar from '@/src/components/shared/BottomNavBar';
-import { logout } from '@/src/services/authApi';
+import { linkGoogleAccount, logout } from '@/src/services/authApi';
 import { disconnectRealtime } from '@/src/services/realtimeClient';
 import { clearAccessToken, getAccessToken } from '@/src/services/tokenStorage';
 import {
@@ -18,7 +18,7 @@ import {
   fetchActivityLogs,
 } from '@/src/services/activityLogApi';
 import { fetchMe, updateMe, updatePassword } from '@/src/services/userApi';
-import { uploadAvatarToCloudinary } from '@/src/services/cloudinaryUpload';
+import { uploadAvatarToS3 } from '@/src/services/s3Upload';
 import { ActivityItem } from '@/src/types/home';
 import { AccountMenuItem } from '@/src/types/profile';
 import {
@@ -30,6 +30,7 @@ import {
 } from './components';
 
 const ACCOUNT_MENU_ITEMS: AccountMenuItem[] = [
+  { id: 'google', icon: 'link', label: 'Google Account' },
   { id: 'security', icon: 'security', label: 'Security' },
   { id: 'logout', icon: 'logout', label: 'Sign Out', isDestructive: true },
 ];
@@ -58,14 +59,13 @@ export default function ProfileScreen() {
   const [activityErrorMessage, setActivityErrorMessage] = useState('');
   const [activityFilterType, setActivityFilterType] = useState<ActivityLogFilterType | null>(null);
   const [activityFilterId, setActivityFilterId] = useState<string | null>(null);
-  const [activityFilterOptions, setActivityFilterOptions] = useState(
-    EMPTY_ACTIVITY_FILTER_OPTIONS,
-  );
+  const [activityFilterOptions, setActivityFilterOptions] = useState(EMPTY_ACTIVITY_FILTER_OPTIONS);
   const [isActivityFilterLoading, setIsActivityFilterLoading] = useState(false);
   const [isActivityLoading, setIsActivityLoading] = useState(true);
   const [activeForm, setActiveForm] = useState<ActiveProfileForm>(null);
   const [formErrorMessage, setFormErrorMessage] = useState('');
   const [isSubmittingForm, setIsSubmittingForm] = useState(false);
+  const [isLinkingGoogle, setIsLinkingGoogle] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [displayNameForm, setDisplayNameForm] = useState({ displayName: '' });
   const [passwordForm, setPasswordForm] = useState(EMPTY_PASSWORD_FORM);
@@ -185,6 +185,19 @@ export default function ProfileScreen() {
     return primaryRole?.name || primaryRole?.code || 'Viewer';
   }, [user?.roles]);
 
+  const accountMenuItems = useMemo(
+    () =>
+      ACCOUNT_MENU_ITEMS.map((item) => {
+        if (item.id !== 'google') return item;
+
+        return {
+          ...item,
+          badge: user?.googleLinked ? 'Linked' : isLinkingGoogle ? 'Linking' : 'Not linked',
+        };
+      }),
+    [isLinkingGoogle, user?.googleLinked],
+  );
+
   const openDisplayNameForm = () => {
     setFormErrorMessage('');
     setDisplayNameForm({
@@ -244,7 +257,7 @@ export default function ProfileScreen() {
 
       mergeUser(nextUser);
       setActiveForm(null);
-      Alert.alert('Đã cập nhật', 'Tên hiển thị đã được thay đổi.');
+      Alert.alert('Updated', 'Display name has been changed.');
       void loadActivityLogs();
     } catch (error) {
       setFormErrorMessage(
@@ -276,10 +289,10 @@ export default function ProfileScreen() {
     setIsUploadingAvatar(true);
 
     try {
-      const avatarUrl = await uploadAvatarToCloudinary(result.assets[0]);
+      const avatarUrl = await uploadAvatarToS3(result.assets[0]);
       const nextUser = await updateMe({ avatarUrl });
       mergeUser(nextUser);
-      Alert.alert('Đã cập nhật', 'Ảnh đại diện đã được thay đổi.');
+      Alert.alert('Updated', 'Profile photo has been changed.');
       void loadActivityLogs();
     } catch (error) {
       Alert.alert(
@@ -321,9 +334,7 @@ export default function ProfileScreen() {
       Alert.alert('Updated', 'Password has been changed.');
       void loadActivityLogs();
     } catch (error) {
-      setFormErrorMessage(
-        error instanceof Error ? error.message : 'Unable to update password.',
-      );
+      setFormErrorMessage(error instanceof Error ? error.message : 'Unable to update password.');
     } finally {
       setIsSubmittingForm(false);
     }
@@ -338,10 +349,7 @@ export default function ProfileScreen() {
       const accessToken = await getAccessToken();
       await logout(accessToken);
     } catch (error) {
-      console.warn(
-        '[ProfileScreen] Server logout failed; clearing local session.',
-        error,
-      );
+      console.warn('[ProfileScreen] Server logout failed; clearing local session.', error);
     } finally {
       disconnectRealtime();
       await clearAccessToken();
@@ -350,7 +358,37 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleLinkGoogleAccount = async () => {
+    if (isLinkingGoogle) return;
+
+    if (user?.googleLinked) {
+      Alert.alert('Google Account', 'Your Google account is already linked.');
+      return;
+    }
+
+    setIsLinkingGoogle(true);
+
+    try {
+      await linkGoogleAccount();
+      const nextUser = await fetchMe();
+      setUser(nextUser);
+      Alert.alert('Linked', 'Google account has been linked.');
+      void loadActivityLogs();
+    } catch (error) {
+      Alert.alert(
+        'Unable to link Google account',
+        error instanceof Error ? error.message : 'Please try again.',
+      );
+    } finally {
+      setIsLinkingGoogle(false);
+    }
+  };
+
   const handleMenuPress = (id: string) => {
+    if (id === 'google') {
+      void handleLinkGoogleAccount();
+      return;
+    }
     if (id === 'security') return openSecurityForm();
     if (id === 'logout' && !isSigningOut)
       return Alert.alert('Sign Out', 'Are you sure?', [
@@ -386,7 +424,7 @@ export default function ProfileScreen() {
 
         <ProfileMenuSection
           title="Account"
-          items={ACCOUNT_MENU_ITEMS}
+          items={accountMenuItems}
           onItemPress={handleMenuPress}
         />
 
@@ -421,8 +459,8 @@ export default function ProfileScreen() {
         onClose={closeForm}
         onSubmit={handleSubmitDisplayName}
         submitLabel="Save"
-        subtitle="Cập nhật tên hiển thị trên hồ sơ của bạn."
-        title="Đổi tên"
+        subtitle="Update the display name on your profile."
+        title="Change name"
         visible={activeForm === 'displayName'}
       />
 

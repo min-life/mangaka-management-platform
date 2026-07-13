@@ -17,6 +17,7 @@ export interface WorkSummaryItem {
 }
 
 export interface AccountMenuItem {
+  badge?: string;
   id: string;
   icon: string;
   label: string;
