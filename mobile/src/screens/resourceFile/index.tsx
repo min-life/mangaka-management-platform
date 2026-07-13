@@ -68,6 +68,9 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  const [materialDetailsById, setMaterialDetailsById] = useState<
+    Record<string, ResourceFileMaterialVersion>
+  >({});
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedFrame, setSelectedFrame] = useState<ResourceTaskFrame | null>(null);
   const [discussionScope, setDiscussionScope] = useState<DiscussionScope>('file');
@@ -100,19 +103,30 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
         ? await fetchFolderBundle(parentFolderId).catch(() => null)
         : null;
       setFile(nextFile);
+      setMaterialDetailsById({});
       setFileDiscussionCommentCount(nextFile.comments?.length ?? 0);
       setParentName(parentBundle?.folder.name ?? 'Resource');
+      const initialTask = route.params.initialTaskId
+        ? nextFile.tasks?.find((task) => task.id === route.params.initialTaskId)
+        : undefined;
+      const selectedTask = initialTask ?? nextFile.tasks?.[0] ?? null;
+
       setSelectedVersionId(
         route.params.initialMaterialVersionId ?? nextFile.materialVersions?.[0]?.id ?? null,
       );
-      setSelectedTaskId(nextFile.tasks?.[0]?.id ?? null);
-      setSelectedFrame(null);
+      setSelectedTaskId(selectedTask?.id ?? null);
+      setSelectedFrame(route.params.initialTaskId ? (selectedTask?.frames[0] ?? null) : null);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải file.');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load file.');
     } finally {
       setIsLoading(false);
     }
-  }, [route.params.fileId, route.params.initialMaterialVersionId, route.params.parentFolderId]);
+  }, [
+    route.params.fileId,
+    route.params.initialMaterialVersionId,
+    route.params.initialTaskId,
+    route.params.parentFolderId,
+  ]);
 
   useEffect(() => {
     void loadFile();
@@ -146,9 +160,33 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
     [discussionFrames],
   );
 
-  const selectedVersion =
+  const selectedVersionSummary =
     versions.find((version) => version.id === selectedVersionId) ?? versions[0];
+  const selectedVersionDetail = selectedVersionSummary
+    ? materialDetailsById[selectedVersionSummary.id]
+    : undefined;
+  const selectedVersion = selectedVersionDetail ?? selectedVersionSummary;
   const previewImageUri = selectedVersion?.materials.imageUri ?? file?.previewImageUri;
+
+  useEffect(() => {
+    const versionId = selectedVersionSummary?.id;
+    if (!versionId || selectedVersionDetail?.hasDetail) {
+      return;
+    }
+
+    let isMounted = true;
+
+    fetchMaterialVersion(versionId)
+      .then((detail) => {
+        if (!isMounted) return;
+        setMaterialDetailsById((prev) => ({ ...prev, [detail.id]: detail }));
+      })
+      .catch(() => undefined);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedVersionDetail?.hasDetail, selectedVersionSummary?.id]);
 
   const handleSelectFrame = (frame: ResourceTaskFrame) => {
     setSelectedFrame((prev) => (prev?.id === frame.id ? null : frame));
@@ -194,7 +232,7 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
       } catch (error) {
         console.warn('[ResourceFileScreen] Open comment material failed.', error);
         setDiscussionErrorMessage(
-          error instanceof Error ? error.message : 'Không thể mở material này.',
+          error instanceof Error ? error.message : 'Unable to open this material.',
         );
       }
     },
@@ -231,7 +269,7 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
     } catch (error) {
       setDiscussionComments([]);
       setDiscussionErrorMessage(
-        error instanceof Error ? error.message : 'Không thể tải file comments.',
+        error instanceof Error ? error.message : 'Unable to load file comments.',
       );
     } finally {
       setIsDiscussionCommentsLoading(false);
@@ -279,7 +317,7 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
     } catch (error) {
       setDiscussionComments([]);
       setDiscussionErrorMessage(
-        error instanceof Error ? error.message : 'Không thể tải task comments.',
+        error instanceof Error ? error.message : 'Unable to load task comments.',
       );
     } finally {
       setIsDiscussionCommentsLoading(false);
@@ -312,7 +350,7 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
     } catch (error) {
       setDiscussionComments([]);
       setDiscussionErrorMessage(
-        error instanceof Error ? error.message : 'Không thể tải frame comments.',
+        error instanceof Error ? error.message : 'Unable to load frame comments.',
       );
     } finally {
       setIsDiscussionCommentsLoading(false);
@@ -468,7 +506,7 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
       return;
     }
 
-    throw new Error('Vui lòng chọn task hoặc frame trước khi bình luận.');
+    throw new Error('Please select a task or frame before commenting.');
   };
 
   if (isLoading) {
@@ -515,9 +553,7 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
 
         <ResourceFileTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
-        {activeTab === 'Overview' && (
-          <OverviewPanel description={description} file={file} fileContent={file.content} />
-        )}
+        {activeTab === 'Overview' && <OverviewPanel description={description} file={file} />}
 
         {activeTab === 'Tasks' && (
           <TasksPanel
@@ -567,6 +603,7 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
         {activeTab === 'Materials' && (
           <MaterialsPanel
             selectedVersionId={selectedVersion?.id ?? null}
+            tasks={tasks}
             versions={versions}
             onSelectVersion={handleSelectVersion}
           />

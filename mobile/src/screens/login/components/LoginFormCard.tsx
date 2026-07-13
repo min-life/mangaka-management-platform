@@ -172,8 +172,8 @@ export default function LoginFormCard({
 
       <Text className="mt-8 text-center text-[13px] leading-5" style={{ color: Colors.textMuted }}>
         By signing in you accept our{' '}
-        <Text style={{ color: Colors.accent, fontWeight: '600' }}>Terms of Use</Text> and{' '}
-        <Text style={{ color: Colors.accent, fontWeight: '600' }}>Privacy Policy</Text>.
+        <Text style={{ color: Colors.accent, fontWeight: '500' }}>Terms of Use</Text> and{' '}
+        <Text style={{ color: Colors.accent, fontWeight: '500' }}>Privacy Policy</Text>.
       </Text>
     </View>
   );

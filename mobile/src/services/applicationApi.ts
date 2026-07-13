@@ -1,6 +1,19 @@
-import { ApiApplication, ApiComment, ApiDataResponse, ApiListResponse } from './apiTypes';
+import {
+  ApiApplication,
+  ApiApplicationVote,
+  ApiComment,
+  ApiDataResponse,
+  ApiListResponse,
+} from './apiTypes';
 import { apiRequest } from './apiClient';
 import { mapApplication, mapComment, uniqueById } from './mappers';
+
+export interface ApplicationVoteSummary {
+  abstain: number;
+  approve: number;
+  reject: number;
+  total: number;
+}
 
 export async function fetchApplications(
   params: {
@@ -36,6 +49,22 @@ export async function fetchApplication(applicationId: string) {
   );
   if (!response.data) throw new Error('Application not found');
   return mapApplication(response.data);
+}
+
+export async function fetchApplicationVoteSummary(
+  applicationId: string,
+): Promise<ApplicationVoteSummary> {
+  const votesResponse = await apiRequest<ApiListResponse<ApiApplicationVote>>(
+    `/applications/${applicationId}/votes`,
+  );
+  const votes = votesResponse.data ?? [];
+
+  return {
+    abstain: votes.filter((vote) => vote.decision === 'ABSTAIN').length,
+    approve: votes.filter((vote) => vote.decision === 'APPROVE').length,
+    reject: votes.filter((vote) => vote.decision === 'REJECT').length,
+    total: votes.length,
+  };
 }
 
 export async function fetchApplicationComments(applicationId: string) {

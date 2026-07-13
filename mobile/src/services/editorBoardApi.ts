@@ -8,26 +8,73 @@ import {
 } from './apiTypes';
 import { apiRequest } from './apiClient';
 import { mapApplication, mapBoardMember, mapEditorBoard, mapProject, uniqueById } from './mappers';
+import { fetchMe } from './userApi';
+import type { EditorBoardRole } from '@/src/types/editorBoards';
+
+type PermissionsResponse = ApiDataResponse<string[]> | string[];
+
+function permissionList(response: PermissionsResponse | null) {
+  if (!response) return [];
+  return Array.isArray(response) ? response : response.data ?? [];
+}
+
+function roleFromPermissions(permissions: string[]): EditorBoardRole {
+  if (permissions.includes('board:owner')) return 'Owner';
+  if (permissions.includes('board:leader')) return 'Lead';
+  return 'Member';
+}
+
+function boardCreatorId(board: ApiEditorBoard) {
+  return board.createdBy ?? board.createdByUser?.id ?? board.createByUser?.id;
+}
+
+async function resolveEditorBoardRole(
+  board: ApiEditorBoard,
+  currentUserId: number,
+): Promise<EditorBoardRole> {
+  if (boardCreatorId(board) === currentUserId) {
+    return 'Owner';
+  }
+
+  const permissionsResponse = await apiRequest<PermissionsResponse>(
+    `/permissions/me/boards/${board.id}`,
+  ).catch(() => null);
+
+  return roleFromPermissions(permissionList(permissionsResponse));
+}
 
 export async function fetchEditorBoards(params: { name?: string } = {}) {
-  const response = await apiRequest<ApiListResponse<ApiEditorBoard>>('/editor-boards', {
-    params: {
-      limit: 50,
-      me: false,
-      name: params.name,
-      page: 1,
-    },
-  });
+  const [response, currentUser] = await Promise.all([
+    apiRequest<ApiListResponse<ApiEditorBoard>>('/editor-boards', {
+      params: {
+        limit: 50,
+        me: false,
+        name: params.name,
+        page: 1,
+      },
+    }),
+    fetchMe(),
+  ]);
+  const rawBoards = response.data ?? [];
+  const boards = await Promise.all(
+    rawBoards.map(async (board) =>
+      mapEditorBoard(board, {
+        currentUserRole: await resolveEditorBoardRole(board, currentUser.id),
+      }),
+    ),
+  );
 
   return {
-    boards: uniqueById((response.data ?? []).map(mapEditorBoard)),
+    boards: uniqueById(boards),
     pagination: response.pagination,
-    rawBoards: response.data ?? [],
+    rawBoards,
   };
 }
 
 type BoardMemberResponseItem = ApiUserSummary & {
+  createdAt?: string;
   isLead?: boolean;
+  joinedAt?: string;
 };
 
 type BoardProjectResponseItem = ApiProject | { project?: ApiProject | null };
@@ -50,6 +97,7 @@ function mapBoardMemberResponse(item: BoardMemberResponseItem | null) {
 
   return {
     isLead: item.isLead,
+    joinedAt: item.joinedAt ?? item.createdAt,
     user: item,
   };
 }
@@ -67,7 +115,7 @@ function unwrapBoardApplication(item: BoardApplicationResponseItem | null) {
 type MappedBoardMember = NonNullable<ReturnType<typeof mapBoardMemberResponse>>;
 
 export async function fetchEditorBoardBundle(boardId: string) {
-  const [boardResponse, membersResponse, projectsResponse, applicationsResponse] =
+  const [boardResponse, membersResponse, projectsResponse, applicationsResponse, currentUser] =
     await Promise.all([
       apiRequest<ApiDataResponse<ApiEditorBoard>>(`/editor-boards/${boardId}`),
       apiRequest<ApiListResponse<BoardMemberResponseItem | null>>(
@@ -82,12 +130,14 @@ export async function fetchEditorBoardBundle(boardId: string) {
         `/editor-boards/${boardId}/applications`,
         { params: { limit: 100, page: 1 } },
       ).catch(() => ({ data: [] })),
+      fetchMe(),
     ]);
 
   if (!boardResponse.data) throw new Error('Editor board not found');
+  const currentUserRole = await resolveEditorBoardRole(boardResponse.data, currentUser.id);
 
   return {
-    board: mapEditorBoard(boardResponse.data),
+    board: mapEditorBoard(boardResponse.data, { currentUserRole }),
     applications: uniqueById(
       (applicationsResponse.data ?? [])
         .map(unwrapBoardApplication)
@@ -113,4 +163,25 @@ export async function leaveEditorBoard(boardId: string) {
   return apiRequest<void>(`/editor-boards/${boardId}/members/me`, {
     method: 'DELETE',
   });
+}
+
+export async function deleteEditorBoard(boardId: string) {
+  return apiRequest<void>(`/editor-boards/${boardId}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function removeEditorBoardMember(boardId: string, userId: string) {
+  return apiRequest<void>(`/editor-boards/${boardId}/members/${userId}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function setEditorBoardMemberLead(boardId: string, userId: string) {
+  const response = await apiRequest<ApiDataResponse<BoardMemberResponseItem>>(
+    `/editor-boards/${boardId}/members/${userId}/lead`,
+    { method: 'PATCH' },
+  );
+
+  return response.data ? mapBoardMember(mapBoardMemberResponse(response.data)!) : undefined;
 }

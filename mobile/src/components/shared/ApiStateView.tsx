@@ -10,19 +10,10 @@ interface ApiStateViewProps {
   type: 'empty' | 'error' | 'loading';
 }
 
-export default function ApiStateView({
-  message,
-  onRetry,
-  title,
-  type,
-}: ApiStateViewProps) {
+export default function ApiStateView({ message, onRetry, title, type }: ApiStateViewProps) {
   const resolvedTitle =
     title ??
-    (type === 'loading'
-      ? 'Đang tải dữ liệu'
-      : type === 'error'
-        ? 'Không thể tải dữ liệu'
-        : 'Không có dữ liệu');
+    (type === 'loading' ? 'Loading data' : type === 'error' ? 'Unable to load data' : 'No data');
 
   return (
     <View className="flex-1 items-center justify-center px-6 py-12">
@@ -31,7 +22,10 @@ export default function ApiStateView({
         {resolvedTitle}
       </Text>
       {message ? (
-        <Text className="mt-2 text-center text-[13px] leading-5" style={{ color: Colors.textMuted }}>
+        <Text
+          className="mt-2 text-center text-[13px] leading-5"
+          style={{ color: Colors.textMuted }}
+        >
           {message}
         </Text>
       ) : null}
@@ -43,11 +37,10 @@ export default function ApiStateView({
           style={{ backgroundColor: Colors.surfaceContainer }}
         >
           <Text className="text-[13px] font-bold" style={{ color: Colors.text }}>
-            Thử lại
+            Try again
           </Text>
         </TouchableOpacity>
       ) : null}
     </View>
   );
 }
-

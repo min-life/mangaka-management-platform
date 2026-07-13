@@ -8,6 +8,7 @@ import { RootStackNavProp, RootStackParamList } from '@/src/navigation/types';
 import { fetchNotifications } from '@/src/services/notificationApi';
 
 export type BottomTab = 'inbox' | 'home' | 'profile';
+type BottomTabRoute = keyof Pick<RootStackParamList, 'Home' | 'Notifications' | 'Profile'>;
 
 interface BottomNavBarProps {
   activeTab?: BottomTab;
@@ -19,12 +20,153 @@ const TABS: Array<{
   key: BottomTab;
   label: string;
   icon: string;
-  route: keyof Pick<RootStackParamList, 'Home' | 'Notifications' | 'Profile'>;
+  route: BottomTabRoute;
 }> = [
   { key: 'inbox', label: 'Inbox', icon: 'mail', route: 'Notifications' },
   { key: 'home', label: 'Home', icon: 'dashboard', route: 'Home' },
   { key: 'profile', label: 'Profile', icon: 'person', route: 'Profile' },
 ];
+
+const BAR_BACKGROUND = Colors.bg;
+const ACTIVE_ICON_COLOR = '#1F2329';
+const INACTIVE_ICON_COLOR = 'rgba(237,241,251,0.56)';
+const INACTIVE_ICON_BG = 'rgba(237,241,251,0.08)';
+const ACTIVE_ICON_BORDER = 'rgba(255,255,255,0.34)';
+
+function UnreadBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+
+  const label = count > 99 ? '99+' : String(count);
+
+  return (
+    <View
+      className="items-center justify-center"
+      style={{
+        backgroundColor: Colors.iconTask,
+        borderColor: BAR_BACKGROUND,
+        borderRadius: 999,
+        borderWidth: 1.5,
+        height: 18,
+        minWidth: label.length > 2 ? 24 : 18,
+        paddingHorizontal: label.length > 1 ? 4 : 0,
+        position: 'absolute',
+        right: 5,
+        top: -5,
+      }}
+    >
+      <Text
+        className="text-[9px] font-bold"
+        numberOfLines={1}
+        style={{
+          color: '#FFFFFF',
+          fontVariant: ['tabular-nums'],
+          letterSpacing: 0,
+        }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function TabIcon({
+  avatarUri,
+  icon,
+  isActive,
+  isProfile,
+}: {
+  avatarUri?: string;
+  icon: string;
+  isActive: boolean;
+  isProfile: boolean;
+}) {
+  if (isProfile && avatarUri) {
+    return (
+      <View
+        className="h-8 w-8 overflow-hidden rounded-full"
+        style={{
+          borderColor: isActive ? Colors.accent : Colors.borderFaint,
+          borderWidth: isActive ? 2 : 1,
+        }}
+      >
+        <Image
+          source={{ uri: avatarUri }}
+          className="h-full w-full"
+          style={{ resizeMode: 'cover' }}
+        />
+      </View>
+    );
+  }
+
+  return (
+    <View
+      className="h-8 w-8 items-center justify-center rounded-full"
+      style={{
+        backgroundColor: isActive ? Colors.accent : INACTIVE_ICON_BG,
+        borderColor: isActive ? ACTIVE_ICON_BORDER : 'transparent',
+        borderWidth: isActive ? 1 : 0,
+      }}
+    >
+      <MaterialIcon
+        name={icon}
+        color={isActive ? ACTIVE_ICON_COLOR : INACTIVE_ICON_COLOR}
+        size={18}
+      />
+    </View>
+  );
+}
+
+function BottomNavItem({
+  avatarUri,
+  isActive,
+  onPress,
+  tab,
+  unreadCount,
+}: {
+  avatarUri?: string;
+  isActive: boolean;
+  onPress: () => void;
+  tab: (typeof TABS)[number];
+  unreadCount: number;
+}) {
+  const showUnreadBadge = tab.key === 'inbox' && unreadCount > 0;
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.78}
+      accessibilityLabel={
+        showUnreadBadge ? `${tab.label}, ${unreadCount} unread notifications` : tab.label
+      }
+      accessibilityRole="button"
+      accessibilityState={{ selected: isActive }}
+      onPress={onPress}
+      className="min-w-0 flex-1 items-center justify-center"
+      style={{ height: 48 }}
+    >
+      <View className="relative h-8 w-[58px] items-center justify-center">
+        <TabIcon
+          avatarUri={avatarUri}
+          icon={tab.icon}
+          isActive={isActive}
+          isProfile={tab.key === 'profile'}
+        />
+        {showUnreadBadge ? <UnreadBadge count={unreadCount} /> : null}
+      </View>
+
+      <Text
+        className="text-[10px] font-semibold"
+        numberOfLines={1}
+        style={{
+          color: isActive ? Colors.accent : Colors.textMuted,
+          letterSpacing: 0,
+          maxWidth: 68,
+        }}
+      >
+        {tab.label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
 
 export default function BottomNavBar({
   activeTab = 'home',
@@ -55,22 +197,19 @@ export default function BottomNavBar({
     }, [unreadInboxCount]),
   );
 
-  const handlePress = (tab: BottomTab) => {
-    const target = TABS.find((item) => item.key === tab);
-    if (target) {
-      navigation.navigate(target.route);
-    }
+  const handlePress = (route: BottomTabRoute) => {
+    navigation.navigate(route);
   };
 
-  const activeColor = '#1F2329';
-  const inactiveColor = Colors.textPlaceholder;
   const resolvedUnreadCount = unreadInboxCount ?? fetchedUnreadCount;
 
   return (
     <SafeAreaView
       edges={['bottom']}
       style={{
-        backgroundColor: 'transparent',
+        backgroundColor: Colors.bg,
+        borderColor: Colors.borderSubtle,
+        borderTopWidth: 1,
         bottom: 0,
         elevation: 24,
         left: 0,
@@ -79,111 +218,23 @@ export default function BottomNavBar({
         zIndex: 24,
       }}
     >
-      <View className="px-4 pb-2 pt-2">
-        <View
-          className="flex-row items-center justify-between rounded-full px-2 py-2"
-          style={{
-            backgroundColor: 'rgba(57, 62, 70, 0.96)',
-            borderWidth: 1,
-            borderColor: Colors.borderFaint,
-            boxShadow: '0 12px 28px rgba(0, 0, 0, 0.34)',
-          }}
-        >
-          {TABS.map((tab) => {
-            const isActive = activeTab === tab.key;
-            const iconColor = isActive ? activeColor : inactiveColor;
-            const textColor = isActive ? activeColor : Colors.textMuted;
-            const showUnreadBadge = tab.key === 'inbox' && resolvedUnreadCount > 0;
-            const unreadBadgeLabel = resolvedUnreadCount > 99 ? '99+' : String(resolvedUnreadCount);
-
-            return (
-              <TouchableOpacity
-                key={tab.key}
-                activeOpacity={0.78}
-                accessibilityLabel={
-                  tab.key === 'inbox' && resolvedUnreadCount > 0
-                    ? `Inbox, ${resolvedUnreadCount} unread notifications`
-                    : tab.label
-                }
-                onPress={() => handlePress(tab.key)}
-                className="min-w-0 flex-1 flex-row items-center justify-center rounded-full"
-                style={{
-                  height: 48,
-                  gap: 7,
-                  backgroundColor: isActive ? Colors.accent : 'transparent',
-                  borderWidth: isActive ? 1 : 0,
-                  borderColor: isActive ? 'rgba(255, 255, 255, 0.38)' : 'transparent',
-                }}
-              >
-                {tab.key === 'profile' && avatarUri ? (
-                  <View
-                    className="h-7 w-7 overflow-hidden rounded-full"
-                    style={{
-                      borderWidth: 1,
-                      borderColor: isActive ? 'rgba(31, 35, 41, 0.2)' : Colors.borderFaint,
-                    }}
-                  >
-                    <Image
-                      source={{ uri: avatarUri }}
-                      className="h-full w-full"
-                      style={{ resizeMode: 'cover' }}
-                    />
-                  </View>
-                ) : (
-                  <View
-                    className="h-7 w-7 items-center justify-center rounded-full"
-                    style={{
-                      backgroundColor: isActive
-                        ? 'rgba(31, 35, 41, 0.1)'
-                        : 'rgba(237, 241, 251, 0.08)',
-                    }}
-                  >
-                    <MaterialIcon name={tab.icon} color={iconColor} size={18} />
-                    {showUnreadBadge ? (
-                      <View
-                        className="items-center justify-center"
-                        style={{
-                          backgroundColor: Colors.iconTask,
-                          borderColor: isActive ? Colors.accent : 'rgba(57, 62, 70, 0.96)',
-                          borderRadius: 999,
-                          borderWidth: 1.5,
-                          minWidth: unreadBadgeLabel.length > 2 ? 24 : 18,
-                          height: 18,
-                          paddingHorizontal: unreadBadgeLabel.length > 1 ? 4 : 0,
-                          position: 'absolute',
-                          right: -8,
-                          top: -7,
-                        }}
-                      >
-                        <Text
-                          className="text-[9px] font-bold"
-                          numberOfLines={1}
-                          style={{
-                            color: '#FFFFFF',
-                            fontVariant: ['tabular-nums'],
-                            letterSpacing: 0,
-                          }}
-                        >
-                          {unreadBadgeLabel}
-                        </Text>
-                      </View>
-                    ) : null}
-                  </View>
-                )}
-                <Text
-                  className="text-[11px] font-semibold"
-                  numberOfLines={1}
-                  style={{
-                    color: textColor,
-                    letterSpacing: 0,
-                    maxWidth: 58,
-                  }}
-                >
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+      <View
+        className="w-full px-3 pb-0 pt-1"
+        style={{
+          boxShadow: '0 -8px 22px rgba(0, 0, 0, 0.28)',
+        }}
+      >
+        <View className="flex-row items-center justify-between">
+          {TABS.map((tab) => (
+            <BottomNavItem
+              key={tab.key}
+              avatarUri={avatarUri}
+              isActive={activeTab === tab.key}
+              onPress={() => handlePress(tab.route)}
+              tab={tab}
+              unreadCount={resolvedUnreadCount}
+            />
+          ))}
         </View>
       </View>
     </SafeAreaView>

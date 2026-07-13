@@ -114,7 +114,7 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
       setSelectedVersionId(nextFile.materialVersions?.[0]?.id ?? null);
       setActiveTab(route.params?.initialTab ?? 'Tasks');
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải task.');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load task.');
     } finally {
       setIsLoading(false);
     }
@@ -210,7 +210,7 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
     } catch (error) {
       setDiscussionComments([]);
       setDiscussionErrorMessage(
-        error instanceof Error ? error.message : 'Không thể tải file comments.',
+        error instanceof Error ? error.message : 'Unable to load file comments.',
       );
     } finally {
       setIsDiscussionCommentsLoading(false);
@@ -261,7 +261,7 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
     } catch (error) {
       setDiscussionComments([]);
       setDiscussionErrorMessage(
-        error instanceof Error ? error.message : 'Không thể tải task comments.',
+        error instanceof Error ? error.message : 'Unable to load task comments.',
       );
     } finally {
       setIsDiscussionCommentsLoading(false);
@@ -294,7 +294,7 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
     } catch (error) {
       setDiscussionComments([]);
       setDiscussionErrorMessage(
-        error instanceof Error ? error.message : 'Không thể tải frame comments.',
+        error instanceof Error ? error.message : 'Unable to load frame comments.',
       );
     } finally {
       setIsDiscussionCommentsLoading(false);
@@ -454,7 +454,7 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
       return;
     }
 
-    throw new Error('Vui lòng chọn task hoặc frame trước khi bình luận.');
+    throw new Error('Please select a task or frame before commenting.');
   };
 
   if (isLoading) {
@@ -505,9 +505,7 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
           tabs={TASK_DETAIL_TABS}
         />
 
-        {activeTab === 'Overview' && (
-          <OverviewPanel description={description} fileContent={file.content} />
-        )}
+        {activeTab === 'Overview' && <OverviewPanel description={description} file={file} />}
 
         {activeTab === 'Tasks' && (
           <TasksPanel
@@ -556,6 +554,7 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
         {activeTab === 'Materials' && (
           <MaterialsPanel
             selectedVersionId={selectedVersion?.id ?? null}
+            tasks={tasks}
             versions={versions}
             onSelectVersion={handleSelectVersion}
           />

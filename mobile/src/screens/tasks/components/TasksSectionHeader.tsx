@@ -6,12 +6,9 @@ interface TasksSectionHeaderProps {
   title?: string;
 }
 
-export default function TasksSectionHeader({
-  count,
-  title = 'My Tasks',
-}: TasksSectionHeaderProps) {
+export default function TasksSectionHeader({ count, title = 'My Tasks' }: TasksSectionHeaderProps) {
   return (
-    <View className="flex-row justify-between items-center mt-4 mb-3">
+    <View className="mb-3 mt-3 flex-row items-center justify-between">
       <Text
         className="text-[12px] font-medium uppercase tracking-widest"
         style={{ color: 'rgba(237,241,251,0.6)', letterSpacing: 1 }}

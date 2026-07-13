@@ -1,10 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, TouchableOpacity, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
 import ApiStateView from '@/src/components/shared/ApiStateView';
 import BottomNavBar from '@/src/components/shared/BottomNavBar';
-import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
 import { RootStackNavProp } from '@/src/navigation/types';
 import { fetchProjects } from '@/src/services/projectApi';
@@ -12,6 +11,7 @@ import { ProjectItem } from '@/src/types/projects';
 
 import {
   ProjectCardItem,
+  ProjectFilterSelect,
   ProjectListItem,
   ProjectsEmptyState,
   ProjectsSearchBar,
@@ -67,28 +67,15 @@ export default function ProjectsScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View className="px-4 pb-4">
-          <View className="mt-3 flex-row items-center gap-3">
+        <View className="px-4">
+          <View className="mt-4">
             <ProjectsSearchBar search={search} onSearchChange={setSearch} />
-            <TouchableOpacity
-              activeOpacity={0.76}
-              accessibilityLabel="Show projects owned by me"
-              accessibilityRole="button"
-              accessibilityState={{ selected: isOwnerFilterActive }}
-              className="h-12 w-12 items-center justify-center rounded-xl"
-              onPress={() => setIsOwnerFilterActive((current) => !current)}
-              style={{
-                backgroundColor: isOwnerFilterActive ? Colors.surfaceContainer : Colors.surface,
-                borderColor: isOwnerFilterActive ? Colors.accent : Colors.borderFaint,
-                borderWidth: 1,
-              }}
-            >
-              <MaterialIcon
-                name="filter"
-                color={isOwnerFilterActive ? Colors.accent : Colors.textMuted}
-                size={22}
-              />
-            </TouchableOpacity>
+          </View>
+          <View className="relative z-20 mt-3">
+            <ProjectFilterSelect
+              isOwnerFilterActive={isOwnerFilterActive}
+              onOwnerFilterChange={setIsOwnerFilterActive}
+            />
           </View>
         </View>
 
@@ -105,7 +92,7 @@ export default function ProjectsScreen() {
             }
             style={
               viewMode === 'list'
-                ? { borderTopWidth: 1, borderTopColor: Colors.borderFaint }
+                ? { borderTopWidth: 0, borderTopColor: Colors.borderFaint }
                 : undefined
             }
           >

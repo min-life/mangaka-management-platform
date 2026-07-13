@@ -35,7 +35,7 @@ export default function EditorBoardApplicationsScreen({
       setBoard(bundle.board);
       setApplications(bundle.applications);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải applications.');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load applications.');
     } finally {
       setIsLoading(false);
     }
@@ -79,8 +79,8 @@ export default function EditorBoardApplicationsScreen({
       ) : (
         <ApiStateView
           type="empty"
-          title="Không có application"
-          message="Editor board này chưa có application nào."
+          title="No applications"
+          message="This editor board does not have any applications yet."
         />
       )}
 

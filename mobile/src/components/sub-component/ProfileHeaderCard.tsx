@@ -29,12 +29,13 @@ export default function ProfileHeaderCard({
 }: ProfileHeaderCardProps) {
   const displayName = name || 'Current user';
   const displayEmail = email || 'No email';
-  const initials = displayName
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join('') || 'U';
+  const initials =
+    displayName
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join('') || 'U';
 
   return (
     <View
@@ -57,11 +58,7 @@ export default function ProfileHeaderCard({
         >
           <View className="h-full w-full overflow-hidden rounded-full items-center justify-center">
             {avatarUri ? (
-              <Image
-                source={{ uri: avatarUri }}
-                className="h-full w-full"
-                resizeMode="cover"
-              />
+              <Image source={{ uri: avatarUri }} className="h-full w-full" resizeMode="cover" />
             ) : (
               <Text className="text-[20px] font-bold" style={{ color: Colors.accent }}>
                 {initials}
@@ -112,24 +109,6 @@ export default function ProfileHeaderCard({
           <Text className="text-[14px] mt-0.5" style={{ color: Colors.textMuted }}>
             {displayEmail}
           </Text>
-
-          {/* Role + Studio */}
-          <View className="flex-row items-center gap-2 mt-2 flex-wrap">
-            <View
-              className="px-2 py-1 rounded"
-              style={{ backgroundColor: Colors.surfaceContainer }}
-            >
-              <Text className="text-[11px] font-medium" style={{ color: Colors.text }}>
-                {roleLabel || 'Viewer'}
-              </Text>
-            </View>
-            <View className="flex-row items-center gap-1">
-              <MaterialIcon name="apartment" color={Colors.textMuted} size={13} />
-              <Text className="text-[11px]" style={{ color: Colors.textMuted }}>
-                Mangaka workspace
-              </Text>
-            </View>
-          </View>
         </View>
       </View>
     </View>

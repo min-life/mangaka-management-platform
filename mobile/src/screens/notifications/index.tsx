@@ -19,12 +19,16 @@ import { groupNotifications, mapNotification, uniqueById } from '@/src/services/
 import { subscribeToNotifications } from '@/src/services/realtimeClient';
 import { NotificationItem } from '@/src/types/notifications';
 import NotificationList from './components/NotificationList';
+import NotificationsFilterBar from './components/NotificationsFilterBar';
 import NotificationsEmptyState from './components/NotificationsEmptyState';
 import NotificationsTopBar from './components/NotificationsTopBar';
 
+type NotificationCategoryFilter = Exclude<NotifFilter, 'Unread'>;
+
 export default function NotificationsScreen() {
   const navigation = useNavigation<RootStackNavProp>();
-  const [activeFilter, setActiveFilter] = useState<NotifFilter>('All');
+  const [activeFilter, setActiveFilter] = useState<NotificationCategoryFilter>('All');
+  const [unreadOnly, setUnreadOnly] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -40,7 +44,7 @@ export default function NotificationsScreen() {
       const result = await fetchNotifications();
       setItems(uniqueById(result.items));
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải notifications.');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to load notifications.');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -73,13 +77,13 @@ export default function NotificationsScreen() {
         .map((section) => ({
           ...section,
           data: section.items.filter((item) => {
+            if (unreadOnly && !item.isUnread) return false;
             if (activeFilter === 'All') return true;
-            if (activeFilter === 'Unread') return item.isUnread;
             return item.filter === activeFilter;
           }),
         }))
         .filter((section) => section.data.length > 0),
-    [activeFilter, sections],
+    [activeFilter, sections, unreadOnly],
   );
 
   const unreadCount = useMemo(() => items.filter((item) => item.isUnread).length, [items]);
@@ -119,11 +123,14 @@ export default function NotificationsScreen() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
-      <NotificationsTopBar
+      <NotificationsTopBar unreadCount={unreadCount} onMarkAllRead={handleMarkAllRead} />
+
+      <NotificationsFilterBar
         activeFilter={activeFilter}
         unreadCount={unreadCount}
+        unreadOnly={unreadOnly}
         onFilterChange={setActiveFilter}
-        onMarkAllRead={handleMarkAllRead}
+        onUnreadOnlyChange={setUnreadOnly}
       />
 
       {isLoading ? (

@@ -92,3 +92,57 @@ sửa câu thông báo - notification -> theo đông
 Report : Tên project
 
 Member
+
+đưa lọc lên trên header phải
+
+-Task: - thêm decription short trong card
+-Task Detail: -Thay x frame -> nhảy sang discussion để xem comment
+
+---
+
+-Material: thêm filter task
+-Project detail: 3 chấm hiển thị 3 cái edit, delete project if(project owner), else leave project
+-Contribute: đổi sọt rác thành dấu 3 chấm để thêm tính năng thay đổi role
+
+Sửa các thông báo thành tiếng anh
+Inbox : - Unread sẽ nằm ngoài
+Sửa navigate
+Task -> Task detail chưa cùng trang với file.
+Up avatar thiếu env
+Đưa filter xuống dưới ô search - Projects
+Project -> Application -> bỏ thống kê
+Application -> tách 2 filter
+-> type application chỉ còn 2 cái CREATE_ARC và CREATE_CHAPTER
+-Discussion : - Task không cho lướt lên
+
+Member bỏ sao
+cho edit role
+thêm join ngày nào
+bỏ role tag
+
+Contribute -> thêm edit
+
+Editor Boards -> thêm các thông tin ở card
+-> out đang call api bị sai
+-> đang không lấy được avatar
+
+Application -> nếu là lead thì cho xem được bao nhiêu lượt vote
+
+Profile-> mangaka workspace
+Project Detail -> sửa ảnh thành giữ nguyên kích thước khung đổi ảnh cho thành display content
+
+aplication detail -> material : đang sai dữ liệu
+editor board detail -> chưa handle được đâu là owner
+
+- thêm check owner để thêm tính năng edit + xóa
+
+File ->
+->Overview -> bỏ thống kê
+->Task -> bỏ frame
+-> Material \_> xóa selected material
+
+- 1 combo box để filter theo task
+
+---
+
+-Profile: Link account gg **\_\_**CHưa được đang chờ BE
