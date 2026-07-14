@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
 
+import {
+  getGeminiApiKeyAttempts,
+  isGeminiQuotaError,
+  markGeminiApiKeyQuotaExhausted,
+  markGeminiApiKeySucceeded,
+} from '@/lib/gemini-key-pool';
 import type { AiFrameDetectRequest, AiFrameDetectResponse } from '@/types/ai-frame';
 
 type GeminiFrameResponse = {
@@ -10,6 +16,16 @@ type GeminiFrameResponse = {
   message?: string;
   startX?: number;
   startY?: number;
+};
+
+type GeminiGenerateContentResponse = {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        text?: unknown;
+      }>;
+    };
+  }>;
 };
 
 const MIN_REGION_SIZE = 0.01;
@@ -64,6 +80,14 @@ function parseGeminiJson(text: string): GeminiFrameResponse | null {
   }
 }
 
+async function readGeminiErrorBody(response: Response) {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
 async function fetchImageAsInlineData(imageUrl: string) {
   const imageResponse = await fetch(imageUrl, { cache: 'no-store' });
 
@@ -79,14 +103,14 @@ async function fetchImageAsInlineData(imageUrl: string) {
 }
 
 export async function POST(request: Request) {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKeys = getGeminiApiKeyAttempts();
   const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
-  if (!apiKey) {
+  if (apiKeys.length === 0) {
     return jsonResponse(
       {
         found: false,
-        message: 'GEMINI_API_KEY is not configured.',
+        message: 'GEMINI_API_KEY_1..4 are not configured.',
       },
       500,
     );
@@ -122,51 +146,66 @@ export async function POST(request: Request) {
       'Nếu không tìm thấy đối tượng, trả về {"found":false,"message":"Object not found"}.',
     ].join(' ');
 
-    const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
-        model,
-      )}:generateContent?key=${encodeURIComponent(apiKey)}`,
-      {
-        body: JSON.stringify({
-          contents: [
+    const geminiRequestBody = {
+      contents: [
+        {
+          parts: [
+            { text: prompt },
             {
-              parts: [
-                { text: prompt },
-                {
-                  inline_data: {
-                    data: image.data,
-                    mime_type: image.mimeType,
-                  },
-                },
-              ],
+              inline_data: {
+                data: image.data,
+                mime_type: image.mimeType,
+              },
             },
           ],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            responseSchema: {
-              type: 'OBJECT',
-              properties: {
-                confidence: { type: 'NUMBER' },
-                endX: { type: 'NUMBER' },
-                endY: { type: 'NUMBER' },
-                found: { type: 'BOOLEAN' },
-                message: { type: 'STRING' },
-                startX: { type: 'NUMBER' },
-                startY: { type: 'NUMBER' },
-              },
-              required: ['found'],
-            },
-          },
-        }),
-        cache: 'no-store',
-        headers: {
-          'Content-Type': 'application/json',
         },
-        method: 'POST',
+      ],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: 'OBJECT',
+          properties: {
+            confidence: { type: 'NUMBER' },
+            endX: { type: 'NUMBER' },
+            endY: { type: 'NUMBER' },
+            found: { type: 'BOOLEAN' },
+            message: { type: 'STRING' },
+            startX: { type: 'NUMBER' },
+            startY: { type: 'NUMBER' },
+          },
+          required: ['found'],
+        },
       },
-    );
+    };
+    let geminiJson: GeminiGenerateContentResponse | null = null;
 
-    if (!geminiResponse.ok) {
+    for (const apiKey of apiKeys) {
+      const geminiResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+          model,
+        )}:generateContent?key=${encodeURIComponent(apiKey.value)}`,
+        {
+          body: JSON.stringify(geminiRequestBody),
+          cache: 'no-store',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          method: 'POST',
+        },
+      );
+
+      if (geminiResponse.ok) {
+        markGeminiApiKeySucceeded(apiKey);
+        geminiJson = await geminiResponse.json();
+        break;
+      }
+
+      const errorBody = await readGeminiErrorBody(geminiResponse);
+      if (isGeminiQuotaError(geminiResponse.status, errorBody)) {
+        markGeminiApiKeyQuotaExhausted(apiKey);
+        continue;
+      }
+
       return jsonResponse(
         {
           found: false,
@@ -176,7 +215,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const geminiJson = await geminiResponse.json();
+    if (!geminiJson) {
+      return jsonResponse(
+        {
+          found: false,
+          message: 'All configured Gemini API keys are out of quota or rate-limited.',
+        },
+        429,
+      );
+    }
     const text = geminiJson?.candidates?.[0]?.content?.parts?.[0]?.text;
     const result = typeof text === 'string' ? parseGeminiJson(text) : null;
 
@@ -204,7 +251,7 @@ export async function POST(request: Request) {
       region,
     });
   } catch (error) {
-    console.error('AI frame detection failed:', error);
+    console.error('AI frame detection failed:', error instanceof Error ? error.message : error);
     return jsonResponse(
       {
         found: false,
