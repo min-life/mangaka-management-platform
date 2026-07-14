@@ -121,6 +121,7 @@ export class FilesService {
   @UseCache((args) => `file:${args[0]}`)
   async getFileById(id: number) {
     try {
+      const { file: _file, task: _task, ...MATERIAL_BASIC_SELECT } = MATERIAL_LIST_SELECT;
       const file = await this.prisma.file.findUnique({
         where: { id },
         select: {
@@ -129,7 +130,10 @@ export class FilesService {
             where: { taskId: null },
             orderBy: { createdAt: 'desc' },
             take: 1,
-            select: MATERIAL_LIST_SELECT,
+            select: {
+              ...MATERIAL_BASIC_SELECT,
+              materials: true,
+            },
           },
         },
       });

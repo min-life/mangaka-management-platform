@@ -258,7 +258,23 @@ export class FramesService {
 
       const frameObj = await this.prisma.materialCommentFrame.findUnique({
         where: { id: frameId },
-        include: { material: { include: { file: { include: { folder: true } } } } },
+        select: {
+          createdBy: true,
+          material: {
+            select: {
+              file: {
+                select: {
+                  id: true,
+                  folder: {
+                    select: {
+                      projectId: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       });
 
       const comment = await this.prisma.comment.create({
