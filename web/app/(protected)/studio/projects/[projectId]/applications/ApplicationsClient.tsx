@@ -303,7 +303,7 @@ export function ApplicationsClient() {
   const handleUpdateStatus = async (
     application: ApplicationResponse,
     status: ApplicationStatus,
-    options?: { rejectionReason?: string; voteDeadline?: string },
+    options?: { rejectionReason?: string },
   ) => {
     setIsSubmitting(true);
     setError(null);
@@ -312,7 +312,6 @@ export function ApplicationsClient() {
       await updateApplicationStatus(
         application.id,
         status,
-        options?.voteDeadline,
         options?.rejectionReason
           ? JSON.stringify({
             kind: 'REJECTION_REASON',

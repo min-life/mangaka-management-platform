@@ -49,7 +49,7 @@ type ApplicationReviewDrawerProps = {
   onUpdateStatus: (
     application: ApplicationResponse,
     status: ApplicationStatus,
-    options?: { rejectionReason?: string; voteDeadline?: string },
+    options?: { rejectionReason?: string },
   ) => void;
   rejectionReason?: string;
 };
@@ -70,7 +70,7 @@ export function ApplicationReviewDrawer({
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [draftRejectReason, setDraftRejectReason] = useState('');
-  const [voteDeadline, setVoteDeadline] = useState('');
+
   const uploadedFiles = useMemo(() => (application ? readUploadedFiles(application.materials) : []), [application]);
   const submittedBy =
     application?.createdByUser?.displayName ??
@@ -204,11 +204,6 @@ export function ApplicationReviewDrawer({
   };
 
   const handleOpenApproveDialog = () => {
-    if (!voteDeadline) {
-      const defaultDate = new Date();
-      defaultDate.setDate(defaultDate.getDate() + 7);
-      setVoteDeadline(defaultDate.toISOString().split('T')[0]);
-    }
     setApproveDialogOpen(true);
   };
 
@@ -666,20 +661,7 @@ export function ApplicationReviewDrawer({
                 ? 'Are you sure you want to submit this application to the editorial board? The board will be notified to review and vote.'
                 : 'Are you sure you want to approve this application?'}
             </DialogDescription>
-            {application?.status === 'PENDING' && (
-              <div className="mt-4 space-y-2 text-left">
-                <Label htmlFor="voteDeadline" className="text-xs font-bold text-white">
-                  Vote Deadline
-                </Label>
-                <Input
-                  id="voteDeadline"
-                  type="date"
-                  value={voteDeadline}
-                  onChange={(e) => setVoteDeadline(e.target.value)}
-                  className="h-9 rounded-[4px] border-[#39424f] bg-[#101820] px-3 text-xs font-medium text-white placeholder:text-[#4b535f] focus-visible:ring-[#FFD369]"
-                />
-              </div>
-            )}
+
           </DialogHeader>
 
           <DialogFooter className="mx-0 mb-0 rounded-none border-[#39424f] bg-[#151c25] px-6 py-4">
@@ -700,9 +682,7 @@ export function ApplicationReviewDrawer({
                   onUpdateStatus(
                     application,
                     application.status === 'PENDING' ? 'SUBMITTED' : 'APPROVE',
-                    application.status === 'PENDING' && voteDeadline
-                      ? { voteDeadline: new Date(voteDeadline).toISOString() }
-                      : undefined
+                    undefined
                   );
                   setApproveDialogOpen(false);
                 }

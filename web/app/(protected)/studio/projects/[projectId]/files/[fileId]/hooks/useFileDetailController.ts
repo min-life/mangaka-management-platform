@@ -60,7 +60,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
   const [focusedFrameMaterialId, setFocusedFrameMaterialId] = useState<string | null>(null);
   const [focusedFrameRegion, setFocusedFrameRegion] = useState<FileTaskRegion | null>(null);
   const [isFrameLoading, setIsFrameLoading] = useState(false);
-  const [commentFilterMode, setCommentFilterMode] = useState<'all' | 'frame' | 'general'>('all');
+  const [commentFilterMode, setCommentFilterMode] = useState<string>('all');
   const latestRequestedFrameIdRef = useRef<number | null>(null);
 
   const [selectedVersionForDetails, setSelectedVersionForDetails] = useState<FileVersionItem | null>(null);
@@ -69,6 +69,11 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(focusedTaskId);
   const [focusedTask, setFocusedTask] = useState<TaskWorkspaceItem | null>(null); const viewport = useCanvasViewport();
+  
+  // Reset filter when switching task context
+  useEffect(() => {
+    setCommentFilterMode('all');
+  }, [selectedTaskId]);
 
   // Cache for lazy loading material details
   const [detailedMaterialCache, setDetailedMaterialCache] = useState<Record<string, any[]>>({});
@@ -77,7 +82,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
   const { user } = useAuth();
   const { can: canProject } = usePermissions({ resource: 'PROJECT', resourceId: projectId });
 
-  const { data, error, isInitialLoading, isRefreshing, reload, quietReload, refreshFrameComments, setData, setError } = useFileDetailDataFetcher({
+  const { data, error, isInitialLoading, isRefreshing, reload, quietReload, refreshFrameComments, setData, setError, hasMoreComments, isLoadingMoreComments, loadMoreComments } = useFileDetailDataFetcher({
     projectId,
     fileId,
     selectedTaskId,
@@ -161,8 +166,14 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
         return v.taskId === null || v.taskId === undefined;
       }
       return v.taskId === Number(focusedTask.id);
+    }).map((v: any) => {
+      const cachedMaterials = detailedMaterialCache[v.id];
+      return {
+        ...v,
+        materials: cachedMaterials && cachedMaterials.length > 0 ? cachedMaterials : v.materials,
+      };
     });
-  }, [data?.versions, focusedTask]);
+  }, [data?.versions, focusedTask, detailedMaterialCache]);
 
   const activeVersionIdForCache = focusedTask
     ? (versions.find((v) => v.isCurrent)?.id ?? versions[0]?.id)
@@ -455,7 +466,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     const combined = [
       ...frameComments.map(c => ({ ...c, type: 'frame' as const })),
       ...(data?.comments ?? []).map(c => ({ ...c, type: 'general' as const })),
-    ].sort((a, b) => new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime());
+    ].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
 
     if (commentFilterMode === 'all') return combined;
     return combined.filter(c => c.type === commentFilterMode);
@@ -594,7 +605,32 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     detailedMaterialCache,
     isCanvasLoading,
     versions,
+    data,
+    appendComment: useCallback((newestComment: any) => {
+      setData((prev) => {
+        if (!prev) return prev;
+        const exists = prev.comments.some((c: any) => String(c.id) === String(newestComment.id));
+        if (exists) return prev;
+        
+        return {
+          ...prev,
+          comments: [
+            ...prev.comments,
+            {
+              id: String(newestComment.id),
+              content: getCommentText(newestComment.content),
+              author: newestComment.createdByUser?.displayName || newestComment.createdByUser?.email || `User #${newestComment.createdBy}`,
+              time: newestComment.createdAt ? new Date(newestComment.createdAt).toISOString() : new Date().toISOString(),
+              timestamp: newestComment.createdAt ? new Date(newestComment.createdAt).getTime() : Date.now(),
+            }
+          ]
+        };
+      });
+    }, [setData]),
     zoom,
+    hasMoreComments,
+    isLoadingMoreComments,
+    loadMoreComments,
   };
 }
 

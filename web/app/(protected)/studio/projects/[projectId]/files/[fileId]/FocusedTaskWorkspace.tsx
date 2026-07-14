@@ -185,33 +185,7 @@ export function FocusedTaskWorkspace({
         </div>
       ) : null}
 
-      {/* Filter comments for discussion */}
-      {setCommentFilterMode && (
-        <div className="mt-3">
-          <span className="text-[10px] font-black uppercase text-[#dce7f3] mb-1.5 block">Discussion Filter</span>
-          <select
-            value={commentFilterMode}
-            onChange={(e) => setCommentFilterMode?.(e.target.value as 'all' | 'frame' | 'general')}
-            className="w-full rounded-[4px] bg-[#151c25] p-2 text-xs font-bold text-[#8b94a1] border border-[#26303b] outline-none hover:border-[#39424f] focus:border-[#FFD369] focus:text-white"
-          >
-            <option value="all">All Comments</option>
-            <option value="frame">All Frame Comments</option>
-            <option value="general">General Comments Only</option>
-            {Array.from(new Set(discussionFrameComments.map(c => c.frameId))).sort((a, b) => {
-              const idxA = frameDisplayIndexMap.get(String(a)) || Number(a);
-              const idxB = frameDisplayIndexMap.get(String(b)) || Number(b);
-              return idxA - idxB;
-            }).map(frameId => {
-              const displayIndex = frameDisplayIndexMap.get(String(frameId)) || frameId;
-              return (
-                <option key={`frame-${frameId}`} value={`frame:${frameId}`}>
-                  Frame {displayIndex} Only
-                </option>
-              );
-            })}
-          </select>
-        </div>
-      )}
+
 
       {/* Review History */}
       {task.submissions && task.submissions.length > 0 && (

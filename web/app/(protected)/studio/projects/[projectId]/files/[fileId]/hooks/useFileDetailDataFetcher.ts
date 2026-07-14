@@ -38,6 +38,10 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
     frameComments: SubmissionFrameComment[];
   } | null>(null);
 
+  const [commentPagination, setCommentPagination] = useState<{ page: number; totalPages: number }>({ page: 1, totalPages: 1 });
+  const [isLoadingMoreComments, setIsLoadingMoreComments] = useState(false);
+  const hasMoreComments = commentPagination.page < commentPagination.totalPages;
+
   const [error, setError] = useState<string | null>(null);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -268,23 +272,28 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
 
       try {
         const commentsRes = selectedTaskId
-          ? await getTaskComments(selectedTaskId)
-          : await getFileComments(fileId);
+          ? await getTaskComments(selectedTaskId, 1, 20)
+          : await getFileComments(fileId, 1, 20);
           
         if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
 
-        const rawComments = commentsRes || [];
-        
+        const rawComments = (commentsRes as any)?.data ?? commentsRes ?? [];
+        const rawPagination = (commentsRes as any)?.pagination;
+        if (rawPagination) {
+          setCommentPagination({ page: rawPagination.page, totalPages: rawPagination.totalPages });
+        }
         for (const c of rawComments as any[]) {
           if (c.frame && c.material) {
             dbTaskComments.push({
               id: String(c.id),
               content: getCommentText(c.content),
               frameId: String(c.frame.id),
+              frameName: c.frame.name,
               materialId: String(c.material.id),
               materialName: c.material.name,
               author: c.createdByUser?.displayName || c.createdByUser?.email || `User #${c.createdByUser?.id || c.createdBy || c.userId}`,
               time: c.createdAt ? formatFileDate(c.createdAt) : '',
+              timestamp: c.createdAt ? new Date(c.createdAt).getTime() : 0,
               taskId: selectedTaskId || undefined,
             });
           } else {
@@ -293,6 +302,7 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
               content: getCommentText(c.content),
               author: c.createdByUser?.displayName || c.createdByUser?.email || `User #${c.createdByUser?.id || c.createdBy || c.userId}`,
               time: c.createdAt ? formatFileDate(c.createdAt) : '',
+              timestamp: c.createdAt ? new Date(c.createdAt).getTime() : 0,
             });
           }
         }
@@ -410,6 +420,7 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
                   author: c.createdByUser?.displayName || c.createdByUser?.email || `User #${c.createdByUser?.id || c.userId}`,
                   content: getCommentText(c.content),
                   time: c.createdAt ? formatFileDate(c.createdAt) : '',
+                  timestamp: c.createdAt ? new Date(c.createdAt).getTime() : 0,
                   region: {
                     startX: parseDecimal(frameDetails.startX),
                     startY: parseDecimal(frameDetails.startY),
@@ -445,6 +456,7 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
             author: c.createdByUser?.displayName || c.createdByUser?.email || `User #${c.createdByUser?.id || c.userId}`,
             content: getCommentText(c.content),
             time: c.createdAt ? formatFileDate(c.createdAt) : '',
+            timestamp: c.createdAt ? new Date(c.createdAt).getTime() : 0,
             region: existing.region,
             taskId: existing.taskId,
             targetVersion: undefined,
@@ -463,5 +475,44 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
         console.error('Failed to refresh frame comments', err);
       }
     }, [loadData, setData]),
+    hasMoreComments,
+    isLoadingMoreComments,
+    loadMoreComments: useCallback(async () => {
+      if (!hasMoreComments || isLoadingMoreComments) return;
+      const nextPage = commentPagination.page + 1;
+      setIsLoadingMoreComments(true);
+      try {
+        const commentsRes = selectedTaskId
+          ? await getTaskComments(selectedTaskId, nextPage, 20)
+          : await getFileComments(fileId, nextPage, 20);
+        const rawComments = (commentsRes as any)?.data ?? commentsRes ?? [];
+        const rawPagination = (commentsRes as any)?.pagination;
+        if (rawPagination) {
+          setCommentPagination({ page: rawPagination.page, totalPages: rawPagination.totalPages });
+        }
+        const newComments: FileDiscussionComment[] = [];
+        for (const c of rawComments as any[]) {
+          if (!(c.frame && c.material)) {
+            newComments.push({
+              id: String(c.id),
+              content: getCommentText(c.content),
+              author: c.createdByUser?.displayName || c.createdByUser?.email || `User #${c.createdByUser?.id || c.createdBy}`,
+              time: c.createdAt ? formatFileDate(c.createdAt) : '',
+              timestamp: c.createdAt ? new Date(c.createdAt).getTime() : 0,
+            });
+          }
+        }
+        setData(prev => {
+          if (!prev) return prev;
+          const existingIds = new Set(prev.comments.map(c => c.id));
+          const unique = newComments.filter(c => !existingIds.has(c.id));
+          return { ...prev, comments: [...prev.comments, ...unique] };
+        });
+      } catch (err) {
+        console.error('Failed to load more comments', err);
+      } finally {
+        setIsLoadingMoreComments(false);
+      }
+    }, [hasMoreComments, isLoadingMoreComments, commentPagination.page, selectedTaskId, fileId]),
   };
 }

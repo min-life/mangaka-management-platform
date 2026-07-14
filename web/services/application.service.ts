@@ -242,12 +242,11 @@ export async function deleteApplication(applicationId: number | string) {
 export async function updateApplicationStatus(
   applicationId: number | string,
   status: ApplicationStatus,
-  voteDeadline?: string,
   comment?: string,
 ) {
   const response = await api.patch<ApplicationItemResponse, ApplicationItemResponse>(
     `/applications/${applicationId}/status`,
-    { status, voteDeadline, comment },
+    { status, comment },
   );
 
   return response.data;

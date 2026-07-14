@@ -143,7 +143,13 @@ export function FileCanvas({ controller }: FileCanvasProps) {
             onClick={() => {
               setResourceTab('discussion');
               setTimeout(() => {
-                document.getElementById('discussion-section')?.scrollIntoView({ behavior: 'smooth' });
+                const input = document.getElementById('comment-input');
+                input?.focus();
+                
+                const scrollContainer = document.getElementById('discussion-scroll-container');
+                if (scrollContainer) {
+                  scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
+                }
               }, 100);
             }}
           >
@@ -272,7 +278,7 @@ export function FileCanvas({ controller }: FileCanvasProps) {
                 </p>
               </div>
             </div>
-          ) : !displayedPreviewUrl ? (
+          ) : !displayedPreviewUrl && !controller.isCanvasLoading ? (
             <div className="absolute inset-0 grid place-items-center px-6 text-center">
               <div>
                 <FileQuestion className="mx-auto size-10 text-[#5b626d]" />
@@ -291,7 +297,8 @@ export function FileCanvas({ controller }: FileCanvasProps) {
               if (!frameThreadsMap.has(fId)) {
                 frameThreadsMap.set(fId, {
                   frameId: fId,
-                  displayIndex: frameThreadsMap.size + 1
+                  displayIndex: frameThreadsMap.size + 1,
+                  frameName: (fc as any).frameName,
                 });
               }
             });
@@ -299,7 +306,9 @@ export function FileCanvas({ controller }: FileCanvasProps) {
             return canvasFrameComments.map(({ frameId, region }) => {
               if (!region || region.endX <= region.startX || region.endY <= region.startY) return null;
               
-              const displayIndex = frameThreadsMap.get(frameId)?.displayIndex || '?';
+              const threadData = frameThreadsMap.get(frameId);
+              const displayIndex = threadData?.displayIndex || '?';
+              const frameName = threadData?.frameName;
 
               return (
                 <button
@@ -328,8 +337,8 @@ export function FileCanvas({ controller }: FileCanvasProps) {
                   }}
                   type="button"
                 >
-                  <span className="absolute -left-3 -top-3 grid size-6 place-items-center rounded-full border-2 border-[#101820] bg-[#ff9ab3] text-[9px] font-black text-[#371522]">
-                    F{displayIndex}
+                  <span className="absolute -left-2 -top-3 px-1.5 py-0.5 rounded-[4px] border-2 border-[#101820] bg-[#ff9ab3] text-[9px] font-black text-[#371522] whitespace-nowrap shadow-md">
+                    {frameName || `F${displayIndex}`}
                   </span>
                 </button>
               );

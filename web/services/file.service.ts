@@ -176,9 +176,9 @@ export async function createFileFrame(
   };
 }
 
-export async function getFileComments(fileId: number | string) {
-  const response = await api.get<{ data: unknown[] }, { data: unknown[] }>(`/files/${fileId}/comments`);
-  return response.data ?? [];
+export async function getFileComments(fileId: number | string, page = 1, limit = 20) {
+  const response = await api.get<{ data: unknown[]; pagination?: { total: number; page: number; limit: number; totalPages: number } }, any>(`/files/${fileId}/comments?page=${page}&limit=${limit}`);
+  return response;
 }
 
 export async function getFileAllFrames(fileId: number | string) {
