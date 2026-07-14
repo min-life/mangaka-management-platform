@@ -2140,7 +2140,7 @@ Upload ảnh bìa cho folder. Ảnh sẽ được đẩy lên AWS S3 và hệ th
   **Response Schema:**
   | Field | Type | Description |
   |-------|------|-------------|
-  | `data` | `array` | Danh sách materials đã được chuẩn hóa (có name, file, task) |
+  | `data` | `array` | Danh sách materials đã được chuẩn hóa (có name, file, task). (Không bao gồm mảng chi tiết `materials`, cần gọi API `/api/materials/:id` để lấy chi tiết) |
   | `pagination` | `string` |  |
 
 
@@ -2572,7 +2572,7 @@ Upload ảnh bìa cho folder. Ảnh sẽ được đẩy lên AWS S3 và hệ th
   **Response Schema:**
   | Field | Type | Description |
   |-------|------|-------------|
-  | `data` | `array` | Danh sách materials đã được chuẩn hóa (có name, file, task) |
+  | `data` | `array` | Danh sách materials đã được chuẩn hóa (có name, file, task). (Không bao gồm mảng chi tiết `materials`, cần gọi API `/api/materials/:id` để lấy chi tiết) |
   | `pagination` | `string` |  |
 
 ---

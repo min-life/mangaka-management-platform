@@ -545,6 +545,8 @@ export class UsersService {
         },
       });
 
+      await this.cacheService.delMultiple([`user:${userId}`, `user:me:${userId}`, 'user:list:*']);
+
       return this.buildFrontendUrl('/auth/oauth-success?linked=google');
     } catch (error) {
       this.handleError(error, 'Link Google account fail', ERROR.SVUPDATEBOARD);
