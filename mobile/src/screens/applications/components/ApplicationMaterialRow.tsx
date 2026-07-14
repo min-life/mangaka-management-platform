@@ -103,12 +103,6 @@ export default function ApplicationMaterialRow({ material }: ApplicationMaterial
           ) : null}
         </View>
       </View>
-      <View
-        className="h-9 w-9 items-center justify-center rounded-full"
-        style={{ backgroundColor: Colors.overlayLight, opacity: canOpen ? 1 : 0.4 }}
-      >
-        <MaterialIcon name="visibility" color={Colors.textMuted} size={18} />
-      </View>
     </TouchableOpacity>
   );
 }
