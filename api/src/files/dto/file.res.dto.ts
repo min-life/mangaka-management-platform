@@ -62,6 +62,9 @@ export class FileResDto {
 
   @ApiProperty({ example: '2026-06-18T03:00:00.000Z' })
   updatedAt!: Date;
+
+  @ApiPropertyOptional({ type: () => MaterialResDto, nullable: true })
+  latestMaterial?: MaterialResDto | null;
 }
 
 export class MaterialResDto {
@@ -70,6 +73,9 @@ export class MaterialResDto {
 
   @ApiPropertyOptional({ example: 'Material name', nullable: true })
   name?: string | null;
+
+  @ApiPropertyOptional({ type: Object, nullable: true })
+  materials?: any | null;
 
   @ApiPropertyOptional({ type: () => SimpleFileResDto, nullable: true })
   file?: SimpleFileResDto | null;

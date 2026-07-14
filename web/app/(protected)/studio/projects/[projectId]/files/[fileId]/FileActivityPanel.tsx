@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { Activity, Check, MessageSquare, Plus, Upload, Circle, Pencil } from 'lucide-react';
 
 import { getActivityVerbPhrase, getActorLabel } from '@/lib/activity-message';
+import { resolveActivityRoute } from '@/lib/activity-route';
 import { getFileActivityLogs } from '@/services/file.service';
 import { useRealtimeProjectActivity } from '@/hooks/use-realtime-activity';
 import { type FileActivityItem } from '../file-ui';
@@ -31,7 +33,6 @@ function ActivitySkeleton() {
 type FileActivityPanelProps = {
   fileId: number | string;
   projectId: number | string;
-  onTaskClick?: (taskId: string) => void;
 };
 
 function formatRelativeTime(dateString: string) {
@@ -94,7 +95,7 @@ const activityTone: Record<string, 'default' | 'success' | 'warning'> = {
   APPLICATION_REJECTED: 'warning',
 };
 
-function formatActivityLog(log: any): FileActivityItem {
+function formatActivityLog(log: any, projectId: number | string): FileActivityItem {
   const actor = log.actor?.displayName || log.actor?.email || `User #${log.actorId}`;
   let label = '';
   let tone: 'default' | 'success' | 'warning' = 'default';
@@ -155,6 +156,9 @@ function formatActivityLog(log: any): FileActivityItem {
       label = 'added a comment';
       tone = 'default';
       type = 'comment';
+      if (log.metadata?.taskId) {
+        metadata = { taskId: log.metadata.taskId, taskName: log.metadata.taskTitle || 'Unknown Task' };
+      }
       break;
     case 'COMMENT_DELETED':
       label = 'deleted a comment';
@@ -215,9 +219,22 @@ function formatActivityLog(log: any): FileActivityItem {
       tone = 'default';
   }
 
+  const route = resolveActivityRoute({
+    action: log.action,
+    editorBoardId: log.editorBoardId ?? null,
+    entityId: log.entityId,
+    entityType: log.entityType,
+    fileId: log.fileId ?? null,
+    metadata: log.metadata,
+    projectId: Number(projectId),
+  });
+  // Suppress links that just point back at the file page already open.
+  const href = route && route !== `/studio/projects/${projectId}/files/${log.fileId}` ? route : undefined;
+
   return {
     id: String(log.id),
     actor: getActorLabel(log.actor, log.actorId),
+    href,
     label: getActivityVerbPhrase(log),
     time: formatRelativeTime(log.createdAt),
     rawDate: log.createdAt,
@@ -227,7 +244,8 @@ function formatActivityLog(log: any): FileActivityItem {
   };
 }
 
-export function FileActivityPanel({ fileId, projectId, onTaskClick }: FileActivityPanelProps) {
+export function FileActivityPanel({ fileId, projectId }: FileActivityPanelProps) {
+  const router = useRouter();
   const [activities, setActivities] = useState<FileActivityItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -240,7 +258,7 @@ export function FileActivityPanel({ fileId, projectId, onTaskClick }: FileActivi
       setError(null);
       try {
         const response = await getFileActivityLogs(fileId);
-        const mapped = (response.data || []).map(formatActivityLog);
+        const mapped = (response.data || []).map((log) => formatActivityLog(log, projectId));
         setActivities(mapped);
       } catch (err) {
         console.error('Failed to load file activities:', err);
@@ -251,20 +269,20 @@ export function FileActivityPanel({ fileId, projectId, onTaskClick }: FileActivi
     }
 
     loadActivities();
-  }, [fileId]);
+  }, [fileId, projectId]);
 
   useEffect(() => {
     if (realtimeLogs.length > 0) {
       const latestLog = realtimeLogs[0];
       if (latestLog?.fileId === Number(fileId)) {
-        const formatted = formatActivityLog(latestLog);
+        const formatted = formatActivityLog(latestLog, projectId);
         setActivities((prev) => {
           if (prev.some((x) => x.id === formatted.id)) return prev;
           return [formatted, ...prev];
         });
       }
     }
-  }, [realtimeLogs, fileId]);
+  }, [realtimeLogs, fileId, projectId]);
 
   const groupedActivities = useMemo(() => {
     const groups: { dateLabel: string; items: FileActivityItem[] }[] = [];
@@ -338,8 +356,12 @@ export function FileActivityPanel({ fileId, projectId, onTaskClick }: FileActivi
                           {item.label}
                           {item.metadata?.taskName && (
                             <span
-                              className="ml-1 font-bold text-[#FFD369] cursor-pointer hover:underline"
-                              onClick={() => item.metadata?.taskId && onTaskClick?.(item.metadata.taskId)}
+                              className={
+                                item.href
+                                  ? 'ml-1 font-bold text-[#FFD369] cursor-pointer hover:underline'
+                                  : 'ml-1 font-bold text-[#FFD369]'
+                              }
+                              onClick={() => item.href && router.push(item.href)}
                             >
                               "{item.metadata.taskName}"
                             </span>

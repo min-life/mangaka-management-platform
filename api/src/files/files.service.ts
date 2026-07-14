@@ -124,12 +124,25 @@ export class FilesService {
     try {
       const file = await this.prisma.file.findUnique({
         where: { id },
-        select: FILE_SELECT,
+        select: {
+          ...FILE_SELECT,
+          fileMaterials: {
+            where: { taskId: null },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: MATERIAL_LIST_SELECT,
+          },
+        },
       });
       if (!file) {
         throw new NotFoundException(ERROR.NFFILE);
       }
-      return file;
+      
+      const { fileMaterials, ...rest } = file;
+      return {
+        ...rest,
+        latestMaterial: fileMaterials?.[0] || null,
+      };
     } catch (error) {
       this.handleError(error, 'Get file fail', ERROR.SVGETFILE);
     }
@@ -441,6 +454,69 @@ export class FilesService {
       return task;
     } catch (error) {
       this.handleError(error, 'Create task fail', ERROR.SVCREATETASK);
+    }
+  }
+
+  @UseCache((args) => `file:${args[0]}:frames`)
+  async getFileFrames(
+    fileId: number,
+    sort?: { field: 'createdAt'; order: 'asc' | 'desc' },
+    pagination?: Pagination,
+  ) {
+    try {
+      await this.ensureFile(fileId);
+
+      const where: Prisma.MaterialCommentFrameWhereInput = {
+        material: {
+          fileId: fileId,
+          taskId: null,
+        },
+      };
+      const orderBy: Prisma.MaterialCommentFrameOrderByWithRelationInput = sort
+        ? { [sort.field]: sort.order }
+        : { createdAt: 'desc' };
+      const { page, limit, skip } = this.buildPagination(pagination);
+
+      const [total, frames] = await this.prisma.$transaction([
+        this.prisma.materialCommentFrame.count({ where }),
+        this.prisma.materialCommentFrame.findMany({
+          where,
+          orderBy,
+          skip,
+          take: limit,
+          select: {
+            id: true,
+            name: true,
+            startX: true,
+            startY: true,
+            endX: true,
+            endY: true,
+            materialId: true,
+            material: {
+              select: {
+                fileId: true,
+              },
+            },
+            createdByUser: USER_SELECT,
+            updatedByUser: USER_SELECT,
+            createdAt: true,
+            updatedAt: true,
+          },
+        }),
+      ]);
+
+      const mappedFrames = frames.map((f) => ({
+        ...f,
+        fileId: f.material?.fileId,
+        material: undefined,
+      }));
+
+      return {
+        frames: mappedFrames,
+        pagination: this.buildPaginationMeta(total, page, limit),
+      };
+    } catch (error) {
+      this.handleError(error, 'Get file frames fail', ERROR.SVGETFILEFRAMES);
     }
   }
 

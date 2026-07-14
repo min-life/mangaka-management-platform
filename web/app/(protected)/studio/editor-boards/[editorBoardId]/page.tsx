@@ -1,25 +1,16 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { use, useEffect } from 'react';
 import Link from 'next/link';
 import { ChevronRight, CircleGauge, FileCheck2, Users } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatActionTitle, formatActivityLogText } from '@/lib/activity-message';
-import {
-  getEditorBoardDashboard,
-  type BoardMemberResponse,
-  type EditorBoardDashboardStats,
-  type EditorBoardResponse,
-} from '@/services/editor-board.service';
-import {
-  getEditorBoardActivityLogs,
-  type ActivityLogResponse,
-} from '@/services/activity-log.service';
-import type { ProjectResponse } from '@/services/project.service';
+import { type EditorBoardDashboardStats } from '@/services/editor-board.service';
 
 import { getStatusLabel, getStatusStyle } from './applications/application-ui';
+import { useEditorBoardStore } from '../store/editor-board-store';
 
 type ApplicationResponse = {
   createdAt: string;
@@ -44,59 +35,18 @@ const EMPTY_DASHBOARD_STATS: EditorBoardDashboardStats = {
 // PhucTD #editor-board start
 export default function EditorBoardDashboardPage({ params }: PageProps) {
   const { editorBoardId } = use(params);
-
-  const [board, setBoard] = useState<EditorBoardResponse | null>(null);
-  const [members, setMembers] = useState<BoardMemberResponse[]>([]);
-  const [projects, setProjects] = useState<ProjectResponse[]>([]);
-  const [applications, setApplications] = useState<ApplicationResponse[]>([]);
-  const [dashboardStats, setDashboardStats] =
-    useState<EditorBoardDashboardStats>(EMPTY_DASHBOARD_STATS);
-  const [activities, setActivities] = useState<ActivityLogResponse[]>([]);
-  const [activityError, setActivityError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const dashboard = useEditorBoardStore((state) => state.dashboards[editorBoardId]);
+  const loadDashboard = useEditorBoardStore((state) => state.loadDashboard);
 
   useEffect(() => {
-    const loadActivityLogs = async () => {
-      const activityResult = await getEditorBoardActivityLogs(editorBoardId, {
-        limit: 3,
-        page: 1,
-      });
+    queueMicrotask(() => {
+      void loadDashboard(editorBoardId);
+    });
+  }, [editorBoardId, loadDashboard]);
 
-      setActivities(activityResult.activities);
-      setActivityError(null);
-      return activityResult.activities;
-    };
-
-    const fetchData = async () => {
-      try {
-        const [dashboardData, activityResult] = await Promise.all([
-          getEditorBoardDashboard<ApplicationResponse>(editorBoardId),
-          loadActivityLogs().catch(() => null),
-        ]);
-
-        setBoard(dashboardData.board);
-        setMembers(dashboardData.members);
-        setProjects(dashboardData.projects);
-        setApplications(dashboardData.applications);
-        setDashboardStats(dashboardData.stats);
-        if (!activityResult) {
-          setActivities([]);
-          setActivityError('Unable to load recent activity.');
-        } else if (activityResult.length === 0) {
-          window.setTimeout(() => {
-            void loadActivityLogs().catch(() => undefined);
-          }, 800);
-        }
-      } catch {
-        setBoard(null);
-        setDashboardStats(EMPTY_DASHBOARD_STATS);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [editorBoardId]);
+  const dashboardData = dashboard?.data;
+  const isLoading = dashboard?.isLoading ?? !dashboard?.loaded;
+  const board = dashboardData?.board ?? null;
 
   if (isLoading) {
     return <div className="p-8 text-center text-[#aeb7c2]">Loading dashboard...</div>;
@@ -105,6 +55,13 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
   if (!board) {
     return <div className="p-8 text-center text-red-400">Failed to load board details.</div>;
   }
+
+  const members = dashboardData?.members ?? [];
+  const projects = dashboardData?.projects ?? [];
+  const applications = (dashboardData?.applications ?? []) as ApplicationResponse[];
+  const dashboardStats = dashboardData?.stats ?? EMPTY_DASHBOARD_STATS;
+  const activities = dashboard?.activities ?? [];
+  const activityError = dashboard?.activityError ?? null;
 
   const statCards = [
     { label: 'Total Projects', meta: 'In this board', value: dashboardStats.totalProjects },

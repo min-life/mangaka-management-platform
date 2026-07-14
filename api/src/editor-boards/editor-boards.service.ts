@@ -218,7 +218,11 @@ export class EditorBoardsService {
           where: { project: { editorBoardId: boardId }, status: { in: ['PENDING', 'SUBMITTED'] } },
         }),
         this.prisma.application.count({
-          where: { project: { editorBoardId: boardId }, status: 'APPROVE', updatedAt: { gte: firstDayOfMonth } },
+          where: {
+            project: { editorBoardId: boardId },
+            status: 'APPROVE',
+            updatedAt: { gte: firstDayOfMonth },
+          },
         }),
         this.prisma.userEditorBoard.findMany({
           where: { editorBoardId: boardId },
@@ -306,6 +310,7 @@ export class EditorBoardsService {
     `board:${args[0]}:members:*`,
     ...args[1].map((userId: number) => `user:${userId}:editor-boards`),
     ...args[1].map((userId: number) => `board:list:${userId}:*`),
+    ...args[1].map((userId: number) => `permission:board:${args[0]}:${userId}`),
   ])
   async addMembersToBoard(editorBoardId: number, userIds: number[], actorId: number) {
     try {
@@ -402,6 +407,7 @@ export class EditorBoardsService {
     `board:${args[0]}:members:*`,
     `user:${args[1]}:editor-boards`,
     `board:list:${args[1]}:*`,
+    `permission:board:${args[0]}:${args[1]}`,
   ])
   async removeBoardMember(editorBoardId: number, userId: number, actorId: number) {
     try {
@@ -446,6 +452,7 @@ export class EditorBoardsService {
     `board:${args[0]}:members:*`,
     `user:${args[1]}:editor-boards`,
     `board:list:${args[1]}:*`,
+    `permission:board:${args[0]}:${args[1]}`,
   ])
   async leaveBoard(editorBoardId: number, userId: number) {
     try {
@@ -472,6 +479,7 @@ export class EditorBoardsService {
     `board:${args[0]}:members:*`,
     `user:${args[1]}:editor-boards`,
     `board:list:${args[1]}:*`,
+    `permission:board:${args[0]}:${args[1]}`,
   ])
   async setToLead(editorBoardId: number, userId: number) {
     try {

@@ -198,6 +198,8 @@ export function ApplicationsClient() {
     }
   }, [activities.length, loadApplications]);
 
+  const applicationIdParam = searchParams.get('applicationId');
+
   const filteredApplications = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
 
@@ -356,6 +358,18 @@ export function ApplicationsClient() {
       setIsLoadingDetail(false);
     }
   };
+
+  // Deep link from activity-log/notification clicks, e.g. ?applicationId=123
+  useEffect(() => {
+    if (!applicationIdParam) return;
+    const applicationId = Number(applicationIdParam);
+    if (!Number.isFinite(applicationId)) return;
+
+    queueMicrotask(() => {
+      void handleOpenApplication({ id: applicationId } as ApplicationResponse);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applicationIdParam]);
 
   const refreshSelectedApplication = async (applicationId: number) => {
     const [detail, commentResult] = await Promise.all([

@@ -2,7 +2,6 @@ import api from '@/lib/api';
 import type { EditorBoardResponse, UserSummaryResponse } from './editor-board.service';
 import type { ApplicationStatus, ApplicationType } from './application.service';
 
-
 export type CreateProjectPayload = {
   description?: string;
   editorBoardId?: number;
@@ -93,13 +92,13 @@ export type ProjectMemberResponse = {
 type ProjectMemberApiResponse =
   | ProjectMemberResponse
   | {
-    createdAt: string;
-    numberOfTasks?: number;
-    role: ProjectMemberRoleResponse;
-    taskOverview?: ProjectMemberResponse['taskOverview'];
-    updatedAt: string;
-    user: UserSummaryResponse;
-  };
+      createdAt: string;
+      numberOfTasks?: number;
+      role: ProjectMemberRoleResponse;
+      taskOverview?: ProjectMemberResponse['taskOverview'];
+      updatedAt: string;
+      user: UserSummaryResponse;
+    };
 
 export type ProjectApplicationResponse = {
   createdAt: string;
@@ -114,14 +113,6 @@ export type ProjectApplicationResponse = {
   status: ApplicationStatus;
   title: string;
   type: ApplicationType;
-  updatedAt: string;
-};
-
-export type ProjectStatResponse = {
-  id: number;
-  metrics: unknown;
-  project?: ProjectResponse;
-  projectId?: number;
   updatedAt: string;
 };
 
@@ -190,10 +181,6 @@ type ProjectApplicationsResponse = {
   pagination?: PaginationResponse;
 };
 
-type ProjectStatApiResponse = {
-  data?: ProjectStatResponse | null;
-};
-
 type ProjectFoldersResponse = {
   data?: ProjectFolderResponse[];
   pagination?: PaginationResponse;
@@ -248,14 +235,19 @@ export async function getProjects(params?: {
 }
 
 export async function linkProjectEditorBoard(projectId: number | string, editorBoardId: number) {
-  const response = await api.post<{ data: any }, { data: any }>(`/projects/${projectId}/editor-boards`, {
-    editorBoardId,
-  });
+  const response = await api.post<{ data: any }, { data: any }>(
+    `/projects/${projectId}/editor-boards`,
+    {
+      editorBoardId,
+    },
+  );
   return response.data;
 }
 
 export async function unlinkProjectEditorBoard(projectId: number | string) {
-  const response = await api.delete<{ data: any }, { data: any }>(`/projects/${projectId}/editor-boards`);
+  const response = await api.delete<{ data: any }, { data: any }>(
+    `/projects/${projectId}/editor-boards`,
+  );
   return response.data;
 }
 
@@ -306,9 +298,10 @@ export async function getProjectMembers(
 }
 
 export async function getProjectMember(projectId: number, userId: number) {
-  const response = await api.get<ApiResponse<ProjectMemberApiResponse>, ApiResponse<ProjectMemberApiResponse>>(
-    `/projects/${projectId}/members/${userId}`,
-  );
+  const response = await api.get<
+    ApiResponse<ProjectMemberApiResponse>,
+    ApiResponse<ProjectMemberApiResponse>
+  >(`/projects/${projectId}/members/${userId}`);
 
   return normalizeProjectMember(response.data ?? (response as ProjectMemberApiResponse));
 }
@@ -338,19 +331,6 @@ export async function getProjectApplications(
     applications: response.data ?? [],
     pagination: response.pagination,
   };
-}
-
-export async function getProjectStats(projectId: number) {
-  const response = await api.get<ProjectStatApiResponse, ProjectStatApiResponse>(
-    `/projects/${projectId}/stats`,
-  );
-
-  return response.data ?? null;
-}
-
-export async function importProjectStats(projectId: number | string, metrics: unknown) {
-  const response = await api.post<ProjectStatApiResponse>(`/projects/${projectId}/stats`, { metrics });
-  return response.data;
 }
 
 export async function updateProjectMember(
@@ -426,10 +406,10 @@ export async function createFolderFile(
     title: string;
   },
 ) {
-  const response = await api.post<ApiResponse<ProjectFileResponse>, ApiResponse<ProjectFileResponse>>(
-    `/folders/${folderId}/files`,
-    payload,
-  );
+  const response = await api.post<
+    ApiResponse<ProjectFileResponse>,
+    ApiResponse<ProjectFileResponse>
+  >(`/folders/${folderId}/files`, payload);
 
   return response.data ?? (response as ProjectFileResponse);
 }
@@ -447,9 +427,10 @@ export async function createProjectFolder(
 }
 
 export async function getFolderById(folderId: number | string) {
-  const response = await api.get<ApiResponse<ProjectFolderResponse>, ApiResponse<ProjectFolderResponse>>(
-    `/folders/${folderId}`,
-  );
+  const response = await api.get<
+    ApiResponse<ProjectFolderResponse>,
+    ApiResponse<ProjectFolderResponse>
+  >(`/folders/${folderId}`);
 
   return response.data ?? (response as ProjectFolderResponse);
 }
@@ -524,8 +505,9 @@ export type ProjectDashboardResponse = {
 };
 
 export async function getProjectDashboard(projectId: number | string) {
-  const response = await api.get<ApiResponse<ProjectDashboardResponse>, ApiResponse<ProjectDashboardResponse>>(
-    `/projects/${projectId}/dashboard`
-  );
+  const response = await api.get<
+    ApiResponse<ProjectDashboardResponse>,
+    ApiResponse<ProjectDashboardResponse>
+  >(`/projects/${projectId}/dashboard`);
   return response.data ?? (response as unknown as ProjectDashboardResponse);
 }

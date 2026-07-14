@@ -152,7 +152,7 @@ export class UsersService {
       const email = dto.email.trim().toLowerCase();
 
       const roleIds = await this.validateSysRoles(dto.roleIds);
-      
+
       const isRandomPassword = !dto.password;
       const rawPassword = dto.password || randomUUID().slice(0, 10);
       const password = await bcrypt.hash(rawPassword, BCRYPT_SALT_ROUNDS);
@@ -416,7 +416,7 @@ export class UsersService {
     }
   }
 
-  @InvalidateCache((args) => [`user:${args[0]}:roles:*`])
+  @InvalidateCache((args) => [`user:${args[0]}:roles:*`, `permission:sys:${args[0]}`])
   async appendRoles(userId: number, roleIds: number[]) {
     try {
       await this.ensureUser(userId);
@@ -433,7 +433,7 @@ export class UsersService {
     }
   }
 
-  @InvalidateCache((args) => [`user:${args[0]}:roles:*`])
+  @InvalidateCache((args) => [`user:${args[0]}:roles:*`, `permission:sys:${args[0]}`])
   async replaceRoles(userId: number, roleIds: number[]) {
     try {
       await this.ensureUser(userId);
@@ -1067,7 +1067,6 @@ export class UsersService {
 
     return permissions;
   }
-
 
   private buildPagination(pagination?: Pagination) {
     const page = pagination?.page || 1;

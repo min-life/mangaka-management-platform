@@ -9,7 +9,6 @@ import {
   ChevronRight,
   FilePenLine,
   Link2,
-  Palette,
   Pencil,
   ShieldCheck,
   UserPlus,
@@ -30,26 +29,27 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/hooks/useAuth';
 import { useRealtimeNotifications } from '@/hooks/use-realtime-notifications';
 import { clearAccessToken, getAccessToken } from '@/lib/auth-storage';
 import { cn } from '@/lib/utils';
 import {
+  createCurrentUserPassword,
   getCurrentUserContextActivities,
   getCurrentUserProfile,
   getApiErrorMessage,
   getGoogleLinkAccountUrl,
+  hasCurrentUserPassword,
   mapActivityLogToUserActivity,
   updateCurrentUserPassword,
   updateCurrentUserProfile,
   uploadAvatarImage,
+  type CreatePasswordPayload,
   type UpdatePasswordPayload,
   type UserActivity,
   type UserProfile,
 } from '../services/user-profile-service';
-
-type ProfileTheme = 'dark' | 'light';
-
-const USER_PROFILE_THEME_KEY = 'mangaka:user-profile-theme';
 
 const ACTIVITY_PAGE_SIZE = 7;
 
@@ -75,9 +75,7 @@ function isSessionExpiredError(error: unknown) {
 
 const text = {
   accountSettings: 'Account Settings',
-  activityLoading: 'Loading activity...',
   activitySummary: 'Activity Summary',
-  appearance: (isDark: boolean) => `Appearance (State ${isDark ? 'Dark' : 'Light'})`,
   assignedEditorBoards: 'Assigned Editor Boards',
   assignedProjects: 'Assigned Projects',
   googleAccountLinked: 'Google Account Linked',
@@ -90,36 +88,20 @@ const text = {
   viewAll: 'View All',
 };
 
-const themeTokens: Record<ProfileTheme, React.CSSProperties> = {
-  dark: {
-    '--profile-bg': '#222831',
-    '--profile-header': '#222831',
-    '--profile-surface': '#1a2029',
-    '--profile-surface-high': '#242a33',
-    '--profile-surface-highest': '#2f353e',
-    '--profile-border': '#50555D',
-    '--profile-text': '#dde3ef',
-    '--profile-title': '#ffffff',
-    '--profile-muted': '#C8C8C8',
-    '--profile-accent': '#FFD369',
-    '--profile-button': '#ffffff',
-    '--profile-button-text': '#2f3131',
-  } as React.CSSProperties,
-  light: {
-    '--profile-bg': '#f5f7fb',
-    '--profile-header': '#ffffff',
-    '--profile-surface': '#ffffff',
-    '--profile-surface-high': '#f1f4f8',
-    '--profile-surface-highest': '#e5eaf1',
-    '--profile-border': '#c9d1dc',
-    '--profile-text': '#1f2937',
-    '--profile-title': '#0f172a',
-    '--profile-muted': '#5f6b7a',
-    '--profile-accent': '#b7791f',
-    '--profile-button': '#111827',
-    '--profile-button-text': '#ffffff',
-  } as React.CSSProperties,
-};
+const profileThemeStyle = {
+  '--profile-bg': '#222831',
+  '--profile-header': '#222831',
+  '--profile-surface': '#1a2029',
+  '--profile-surface-high': '#242a33',
+  '--profile-surface-highest': '#2f353e',
+  '--profile-border': '#50555D',
+  '--profile-text': '#dde3ef',
+  '--profile-title': '#ffffff',
+  '--profile-muted': '#C8C8C8',
+  '--profile-accent': '#FFD369',
+  '--profile-button': '#ffffff',
+  '--profile-button-text': '#2f3131',
+} as React.CSSProperties;
 
 function getInitials(name: string) {
   return (
@@ -214,6 +196,27 @@ function EmptyState({ message }: { message: string }) {
   return (
     <Card className="flex min-h-[112px] items-center justify-center rounded-xl border border-[var(--profile-border)] bg-[var(--profile-surface)] p-5 text-center text-[13px] text-[var(--profile-muted)] ring-0">
       {message}
+    </Card>
+  );
+}
+
+function ActivitySkeleton() {
+  return (
+    <Card className="gap-0 rounded-xl border border-[var(--profile-border)] bg-[var(--profile-surface)] p-4 ring-0">
+      <div className="space-y-4">
+        {[0, 1, 2].map((index) => (
+          <div className="flex gap-4" key={index}>
+            <Skeleton className="size-6 shrink-0 rounded-full bg-[var(--profile-surface-highest)]" />
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <Skeleton className="h-3 w-1/3 bg-[var(--profile-surface-highest)]" />
+                <Skeleton className="h-3 w-12 bg-[var(--profile-surface-highest)]" />
+              </div>
+              <Skeleton className="h-3 w-2/3 bg-[var(--profile-surface-highest)]" />
+            </div>
+          </div>
+        ))}
+      </div>
     </Card>
   );
 }
@@ -325,9 +328,9 @@ function ChangePasswordDialog({
               onChange={(event) => setConfirmPassword(event.target.value)}
             />
           </div>
-          <DialogFooter className="border-t border-white/[0.08] bg-[#101722] px-6 py-4">
+          <DialogFooter className="mx-0 mb-0 rounded-none border-t border-white/[0.08] bg-[#101722] px-6 py-4">
             <Button
-              className="border-black bg-black text-white hover:border-black hover:bg-black/85 hover:text-white"
+              className="border-black bg-black px-5 text-white hover:border-black hover:bg-black/85 hover:text-white"
               disabled={isSubmitting}
               type="button"
               variant="outline"
@@ -336,7 +339,7 @@ function ChangePasswordDialog({
               Cancel
             </Button>
             <Button
-              className="border-black bg-black text-white hover:border-black hover:bg-black/85 hover:text-white"
+              className="border-black bg-black px-5 text-white hover:border-black hover:bg-black/85 hover:text-white"
               disabled={isSubmitting}
               type="submit"
               variant="outline"
@@ -350,39 +353,127 @@ function ChangePasswordDialog({
   );
 }
 
+function SetPasswordDialog({
+  open,
+  isSubmitting,
+  onOpenChange,
+  onSubmit,
+}: {
+  open: boolean;
+  isSubmitting: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (values: CreatePasswordPayload) => Promise<void>;
+}) {
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!newPassword || !confirmPassword) {
+      toast.error('All password fields are required.');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast.error('New password must be at least 6 characters.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error('New password and confirmation must match.');
+      return;
+    }
+
+    await onSubmit({ newPassword });
+    setNewPassword('');
+    setConfirmPassword('');
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="w-[480px] max-w-[calc(100vw-32px)] overflow-hidden rounded-2xl border border-white/[0.12] bg-[#151b24] p-0 text-[#eef3fb] shadow-[0_24px_80px_rgba(0,0,0,0.55)]">
+        <form onSubmit={handleSubmit}>
+          <DialogHeader className="border-b border-white/[0.08] bg-[#18202c] px-6 py-5">
+            <DialogTitle className="text-[22px] text-white">Set Password</DialogTitle>
+            <DialogDescription className="text-[#b8c3d2]">
+              Your account doesn&apos;t have a password yet. Set one so you can also sign in with email.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 p-6">
+            <Input
+              autoFocus
+              className="h-10 border-white/[0.14] bg-[#0f1620] text-[#eef3fb]"
+              disabled={isSubmitting}
+              placeholder="New password"
+              type="password"
+              value={newPassword}
+              onChange={(event) => setNewPassword(event.target.value)}
+            />
+            <Input
+              className="h-10 border-white/[0.14] bg-[#0f1620] text-[#eef3fb]"
+              disabled={isSubmitting}
+              placeholder="Confirm new password"
+              type="password"
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+            />
+          </div>
+          <DialogFooter className="mx-0 mb-0 rounded-none border-t border-white/[0.08] bg-[#101722] px-6 py-4">
+            <Button
+              className="border-black bg-black px-5 text-white hover:border-black hover:bg-black/85 hover:text-white"
+              disabled={isSubmitting}
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="border-black bg-black px-5 text-white hover:border-black hover:bg-black/85 hover:text-white"
+              disabled={isSubmitting}
+              type="submit"
+              variant="outline"
+            >
+              {isSubmitting ? 'Saving...' : 'Set Password'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function UserProfilePage() {
   const router = useRouter();
+  const { user: authUser, updateUser: updateAuthUser } = useAuth();
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const { notifications } = useRealtimeNotifications(Boolean(currentUser));
+  const { notifications } = useRealtimeNotifications(Boolean(authUser));
   const [allActivities, setAllActivities] = useState<UserActivity[]>([]);
   const [visibleActivityCount, setVisibleActivityCount] = useState(ACTIVITY_PAGE_SIZE);
   const activityScrollRef = useRef<HTMLDivElement | null>(null);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
+  const [isActivitiesLoading, setIsActivitiesLoading] = useState(true);
   const [error, setError] = useState('');
-  const [isPasswordOpen, setIsPasswordOpen] = useState(false);
+  const [passwordDialogMode, setPasswordDialogMode] = useState<'change' | 'set' | null>(null);
+  const [isCheckingPasswordStatus, setIsCheckingPasswordStatus] = useState(false);
   const [isProfileSubmitting, setIsProfileSubmitting] = useState(false);
   const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
   const [isEditingDisplayName, setIsEditingDisplayName] = useState(false);
   const [draftDisplayName, setDraftDisplayName] = useState('');
-  // Always start with the server-rendered default ('dark') so the client's first
-  // render matches SSR output; the stored preference is applied after mount below.
-  const [theme, setTheme] = useState<ProfileTheme>('dark');
 
   useEffect(() => {
-    const storedTheme = window.localStorage.getItem(USER_PROFILE_THEME_KEY);
-    if (storedTheme === 'light') {
-      setTheme('light');
+    if (!getAccessToken()) {
+      clearAccessToken();
+      router.replace('/login');
+      return;
     }
-  }, []);
 
-  useEffect(() => {
-    void loadProfileData();
+    void loadProfile();
+    void loadActivities();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    window.localStorage.setItem(USER_PROFILE_THEME_KEY, theme);
-  }, [theme]);
 
   useEffect(() => {
     const activityLog = notifications[0]?.activityLog;
@@ -391,7 +482,7 @@ export function UserProfilePage() {
       return;
     }
 
-    const nextActivity = mapActivityLogToUserActivity(activityLog);
+    const nextActivity = mapActivityLogToUserActivity(activityLog, { isDirectedAtViewer: true });
     setAllActivities((currentActivities) => {
       if (currentActivities.some((activity) => activity.id === nextActivity.id)) {
         return currentActivities;
@@ -404,46 +495,66 @@ export function UserProfilePage() {
     setVisibleActivityCount((current) => current + 1);
   }, [notifications]);
 
-  const themeStyle = useMemo(() => themeTokens[theme], [theme]);
-  const displayName = currentUser?.displayName ?? 'Unnamed User';
-  const avatarUrl = currentUser?.avatarUrl ?? '';
+  const displayName = currentUser?.displayName ?? authUser?.displayName ?? 'Unnamed User';
+  const avatarUrl = currentUser?.avatarUrl ?? authUser?.avatarUrl ?? '';
   const roleName = getPrimaryRole(currentUser);
   const initials = getInitials(displayName);
-  const isDarkTheme = theme === 'dark';
   const activities = useMemo(
     () => allActivities.slice(0, visibleActivityCount),
     [allActivities, visibleActivityCount],
   );
   const hasMoreActivities = visibleActivityCount < allActivities.length;
 
-  async function loadProfileData() {
-    setIsLoading(true);
-    setError('');
-
-    if (!getAccessToken()) {
+  function handleSessionExpiry(loadError: unknown) {
+    if (isSessionExpiredError(loadError)) {
       clearAccessToken();
       router.replace('/login');
-      return;
+      return true;
     }
+
+    return false;
+  }
+
+  async function loadProfile() {
+    setIsProfileLoading(true);
 
     try {
       const profileData = await getCurrentUserProfile();
-      const activityData = await getCurrentUserContextActivities();
-
       setCurrentUser(profileData);
-      setAllActivities(activityData);
-      setVisibleActivityCount(ACTIVITY_PAGE_SIZE);
     } catch (loadError) {
-      if (isSessionExpiredError(loadError)) {
-        clearAccessToken();
-        router.replace('/login');
+      if (handleSessionExpiry(loadError)) {
         return;
       }
 
       setError(getApiErrorMessage(loadError, 'Unable to load profile data.'));
     } finally {
-      setIsLoading(false);
+      setIsProfileLoading(false);
     }
+  }
+
+  async function loadActivities() {
+    setIsActivitiesLoading(true);
+
+    try {
+      const activityData = await getCurrentUserContextActivities();
+
+      setAllActivities(activityData);
+      setVisibleActivityCount(ACTIVITY_PAGE_SIZE);
+    } catch (loadError) {
+      if (handleSessionExpiry(loadError)) {
+        return;
+      }
+
+      setError(getApiErrorMessage(loadError, 'Unable to load activity data.'));
+    } finally {
+      setIsActivitiesLoading(false);
+    }
+  }
+
+  function retryLoad() {
+    setError('');
+    void loadProfile();
+    void loadActivities();
   }
 
   // Pagination happens entirely client-side (see getCurrentUserContextActivities):
@@ -490,9 +601,7 @@ export function UserProfilePage() {
     setIsProfileSubmitting(true);
 
     try {
-      const uploadResult = input.avatarFile
-        ? await uploadAvatarImage(input.avatarFile)
-        : null;
+      const uploadResult = input.avatarFile ? await uploadAvatarImage(input.avatarFile) : null;
       const updatedUser = await updateCurrentUserProfile({
         displayName: input.displayName ?? currentUser?.displayName ?? '',
         ...(uploadResult?.avatarUrl ? { avatarUrl: uploadResult.avatarUrl } : {}),
@@ -503,6 +612,7 @@ export function UserProfilePage() {
         ...updatedUser,
         roles: updatedUser.roles.length ? updatedUser.roles : (currentUser?.roles ?? []),
       }));
+      updateAuthUser({ avatarUrl: updatedUser.avatarUrl, displayName: updatedUser.displayName });
       toast.success('Profile updated successfully');
       return true;
     } catch (updateError) {
@@ -550,7 +660,7 @@ export function UserProfilePage() {
 
     try {
       await updateCurrentUserPassword(values);
-      setIsPasswordOpen(false);
+      setPasswordDialogMode(null);
       toast.success('Password updated successfully');
     } catch (passwordError) {
       toast.error(getApiErrorMessage(passwordError, 'Unable to update password.'));
@@ -559,19 +669,53 @@ export function UserProfilePage() {
     }
   }
 
+  async function handleCreatePassword(values: CreatePasswordPayload) {
+    setIsPasswordSubmitting(true);
+
+    try {
+      await createCurrentUserPassword(values);
+      setPasswordDialogMode(null);
+      toast.success('Password set successfully');
+    } catch (passwordError) {
+      toast.error(getApiErrorMessage(passwordError, 'Unable to set password.'));
+    } finally {
+      setIsPasswordSubmitting(false);
+    }
+  }
+
+  async function handleOpenPasswordDialog() {
+    if (isCheckingPasswordStatus) {
+      return;
+    }
+
+    setIsCheckingPasswordStatus(true);
+
+    try {
+      const hasPwd = await hasCurrentUserPassword();
+      setPasswordDialogMode(hasPwd ? 'change' : 'set');
+    } catch (checkError) {
+      toast.error(getApiErrorMessage(checkError, 'Unable to check password status.'));
+    } finally {
+      setIsCheckingPasswordStatus(false);
+    }
+  }
+
   return (
     <div
-      className={cn(
-        'min-h-screen bg-[var(--profile-bg)] text-[var(--profile-text)]',
-        isDarkTheme && 'dark',
-      )}
-      style={themeStyle}
+      className="dark min-h-screen bg-[var(--profile-bg)] text-[var(--profile-text)]"
+      style={profileThemeStyle}
     >
       <ChangePasswordDialog
         isSubmitting={isPasswordSubmitting}
-        open={isPasswordOpen}
-        onOpenChange={setIsPasswordOpen}
+        open={passwordDialogMode === 'change'}
+        onOpenChange={(open) => setPasswordDialogMode(open ? 'change' : null)}
         onSubmit={handleUpdatePassword}
+      />
+      <SetPasswordDialog
+        isSubmitting={isPasswordSubmitting}
+        open={passwordDialogMode === 'set'}
+        onOpenChange={(open) => setPasswordDialogMode(open ? 'set' : null)}
+        onSubmit={handleCreatePassword}
       />
 
       <WorkspaceHeader title="Profile" />
@@ -670,7 +814,9 @@ export function UserProfilePage() {
               </div>
             )}
             <div className="flex flex-wrap items-center gap-4 text-[var(--profile-muted)]">
-              <span className="text-[14px]">{currentUser?.email ?? 'Loading...'}</span>
+              <span className="text-[14px]">
+                {currentUser?.email ?? authUser?.email ?? 'Loading...'}
+              </span>
               <Separator className="h-4 bg-[var(--profile-border)]" orientation="vertical" />
               <span className="flex items-center gap-1 text-[14px]">
                 <ShieldCheck className="size-[18px]" />
@@ -684,7 +830,7 @@ export function UserProfilePage() {
           <Card className="mb-6 border-[#EF4444]/30 bg-[#EF4444]/10 p-6 text-[var(--profile-text)]">
             <div className="flex items-center justify-between gap-4">
               <p>{error}</p>
-              <Button variant="outline" onClick={() => void loadProfileData()}>
+              <Button variant="outline" onClick={retryLoad}>
                 {text.retry}
               </Button>
             </div>
@@ -696,8 +842,8 @@ export function UserProfilePage() {
             <h3 className="mb-4 text-[22px] font-semibold text-[var(--profile-title)]">
               {text.activitySummary}
             </h3>
-            {isLoading ? (
-              <EmptyState message={text.activityLoading} />
+            {isActivitiesLoading ? (
+              <ActivitySkeleton />
             ) : activities.length > 0 ? (
               <div className="max-h-[600px] overflow-y-auto pr-1" ref={activityScrollRef}>
                 <ActivityTimeline activities={activities} />
@@ -714,9 +860,11 @@ export function UserProfilePage() {
             <Card className="gap-0 rounded-xl border border-[var(--profile-border)] bg-[var(--profile-surface)] p-4 text-[var(--profile-text)] ring-0">
               <div className="space-y-2">
                 <SettingsButton
-                  disabled={currentUser?.googleLinked}
+                  disabled={isProfileLoading || currentUser?.googleLinked}
                   icon={Link2}
-                  label={currentUser?.googleLinked ? text.googleAccountLinked : text.linkGoogleAccount}
+                  label={
+                    currentUser?.googleLinked ? text.googleAccountLinked : text.linkGoogleAccount
+                  }
                   onClick={() => {
                     void (async () => {
                       try {
@@ -733,14 +881,7 @@ export function UserProfilePage() {
                 <SettingsButton
                   icon={ShieldCheck}
                   label={text.securityPassword}
-                  onClick={() => setIsPasswordOpen(true)}
-                />
-                <SettingsButton
-                  icon={Palette}
-                  label={text.appearance(isDarkTheme)}
-                  onClick={() =>
-                    setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))
-                  }
+                  onClick={() => void handleOpenPasswordDialog()}
                 />
               </div>
             </Card>

@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { Bell, CheckCheck, Circle } from 'lucide-react';
 
 import {
@@ -13,7 +14,9 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useRealtimeNotifications } from '@/hooks/use-realtime-notifications';
 import { formatNotificationText } from '@/lib/activity-message';
+import { resolveActivityRoute } from '@/lib/activity-route';
 import { cn } from '@/lib/utils';
+import type { NotificationResponse } from '@/services/notification.service';
 
 type NotificationBellProps = {
   className?: string;
@@ -41,8 +44,21 @@ export function NotificationBell({
   dotClassName,
   triggerClassName,
 }: NotificationBellProps) {
+  const router = useRouter();
   const { error, isConnected, isLoading, markAllAsRead, markAsRead, notifications, unreadCount } =
     useRealtimeNotifications();
+
+  const handleNotificationClick = (notification: NotificationResponse) => {
+    void markAsRead(notification.id);
+
+    const activity = notification.activityLog;
+    if (!activity) return;
+
+    const route = resolveActivityRoute(activity);
+    if (route) {
+      router.push(route);
+    }
+  };
 
   return (
     <DropdownMenu>
@@ -106,7 +122,7 @@ export function NotificationBell({
                 <DropdownMenuItem
                   className="cursor-pointer items-start gap-3 rounded-none border-b border-[#222831] px-4 py-3 focus:bg-[#222831] focus:text-white"
                   key={notification.id}
-                  onClick={() => void markAsRead(notification.id)}
+                  onClick={() => handleNotificationClick(notification)}
                 >
                   <Circle
                     className={cn(

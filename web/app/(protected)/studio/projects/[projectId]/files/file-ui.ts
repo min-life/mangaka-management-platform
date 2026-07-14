@@ -71,6 +71,7 @@ export type SubmissionFrameComment = {
 
 export type FileActivityItem = {
   actor: string;
+  href?: string | null;
   id: string;
   label: string;
   time: string;

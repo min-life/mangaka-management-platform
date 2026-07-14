@@ -159,7 +159,10 @@ export class ProjectsController {
   })
   @ApiOperation({ summary: 'Get project dashboard statistics' })
   @ApiParam({ name: 'id', type: Number, description: 'Project id' })
-  @ApiOkResponse({ description: 'Project dashboard retrieved successfully', type: ProjectDashboardResponseDto })
+  @ApiOkResponse({
+    description: 'Project dashboard retrieved successfully',
+    type: ProjectDashboardResponseDto,
+  })
   @Get(':id/dashboard')
   async getProjectDashboard(
     @Param('id', ParseIntPipe) id: number,

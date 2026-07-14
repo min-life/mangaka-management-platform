@@ -352,7 +352,7 @@ export class ProjectsService {
         overdueTasks,
         dueSoonTasks,
         pendingApplications,
-        recentFilesRaw
+        recentFilesRaw,
       ] = await Promise.all([
         this.prisma.userProject.count({ where: { projectId } }),
         this.prisma.folder.count({ where: { projectId } }),
@@ -367,25 +367,33 @@ export class ProjectsService {
           where: { file: { folder: { projectId } }, assignedBy: userId, status: { not: 'DONE' } },
           select: { id: true, title: true, status: true, deadline: true, fileId: true },
           take: 5,
-          orderBy: { createdAt: 'desc' }
+          orderBy: { createdAt: 'desc' },
         }),
         this.prisma.task.findMany({
-          where: { file: { folder: { projectId } }, deadline: { lt: new Date() }, status: { not: 'DONE' } },
+          where: {
+            file: { folder: { projectId } },
+            deadline: { lt: new Date() },
+            status: { not: 'DONE' },
+          },
           select: { id: true, title: true, status: true, deadline: true, fileId: true },
           take: 5,
-          orderBy: { deadline: 'asc' }
+          orderBy: { deadline: 'asc' },
         }),
         this.prisma.task.findMany({
-          where: { file: { folder: { projectId } }, deadline: { gte: new Date(), lte: new Date(Date.now() + 24 * 60 * 60 * 1000) }, status: { not: 'DONE' } },
+          where: {
+            file: { folder: { projectId } },
+            deadline: { gte: new Date(), lte: new Date(Date.now() + 24 * 60 * 60 * 1000) },
+            status: { not: 'DONE' },
+          },
           select: { id: true, title: true, status: true, deadline: true, fileId: true },
           take: 5,
-          orderBy: { deadline: 'asc' }
+          orderBy: { deadline: 'asc' },
         }),
         this.prisma.application.findMany({
           where: { projectId, status: { in: ['PENDING', 'SUBMITTED'] } },
           select: { id: true, title: true, status: true },
           take: 5,
-          orderBy: { createdAt: 'desc' }
+          orderBy: { createdAt: 'desc' },
         }),
         this.prisma.file.findMany({
           where: { folder: { projectId } },
@@ -398,12 +406,12 @@ export class ProjectsService {
               where: { taskId: null },
               orderBy: { createdAt: 'desc' },
               take: 1,
-              select: { materials: true }
-            }
+              select: { materials: true },
+            },
           },
           take: 4,
-          orderBy: { updatedAt: 'desc' }
-        })
+          orderBy: { updatedAt: 'desc' },
+        }),
       ]);
 
       const progressStats = {
@@ -413,7 +421,7 @@ export class ProjectsService {
         reviewTasks: progressStatsRaw.find((p) => p.status === 'REVIEW')?._count || 0,
       };
 
-      const recentFiles = recentFilesRaw.map(file => {
+      const recentFiles = recentFilesRaw.map((file) => {
         let imageUrl: string | null = null;
         if (file.fileMaterials && file.fileMaterials.length > 0) {
           const materialsArray = file.fileMaterials[0].materials as any[];
@@ -426,7 +434,7 @@ export class ProjectsService {
           title: file.title,
           updatedAt: file.updatedAt,
           folder: file.folder,
-          imageUrl
+          imageUrl,
         };
       });
 
@@ -505,6 +513,7 @@ export class ProjectsService {
     `project:${args[0]}:members:*`,
     ...args[1].map((userId: number) => `user:${userId}:projects`),
     ...args[1].map((userId: number) => `project:list:${userId}:*`),
+    ...args[1].map((userId: number) => `permission:project:${args[0]}:${userId}`),
   ])
   async addMembersToProject(projectId: number, userIds: number[], roleId: number, actorId: number) {
     try {
@@ -647,6 +656,7 @@ export class ProjectsService {
     `project:${args[0]}:members:*`,
     `user:${args[1]}:projects`,
     `project:list:${args[1]}:*`,
+    `permission:project:${args[0]}:${args[1]}`,
   ])
   async updateProjectMember(projectId: number, userId: number, roleId: number, actorId: number) {
     try {
@@ -679,6 +689,7 @@ export class ProjectsService {
     `project:${args[0]}:members:*`,
     `user:${args[1]}:projects`,
     `project:list:${args[1]}:*`,
+    `permission:project:${args[0]}:${args[1]}`,
   ])
   async removeProjectMember(projectId: number, userId: number, actorId: number) {
     try {
@@ -709,6 +720,7 @@ export class ProjectsService {
     `project:${args[0]}:members:*`,
     `user:${args[1]}:projects`,
     `project:list:${args[1]}:*`,
+    `permission:project:${args[0]}:${args[1]}`,
   ])
   async leaveProject(projectId: number, userId: number) {
     try {

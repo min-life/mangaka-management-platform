@@ -46,6 +46,8 @@ import {
   CommentsResponseDto,
   CreateCommentReqDto,
   QueryCommentsReqDto,
+  QueryFramesReqDto,
+  FramesResponseDto,
 } from '../frames/dto';
 
 @ApiTags('Files')
@@ -56,6 +58,30 @@ export class FilesController {
     private readonly filesService: FilesService,
     private readonly activityLogsService: ActivityLogsService,
   ) {}
+
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['project:read', 'project:owner'],
+    resource: 'FILE',
+  })
+  @ApiOperation({ summary: 'Get file frames' })
+  @ApiParam({ name: 'id', type: Number, description: 'File id' })
+  @ApiOkResponse({
+    description: 'File frames retrieved successfully',
+    type: FramesResponseDto,
+  })
+  @Get(':id/frames')
+  async getFileFrames(@Param('id', ParseIntPipe) id: number, @Query() query: QueryFramesReqDto) {
+    const result = await this.filesService.getFileFrames(
+      id,
+      query.field && query.order ? { field: query.field, order: query.order } : undefined,
+      query.page && query.limit ? { page: query.page, limit: query.limit } : undefined,
+    );
+    return {
+      data: result.frames,
+      pagination: result.pagination,
+    };
+  }
 
   @Permissions({
     mode: 'ANY',

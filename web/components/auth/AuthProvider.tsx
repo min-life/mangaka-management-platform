@@ -108,6 +108,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await fetchCurrentUser();
   }, [fetchCurrentUser]);
 
+  const updateUser = useCallback((patch: Partial<AuthUser>) => {
+    setUser((current) => (current ? { ...current, ...patch } : current));
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
     void checkCurrentUser().then((result) => {
@@ -139,9 +143,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       status,
       error,
       refreshUser,
+      updateUser,
       logout,
     }),
-    [error, logout, refreshUser, status, user],
+    [error, logout, refreshUser, status, updateUser, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
