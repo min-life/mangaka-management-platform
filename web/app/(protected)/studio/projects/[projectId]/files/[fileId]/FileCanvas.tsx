@@ -351,7 +351,7 @@ export function FileCanvas({ controller }: FileCanvasProps) {
                   backgroundSize: 'contain',
                 }}
               />
-
+              
               {(loadedImageUrl !== displayedPreviewUrl || controller.isCanvasLoading) && (
                 <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
                   <div className="flex flex-col items-center gap-3 bg-[#0d151e]/80 p-4 rounded-lg shadow-2xl backdrop-blur-sm border border-[#39424f]">
@@ -367,9 +367,7 @@ export function FileCanvas({ controller }: FileCanvasProps) {
             <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
               <div className="flex flex-col items-center gap-3 bg-[#0d151e]/80 p-4 rounded-lg shadow-2xl backdrop-blur-sm border border-[#39424f]">
                 <Loader2 className="size-8 animate-spin text-[#FFD369]" />
-                <span className="text-xs font-bold text-[#FFD369] uppercase tracking-wider">
-                  Loading Version...
-                </span>
+                <span className="text-xs font-bold text-[#FFD369] uppercase tracking-wider">Loading Version...</span>
               </div>
             </div>
           ) : null}
@@ -441,9 +439,8 @@ export function FileCanvas({ controller }: FileCanvasProps) {
             });
 
             return canvasFrameComments.map(({ frameId, region }) => {
-              if (!region || region.endX <= region.startX || region.endY <= region.startY)
-                return null;
-
+              if (!region || region.endX <= region.startX || region.endY <= region.startY) return null;
+              
               const threadData = frameThreadsMap.get(frameId);
               const displayIndex = threadData?.displayIndex || '?';
               const frameName = threadData?.frameName;
@@ -462,9 +459,7 @@ export function FileCanvas({ controller }: FileCanvasProps) {
                       if (el) {
                         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                       } else {
-                        document
-                          .getElementById('sidebar-discussion')
-                          ?.scrollIntoView({ behavior: 'smooth' });
+                        document.getElementById('sidebar-discussion')?.scrollIntoView({ behavior: 'smooth' });
                       }
                     });
                   }}
