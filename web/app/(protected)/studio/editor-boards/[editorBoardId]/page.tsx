@@ -2,10 +2,9 @@
 
 import { use, useEffect } from 'react';
 import Link from 'next/link';
-import { ChevronRight, CircleGauge, FileCheck2, Users } from 'lucide-react';
+import { ChevronRight, CircleGauge, FileCheck2 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { formatActionTitle, formatActivityLogText } from '@/lib/activity-message';
 import { type EditorBoardDashboardStats } from '@/services/editor-board.service';
 
@@ -32,6 +31,94 @@ const EMPTY_DASHBOARD_STATS: EditorBoardDashboardStats = {
   totalProjects: 0,
 };
 
+function DashboardSkeleton() {
+  return (
+    <section className="px-5 py-6">
+      <div className="flex items-start justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <div className="size-16 animate-pulse rounded-[5px] border border-[#39424f] bg-[#1f2937]" />
+          <div>
+            <div className="flex items-center gap-3">
+              <div className="h-7 w-56 animate-pulse rounded-[4px] bg-[#26303b]" />
+              <div className="h-6 w-20 animate-pulse rounded-full bg-[#1f2937]" />
+            </div>
+            <div className="mt-2 h-3 w-40 animate-pulse rounded-[4px] bg-[#1f2937]" />
+            <div className="mt-2 h-3 w-72 max-w-full animate-pulse rounded-[4px] bg-[#1f2937]" />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-36 animate-pulse rounded-[4px] bg-[#1f2937]" />
+          <div className="h-9 w-28 animate-pulse rounded-[4px] bg-[#FFD369]/20" />
+        </div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-4 gap-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <article className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-4" key={index}>
+            <div className="h-3 w-28 animate-pulse rounded-[4px] bg-[#1f2937]" />
+            <div className="mt-3 flex items-baseline gap-2">
+              <div className="h-8 w-14 animate-pulse rounded-[4px] bg-[#26303b]" />
+              <div className="h-3 w-24 animate-pulse rounded-[4px] bg-[#1f2937]" />
+            </div>
+          </article>
+        ))}
+      </div>
+
+      <div className="mt-5 grid grid-cols-[minmax(0,1fr)_420px] gap-5">
+        <section className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-5">
+          <div className="mb-5 h-4 w-32 animate-pulse rounded-[4px] bg-[#26303b]" />
+          <div className="grid gap-3">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <article
+                className="rounded-[5px] border border-[#303842] bg-[#202832] p-3"
+                key={index}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 size-8 shrink-0 animate-pulse rounded-[4px] bg-[#101820]" />
+                  <div className="min-w-0 flex-1">
+                    <div className="h-3 w-40 animate-pulse rounded-[4px] bg-[#26303b]" />
+                    <div className="mt-2 h-3 w-full animate-pulse rounded-[4px] bg-[#1f2937]" />
+                    <div className="mt-2 h-3 w-2/3 animate-pulse rounded-[4px] bg-[#1f2937]" />
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <div className="flex flex-col gap-5">
+          {Array.from({ length: 3 }).map((_, sectionIndex) => (
+            <aside
+              className="rounded-[5px] border border-[#39424f] bg-[#1a222d] p-5"
+              key={sectionIndex}
+            >
+              <div className="mb-4 flex items-center justify-between">
+                <div className="h-4 w-36 animate-pulse rounded-[4px] bg-[#26303b]" />
+                <div className="h-3 w-12 animate-pulse rounded-[4px] bg-[#1f2937]" />
+              </div>
+              <div className="grid gap-3">
+                {Array.from({ length: sectionIndex === 0 ? 3 : 2 }).map((_, itemIndex) => (
+                  <div
+                    className="flex items-center gap-3 border-b border-[#303842] pb-3 last:border-0 last:pb-0"
+                    key={itemIndex}
+                  >
+                    <div className="size-9 shrink-0 animate-pulse rounded-[4px] bg-[#101820]" />
+                    <div className="min-w-0 flex-1">
+                      <div className="h-3 w-3/4 animate-pulse rounded-[4px] bg-[#26303b]" />
+                      <div className="mt-2 h-3 w-1/2 animate-pulse rounded-[4px] bg-[#1f2937]" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </aside>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // PhucTD #editor-board start
 export default function EditorBoardDashboardPage({ params }: PageProps) {
   const { editorBoardId } = use(params);
@@ -49,7 +136,7 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
   const board = dashboardData?.board ?? null;
 
   if (isLoading) {
-    return <div className="p-8 text-center text-[#aeb7c2]">Loading dashboard...</div>;
+    return <DashboardSkeleton />;
   }
 
   if (!board) {
@@ -129,25 +216,6 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
               <p className="mt-1 text-xs text-[#aeb7c2]">{board.description}</p>
             ) : null}
           </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Button
-            asChild
-            className="h-9 rounded-[4px] border-[#4b535f] bg-[#222a34] px-4 text-xs font-black text-white hover:bg-[#303842]"
-            variant="outline"
-          >
-            <Link href={`/studio/editor-boards/${editorBoardId}/members`}>
-              <Users className="mr-2 size-4" />
-              Manage Members
-            </Link>
-          </Button>
-          <Button
-            asChild
-            className="h-9 rounded-[4px] bg-[#FFD369] px-4 text-xs font-black text-[#101820] hover:bg-[#e6c94f]"
-          >
-            <Link href={`/studio/editor-boards/${editorBoardId}/projects`}>View Projects</Link>
-          </Button>
         </div>
       </div>
 
