@@ -1,7 +1,17 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { BarChart3, DollarSign, Eye, MessageSquareText, Star, TrendingUp } from 'lucide-react';
+import {
+  BarChart3,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  DollarSign,
+  Eye,
+  MessageSquareText,
+  Star,
+  TrendingUp,
+} from 'lucide-react';
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
 
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
@@ -12,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { LoadingState } from '@/components/ui/loading-state';
 import { RefreshingIndicator } from '@/components/ui/refreshing-indicator';
 import { useAsyncResource } from '@/hooks/useAsyncResource';
@@ -47,12 +58,8 @@ const MONTH_LABELS = [
 
 const ALL_SCOPE = 'all';
 
-function getYearOptions(extraYear?: number) {
-  const currentYear = new Date().getFullYear();
-  const years = new Set(Array.from({ length: 6 }, (_, index) => currentYear - index));
-  if (extraYear) years.add(extraYear);
-  return Array.from(years).sort((a, b) => b - a);
-}
+const YEARS_PER_PAGE = 6;
+const CURRENT_YEAR = new Date().getFullYear();
 
 function isStatsEmpty(stats: ProjectStatsResult): boolean {
   return (
@@ -185,6 +192,8 @@ export function StatisticsClient({ projectId: projectIdProp }: StatisticsClientP
   const [selectedArcId, setSelectedArcId] = useState<number | null>(null);
   const [selectedChapterId, setSelectedChapterId] = useState<number | null>(null);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [isYearPickerOpen, setIsYearPickerOpen] = useState(false);
+  const [yearPageEnd, setYearPageEnd] = useState(CURRENT_YEAR);
 
   const {
     data: folderData,
@@ -241,6 +250,10 @@ export function StatisticsClient({ projectId: projectIdProp }: StatisticsClientP
     [projectId, selectedArcId, selectedChapterId, selectedYear],
   );
 
+  const dataMinYear = stats?.minYear ?? CURRENT_YEAR;
+  const dataMaxYear = stats?.maxYear ?? CURRENT_YEAR;
+  const effectiveYear = selectedYear ?? stats?.year ?? CURRENT_YEAR;
+
   const handleArcChange = (value: string) => {
     if (value === ALL_SCOPE) {
       setSelectedArcId(null);
@@ -255,8 +268,31 @@ export function StatisticsClient({ projectId: projectIdProp }: StatisticsClientP
     setSelectedChapterId(value === ALL_SCOPE ? null : Number(value));
   };
 
-  const handleYearChange = (value: string) => {
-    setSelectedYear(value === ALL_SCOPE ? null : Number(value));
+  const handleYearPickerOpenChange = (nextOpen: boolean) => {
+    setIsYearPickerOpen(nextOpen);
+    if (nextOpen) {
+      setYearPageEnd(dataMaxYear);
+    }
+  };
+
+  const yearPageOptions = Array.from({ length: YEARS_PER_PAGE }, (_, index) => yearPageEnd - index);
+
+  const canGoOlder = yearPageEnd - YEARS_PER_PAGE + 1 > dataMinYear;
+  const canGoNewer = yearPageEnd < dataMaxYear;
+
+  const handlePrevYears = () => {
+    if (!canGoOlder) return;
+    setYearPageEnd((prev) => prev - YEARS_PER_PAGE);
+  };
+
+  const handleNextYears = () => {
+    if (!canGoNewer) return;
+    setYearPageEnd((prev) => Math.min(prev + YEARS_PER_PAGE, CURRENT_YEAR));
+  };
+
+  const handleYearSelect = (year: number) => {
+    setSelectedYear(year);
+    setIsYearPickerOpen(false);
   };
 
   const isLoading = isFoldersLoading || isStatsLoading;
@@ -326,22 +362,67 @@ export function StatisticsClient({ projectId: projectIdProp }: StatisticsClientP
             <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#aeb7c2]">
               Year
             </span>
-            <Select
-              onValueChange={handleYearChange}
-              value={selectedYear ? String(selectedYear) : ALL_SCOPE}
-            >
-              <SelectTrigger className="h-9 w-[130px] rounded-[4px] border-[#50555D] bg-[#161c25] text-xs text-[#dde3ef]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="border-[#50555D] bg-[#1a2029] text-white">
-                <SelectItem value={ALL_SCOPE}>Latest</SelectItem>
-                {getYearOptions(stats?.year).map((yearOption) => (
-                  <SelectItem key={yearOption} value={String(yearOption)}>
-                    {yearOption}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover onOpenChange={handleYearPickerOpenChange} open={isYearPickerOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  className="flex h-9 w-[130px] items-center gap-2 rounded-[4px] border border-[#50555D] bg-[#161c25] px-3 text-xs font-bold text-[#dde3ef]"
+                  type="button"
+                >
+                  <CalendarDays className="size-3.5 text-[#8b94a1]" />
+                  {effectiveYear}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="start"
+                className="w-[220px] border-[#50555D] bg-[#1a2029] p-2 text-white"
+              >
+                <div className="flex items-center justify-between px-1 pb-2">
+                  <button
+                    aria-label="Older years"
+                    className="grid size-6 place-items-center rounded-[4px] text-[#8b94a1] hover:bg-[#242a33] hover:text-white disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+                    disabled={!canGoOlder}
+                    onClick={handlePrevYears}
+                    type="button"
+                  >
+                    <ChevronLeft className="size-4" />
+                  </button>
+                  <span className="text-[11px] font-bold text-[#aeb7c2]">
+                    {yearPageOptions[yearPageOptions.length - 1]}–{yearPageOptions[0]}
+                  </span>
+                  <button
+                    aria-label="Newer years"
+                    className="grid size-6 place-items-center rounded-[4px] text-[#8b94a1] hover:bg-[#242a33] hover:text-white disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+                    disabled={!canGoNewer}
+                    onClick={handleNextYears}
+                    type="button"
+                  >
+                    <ChevronRight className="size-4" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {yearPageOptions.map((yearOption) => {
+                    const isOutOfRange = yearOption < dataMinYear || yearOption > dataMaxYear;
+                    return (
+                      <button
+                        className={`rounded-[4px] px-2 py-1.5 text-xs font-bold ${
+                          isOutOfRange
+                            ? 'cursor-not-allowed text-[#4b535f]'
+                            : effectiveYear === yearOption
+                              ? 'bg-[#FFD369] text-[#101820]'
+                              : 'text-[#dde3ef] hover:bg-[#242a33]'
+                        }`}
+                        disabled={isOutOfRange}
+                        key={yearOption}
+                        onClick={() => handleYearSelect(yearOption)}
+                        type="button"
+                      >
+                        {yearOption}
+                      </button>
+                    );
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
 
           <ImportProjectStatsDialog

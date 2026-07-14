@@ -236,7 +236,7 @@ export class EditorBoardsService {
           orderBy: { createdAt: 'desc' },
         }),
         this.prisma.application.findMany({
-          where: { project: { editorBoardId: boardId } },
+          where: { project: { editorBoardId: boardId }, status: APPLICATION_STATUS.SUBMITTED },
           select: APPLICATION_LIST_SELECT,
           take: 5,
           orderBy: { updatedAt: 'desc' },
@@ -385,7 +385,12 @@ export class EditorBoardsService {
       ]);
 
       return {
-        data: members.map((member) => ({ ...member.user, isLead: member.isLead })),
+        data: members.map((member) => ({
+          ...member.user,
+          isLead: member.isLead,
+          createdAt: member.createdAt,
+          updatedAt: member.updatedAt,
+        })),
         pagination: this.buildPaginationMeta(total, page, limit),
       };
     } catch (error) {
@@ -397,7 +402,12 @@ export class EditorBoardsService {
   async getBoardMember(editorBoardId: number, userId: number) {
     try {
       const member = await this.findBoardMember(editorBoardId, userId);
-      return { ...member.user, isLead: member.isLead };
+      return {
+        ...member.user,
+        isLead: member.isLead,
+        createdAt: member.createdAt,
+        updatedAt: member.updatedAt,
+      };
     } catch (error) {
       this.handleError(error, 'Get board member fail', ERROR.SVGETBOARDMEMBER);
     }
@@ -502,7 +512,12 @@ export class EditorBoardsService {
           },
           select: BOARD_MEMBER_SELECT,
         });
-        return { ...member.user, isLead: member.isLead };
+        return {
+          ...member.user,
+          isLead: member.isLead,
+          createdAt: member.createdAt,
+          updatedAt: member.updatedAt,
+        };
       });
       return updatedMember;
     } catch (error) {

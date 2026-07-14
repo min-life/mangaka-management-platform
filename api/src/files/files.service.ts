@@ -58,7 +58,6 @@ export const MATERIAL_LIST_SELECT = {
   id: true,
   name: true,
   taskId: true,
-  materials: true,
   createdByUser: USER_SELECT,
   updatedByUser: USER_SELECT,
   createdAt: true,
@@ -558,6 +557,20 @@ export class FilesService {
             id: true,
             content: true,
             fileId: true,
+            taskId: true,
+            frameId: true,
+            frame: {
+              select: {
+                id: true,
+                name: true,
+                material: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
             createdByUser: {
               select: { id: true, email: true, displayName: true, avatarUrl: true },
             },
@@ -567,8 +580,18 @@ export class FilesService {
         }),
       ]);
 
+      const mappedComments = comments.map((c) => {
+        const material = c.frame?.material;
+        const frame = c.frame ? { id: c.frame.id, name: c.frame.name } : null;
+        return {
+          ...c,
+          frame,
+          material,
+        };
+      });
+
       return {
-        comments,
+        comments: mappedComments,
         pagination: this.buildPaginationMeta(total, page, limit),
       };
     } catch (error) {
