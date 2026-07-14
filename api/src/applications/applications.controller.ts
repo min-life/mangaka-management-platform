@@ -22,6 +22,7 @@ import {
   ApplicationMaterialReqDto,
   ApplicationVoteResponseDto,
   VoteApplicationReqDto,
+  UpdateApplicationDeadlineReqDto,
 } from './dto';
 
 import {
@@ -209,9 +210,33 @@ export class ApplicationsController {
     const application = await this.applicationsService.updateApplicationStatus(id, {
       status: data.status,
       userId: currentUser.userId,
-      voteDeadline: data.voteDeadline,
       comment: data.comment,
     });
+    return {
+      data: application,
+    };
+  }
+
+  @Permissions({
+    mode: 'ANY',
+    permissions: ['board:owner', 'board:leader'],
+    resource: 'APPLICATION',
+  })
+  @ApiOperation({ summary: 'Update application voting deadline' })
+  @ApiParam({ name: 'id', type: Number, description: 'Application id' })
+  @ApiOkResponse({
+    description: 'Application deadline updated successfully',
+    type: ApplicationResponseDto,
+  })
+  @Patch(':id/deadline')
+  async updateApplicationDeadline(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() data: UpdateApplicationDeadlineReqDto,
+  ) {
+    const application = await this.applicationsService.updateApplicationDeadline(
+      id,
+      data.voteDeadline,
+    );
     return {
       data: application,
     };

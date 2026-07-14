@@ -18,6 +18,8 @@ export type ProjectStatSummary = {
 };
 
 export type ProjectStatsResult = {
+  maxYear: number;
+  minYear: number;
   months: ProjectStatMonth[];
   summary: ProjectStatSummary;
   year: number;
