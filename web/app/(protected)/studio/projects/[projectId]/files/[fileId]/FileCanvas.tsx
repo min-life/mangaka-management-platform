@@ -143,7 +143,13 @@ export function FileCanvas({ controller }: FileCanvasProps) {
             onClick={() => {
               setResourceTab('discussion');
               setTimeout(() => {
-                document.getElementById('discussion-section')?.scrollIntoView({ behavior: 'smooth' });
+                const input = document.getElementById('comment-input');
+                input?.focus();
+                
+                const scrollContainer = document.getElementById('discussion-scroll-container');
+                if (scrollContainer) {
+                  scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
+                }
               }, 100);
             }}
           >
@@ -201,7 +207,7 @@ export function FileCanvas({ controller }: FileCanvasProps) {
               
               <div
                 className={`w-full h-full absolute inset-0 transition-opacity duration-150 ${
-                  loadedImageUrl !== displayedPreviewUrl || isLoading
+                  loadedImageUrl !== displayedPreviewUrl || isLoading || controller.isCanvasLoading
                     ? 'opacity-0'
                     : 'opacity-100'
                 }`}
@@ -213,7 +219,7 @@ export function FileCanvas({ controller }: FileCanvasProps) {
                 }}
               />
               
-              {(loadedImageUrl !== displayedPreviewUrl) && (
+              {(loadedImageUrl !== displayedPreviewUrl || controller.isCanvasLoading) && (
                 <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
                   <div className="flex flex-col items-center gap-3 bg-[#0d151e]/80 p-4 rounded-lg shadow-2xl backdrop-blur-sm border border-[#39424f]">
                     <Loader2 className="size-8 animate-spin text-[#FFD369]" />
@@ -222,6 +228,13 @@ export function FileCanvas({ controller }: FileCanvasProps) {
                 </div>
               )}
             </>
+          ) : controller.isCanvasLoading ? (
+            <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+              <div className="flex flex-col items-center gap-3 bg-[#0d151e]/80 p-4 rounded-lg shadow-2xl backdrop-blur-sm border border-[#39424f]">
+                <Loader2 className="size-8 animate-spin text-[#FFD369]" />
+                <span className="text-xs font-bold text-[#FFD369] uppercase tracking-wider">Loading Version...</span>
+              </div>
+            </div>
           ) : null}
 
           {/* Layer 2: Overlay Image (Current version on top, only active during historical comparison with comparisonOpacity > 0) */}
@@ -247,6 +260,14 @@ export function FileCanvas({ controller }: FileCanvasProps) {
             </div>
           )}
           {/* Initial load overlay: full blocking spinner when no preview yet */}
+          {controller.isFrameLoading ? (
+            <div className="absolute inset-0 grid place-items-center px-6 text-center bg-[#111923]/60 z-10 pointer-events-none">
+              <div>
+                <Loader2 className="mx-auto size-8 text-[#FFD369] animate-spin" />
+                <p className="mt-2 text-xs font-bold text-[#FFD369]">Loading frame position...</p>
+              </div>
+            </div>
+          ) : null}
           {isLoading && !isRefreshing ? (
             <div className="absolute inset-0 grid place-items-center px-6 text-center bg-[#111923]/80 z-10">
               <div>
@@ -257,7 +278,7 @@ export function FileCanvas({ controller }: FileCanvasProps) {
                 </p>
               </div>
             </div>
-          ) : !displayedPreviewUrl ? (
+          ) : !displayedPreviewUrl && !controller.isCanvasLoading ? (
             <div className="absolute inset-0 grid place-items-center px-6 text-center">
               <div>
                 <FileQuestion className="mx-auto size-10 text-[#5b626d]" />
@@ -270,58 +291,58 @@ export function FileCanvas({ controller }: FileCanvasProps) {
           ) : null}
 
           {(() => {
-            // Match the exact thread generation logic from FileCommentsPanel
             const frameThreadsMap = new Map<string, any>();
             discussionFrameComments.forEach(fc => {
               const fId = fc.frameId || fc.id;
               if (!frameThreadsMap.has(fId)) {
                 frameThreadsMap.set(fId, {
                   frameId: fId,
-                  comment: fc,
-                  displayIndex: frameThreadsMap.size + 1
+                  displayIndex: frameThreadsMap.size + 1,
+                  frameName: (fc as any).frameName,
                 });
               }
             });
-            
-            // Only render threads that exist in canvasFrameComments
-            const canvasFrameIds = new Set(canvasFrameComments.map(c => c.frameId || c.id));
-            const activeThreads = Array.from(frameThreadsMap.values()).filter(t => canvasFrameIds.has(t.frameId));
 
-            console.log('DEBUG ACTIVE_THREADS:', activeThreads.map(t => ({ id: t.comment.id, region: t.comment.region })));
+            return canvasFrameComments.map(({ frameId, region }) => {
+              if (!region || region.endX <= region.startX || region.endY <= region.startY) return null;
+              
+              const threadData = frameThreadsMap.get(frameId);
+              const displayIndex = threadData?.displayIndex || '?';
+              const frameName = threadData?.frameName;
 
-            return activeThreads.map(({ frameId, comment, displayIndex }) => (
-              <button
-                aria-label={`Open frame comment ${displayIndex}`}
-                className="absolute z-30 border-2 border-[#ff9ab3] bg-[#6b2637]/20 text-left hover:bg-[#6b2637]/35"
-                key={comment.id}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setResourceTab('discussion');
-                  const targetFrameId = comment.frameId || comment.id;
-                  setReplyingFrameId(targetFrameId);
-                  requestAnimationFrame(() => {
-                    const el = document.getElementById(`frame-thread-${targetFrameId}`);
-                    if (el) {
-                      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    } else {
-                      document.getElementById('sidebar-discussion')?.scrollIntoView({ behavior: 'smooth' });
-                    }
-                  });
-                }}
-                onPointerDown={(event) => event.stopPropagation()}
-                style={{
-                  height: `${Math.max(comment.region.endY - comment.region.startY, 0.04) * 100}%`,
-                  left: `${comment.region.startX * 100}%`,
-                  top: `${comment.region.startY * 100}%`,
-                  width: `${Math.max(comment.region.endX - comment.region.startX, 0.04) * 100}%`,
-                }}
-                type="button"
-              >
-                <span className="absolute -left-3 -top-3 grid size-6 place-items-center rounded-full border-2 border-[#101820] bg-[#ff9ab3] text-[9px] font-black text-[#371522]">
-                  F{displayIndex}
-                </span>
-              </button>
-            ));
+              return (
+                <button
+                  aria-label={`Open frame comment ${displayIndex}`}
+                  className="absolute z-30 border-2 border-[#ff9ab3] bg-[#6b2637]/20 text-left hover:bg-[#6b2637]/35"
+                  key={frameId}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setResourceTab('discussion');
+                    setReplyingFrameId(frameId);
+                    requestAnimationFrame(() => {
+                      const el = document.getElementById(`frame-thread-${frameId}`);
+                      if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      } else {
+                        document.getElementById('sidebar-discussion')?.scrollIntoView({ behavior: 'smooth' });
+                      }
+                    });
+                  }}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  style={{
+                    height: `${Math.max(region.endY - region.startY, 0.04) * 100}%`,
+                    left: `${region.startX * 100}%`,
+                    top: `${region.startY * 100}%`,
+                    width: `${Math.max(region.endX - region.startX, 0.04) * 100}%`,
+                  }}
+                  type="button"
+                >
+                  <span className="absolute -left-2 -top-3 px-1.5 py-0.5 rounded-[4px] border-2 border-[#101820] bg-[#ff9ab3] text-[9px] font-black text-[#371522] whitespace-nowrap shadow-md">
+                    {frameName || `F${displayIndex}`}
+                  </span>
+                </button>
+              );
+            });
           })()}
 
           {draftRegion ? (

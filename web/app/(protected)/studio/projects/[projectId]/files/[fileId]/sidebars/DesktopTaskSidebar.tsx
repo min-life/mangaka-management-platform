@@ -103,12 +103,12 @@ export function DesktopTaskSidebar({
       />
       
       <button
-        className="absolute left-0 top-1/2 z-40 hidden size-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-[#FFD369] bg-[#FFD369] text-[#222831] shadow-[0_4px_12px_rgba(0,0,0,0.6)] transition-all hover:bg-[#eac04f] lg:grid"
+        className="absolute left-0 top-6 z-40 hidden h-8 w-6 place-items-center justify-center rounded-r-full border border-l-0 border-[#FFD369] bg-[#FFD369] text-[#222831] shadow-[4px_4px_12px_rgba(0,0,0,0.6)] transition-all hover:bg-[#eac04f] hover:w-7 lg:flex"
         onClick={onClose}
         title="Collapse Sidebar"
         type="button"
       >
-        <ChevronRight className="size-4" />
+        <ChevronRight className="size-4 mr-0.5" />
       </button>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

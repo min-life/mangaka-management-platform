@@ -1,3 +1,4 @@
+import type { Dispatch, SetStateAction } from 'react';
 import type { FileExplorerItem, FileTaskItem, FileVersionItem } from '../../file-ui';
 import type { TaskWorkspaceItem } from '../../../tasks/task-ui';
 
@@ -31,7 +32,7 @@ export type FileTaskSidebarProps = {
   discussionContextKey: string;
   setDiscussionContext: (key: string) => void;
   commentFilterMode: string;
-  setCommentFilterMode: (mode: string) => void;
+  setCommentFilterMode: Dispatch<SetStateAction<string>>;
   discussionFrameComments: any[];
 };
 
