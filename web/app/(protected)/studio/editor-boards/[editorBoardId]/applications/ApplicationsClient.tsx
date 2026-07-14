@@ -64,6 +64,35 @@ type ApplicationDetailResponse = {
   data?: EditorBoardApplicationResponse;
 };
 
+function ApplicationListSkeleton({ count = 4 }: { count?: number }) {
+  return (
+    <>
+      {Array.from({ length: count }).map((_, index) => (
+        <article
+          className="rounded-[5px] border border-[#39424f] bg-[#101820] px-5 py-4"
+          key={index}
+        >
+          <div className="flex items-start justify-between gap-5">
+            <div className="flex min-w-0 flex-1 gap-4">
+              <div className="size-11 shrink-0 animate-pulse rounded-[4px] bg-[#1f2937]" />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="h-5 w-56 max-w-full animate-pulse rounded-[4px] bg-[#26303b]" />
+                  <div className="h-7 w-28 animate-pulse rounded-full bg-[#1f2937]" />
+                  <div className="h-7 w-24 animate-pulse rounded-full bg-[#1f2937]" />
+                </div>
+                <div className="mt-2 h-3 w-72 max-w-full animate-pulse rounded-[4px] bg-[#1f2937]" />
+                <div className="mt-3 h-4 w-full max-w-[560px] animate-pulse rounded-[4px] bg-[#26303b]" />
+              </div>
+            </div>
+            <div className="h-9 w-24 shrink-0 animate-pulse rounded-[4px] bg-[#1f2937]" />
+          </div>
+        </article>
+      ))}
+    </>
+  );
+}
+
 async function getApplicationDetails(applicationId: number | string) {
   const response = await api.get<ApplicationDetailResponse, ApplicationDetailResponse>(
     `/applications/${applicationId}`,
@@ -105,6 +134,8 @@ export function ApplicationsClient({ editorBoardId }: ApplicationsClientProps) {
     permissions.includes('board:owner') ||
     permissions.includes('board:leader') ||
     permissions.includes('board:application.approve');
+  const canManageVoteDeadline =
+    permissions.includes('board:owner') || permissions.includes('board:leader');
 
   const loadApplications = useCallback(async () => {
     await loadApplicationsPage(editorBoardId, {
@@ -235,6 +266,20 @@ export function ApplicationsClient({ editorBoardId }: ApplicationsClientProps) {
     }
   };
 
+  const handleVoteDeadlineChange = async (application: EditorBoardApplicationResponse) => {
+    setSelectedApplication((current) =>
+      current?.id === application.id ? { ...current, ...application } : current,
+    );
+
+    await loadApplicationsPage(editorBoardId, {
+      force: true,
+      limit: APPLICATION_PAGE_SIZE,
+      mode: 'replace',
+      page: 1,
+      search: searchQuery,
+    });
+  };
+
   return (
     <section className="px-5 py-6">
       <div className="flex items-end justify-between">
@@ -302,9 +347,7 @@ export function ApplicationsClient({ editorBoardId }: ApplicationsClientProps) {
 
       <section className="mt-4 space-y-3">
         {isLoading ? (
-          <article className="rounded-[5px] border border-[#39424f] bg-[#101820] px-5 py-5 text-xs font-bold text-[#aeb7c2]">
-            Loading applications...
-          </article>
+          <ApplicationListSkeleton />
         ) : filteredApplications.length ? (
           filteredApplications.map((application) => {
             const ApplicationTypeIcon = APPLICATION_TYPE_ICONS[application.type] ?? FileText;
@@ -364,22 +407,20 @@ export function ApplicationsClient({ editorBoardId }: ApplicationsClientProps) {
           </article>
         )}
         <div ref={loadMoreRef} />
-        {isLoadingMore ? (
-          <article className="rounded-[5px] border border-[#39424f] bg-[#101820] px-5 py-4 text-center text-xs font-bold text-[#aeb7c2]">
-            Loading more applications...
-          </article>
-        ) : null}
+        {isLoadingMore ? <ApplicationListSkeleton count={2} /> : null}
       </section>
 
       <ApplicationReviewDrawer
         application={selectedApplication}
         canApprove={canApprove}
+        canManageVoteDeadline={canManageVoteDeadline}
         isSubmitting={isSubmitting}
         onOpenChange={(open) => {
           if (!open) {
             setSelectedApplication(null);
           }
         }}
+        onVoteDeadlineChange={(application) => void handleVoteDeadlineChange(application)}
         onUpdateStatus={(application, status) => void handleUpdateStatus(application, status)}
       />
     </section>

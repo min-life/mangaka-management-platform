@@ -1,17 +1,9 @@
 import api from '@/lib/api';
 import { AxiosError } from 'axios';
 
-export type ApplicationStatus =
-  | 'APPROVE'
-  | 'CANCELLED'
-  | 'PENDING'
-  | 'REJECT'
-  | 'SUBMITTED';
+export type ApplicationStatus = 'APPROVE' | 'CANCELLED' | 'PENDING' | 'REJECT' | 'SUBMITTED';
 export type ApplicationType =
-  | 'CREATE_ARC'
-  | 'CREATE_CHAPTER'
-  | 'MANUSCRIPT_REVIEW'
-  | 'PUBLISH_REQUEST';
+  'CREATE_ARC' | 'CREATE_CHAPTER' | 'MANUSCRIPT_REVIEW' | 'PUBLISH_REQUEST';
 export type VoteDecision = 'ABSTAIN' | 'APPROVE' | 'REJECT';
 
 export type UserSummary = {
@@ -209,7 +201,7 @@ export async function createProjectApplication(
             },
           }
         : {}),
-    }
+    },
   );
 
   return response.data;
@@ -242,22 +234,34 @@ export async function deleteApplication(applicationId: number | string) {
 export async function updateApplicationStatus(
   applicationId: number | string,
   status: ApplicationStatus,
-  voteDeadline?: string,
+  _voteDeadline?: string,
   comment?: string,
 ) {
   const response = await api.patch<ApplicationItemResponse, ApplicationItemResponse>(
     `/applications/${applicationId}/status`,
-    { status, voteDeadline, comment },
+    { status, comment },
   );
 
   return response.data;
 }
 
+export async function updateApplicationVoteDeadline(
+  applicationId: number | string,
+  voteDeadline: string,
+) {
+  const response = await api.patch<ApplicationItemResponse, ApplicationItemResponse>(
+    `/applications/${applicationId}/deadline`,
+    { voteDeadline },
+  );
+
+  return response.data;
+}
 
 export async function getApplicationVotes(applicationId: number | string) {
-  const response = await api.get<{ data: ApplicationVoteResponse[] }, { data: ApplicationVoteResponse[] }>(
-    `/applications/${applicationId}/votes`,
-  );
+  const response = await api.get<
+    { data: ApplicationVoteResponse[] },
+    { data: ApplicationVoteResponse[] }
+  >(`/applications/${applicationId}/votes`);
   return response.data ?? [];
 }
 
@@ -265,10 +269,10 @@ export async function voteApplication(
   applicationId: number | string,
   payload: VoteApplicationPayload,
 ) {
-  const response = await api.post<{ data: ApplicationVoteResponse }, { data: ApplicationVoteResponse }>(
-    `/applications/${applicationId}/votes`,
-    payload,
-  );
+  const response = await api.post<
+    { data: ApplicationVoteResponse },
+    { data: ApplicationVoteResponse }
+  >(`/applications/${applicationId}/votes`, payload);
 
   return response.data;
 }
@@ -300,10 +304,7 @@ export async function getApplicationComments(applicationId: number | string) {
   }
 }
 
-export async function createApplicationComment(
-  applicationId: number | string,
-  content: unknown,
-) {
+export async function createApplicationComment(applicationId: number | string, content: unknown) {
   const response = await api.post<
     { data?: ApplicationCommentResponse },
     { data?: ApplicationCommentResponse }
@@ -337,10 +338,7 @@ export async function updateApplicationMaterial(
   return response.data;
 }
 
-export async function deleteApplicationMaterial(
-  applicationId: number | string,
-  index: number,
-) {
+export async function deleteApplicationMaterial(applicationId: number | string, index: number) {
   const response = await api.delete<ApplicationItemResponse, ApplicationItemResponse>(
     `/applications/${applicationId}/materials/${index}`,
   );
