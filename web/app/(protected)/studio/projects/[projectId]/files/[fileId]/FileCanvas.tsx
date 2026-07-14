@@ -16,13 +16,7 @@ import {
 import { Button } from '@/components/ui/button';
 
 import type { FileDetailController } from './hooks/useFileDetailController';
-import type { FileTaskRegion, SubmissionFrameComment } from '../file-ui';
-
-type CanvasFrameThread = {
-  comment: SubmissionFrameComment;
-  displayIndex: number;
-  frameId: string;
-};
+import type { FileTaskRegion } from '../file-ui';
 
 type FileCanvasProps = {
   controller: FileDetailController;
@@ -197,6 +191,7 @@ export function FileCanvas({ controller }: FileCanvasProps) {
         </p>
       ) : null}
 
+
       <div className="mb-3 flex h-10 items-center justify-between gap-3 border border-[#26303b] bg-[#0d151e] px-3">
         <div className="flex items-center gap-1">
           <ToolbarButton
@@ -230,7 +225,10 @@ export function FileCanvas({ controller }: FileCanvasProps) {
           >
             <Maximize2 className="size-4" />
           </ToolbarButton>
-          <ToolbarButton label="Rotate" onClick={() => setRotation((prev) => (prev + 90) % 360)}>
+          <ToolbarButton
+            label="Rotate"
+            onClick={() => setRotation((prev) => (prev + 90) % 360)}
+          >
             <RotateCw className="size-4" />
           </ToolbarButton>
 
@@ -264,10 +262,7 @@ export function FileCanvas({ controller }: FileCanvasProps) {
 
                 const scrollContainer = document.getElementById('discussion-scroll-container');
                 if (scrollContainer) {
-                  scrollContainer.scrollTo({
-                    top: scrollContainer.scrollHeight,
-                    behavior: 'smooth',
-                  });
+                  scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
                 }
               }, 100);
             }}
@@ -291,17 +286,17 @@ export function FileCanvas({ controller }: FileCanvasProps) {
           <ToolbarButton label="AI Frame Detection" onClick={handleOpenAiFrameDialog}>
             <Sparkles className="size-4 text-[#FFD369]" />
           </ToolbarButton>
+
         </div>
       </div>
 
       <div
-        className={`relative grid aspect-[16/10] max-h-[680px] w-full touch-none place-items-center overflow-hidden rounded-[4px] border bg-[#111923] shadow-[0_20px_60px_rgba(0,0,0,0.35)] ${
-          annotationMode || frameAnnotationMode
-            ? 'cursor-crosshair border-[#FFD369]'
-            : isPanning
-              ? 'cursor-grabbing border-[#303842]'
-              : 'cursor-grab border-[#303842]'
-        }`}
+        className={`relative grid aspect-[16/10] max-h-[680px] w-full touch-none place-items-center overflow-hidden rounded-[4px] border bg-[#111923] shadow-[0_20px_60px_rgba(0,0,0,0.35)] ${annotationMode || frameAnnotationMode
+          ? 'cursor-crosshair border-[#FFD369]'
+          : isPanning
+            ? 'cursor-grabbing border-[#303842]'
+            : 'cursor-grab border-[#303842]'
+          }`}
         onPointerDown={handleCanvasPointerDown}
         onPointerMove={handleCanvasPointerMove}
         onPointerUp={handleCanvasPointerUp}
@@ -310,9 +305,8 @@ export function FileCanvas({ controller }: FileCanvasProps) {
         <div
           className="w-full h-full absolute inset-0 origin-center"
           style={{
-            transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${
-              zoom / 100
-            }) rotate(${rotation}deg)`,
+            transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom / 100
+              }) rotate(${rotation}deg)`,
             transition: isPanning ? 'none' : 'transform 0.15s ease-out',
           }}
         >
@@ -356,9 +350,7 @@ export function FileCanvas({ controller }: FileCanvasProps) {
                 <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
                   <div className="flex flex-col items-center gap-3 bg-[#0d151e]/80 p-4 rounded-lg shadow-2xl backdrop-blur-sm border border-[#39424f]">
                     <Loader2 className="size-8 animate-spin text-[#FFD369]" />
-                    <span className="text-xs font-bold text-[#FFD369] uppercase tracking-wider">
-                      Loading Version...
-                    </span>
+                    <span className="text-xs font-bold text-[#FFD369] uppercase tracking-wider">Loading Version...</span>
                   </div>
                 </div>
               )}
@@ -426,14 +418,16 @@ export function FileCanvas({ controller }: FileCanvasProps) {
           ) : null}
 
           {(() => {
-            const frameThreadsMap = new Map<string, any>();
-            discussionFrameComments.forEach((fc) => {
+            const frameThreadsMap = new Map<
+              string,
+              { displayIndex: number; frameName?: string }
+            >();
+            discussionFrameComments.forEach(fc => {
               const fId = fc.frameId || fc.id;
               if (!frameThreadsMap.has(fId)) {
                 frameThreadsMap.set(fId, {
-                  frameId: fId,
                   displayIndex: frameThreadsMap.size + 1,
-                  frameName: (fc as any).frameName,
+                  frameName: fc.frameName,
                 });
               }
             });
@@ -596,11 +590,8 @@ function ToolbarButton({
   return (
     <Button
       aria-label={label}
-      className={`size-7 rounded-[3px] ${
-        active
-          ? 'bg-[#303842] text-[#FFD369]'
-          : 'text-[#aeb7c2] hover:bg-[#17202b] hover:text-white'
-      }`}
+      className={`size-7 rounded-[3px] ${active ? 'bg-[#303842] text-[#FFD369]' : 'text-[#aeb7c2] hover:bg-[#17202b] hover:text-white'
+        }`}
       onClick={onClick}
       size="icon"
       title={label}
