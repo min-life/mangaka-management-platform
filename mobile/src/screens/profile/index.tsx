@@ -18,7 +18,7 @@ import {
   fetchActivityLogs,
 } from '@/src/services/activityLogApi';
 import { fetchMe, updateMe, updatePassword } from '@/src/services/userApi';
-import { uploadAvatarToS3 } from '@/src/services/s3Upload';
+import { uploadAvatarToCloudinary } from '@/src/services/cloudinaryUpload';
 import { ActivityItem } from '@/src/types/home';
 import { AccountMenuItem } from '@/src/types/profile';
 import {
@@ -274,7 +274,7 @@ export default function ProfileScreen() {
     setIsUploadingAvatar(true);
 
     try {
-      const avatarUrl = await uploadAvatarToS3(result.assets[0]);
+      const avatarUrl = await uploadAvatarToCloudinary(result.assets[0]);
       const nextUser = await updateMe({ avatarUrl });
       mergeUser(nextUser);
       Alert.alert('Updated', 'Profile photo has been changed.');
