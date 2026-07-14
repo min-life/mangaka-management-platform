@@ -111,6 +111,9 @@ export class CommentWithContextResDto extends CommentResDto {
   @ApiPropertyOptional({ example: 1, nullable: true })
   taskId?: number | null;
 
+  @ApiPropertyOptional({ example: 1, nullable: true })
+  fileId?: number | null;
+
   @ApiPropertyOptional({ type: () => SimpleFrameContextDto, nullable: true })
   frame?: SimpleFrameContextDto | null;
 
