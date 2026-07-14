@@ -53,6 +53,9 @@ export class ApplicationResDto {
   @ApiProperty({ enum: APPLICATION_STATUS, example: APPLICATION_STATUS.PENDING })
   status!: APPLICATION_STATUS;
 
+  @ApiPropertyOptional({ example: '2026-06-18T03:00:00.000Z', nullable: true })
+  voteDeadline?: Date | null;
+
   @ApiPropertyOptional({
     example: 1,
     description: 'Parent folder ID for CREATE_CHAPTER type',
