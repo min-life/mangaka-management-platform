@@ -58,6 +58,7 @@ const APPLICATION_LIST_SELECT = {
   title: true,
   type: true,
   status: true,
+  voteDeadline: true,
   parentFolderId: true,
   folderImageUrl: true,
   project: {
