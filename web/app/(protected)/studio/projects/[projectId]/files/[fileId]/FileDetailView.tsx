@@ -59,6 +59,8 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
     isTaskContextLoading,
     isSavingComment,
     isSubmittingReview,
+    isLoadingVersions,
+    isLoadingComments,
     loadFile,
     quietReload,
     refreshFrameComments,
@@ -90,6 +92,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
     taskDialogOpen,
     tasks,
     versions,
+    latestMaterialVersion,
   } = controller;
 
   const { activities } = useRealtimeProjectActivity(projectId);
@@ -114,6 +117,8 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
         const metadata = latestActivity.metadata as any;
         if (latestActivity.action === 'COMMENT_CREATED' && metadata?.frameId) {
           void refreshFrameComments(metadata.frameId);
+        } else if (latestActivity.action === 'COMMENT_CREATED') {
+          // Already handled optimistically by appendComment via useRealtimeComments — skip full reload
         } else {
           void quietReload();
         }
@@ -200,6 +205,14 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
               {resourceTab === 'overview' ? (
                 <FileOverviewTab file={file} folder={folder} tasks={tasks} />
               ) : resourceTab === 'discussion' ? (
+                isLoadingComments ? (
+                  <div className="flex items-center justify-center py-16">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="h-7 w-7 animate-spin rounded-full border-4 border-[#39424f] border-t-[#FFD369]" />
+                      <span className="text-[11px] font-bold text-[#8b94a1]">Loading comments…</span>
+                    </div>
+                  </div>
+                ) : (
                 <div className="text-white">
                   <FileCommentsPanel
                     discussionListComments={controller.discussionListComments}
@@ -246,8 +259,17 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
                       canvasRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }}
                   />
-                </div>
+                  </div>
+                )
               ) : resourceTab === 'versions' ? (
+                isLoadingVersions ? (
+                  <div className="flex items-center justify-center py-16">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="h-7 w-7 animate-spin rounded-full border-4 border-[#39424f] border-t-[#FFD369]" />
+                      <span className="text-[11px] font-bold text-[#8b94a1]">Loading versions…</span>
+                    </div>
+                  </div>
+                ) : (
                 <FileVersionsTab
                   versions={versions}
                   selectedVersion={selectedVersion}
@@ -268,6 +290,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
                   setError={setError}
 
                 />
+                )
               ) : resourceTab === 'activity' ? (
                 <FileActivityPanel fileId={file.id} projectId={projectId} />
               ) : null}
@@ -312,6 +335,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
           selectedVersion={selectedVersion}
           tasks={tasks}
           versions={versions}
+          latestMaterialVersion={latestMaterialVersion}
           members={members}
           onRefresh={loadFile}
           discussionContextKey={discussionContextKey}
@@ -356,6 +380,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
           selectedVersion={selectedVersion}
           tasks={tasks}
           versions={versions}
+          latestMaterialVersion={latestMaterialVersion}
           members={members}
           onRefresh={loadFile}
           discussionContextKey={discussionContextKey}

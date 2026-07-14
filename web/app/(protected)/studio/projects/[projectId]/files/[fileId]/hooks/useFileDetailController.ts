@@ -49,7 +49,7 @@ type UseFileDetailControllerProps = {
 export function useFileDetailController({ fileId, focusedTaskId, projectId }: UseFileDetailControllerProps) {
 
   const canvasRef = useRef<HTMLDivElement>(null);
-  const [resourceTab, setResourceTab] = useState<ResourceTab>('versions');
+  const [resourceTab, setResourceTab] = useState<ResourceTab>('overview');
 
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [isSavingComment, setIsSavingComment] = useState(false);
@@ -82,7 +82,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
   const { user } = useAuth();
   const { can: canProject } = usePermissions({ resource: 'PROJECT', resourceId: projectId });
 
-  const { data, error, isInitialLoading, isRefreshing, reload, quietReload, refreshFrameComments, setData, setError, hasMoreComments, isLoadingMoreComments, loadMoreComments } = useFileDetailDataFetcher({
+  const { data, error, isInitialLoading, isRefreshing, reload, quietReload, refreshFrameComments, setData, setError, hasMoreComments, isLoadingMoreComments, loadMoreComments, loadVersions, loadComments, versionsLoaded, commentsLoaded, isLoadingVersions, isLoadingComments } = useFileDetailDataFetcher({
     projectId,
     fileId,
     selectedTaskId,
@@ -92,6 +92,20 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
   const project = data?.project ?? null;
   const folders = data?.folders ?? [];
   const tasks = data?.tasks ?? [];
+  const latestMaterialVersion = data?.latestMaterialVersion ?? null;
+
+  // Auto-trigger deferred loads when tabs are first opened
+  useEffect(() => {
+    if ((resourceTab === 'versions') && !versionsLoaded && !isLoadingVersions) {
+      void loadVersions();
+    }
+  }, [resourceTab, versionsLoaded, isLoadingVersions, loadVersions]);
+
+  useEffect(() => {
+    if (resourceTab === 'discussion' && !commentsLoaded && !isLoadingComments) {
+      void loadComments();
+    }
+  }, [resourceTab, commentsLoaded, isLoadingComments, loadComments]);
 
   const {
     selectedVersion,
@@ -189,7 +203,6 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     }
 
     let isMounted = true;
-    setIsCanvasLoading(true);
 
     getMaterialById(versionId)
       .then((res: any) => {
@@ -201,11 +214,6 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
       })
       .catch((err) => {
         console.error('Failed to load material details:', err);
-      })
-      .finally(() => {
-        if (isMounted) {
-          setIsCanvasLoading(false);
-        }
       });
 
     return () => {
@@ -318,6 +326,28 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     });
   }, [setData]);
 
+  const appendComment = useCallback((newestComment: any) => {
+    setData((prev) => {
+      if (!prev) return prev;
+      const exists = prev.comments.some((c: any) => String(c.id) === String(newestComment.id));
+      if (exists) return prev;
+      return {
+        ...prev,
+        comments: [
+          ...prev.comments,
+          {
+            id: String(newestComment.id),
+            content: getCommentText(newestComment.content),
+            author: newestComment.createdByUser?.displayName || newestComment.createdByUser?.email || `User #${newestComment.createdBy}`,
+            time: newestComment.createdAt ? new Date(newestComment.createdAt).toISOString() : new Date().toISOString(),
+            timestamp: newestComment.createdAt ? new Date(newestComment.createdAt).getTime() : Date.now(),
+            context: newestComment.context ?? null,
+          }
+        ]
+      };
+    });
+  }, [setData]);
+
   const {
     handleCreateAnnotatedTask,
     focusFileTask,
@@ -370,6 +400,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     setPendingFrameRegion,
     setDraftRegion,
     setFrameAnnotationMode,
+    appendComment,
   });
 
   const startTaskFrameSelection = () => {
@@ -559,6 +590,8 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     isPanning,
     isSavingComment,
     isSubmittingReview,
+    isLoadingVersions,
+    isLoadingComments,
     isViewingHistoricalVersion,
     loadFile,
     quietReload,
@@ -605,28 +638,9 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     detailedMaterialCache,
     isCanvasLoading,
     versions,
+    latestMaterialVersion,
     data,
-    appendComment: useCallback((newestComment: any) => {
-      setData((prev) => {
-        if (!prev) return prev;
-        const exists = prev.comments.some((c: any) => String(c.id) === String(newestComment.id));
-        if (exists) return prev;
-        
-        return {
-          ...prev,
-          comments: [
-            ...prev.comments,
-            {
-              id: String(newestComment.id),
-              content: getCommentText(newestComment.content),
-              author: newestComment.createdByUser?.displayName || newestComment.createdByUser?.email || `User #${newestComment.createdBy}`,
-              time: newestComment.createdAt ? new Date(newestComment.createdAt).toISOString() : new Date().toISOString(),
-              timestamp: newestComment.createdAt ? new Date(newestComment.createdAt).getTime() : Date.now(),
-            }
-          ]
-        };
-      });
-    }, [setData]),
+    appendComment,
     zoom,
     hasMoreComments,
     isLoadingMoreComments,

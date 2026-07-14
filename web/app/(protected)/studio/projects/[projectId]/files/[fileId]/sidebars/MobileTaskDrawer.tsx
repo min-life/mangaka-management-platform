@@ -29,6 +29,7 @@ export function MobileTaskDrawer({
   selectedTaskId,
   tasks,
   versions,
+  latestMaterialVersion,
   discussionContextKey,
   setDiscussionContext,
   commentFilterMode,
@@ -111,7 +112,7 @@ export function MobileTaskDrawer({
 
           <section className="flex-1 overflow-y-auto bg-[#101820]">
             {sidebarTab === 'material' ? (
-              <MaterialTabDetail versions={versions} focusedTask={focusedTask} fileId={file.id} onRefresh={onRefresh} />
+              <MaterialTabDetail versions={versions} latestMaterialVersion={latestMaterialVersion} focusedTask={focusedTask} fileId={file.id} onRefresh={onRefresh} />
             ) : (
               <div className="p-4">
                 <TaskDetailPanel

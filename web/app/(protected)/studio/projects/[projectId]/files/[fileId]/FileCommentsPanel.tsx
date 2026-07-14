@@ -258,7 +258,7 @@ export function FileCommentsPanel({
               </div>
             )}
             <div className="flex flex-col gap-3">
-            {displayComments.map((comment) => {
+            {displayComments.map((comment, idx) => {
               const isFrameComment = 'frameId' in comment;
           const displayIndex = isFrameComment ? frameDisplayIndexMap.get(String((comment as SubmissionFrameComment).frameId || comment.id)) : undefined;
           return (
@@ -267,7 +267,7 @@ export function FileCommentsPanel({
                   ? 'border-[#ff9ab3]/30 border-l-[#ff9ab3] bg-[#160d11]'
                   : 'border-[#303842] border-l-[#4b535f] bg-[#151c25]'
                 }`}
-              key={comment.id}
+              key={isFrameComment ? `frame-${comment.id}-${idx}` : `comment-${comment.id}-${idx}`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2">

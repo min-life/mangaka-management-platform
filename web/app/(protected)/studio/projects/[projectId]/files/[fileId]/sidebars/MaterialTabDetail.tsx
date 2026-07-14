@@ -9,11 +9,13 @@ import type { TaskWorkspaceItem } from '../../../tasks/task-ui';
 
 export function MaterialTabDetail({
   versions,
+  latestMaterialVersion,
   focusedTask,
   fileId,
   onRefresh,
 }: {
   versions: FileVersionItem[];
+  latestMaterialVersion?: FileVersionItem | null;
   focusedTask: TaskWorkspaceItem | null;
   fileId: number;
   onRefresh?: () => void | Promise<void>;
@@ -28,7 +30,7 @@ export function MaterialTabDetail({
   // Get the most recent version for the focused task, or the most recent overall version
   const targetVersion = focusedTask 
     ? (versions.find(v => v.taskId === Number(focusedTask.id) && v.isCurrent) ?? versions.find(v => v.taskId === Number(focusedTask.id)))
-    : versions[0];
+    : (versions[0] ?? latestMaterialVersion);
     
   const imgMat: any = (targetVersion?.materials as any[] || []).find((m: any) => m.type === 'IMAGE' || m.originalName?.match(/\.(png|jpe?g)$/i) || m.name?.match(/\.(png|jpe?g)$/i));
   const textMat: any = (targetVersion?.materials as any[] || []).find((m: any) => m.type === 'TEXT' || m.originalName?.match(/\.(txt|md|docx?)$/i) || m.name?.match(/\.(txt|md|docx?)$/i));

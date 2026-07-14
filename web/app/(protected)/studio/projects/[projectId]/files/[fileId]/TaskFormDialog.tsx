@@ -98,11 +98,14 @@ export function TaskFormDialog({
     onCancel();
   };
 
+  const [isInternalSubmitting, setIsInternalSubmitting] = useState(false);
+
   const handleSubmit = async () => {
     const selectedMember = members.find((member) => member.id === Number(effectiveAssigneeId));
     const assigneeName = selectedMember?.name || 'Unassigned';
 
     try {
+      setIsInternalSubmitting(true);
       await onSubmit(
         {
           assignedTo: assigneeName,
@@ -120,6 +123,8 @@ export function TaskFormDialog({
       resetForm();
     } catch {
       // Keep the form values so the user can retry after an API error.
+    } finally {
+      setIsInternalSubmitting(false);
     }
   };
 
@@ -288,24 +293,26 @@ export function TaskFormDialog({
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8b94a1]">
-                Status
-              </label>
-              <div className="relative">
-                <select
-                  className="h-11 w-full rounded-[6px] border border-[#212936] bg-[#0d151e] px-4 text-sm font-bold text-white outline-none focus:border-[#FFD369] appearance-none"
-                  onChange={(event) => setStatus(event.target.value as FileStatus)}
-                  value={status}
-                >
-                  <option value="PENDING">Pending</option>
-                  <option value="INPROGRESS">In Progress</option>
-                  <option value="REVIEW">Review</option>
-                  <option value="DONE">Done</option>
-                </select>
-                <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 size-4 text-[#8b94a1] pointer-events-none" />
+            {mode === 'edit' && (
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8b94a1]">
+                  Status
+                </label>
+                <div className="relative">
+                  <select
+                    className="h-11 w-full rounded-[6px] border border-[#212936] bg-[#0d151e] px-4 text-sm font-bold text-white outline-none focus:border-[#FFD369] appearance-none"
+                    onChange={(event) => setStatus(event.target.value as FileStatus)}
+                    value={status}
+                  >
+                    <option value="PENDING">Pending</option>
+                    <option value="INPROGRESS">In Progress</option>
+                    <option value="REVIEW">Review</option>
+                    <option value="DONE">Done</option>
+                  </select>
+                  <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 size-4 text-[#8b94a1] pointer-events-none" />
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
 
@@ -315,7 +322,7 @@ export function TaskFormDialog({
           <div className="flex w-full justify-end gap-3">
             <Button
               className="h-10 rounded-[6px] border border-[#212936] bg-[#0c1219] px-5 text-xs font-black text-[#8b94a1] hover:bg-[#151c25] hover:text-white"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isInternalSubmitting}
               onClick={handleCancel}
               type="button"
             >
@@ -323,11 +330,11 @@ export function TaskFormDialog({
             </Button>
             <Button
               className="h-10 rounded-[6px] bg-[#FFD369] px-5 text-xs font-black text-[#222831] hover:bg-[#eac04f] disabled:opacity-50"
-              disabled={isSubmitting || !title.trim()}
+              disabled={isSubmitting || isInternalSubmitting || !title.trim()}
               onClick={() => void handleSubmit()}
               type="button"
             >
-              {isSubmitting ? (mode === 'create' ? 'Creating...' : 'Saving...') : (mode === 'create' ? 'Create Task' : 'Save Changes')}
+              {(isSubmitting || isInternalSubmitting) ? (mode === 'create' ? 'Creating...' : 'Saving...') : (mode === 'create' ? 'Create Task' : 'Save Changes')}
             </Button>
           </div>
         </DialogFooter>

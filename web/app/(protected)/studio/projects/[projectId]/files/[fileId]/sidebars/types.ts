@@ -27,6 +27,7 @@ export type FileTaskSidebarProps = {
   selectedVersion: FileVersionItem | null;
   tasks: FileTaskItem[];
   versions: FileVersionItem[];
+  latestMaterialVersion: FileVersionItem | null;
   members?: Array<{ id: number; name: string }>;
   onRefresh?: () => void | Promise<void>;
   discussionContextKey: string;

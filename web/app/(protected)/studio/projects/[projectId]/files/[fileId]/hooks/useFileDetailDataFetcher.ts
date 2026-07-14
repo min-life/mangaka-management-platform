@@ -36,11 +36,18 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
     tasks: FileTaskItem[];
     comments: FileDiscussionComment[];
     frameComments: SubmissionFrameComment[];
+    latestMaterialVersion: FileVersionItem | null;
   } | null>(null);
 
   const [commentPagination, setCommentPagination] = useState<{ page: number; totalPages: number }>({ page: 1, totalPages: 1 });
   const [isLoadingMoreComments, setIsLoadingMoreComments] = useState(false);
   const hasMoreComments = commentPagination.page < commentPagination.totalPages;
+
+  // Track whether deferred sections have been loaded
+  const [versionsLoaded, setVersionsLoaded] = useState(false);
+  const [commentsLoaded, setCommentsLoaded] = useState(false);
+  const [isLoadingVersions, setIsLoadingVersions] = useState(false);
+  const [isLoadingComments, setIsLoadingComments] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -52,6 +59,9 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
   const reloadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingResolvesRef = useRef<(() => void)[]>([]);
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // FAST initial load: project + file + tasks only (no materials, no comments)
+  // ─────────────────────────────────────────────────────────────────────────────
   const loadData = useCallback(async (isRefresh = false, quiet = false, signal?: AbortSignal) => {
     const currentLoadId = ++activeLoadRef.current;
 
@@ -94,7 +104,7 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
         throw new Error('File was not found in the current project workspace.');
       }
 
-      // 2. Fetch File Data
+      // 2. Fetch File Data (has previewUrl for canvas — no need to call materials yet)
       const response = await getFileById(fileId);
       if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
 
@@ -103,63 +113,7 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
         response.createdByUser?.email ||
         (response.createdBy ? `User #${response.createdBy}` : 'Unknown user');
 
-      // 3. Fetch Versions/Materials
-      let dbVersions: FileVersionItem[] = [];
-      try {
-        const materialsRes = await getFileMaterials(fileId);
-        let versionsArray = (materialsRes || []) as FileMaterialVersionRecord[];
-        
-        // Strip data wrappers if they exist
-        if (!Array.isArray(versionsArray) && (materialsRes as any).data) {
-          versionsArray = (materialsRes as any).data;
-        }
-
-        if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
-        dbVersions = buildStableMaterialVersions(versionsArray);
-
-        // Fetch Task Materials if a task is selected
-        if (selectedTaskId) {
-          const taskIdNum = Number(selectedTaskId);
-          if (!isNaN(taskIdNum) && taskIdNum > 0) {
-            const taskMaterials = await getTaskMaterials(selectedTaskId);
-            if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
-
-            const rawList: any[] = Array.isArray(taskMaterials)
-              ? taskMaterials
-              : (taskMaterials?.data ?? (taskMaterials ?? []));
-
-            const isFileName = (name: string) => /\.[a-zA-Z0-9]+$/.test(name);
-            const sortedMaterials = [...rawList].sort(
-              (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-            );
-            const newestId = sortedMaterials.at(-1)?.id;
-
-            const taskVersions = sortedMaterials
-              .map((m: any, index: number) => {
-                const thumbnail = m.materials?.find((item: any) => item.isThumbnail) ||
-                  m.materials?.find((item: any) => item.type === 'IMAGE' || item.originalName?.match(/\.(png|jpe?g)$/i) || item.name?.match(/\.(png|jpe?g)$/i));
-                return {
-                  id: String(m.id),
-                  note: (m.name && !isFileName(m.name)) ? m.name : `Material v${index + 1}`,
-                  author: m.createdByUser?.displayName || m.createdByUser?.email || '',
-                  createdAt: m.createdAt ? formatFileDate(m.createdAt) : '',
-                  isCurrent: m.id === newestId,
-                  version: index + 1,
-                  materials: m.materials || [],
-                  previewUrl: thumbnail?.downloadUrl || thumbnail?.url || undefined,
-                  taskId: Number(selectedTaskId),
-                } as FileVersionItem;
-              })
-              .reverse();
-
-            dbVersions = [...dbVersions, ...taskVersions];
-          }
-        }
-      } catch (err) {
-        console.error('Failed to load version history:', err);
-      }
-
-      // 4. Fetch Tasks
+      // 3. Fetch Tasks only (materials fetched lazily when Versions tab is opened)
       let dbTasks: FileTaskItem[] = [];
       try {
         const tasksRes = await getFileTasks(fileId);
@@ -171,22 +125,6 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
           const versionMatch = t.description?.match(/\[version:(v\d+)\]/);
           let taskVersion = versionMatch ? versionMatch[1] : undefined;
 
-          if (!taskVersion && dbVersions.length > 0 && t.createdAt) {
-            const sorted = [...dbVersions].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-            const taskTime = new Date(t.createdAt).getTime();
-            let matchedVer = sorted[0];
-            for (const v of sorted) {
-              if (new Date(v.createdAt).getTime() <= taskTime) {
-                matchedVer = v;
-              } else {
-                break;
-              }
-            }
-            if (matchedVer) {
-              taskVersion = `v${matchedVer.version}`;
-            }
-          }
-
           const rawDesc = t.description || '';
           const submissions: any[] = [];
           const submissionRegex = /\[Note:\s*([\s\S]*?)\](?:\s*\[version:(v\d+)\])?/g;
@@ -195,32 +133,12 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
           while ((match = submissionRegex.exec(rawDesc)) !== null) {
             const note = match[1].trim();
             const versionTag = match[2];
-            let previewUrl = undefined;
-            let assetName = 'submission.png';
-            if (versionTag) {
-              const matchVer = dbVersions.find(v => `v${v.version}` === versionTag && v.taskId === t.id) || dbVersions.find(v => `v${v.version}` === versionTag && !v.taskId);
-              if (matchVer) {
-                previewUrl = matchVer.previewUrl;
-                const thumbnailMaterial = matchVer.materials?.find((m: any) => m.isThumbnail) || matchVer.materials?.find((m: any) => m.type === 'IMAGE' || m.originalName?.match(/\.(png|jpe?g)$/i) || m.name?.match(/\.(png|jpe?g)$/i));
-                assetName = (thumbnailMaterial as any)?.name || (thumbnailMaterial as any)?.originalName || `submission-${versionTag}.png`;
-              }
-            } else {
-              const currentV = dbVersions.filter(v => v.taskId === t.id).find(v => v.isCurrent)
-                || dbVersions.find(v => v.taskId === t.id)
-                || dbVersions.find(v => v.isCurrent && !v.taskId)
-                || dbVersions[dbVersions.length - 1];
-              if (currentV) {
-                previewUrl = currentV.previewUrl;
-                const thumbnailMaterial = currentV.materials?.find((m: any) => m.isThumbnail) || currentV.materials?.find((m: any) => m.type === 'IMAGE' || m.originalName?.match(/\.(png|jpe?g)$/i) || m.name?.match(/\.(png|jpe?g)$/i));
-                assetName = (thumbnailMaterial as any)?.name || (thumbnailMaterial as any)?.originalName || `submission-v${currentV.version}.png`;
-              }
-            }
             submissions.push({
               id: `sub_${Date.now()}_${Math.random()}`,
               status: 'PENDING_REVIEW',
               note,
-              assetName,
-              previewUrl,
+              assetName: 'submission.png',
+              previewUrl: undefined,
               createdAt: new Date().toISOString(),
               targetVersion: versionTag,
             });
@@ -240,6 +158,7 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
             updatedAt: t.updatedAt,
             targetVersion: taskVersion,
             submissions,
+            isMine: t.isMine,
           } as FileTaskItem;
         });
 
@@ -266,51 +185,37 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
         console.error('Failed to load file tasks:', err);
       }
 
-      // 5. Fetch Comments
-      let dbComments: FileDiscussionComment[] = [];
-      let dbTaskComments: SubmissionFrameComment[] = [];
-
-      try {
-        const commentsRes = selectedTaskId
-          ? await getTaskComments(selectedTaskId, 1, 20)
-          : await getFileComments(fileId, 1, 20);
-          
-        if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
-
-        const rawComments = (commentsRes as any)?.data ?? commentsRes ?? [];
-        const rawPagination = (commentsRes as any)?.pagination;
-        if (rawPagination) {
-          setCommentPagination({ page: rawPagination.page, totalPages: rawPagination.totalPages });
-        }
-        for (const c of rawComments as any[]) {
-          if (c.frame && c.material) {
-            dbTaskComments.push({
-              id: String(c.id),
-              content: getCommentText(c.content),
-              frameId: String(c.frame.id),
-              frameName: c.frame.name,
-              materialId: String(c.material.id),
-              materialName: c.material.name,
-              author: c.createdByUser?.displayName || c.createdByUser?.email || `User #${c.createdByUser?.id || c.createdBy || c.userId}`,
-              time: c.createdAt ? formatFileDate(c.createdAt) : '',
-              timestamp: c.createdAt ? new Date(c.createdAt).getTime() : 0,
-              taskId: selectedTaskId || undefined,
-            });
-          } else {
-            dbComments.push({
-              id: String(c.id),
-              content: getCommentText(c.content),
-              author: c.createdByUser?.displayName || c.createdByUser?.email || `User #${c.createdByUser?.id || c.createdBy || c.userId}`,
-              time: c.createdAt ? formatFileDate(c.createdAt) : '',
-              timestamp: c.createdAt ? new Date(c.createdAt).getTime() : 0,
-            });
-          }
-        }
-      } catch (err) {
-        console.error('Failed to load comments:', err);
-      }
-
       if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
+
+      // Extract preview URL from the latestMaterial returned by GET /file/:id
+      const latestMaterial = (response as any).latestMaterial;
+      const latestMaterials: any[] = latestMaterial?.materials ?? [];
+      const latestThumbnail =
+        latestMaterials.find((m: any) => m.isThumbnail) ||
+        latestMaterials.find((m: any) =>
+          m.type === 'IMAGE' ||
+          m.originalName?.match(/\.(png|jpe?g)$/i) ||
+          m.name?.match(/\.(png|jpe?g)$/i)
+        );
+      const latestPreviewUrl = latestThumbnail?.downloadUrl || latestThumbnail?.url || (response as any).previewUrl || '';
+
+      // Build a synthetic version from latestMaterial for the sidebar
+      let latestMaterialVersion: FileVersionItem | null = null;
+      if (latestMaterial) {
+        const mats: any[] = latestMaterial.materials ?? [];
+        const thumb = mats.find((m: any) => m.isThumbnail) ||
+          mats.find((m: any) => m.type === 'IMAGE' || m.originalName?.match(/\.(png|jpe?g)$/i) || m.name?.match(/\.(png|jpe?g)$/i));
+        latestMaterialVersion = {
+          id: String(latestMaterial.id),
+          note: latestMaterial.name || 'Latest',
+          author: latestMaterial.createdByUser?.displayName || latestMaterial.createdByUser?.email || '',
+          createdAt: latestMaterial.createdAt ? formatFileDate(latestMaterial.createdAt) : '',
+          isCurrent: true,
+          version: 1,
+          materials: mats,
+          previewUrl: thumb?.downloadUrl || thumb?.url || undefined,
+        } as FileVersionItem;
+      }
 
       const result = {
         project: projData,
@@ -321,21 +226,28 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
           title: response.title,
           updatedAt: response.updatedAt ? formatFileDate(response.updatedAt) : '',
           updatedBy: response.updatedByUser?.displayName || response.updatedByUser?.email || 'Unknown',
-          previewUrl: (response as any).previewUrl || '',
+          previewUrl: latestPreviewUrl,
           isFolder: false,
           createdBy: createdByLabel,
           createdAt: response.createdAt ? formatFileDate(response.createdAt) : '',
           status: (response as any).status || 'DRAFT',
           folderId: (response as any).folder?.id,
         } as unknown) as FileExplorerItem,
-        versions: dbVersions,
+        // Versions & comments start empty — loaded lazily on demand
+        versions: [],
         tasks: dbTasks,
-        comments: dbComments,
-        frameComments: dbTaskComments,
+        comments: [],
+        frameComments: [],
+        latestMaterialVersion,
       };
 
       setData(result);
       setHasLoaded(true);
+      // Reset deferred flags on full reload so they can be triggered again
+      if (!isRefresh) {
+        setVersionsLoaded(false);
+        setCommentsLoaded(false);
+      }
     } catch (err: any) {
       if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
       if (!hasLoaded) {
@@ -350,10 +262,128 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
     }
   }, [projectId, fileId, selectedTaskId, hasLoaded]);
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // DEFERRED: load versions/materials (triggered when Versions tab is opened)
+  // ─────────────────────────────────────────────────────────────────────────────
+  const loadVersions = useCallback(async () => {
+    if (versionsLoaded || isLoadingVersions) return;
+    setIsLoadingVersions(true);
+    try {
+      let dbVersions: FileVersionItem[] = [];
+
+      const materialsRes = await getFileMaterials(fileId);
+      let versionsArray = (materialsRes || []) as FileMaterialVersionRecord[];
+      if (!Array.isArray(versionsArray) && (materialsRes as any).data) {
+        versionsArray = (materialsRes as any).data;
+      }
+      dbVersions = buildStableMaterialVersions(versionsArray);
+
+      if (selectedTaskId) {
+        const taskIdNum = Number(selectedTaskId);
+        if (!isNaN(taskIdNum) && taskIdNum > 0) {
+          const taskMaterials = await getTaskMaterials(selectedTaskId);
+
+          const rawList: any[] = Array.isArray(taskMaterials)
+            ? taskMaterials
+            : (taskMaterials?.data ?? (taskMaterials ?? []));
+
+          const isFileName = (name: string) => /\.[a-zA-Z0-9]+$/.test(name);
+          const sortedMaterials = [...rawList].sort(
+            (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          );
+          const newestId = sortedMaterials.at(-1)?.id;
+
+          const taskVersions = sortedMaterials
+            .map((m: any, index: number) => {
+              const thumbnail = m.materials?.find((item: any) => item.isThumbnail) ||
+                m.materials?.find((item: any) => item.type === 'IMAGE' || item.originalName?.match(/\.(png|jpe?g)$/i) || item.name?.match(/\.(png|jpe?g)$/i));
+              return {
+                id: String(m.id),
+                note: (m.name && !isFileName(m.name)) ? m.name : `Material v${index + 1}`,
+                author: m.createdByUser?.displayName || m.createdByUser?.email || '',
+                createdAt: m.createdAt ? formatFileDate(m.createdAt) : '',
+                isCurrent: m.id === newestId,
+                version: index + 1,
+                materials: m.materials || [],
+                previewUrl: thumbnail?.downloadUrl || thumbnail?.url || undefined,
+                taskId: Number(selectedTaskId),
+              } as FileVersionItem;
+            })
+            .reverse();
+
+          dbVersions = [...dbVersions, ...taskVersions];
+        }
+      }
+
+      setData(prev => prev ? { ...prev, versions: dbVersions } : prev);
+      setVersionsLoaded(true);
+    } catch (err) {
+      console.error('Failed to load version history:', err);
+    } finally {
+      setIsLoadingVersions(false);
+    }
+  }, [fileId, selectedTaskId, versionsLoaded, isLoadingVersions]);
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // DEFERRED: load comments (triggered when Discussion tab is opened)
+  // ─────────────────────────────────────────────────────────────────────────────
+  const loadComments = useCallback(async () => {
+    if (commentsLoaded || isLoadingComments) return;
+    setIsLoadingComments(true);
+    try {
+      const commentsRes = selectedTaskId
+        ? await getTaskComments(selectedTaskId, 1, 20)
+        : await getFileComments(fileId, 1, 20);
+
+      const rawComments = (commentsRes as any)?.data ?? commentsRes ?? [];
+      const rawPagination = (commentsRes as any)?.pagination;
+      if (rawPagination) {
+        setCommentPagination({ page: rawPagination.page, totalPages: rawPagination.totalPages });
+      }
+
+      const dbComments: FileDiscussionComment[] = [];
+      const dbTaskComments: SubmissionFrameComment[] = [];
+
+      for (const c of rawComments as any[]) {
+        if (c.frame && c.material) {
+          dbTaskComments.push({
+            id: String(c.id),
+            content: getCommentText(c.content),
+            frameId: String(c.frame.id),
+            frameName: c.frame.name,
+            materialId: String(c.material.id),
+            materialName: c.material.name,
+            author: c.createdByUser?.displayName || c.createdByUser?.email || `User #${c.createdByUser?.id || c.createdBy || c.userId}`,
+            time: c.createdAt ? formatFileDate(c.createdAt) : '',
+            timestamp: c.createdAt ? new Date(c.createdAt).getTime() : 0,
+            taskId: selectedTaskId || undefined,
+          });
+        } else {
+          dbComments.push({
+            id: String(c.id),
+            content: getCommentText(c.content),
+            author: c.createdByUser?.displayName || c.createdByUser?.email || `User #${c.createdByUser?.id || c.createdBy || c.userId}`,
+            time: c.createdAt ? formatFileDate(c.createdAt) : '',
+            timestamp: c.createdAt ? new Date(c.createdAt).getTime() : 0,
+          });
+        }
+      }
+
+      setData(prev => prev ? { ...prev, comments: dbComments, frameComments: dbTaskComments } : prev);
+      setCommentsLoaded(true);
+    } catch (err) {
+      console.error('Failed to load comments:', err);
+    } finally {
+      setIsLoadingComments(false);
+    }
+  }, [fileId, selectedTaskId, commentsLoaded, isLoadingComments]);
+
   useEffect(() => {
     const controller = new AbortController();
     setHasLoaded(false);
     setData(null);
+    setVersionsLoaded(false);
+    setCommentsLoaded(false);
     void loadData(false, false, controller.signal).catch(() => { });
     return () => controller.abort();
   }, [projectId, fileId]);
@@ -373,6 +403,12 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
     setError,
     isInitialLoading,
     isRefreshing,
+    isLoadingVersions,
+    isLoadingComments,
+    versionsLoaded,
+    commentsLoaded,
+    loadVersions,
+    loadComments,
     reload: useCallback(() => {
       return new Promise<void>((resolve) => {
         pendingResolvesRef.current.push(resolve);
@@ -442,7 +478,6 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
               });
             }).catch((err) => {
               console.error('Failed to get frame details', err);
-              // Fallback to full reload if we fail to get frame details
               if (reloadTimeoutRef.current) clearTimeout(reloadTimeoutRef.current);
               reloadTimeoutRef.current = setTimeout(() => {
                 loadData(true, true).catch(() => { });
