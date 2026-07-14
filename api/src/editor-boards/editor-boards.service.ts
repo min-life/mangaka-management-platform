@@ -236,7 +236,7 @@ export class EditorBoardsService {
           orderBy: { createdAt: 'desc' },
         }),
         this.prisma.application.findMany({
-          where: { project: { editorBoardId: boardId } },
+          where: { project: { editorBoardId: boardId }, status: APPLICATION_STATUS.SUBMITTED },
           select: APPLICATION_LIST_SELECT,
           take: 5,
           orderBy: { updatedAt: 'desc' },
