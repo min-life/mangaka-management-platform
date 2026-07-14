@@ -17,6 +17,7 @@ import { CreateFrameCommentDialog } from './CreateFrameCommentDialog';
 import { AiFrameDetectionDialog } from './AiFrameDetectionDialog';
 
 import { type FileVersionItem } from '../file-ui';
+import { getCommentText } from './file-detail-types';
 import type { FileDetailController } from './hooks/useFileDetailController';
 import { useRealtimeProjectActivity, useRealtimeComments } from '@/hooks/use-realtime-activity';
 
@@ -103,6 +104,13 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
     file?.id ?? 0
   );
 
+  useEffect(() => {
+    const newestComment = createdComments.at(-1) as any;
+    if (newestComment) {
+      controller.appendComment(newestComment);
+    }
+  }, [createdComments, controller.data, controller]);
+
   // Reload file data when there is any new activity related to this file
   useEffect(() => {
     if (!file?.id) return;
@@ -122,13 +130,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
     }
   }, [activities, activities.length, file?.id, quietReload, refreshFrameComments]);
 
-  // Reload file comments when there is a new direct file comment event
-  useEffect(() => {
-    if (!file?.id) return;
-    if (createdComments.length > 0 || updatedComments.length > 0 || deletedCommentIds.length > 0) {
-      void quietReload();
-    }
-  }, [createdComments.length, updatedComments.length, deletedCommentIds.length, file?.id, quietReload]);
+
 
   if (!file) {
     return null;
@@ -209,6 +211,12 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
               ) : resourceTab === 'discussion' ? (
                 <div className="text-white">
                   <FileCommentsPanel
+                    discussionListComments={controller.discussionListComments}
+
+                    focusedFrameId={controller.focusedFrameId}
+                    isFrameLoading={controller.isFrameLoading}
+                    isContextLoading={isTaskContextLoading}
+                    handleFrameClick={controller.handleFrameClick}
                     comments={discussionContextKey === 'file' ? fileComments : taskComments}
                     fileId={file.id}
                     taskId={focusedTask?.id ? Number(focusedTask.id) : null}
@@ -216,6 +224,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
                     contextLabel={discussionContextLabel}
                     frameComments={discussionFrameComments}
                     filterMode={commentFilterMode}
+                    setFilterMode={setCommentFilterMode}
                     isSaving={isSavingComment}
                     onCreateComment={handleCreateDiscussionComment}
                     onUpdateComment={handleUpdateDiscussionComment}
@@ -223,6 +232,9 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
                     onReplyToFrame={handleReplyToFrame}
                     replyingFrameId={controller.replyingFrameId}
                     setReplyingFrameId={controller.setReplyingFrameId}
+                    onLoadMore={controller.loadMoreComments}
+                    hasMore={controller.hasMoreComments}
+                    isLoadingMore={controller.isLoadingMoreComments}
                     onSelectFrame={(comment) => {
                       let nextVersion: FileVersionItem | null = null;
                       if (comment.materialId) {

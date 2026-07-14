@@ -1745,7 +1745,7 @@ Hệ thống cho phép nhập và tổng hợp số liệu của dự án thông
   **Response Schema:**
   | Field | Type | Description |
   |-------|------|-------------|
-  | `data` | `string` |  |
+  | `data` | `ApplicationResDto` | Application details, now includes `voteDeadline` |
 
 ---
 

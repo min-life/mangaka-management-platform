@@ -27,6 +27,7 @@ export function CreateFrameCommentDialog({
   region,
 }: CreateFrameCommentDialogProps) {
   const [content, setContent] = useState('');
+  const [frameName, setFrameName] = useState('');
 
   const handleCreate = () => {
     if (!region || !content.trim()) return;
@@ -36,8 +37,10 @@ export function CreateFrameCommentDialog({
       id: `frame-comment-${Date.now()}`,
       region,
       time: 'Just now',
+      frameName: frameName.trim() || undefined,
     });
     setContent('');
+    setFrameName('');
   };
 
   return (
@@ -51,9 +54,15 @@ export function CreateFrameCommentDialog({
             This note is attached to the selected region of this submission.
           </DialogDescription>
         </DialogHeader>
-        <div className="bg-[#151c25] px-5 py-4">
-          <textarea
+        <div className="bg-[#151c25] px-5 py-4 space-y-3">
+          <input
             autoFocus
+            className="w-full rounded-lg border border-[#39424f] bg-[#101820] p-3 text-sm text-white placeholder:text-[#6a7381] focus:border-[#FFD369] focus:outline-none focus:ring-1 focus:ring-[#FFD369] transition-all"
+            onChange={(event) => setFrameName(event.target.value)}
+            placeholder="Frame name (optional)..."
+            value={frameName}
+          />
+          <textarea
             className="h-28 w-full resize-none rounded-lg border border-[#39424f] bg-[#101820] p-3 text-sm text-white placeholder:text-[#6a7381] focus:border-[#FFD369] focus:outline-none focus:ring-1 focus:ring-[#FFD369] transition-all"
             onChange={(event) => setContent(event.target.value)}
             placeholder="Describe what should be corrected in this region..."

@@ -2,10 +2,9 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { getProjectFolders, getProjectMembers, getProjectById, type ProjectFolderResponse, type ProjectResponse } from '@/services/project.service';
 import { parseDecimal } from '@/lib/utils';
 import { getFileById, getFileComments, getFileMaterials, getFileTasks } from '@/services/file.service';
-import { getTaskFrames, getTaskComments, getTaskMaterials } from '@/services/task.service';
+import { getTaskComments, getTaskMaterials } from '@/services/task.service';
 import { getFrameComments, getFrameById } from '@/services/frame.service';
 import { getMaterialById, getMaterialFrames } from '@/services/material.service';
-import pLimit from 'p-limit';
 import {
   formatFileDate,
   type FileTaskItem,
@@ -38,6 +37,10 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
     comments: FileDiscussionComment[];
     frameComments: SubmissionFrameComment[];
   } | null>(null);
+
+  const [commentPagination, setCommentPagination] = useState<{ page: number; totalPages: number }>({ page: 1, totalPages: 1 });
+  const [isLoadingMoreComments, setIsLoadingMoreComments] = useState(false);
+  const hasMoreComments = commentPagination.page < commentPagination.totalPages;
 
   const [error, setError] = useState<string | null>(null);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -164,20 +167,6 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
 
         const tasksWithFramesPromises = (tasksRes || []).map(async (t: any) => {
           let region: FileTaskRegion | undefined = undefined;
-          try {
-            const frames = await getTaskFrames(t.id);
-            const taskFrame = frames[frames.length - 1];
-            if (taskFrame) {
-              region = {
-                endX: parseDecimal(taskFrame.endX),
-                endY: parseDecimal(taskFrame.endY),
-                startX: parseDecimal(taskFrame.startX),
-                startY: parseDecimal(taskFrame.startY),
-              };
-            }
-          } catch (frameErr) {
-            console.error(`Failed to load frames for task ${t.id}:`, frameErr);
-          }
 
           const versionMatch = t.description?.match(/\[version:(v\d+)\]/);
           let taskVersion = versionMatch ? versionMatch[1] : undefined;
@@ -282,105 +271,43 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
       let dbTaskComments: SubmissionFrameComment[] = [];
 
       try {
-        if (selectedTaskId) {
-          const taskCommentsRes = await getTaskComments(selectedTaskId);
-          if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
+        const commentsRes = selectedTaskId
+          ? await getTaskComments(selectedTaskId, 1, 20)
+          : await getFileComments(fileId, 1, 20);
+          
+        if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
 
-          dbComments = (taskCommentsRes || []).map((c: any) => ({
-            author: c.createdByUser?.displayName || c.createdByUser?.email || `User #${c.createdByUser?.id || c.createdBy || c.userId}`,
-            content: getCommentText(c.content),
-            id: String(c.id),
-            time: c.createdAt ? formatFileDate(c.createdAt) : '',
-            context: `task:${selectedTaskId}`,
-          }));
-        } else {
-          const fileCommentsRes = await getFileComments(fileId);
-          if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
-
-          dbComments = (fileCommentsRes || []).map((c: any) => ({
-            author: c.createdByUser?.displayName || c.createdByUser?.email || `User #${c.createdByUser?.id || c.createdBy || c.userId}`,
-            content: getCommentText(c.content),
-            id: String(c.id),
-            time: c.createdAt ? formatFileDate(c.createdAt) : '',
-          }));
+        const rawComments = (commentsRes as any)?.data ?? commentsRes ?? [];
+        const rawPagination = (commentsRes as any)?.pagination;
+        if (rawPagination) {
+          setCommentPagination({ page: rawPagination.page, totalPages: rawPagination.totalPages });
+        }
+        for (const c of rawComments as any[]) {
+          if (c.frame && c.material) {
+            dbTaskComments.push({
+              id: String(c.id),
+              content: getCommentText(c.content),
+              frameId: String(c.frame.id),
+              frameName: c.frame.name,
+              materialId: String(c.material.id),
+              materialName: c.material.name,
+              author: c.createdByUser?.displayName || c.createdByUser?.email || `User #${c.createdByUser?.id || c.createdBy || c.userId}`,
+              time: c.createdAt ? formatFileDate(c.createdAt) : '',
+              timestamp: c.createdAt ? new Date(c.createdAt).getTime() : 0,
+              taskId: selectedTaskId || undefined,
+            });
+          } else {
+            dbComments.push({
+              id: String(c.id),
+              content: getCommentText(c.content),
+              author: c.createdByUser?.displayName || c.createdByUser?.email || `User #${c.createdByUser?.id || c.createdBy || c.userId}`,
+              time: c.createdAt ? formatFileDate(c.createdAt) : '',
+              timestamp: c.createdAt ? new Date(c.createdAt).getTime() : 0,
+            });
+          }
         }
       } catch (err) {
         console.error('Failed to load comments:', err);
-      }
-
-      try {
-        const limit = pLimit(10);
-        let allFrames: any[] = [];
-
-        if (selectedTaskId) {
-          try {
-            const frames = await getTaskFrames(selectedTaskId);
-            allFrames = frames.map(f => ({
-              ...f,
-              injectedMaterialId: f.materialId,
-              injectedTaskId: selectedTaskId,
-            }));
-          } catch (e) {
-            console.error('Failed to load task frames:', e);
-          }
-        } else {
-          const materialIds = [...new Set(dbVersions.map(v => String(v.id)).filter(id => id && id !== ''))];
-          const allFramesResults = await Promise.allSettled(
-            materialIds.map(matId => limit(async () => {
-              const frames = await getMaterialFrames(matId);
-              const material = dbVersions.find(v => String(v.id) === String(matId));
-              return frames.map((f: any) => ({
-                ...f,
-                injectedMaterialId: matId,
-                injectedTaskId: material?.taskId,
-              }));
-            }))
-          );
-
-          allFrames = allFramesResults.flatMap((result, idx) => {
-            if (result.status === 'rejected') {
-              console.error(`Failed to load frames for material ${materialIds[idx]}`, result.reason);
-              return [];
-            }
-            return result.value;
-          });
-        }
-
-        if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
-
-        const allFrameCommentsResults = await Promise.allSettled(
-          allFrames.map(frame => limit(async () => {
-            const commentsRes = await getFrameComments(frame.id);
-            return commentsRes.map((c: any) => ({
-              id: String(c.id),
-              author: c.createdByUser?.displayName || c.createdByUser?.email || `User #${c.createdByUser?.id || c.userId}`,
-              content: getCommentText(c.content),
-              time: c.createdAt ? formatFileDate(c.createdAt) : '',
-              region: {
-                startX: parseDecimal(frame.startX),
-                startY: parseDecimal(frame.startY),
-                endX: parseDecimal(frame.endX),
-                endY: parseDecimal(frame.endY),
-              },
-              taskId: frame.injectedTaskId ? String(frame.injectedTaskId) : undefined,
-              targetVersion: undefined,
-              frameId: String(frame.id),
-              materialId: frame.injectedMaterialId ? String(frame.injectedMaterialId) : undefined,
-              materialName: undefined,
-            } as SubmissionFrameComment));
-          }))
-        );
-
-        dbTaskComments = allFrameCommentsResults.flatMap((result, idx) => {
-          if (result.status === 'rejected') {
-            console.error(`Failed to load comments for frame ${allFrames[idx].id}`, result.reason);
-            return [];
-          }
-          return result.value;
-        });
-
-      } catch (err) {
-        console.error('Failed to load frame comments:', err);
       }
 
       if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
@@ -493,6 +420,7 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
                   author: c.createdByUser?.displayName || c.createdByUser?.email || `User #${c.createdByUser?.id || c.userId}`,
                   content: getCommentText(c.content),
                   time: c.createdAt ? formatFileDate(c.createdAt) : '',
+                  timestamp: c.createdAt ? new Date(c.createdAt).getTime() : 0,
                   region: {
                     startX: parseDecimal(frameDetails.startX),
                     startY: parseDecimal(frameDetails.startY),
@@ -528,6 +456,7 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
             author: c.createdByUser?.displayName || c.createdByUser?.email || `User #${c.createdByUser?.id || c.userId}`,
             content: getCommentText(c.content),
             time: c.createdAt ? formatFileDate(c.createdAt) : '',
+            timestamp: c.createdAt ? new Date(c.createdAt).getTime() : 0,
             region: existing.region,
             taskId: existing.taskId,
             targetVersion: undefined,
@@ -546,5 +475,44 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
         console.error('Failed to refresh frame comments', err);
       }
     }, [loadData, setData]),
+    hasMoreComments,
+    isLoadingMoreComments,
+    loadMoreComments: useCallback(async () => {
+      if (!hasMoreComments || isLoadingMoreComments) return;
+      const nextPage = commentPagination.page + 1;
+      setIsLoadingMoreComments(true);
+      try {
+        const commentsRes = selectedTaskId
+          ? await getTaskComments(selectedTaskId, nextPage, 20)
+          : await getFileComments(fileId, nextPage, 20);
+        const rawComments = (commentsRes as any)?.data ?? commentsRes ?? [];
+        const rawPagination = (commentsRes as any)?.pagination;
+        if (rawPagination) {
+          setCommentPagination({ page: rawPagination.page, totalPages: rawPagination.totalPages });
+        }
+        const newComments: FileDiscussionComment[] = [];
+        for (const c of rawComments as any[]) {
+          if (!(c.frame && c.material)) {
+            newComments.push({
+              id: String(c.id),
+              content: getCommentText(c.content),
+              author: c.createdByUser?.displayName || c.createdByUser?.email || `User #${c.createdByUser?.id || c.createdBy}`,
+              time: c.createdAt ? formatFileDate(c.createdAt) : '',
+              timestamp: c.createdAt ? new Date(c.createdAt).getTime() : 0,
+            });
+          }
+        }
+        setData(prev => {
+          if (!prev) return prev;
+          const existingIds = new Set(prev.comments.map(c => c.id));
+          const unique = newComments.filter(c => !existingIds.has(c.id));
+          return { ...prev, comments: [...prev.comments, ...unique] };
+        });
+      } catch (err) {
+        console.error('Failed to load more comments', err);
+      } finally {
+        setIsLoadingMoreComments(false);
+      }
+    }, [hasMoreComments, isLoadingMoreComments, commentPagination.page, selectedTaskId, fileId]),
   };
 }

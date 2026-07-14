@@ -65,6 +65,19 @@ function mapApiFileToExplorerItem(file: ProjectFileResponse, folderId: number): 
 
 import { useProjectParams } from '@/hooks/useProjectParams';
 
+function FilesSkeleton() {
+  return (
+    <section className="min-h-[560px] p-5">
+      {/* Grid Skeleton */}
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="h-[234px] animate-pulse rounded-[10px] border border-[#2d3848] bg-[#141c27]" />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function FilesClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -428,7 +441,7 @@ export function FilesClient() {
 
       <div className="mt-4 min-h-[560px] flex-1 overflow-hidden rounded-[5px] border border-[#26303b] bg-[#101820]">
         {isInitialLoading ? (
-          <LoadingState message="Loading file workspace..." minHeight="560px" />
+          <FilesSkeleton />
         ) : (
           <div className={`transition-opacity duration-200 ${isRefreshing ? 'opacity-50 pointer-events-none' : ''}`}>
             {folders.length ? (

@@ -131,13 +131,16 @@ export function AuthForm({
     .map((part) => part.charAt(0).toUpperCase())
     .join('');
 
-  if (status === 'loading' || status === 'authenticated' || isRedirecting) {
+  const shouldShowFullscreenLoader =
+    status === 'loading' || status === 'authenticated' || isRedirecting || isSubmitting;
+
+  if (shouldShowFullscreenLoader) {
     return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#222831] text-white">
-        <div className="flex flex-col items-center space-y-4">
-          <Loader2 className="size-10 animate-spin text-[#FFD369]" />
-          <p className="text-sm font-bold tracking-wider text-[#aeb7c2]">
-            Loading Inkly workspace...
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#222831] text-[#eeeeee]">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="size-6 animate-spin text-[#FFD369]" />
+          <p className="text-sm font-medium text-[#EEEEEE]">
+            Loading workspace...
           </p>
         </div>
       </div>
@@ -176,6 +179,7 @@ export function AuthForm({
                 <Input
                   autoComplete="current-password"
                   className={`${authInputClassName} pr-12`}
+                  disabled={isSubmitting}
                   id={field.id}
                   name={field.id}
                   onChange={(event) => setPassword(event.target.value)}
@@ -196,6 +200,7 @@ export function AuthForm({
               <Input
                 autoComplete="email"
                 className={authInputClassName}
+                disabled={isSubmitting}
                 id={field.id}
                 name={field.id}
                 onChange={(event) => setEmail(event.target.value)}

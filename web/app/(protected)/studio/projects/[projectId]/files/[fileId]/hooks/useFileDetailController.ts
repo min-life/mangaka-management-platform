@@ -18,7 +18,10 @@ import {
 
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/use-permissions';
+import { getFrameById } from '@/services/frame.service';
+import { getMaterialById } from '@/services/material.service';
 import { toast } from '@/lib/toast';
+import { parseDecimal } from '@/lib/utils';
 
 import { useFileDetailDataFetcher } from './useFileDetailDataFetcher';
 import { useTaskVersionResolver } from './useTaskVersionResolver';
@@ -59,10 +62,16 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
   const [resourceTab, setResourceTab] = useState<ResourceTab>('versions');
 
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
-  const [commentFilterMode, setCommentFilterMode] = useState<string>('all');
   const [isSavingComment, setIsSavingComment] = useState(false);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [replyingFrameId, setReplyingFrameId] = useState<string | null>(null);
+
+  const [focusedFrameId, setFocusedFrameId] = useState<number | null>(null);
+  const [focusedFrameMaterialId, setFocusedFrameMaterialId] = useState<string | null>(null);
+  const [focusedFrameRegion, setFocusedFrameRegion] = useState<FileTaskRegion | null>(null);
+  const [isFrameLoading, setIsFrameLoading] = useState(false);
+  const [commentFilterMode, setCommentFilterMode] = useState<string>('all');
+  const latestRequestedFrameIdRef = useRef<number | null>(null);
 
   const [selectedVersionForDetails, setSelectedVersionForDetails] = useState<FileVersionItem | null>(null);
   const [deletingVersionId, setDeletingVersionId] = useState<string | null>(null);
@@ -74,11 +83,20 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
   const [isDetectingAiFrame, setIsDetectingAiFrame] = useState(false);
   const [isAiFrameReviewing, setIsAiFrameReviewing] = useState(false);
   const [canvasImageMetrics, setCanvasImageMetrics] = useState<CanvasImageMetrics | null>(null);
+  
+  // Reset filter when switching task context
+  useEffect(() => {
+    setCommentFilterMode('all');
+  }, [selectedTaskId]);
+
+  // Cache for lazy loading material details
+  const [detailedMaterialCache, setDetailedMaterialCache] = useState<Record<string, any[]>>({});
+  const [isCanvasLoading, setIsCanvasLoading] = useState(false);
 
   const { user } = useAuth();
   const { can: canProject } = usePermissions({ resource: 'PROJECT', resourceId: projectId });
 
-  const { data, error, isInitialLoading, isRefreshing, reload, quietReload, refreshFrameComments, setData, setError } = useFileDetailDataFetcher({
+  const { data, error, isInitialLoading, isRefreshing, reload, quietReload, refreshFrameComments, setData, setError, hasMoreComments, isLoadingMoreComments, loadMoreComments } = useFileDetailDataFetcher({
     projectId,
     fileId,
     selectedTaskId,
@@ -105,6 +123,8 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     isRefreshing,
     user,
   });
+
+
 
   const {
     zoom,
@@ -159,8 +179,52 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
         return v.taskId === null || v.taskId === undefined;
       }
       return v.taskId === Number(focusedTask.id);
+    }).map((v: any) => {
+      const cachedMaterials = detailedMaterialCache[v.id];
+      return {
+        ...v,
+        materials: cachedMaterials && cachedMaterials.length > 0 ? cachedMaterials : v.materials,
+      };
     });
-  }, [data?.versions, focusedTask]);
+  }, [data?.versions, focusedTask, detailedMaterialCache]);
+
+  const activeVersionIdForCache = focusedTask
+    ? (versions.find((v) => v.isCurrent)?.id ?? versions[0]?.id)
+    : (selectedVersion?.id ?? versions.find((v) => v.isCurrent)?.id ?? versions[0]?.id);
+
+  // Lazy load detailed material data when active version changes
+  useEffect(() => {
+    if (!activeVersionIdForCache) return;
+    
+    const versionId = activeVersionIdForCache;
+    if (detailedMaterialCache[versionId]) {
+      return; // Already cached
+    }
+
+    let isMounted = true;
+    setIsCanvasLoading(true);
+
+    getMaterialById(versionId)
+      .then((res: any) => {
+        if (!isMounted) return;
+        setDetailedMaterialCache(prev => ({
+          ...prev,
+          [versionId]: res.data?.materials || res.materials || []
+        }));
+      })
+      .catch((err) => {
+        console.error('Failed to load material details:', err);
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsCanvasLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeVersionIdForCache, detailedMaterialCache]);
   const frameComments = data?.frameComments ?? [];
   const fileComments = ((data?.comments ?? []) as FileDiscussionCommentWithContext[]).filter(
     (comment) => !comment.context,
@@ -463,7 +527,71 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
   const currentMaterialFrameComments = currentMaterialId
     ? frameComments.filter((comment) => comment.materialId === currentMaterialId)
     : [];
-  const canvasFrameComments = currentMaterialFrameComments;
+
+  const handleFrameClick = useCallback(async (frameId: string, materialId: string) => {
+    const fId = Number(frameId);
+    latestRequestedFrameIdRef.current = fId;
+    
+    // Switch to the correct material
+    const targetMaterial = versions.find(v => String(v.id) === String(materialId));
+    if (targetMaterial) {
+      setSelectedVersion(targetMaterial);
+    }
+    
+    setIsFrameLoading(true);
+
+    try {
+      const frame = await getFrameById(fId);
+      if (latestRequestedFrameIdRef.current !== fId) return;
+
+      setFocusedFrameId(fId);
+      setFocusedFrameMaterialId(String(materialId));
+      const region = {
+        startX: parseDecimal(frame.startX),
+        startY: parseDecimal(frame.startY),
+        endX: parseDecimal(frame.endX),
+        endY: parseDecimal(frame.endY),
+      };
+      setFocusedFrameRegion(region);
+
+      // Pan to region logic (Removed as per user request to not move the image)
+      if (canvasRef.current) {
+        requestAnimationFrame(() =>
+          canvasRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        );
+      }
+    } catch (err) {
+      if (latestRequestedFrameIdRef.current !== fId) return;
+      console.error(`Failed to load frame ${frameId}`, err);
+      toast.error('Failed to load frame position. Try again later.');
+      setFocusedFrameId(null);
+      setFocusedFrameMaterialId(null);
+      setFocusedFrameRegion(null);
+    } finally {
+      if (latestRequestedFrameIdRef.current === fId) {
+        setIsFrameLoading(false);
+      }
+    }
+  }, [versions, setSelectedVersion, setPanOffset, zoom]);
+
+  const canvasFrameComments = useMemo(() => {
+    if (!focusedFrameId || !focusedFrameRegion || String(focusedFrameMaterialId) !== String(activeVersionIdForCache)) return [];
+    return [{
+      frameId: String(focusedFrameId),
+      region: focusedFrameRegion,
+    }];
+  }, [focusedFrameId, focusedFrameRegion, focusedFrameMaterialId, activeVersionIdForCache]);
+
+  const discussionListComments = useMemo(() => {
+    const combined = [
+      ...frameComments.map(c => ({ ...c, type: 'frame' as const })),
+      ...(data?.comments ?? []).map(c => ({ ...c, type: 'general' as const })),
+    ].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+    if (commentFilterMode === 'all') return combined;
+    return combined.filter(c => c.type === commentFilterMode);
+  }, [frameComments, data?.comments, commentFilterMode]);
+
   const discussionContextKey = focusedTask
     ? `task:${focusedTask.id}`
     : 'file';
@@ -514,6 +642,10 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     discussionContextKey,
     discussionContextLabel,
     discussionFrameComments,
+    discussionListComments,
+    focusedFrameId,
+    isFrameLoading,
+    handleFrameClick,
     commentFilterMode,
     setCommentFilterMode,
     displayedPreviewUrl,
@@ -599,9 +731,35 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     taskDialogOpen,
     tasks,
 
-
+    detailedMaterialCache,
+    isCanvasLoading,
     versions,
+    data,
+    appendComment: useCallback((newestComment: any) => {
+      setData((prev) => {
+        if (!prev) return prev;
+        const exists = prev.comments.some((c: any) => String(c.id) === String(newestComment.id));
+        if (exists) return prev;
+        
+        return {
+          ...prev,
+          comments: [
+            ...prev.comments,
+            {
+              id: String(newestComment.id),
+              content: getCommentText(newestComment.content),
+              author: newestComment.createdByUser?.displayName || newestComment.createdByUser?.email || `User #${newestComment.createdBy}`,
+              time: newestComment.createdAt ? new Date(newestComment.createdAt).toISOString() : new Date().toISOString(),
+              timestamp: newestComment.createdAt ? new Date(newestComment.createdAt).getTime() : Date.now(),
+            }
+          ]
+        };
+      });
+    }, [setData]),
     zoom,
+    hasMoreComments,
+    isLoadingMoreComments,
+    loadMoreComments,
   };
 }
 

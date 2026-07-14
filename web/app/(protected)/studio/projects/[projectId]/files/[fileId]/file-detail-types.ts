@@ -8,6 +8,7 @@ export type FileDiscussionComment = {
   content: string;
   id: string;
   time: string;
+  timestamp?: number;
 };
 
 export function getCommentText(content: unknown) {
