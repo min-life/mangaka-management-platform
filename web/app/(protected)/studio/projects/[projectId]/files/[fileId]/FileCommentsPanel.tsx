@@ -23,9 +23,16 @@ type FrameThread = {
 };
 
 type FileCommentsPanelProps = {
+  discussionListComments?: any[];
+  discussionFilter?: 'all' | 'frame' | 'general';
+  setDiscussionFilter?: (filter: 'all' | 'frame' | 'general') => void;
+  focusedFrameId?: number | null;
+  isFrameLoading?: boolean;
+  handleFrameClick?: (frameId: string, materialId: string) => Promise<void>;
+
   comments?: CommentItem[];
-  contextKey: string;
-  contextLabel: string;
+  contextKey?: string;
+  contextLabel?: string;
   currentMaterialId?: string | null;
   fileId?: number | string;
   frameComments?: SubmissionFrameComment[];
@@ -42,6 +49,13 @@ type FileCommentsPanelProps = {
 };
 
 export function FileCommentsPanel({
+  discussionListComments = [],
+  discussionFilter = 'all',
+  setDiscussionFilter,
+  focusedFrameId = null,
+  isFrameLoading = false,
+  handleFrameClick,
+
   comments = [],
   contextKey,
   contextLabel,
@@ -84,7 +98,9 @@ export function FileCommentsPanel({
     return map;
   }, [frameComments]);
 
-  const displayComments = useMemo(() => {
+  const fallbackComments = useMemo(() => {
+    if (discussionListComments.length > 0) return [];
+    
     const frameCommentIds = new Set(frameComments.map(c => c.id));
     const filteredComments = comments.filter(c => !frameCommentIds.has(c.id));
 
@@ -104,7 +120,11 @@ export function FileCommentsPanel({
       if (!isNaN(idA) && !isNaN(idB)) return idA - idB;
       return String(a.id).localeCompare(String(b.id));
     });
-  }, [comments, frameComments, filterMode]);
+  }, [comments, frameComments, filterMode, discussionListComments.length]);
+
+  const displayComments = discussionListComments.length > 0 
+    ? discussionListComments 
+    : fallbackComments;
 
   const handleComment = async () => {
     if (!content.trim()) return;
@@ -138,6 +158,23 @@ export function FileCommentsPanel({
 
   return (
     <section data-context-key={contextKey}>
+      {setDiscussionFilter && (
+        <div className="mb-4 flex items-center gap-2 rounded-[4px] bg-[#151c25] p-1">
+          {(['all', 'frame', 'general'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setDiscussionFilter(tab)}
+              className={`flex-1 rounded-[3px] py-1.5 text-[10px] font-black capitalize transition-colors ${
+                discussionFilter === tab
+                  ? 'bg-[#303842] text-[#FFD369]'
+                  : 'text-[#8b94a1] hover:text-white'
+              }`}
+            >
+              {tab === 'frame' ? 'Frames' : tab === 'general' ? 'General' : 'All'}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="flex flex-col gap-3 pr-1">
         {displayComments.map((comment) => {
           const isFrameComment = 'frameId' in comment;
@@ -165,8 +202,19 @@ export function FileCommentsPanel({
                         <span className="text-[#ff9ab3]/50">·</span>
                         <button
                           type="button"
-                          onClick={() => onSelectFrame?.(comment as SubmissionFrameComment)}
-                          className="text-[10px] font-black text-[#ff9ab3] hover:underline"
+                          disabled={isFrameLoading}
+                          onClick={() => {
+                            if (handleFrameClick && 'frameId' in comment && 'materialId' in comment && comment.materialId) {
+                              handleFrameClick(String(comment.frameId), String(comment.materialId));
+                            } else {
+                              onSelectFrame?.(comment as SubmissionFrameComment);
+                            }
+                          }}
+                          className={`text-[10px] font-black ${
+                            String(focusedFrameId) === String((comment as any).frameId)
+                              ? 'text-white underline decoration-[#ff9ab3]'
+                              : 'text-[#ff9ab3] hover:underline'
+                          } ${isFrameLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           Frame {displayIndex}
                         </button>

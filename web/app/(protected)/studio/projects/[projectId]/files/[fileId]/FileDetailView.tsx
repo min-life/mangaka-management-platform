@@ -200,6 +200,12 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
               ) : resourceTab === 'discussion' ? (
                 <div className="text-white">
                   <FileCommentsPanel
+                    discussionListComments={controller.discussionListComments}
+                    discussionFilter={controller.discussionFilter}
+                    setDiscussionFilter={controller.setDiscussionFilter}
+                    focusedFrameId={controller.focusedFrameId}
+                    isFrameLoading={controller.isFrameLoading}
+                    handleFrameClick={controller.handleFrameClick}
                     comments={discussionContextKey === 'file' ? fileComments : taskComments}
                     fileId={file.id}
                     taskId={focusedTask?.id ? Number(focusedTask.id) : null}

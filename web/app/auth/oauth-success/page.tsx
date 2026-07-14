@@ -8,13 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { setAccessToken } from '@/lib/auth-storage';
 import { toast } from '@/lib/toast';
 
-function LoadingState() {
-  return (
-    <main className="flex min-h-screen items-center justify-center bg-[#131313] text-[#e2e2e2]">
-      <Loader2 className="size-6 animate-spin text-[#c6c6c6]" />
-    </main>
-  );
-}
+import { LoadingScreen } from '@/components/auth/LoadingScreen';
 
 function OAuthSuccessContent() {
   const router = useRouter();
@@ -70,12 +64,12 @@ function OAuthSuccessContent() {
     }
   }, [isProcessing, status, user, router, searchParams]);
 
-  return <LoadingState />;
+  return <LoadingScreen />;
 }
 
 export default function OAuthSuccessPage() {
   return (
-    <Suspense fallback={<LoadingState />}>
+    <Suspense fallback={<LoadingScreen />}>
       <OAuthSuccessContent />
     </Suspense>
   );

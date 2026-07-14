@@ -48,10 +48,10 @@ export function useFileDetailCommentActions({
       if (material) {
         const frame = await createMaterialFrame(material.id, {
           name: selectedTaskId ? `Task #${selectedTaskId}` : 'Review frame',
-          startX: comment.region.startX,
-          startY: comment.region.startY,
-          endX: comment.region.endX,
-          endY: comment.region.endY,
+          startX: comment.region?.startX ?? 0,
+          startY: comment.region?.startY ?? 0,
+          endX: comment.region?.endX ?? 0,
+          endY: comment.region?.endY ?? 0,
         });
         await createFrameComment(frame.id, {
           text: comment.content,

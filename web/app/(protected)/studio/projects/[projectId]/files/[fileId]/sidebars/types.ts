@@ -30,8 +30,8 @@ export type FileTaskSidebarProps = {
   onRefresh?: () => void | Promise<void>;
   discussionContextKey: string;
   setDiscussionContext: (key: string) => void;
-  commentFilterMode: string;
-  setCommentFilterMode: (mode: string) => void;
+  commentFilterMode: 'all' | 'frame' | 'general';
+  setCommentFilterMode: (mode: 'all' | 'frame' | 'general') => void;
   discussionFrameComments: any[];
 };
 

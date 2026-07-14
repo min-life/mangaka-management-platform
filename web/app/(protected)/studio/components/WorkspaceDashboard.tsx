@@ -188,7 +188,7 @@ export function WorkspaceDashboard() {
   const [applicationsTotal, setApplicationsTotal] = useState(0);
   const [applicationsTotalPages, setApplicationsTotalPages] = useState(1);
 
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  // Removed hasLoadedOnce
   const [projectsFilter, setProjectsFilter] = useState<'all' | 'me'>('all');
   const [boardsFilter, setBoardsFilter] = useState<'all' | 'me'>('all');
 
@@ -317,25 +317,7 @@ export function WorkspaceDashboard() {
     }
   }, [applicationsResource.data]);
 
-
-
-  useEffect(() => {
-    if (
-      !projectsResource.isInitialLoading &&
-      !boardsResource.isInitialLoading &&
-      !tasksResource.isInitialLoading &&
-      !applicationsResource.isInitialLoading
-    ) {
-      queueMicrotask(() => {
-        setHasLoadedOnce(true);
-      });
-    }
-  }, [
-    projectsResource.isInitialLoading,
-    boardsResource.isInitialLoading,
-    tasksResource.isInitialLoading,
-    applicationsResource.isInitialLoading,
-  ]);
+  // Remove hasLoadedOnce effect
 
   const handleProjectsSort = (field: 'name' | 'updatedAt' | 'createdAt') => {
     if (projectsSortField === field) {
@@ -835,8 +817,14 @@ export function WorkspaceDashboard() {
             {boardError}
           </p>
         ) : null}
-        {!hasLoadedOnce ? (
-          <LoadingState message="Syncing studio workspace..." minHeight="350px" />
+        {activeTab === 'projects' && projectsResource.isInitialLoading ? (
+          <LoadingState message="Syncing projects..." minHeight="350px" />
+        ) : activeTab === 'editorBoards' && boardsResource.isInitialLoading ? (
+          <LoadingState message="Syncing editor boards..." minHeight="350px" />
+        ) : activeTab === 'myTasks' && tasksResource.isInitialLoading ? (
+          <LoadingState message="Syncing tasks..." minHeight="350px" />
+        ) : activeTab === 'applications' && applicationsResource.isInitialLoading ? (
+          <LoadingState message="Syncing applications..." minHeight="350px" />
         ) : (
           <div
             className={`transition-opacity duration-200 ${

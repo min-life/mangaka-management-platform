@@ -45,7 +45,7 @@ type FocusedTaskWorkspaceProps = {
   members?: Array<{ id: number; name: string }>;
   onRefresh?: () => void | Promise<void>;
   commentFilterMode?: string;
-  setCommentFilterMode?: (mode: string) => void;
+  setCommentFilterMode?: (mode: 'all' | 'frame' | 'general') => void;
   discussionFrameComments?: any[];
 };
 
@@ -191,7 +191,7 @@ export function FocusedTaskWorkspace({
           <span className="text-[10px] font-black uppercase text-[#dce7f3] mb-1.5 block">Discussion Filter</span>
           <select
             value={commentFilterMode}
-            onChange={(e) => setCommentFilterMode(e.target.value)}
+            onChange={(e) => setCommentFilterMode?.(e.target.value as 'all' | 'frame' | 'general')}
             className="w-full rounded-[4px] bg-[#151c25] p-2 text-xs font-bold text-[#8b94a1] border border-[#26303b] outline-none hover:border-[#39424f] focus:border-[#FFD369] focus:text-white"
           >
             <option value="all">All Comments</option>

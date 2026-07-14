@@ -64,7 +64,7 @@ export type SubmissionFrameComment = {
   materialId?: string;
   materialVersion?: string;
   materialName?: string;
-  region: FileTaskRegion;
+  region?: FileTaskRegion;
   taskId?: string;
   time: string;
 };
