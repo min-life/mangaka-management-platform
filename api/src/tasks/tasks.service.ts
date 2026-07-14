@@ -81,6 +81,7 @@ export class TasksService {
   @UseCache((args) => `task:${args[0]}`)
   async getTaskById(id: number) {
     try {
+      const { file: _file, task: _task, ...MATERIAL_BASIC_SELECT } = MATERIAL_LIST_SELECT;
       const task = await this.prisma.task.findUnique({
         where: { id },
         select: {
@@ -88,7 +89,10 @@ export class TasksService {
           fileMaterials: {
             orderBy: { createdAt: 'desc' },
             take: 1,
-            select: MATERIAL_LIST_SELECT,
+            select: {
+              ...MATERIAL_BASIC_SELECT,
+              materials: true,
+            },
           },
         },
       });
