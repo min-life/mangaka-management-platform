@@ -74,6 +74,12 @@ export class ProjectStatResDto {
   @ApiProperty({ example: 2026 })
   year!: number;
 
+  @ApiProperty({ example: 2023, description: 'Earliest year with imported stats for this scope' })
+  minYear!: number;
+
+  @ApiProperty({ example: 2027, description: 'Latest year with imported stats for this scope' })
+  maxYear!: number;
+
   @ApiProperty({ type: ProjectStatSummaryDto })
   summary!: ProjectStatSummaryDto;
 

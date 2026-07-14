@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import {
-  Eye,
   MoreVertical,
   Plus,
   Search,
@@ -693,13 +692,6 @@ export function EditorialMembersManagementPage() {
                             align="end"
                             className="min-w-44 rounded-[5px] border-[#39424f] bg-[#151c25] p-1 text-white"
                           >
-                            <DropdownMenuItem
-                              className="gap-2 rounded-[3px] text-xs font-bold focus:bg-[#303842] focus:text-white"
-                              onClick={() => setSelectedMember(member)}
-                            >
-                              <Eye className="size-4" />
-                              View Details
-                            </DropdownMenuItem>
                             <DropdownMenuItem
                               className="gap-2 rounded-[3px] text-xs font-bold focus:bg-[#303842] focus:text-white"
                               disabled={member.isLead || isSubmitting}

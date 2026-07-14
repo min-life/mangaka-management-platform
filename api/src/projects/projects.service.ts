@@ -1236,14 +1236,18 @@ export class ProjectsService {
         whereClause.folderId = { in: arcChapters.map((c) => c.id) };
       }
 
+      const yearAggregate = await this.prisma.projectStat.aggregate({
+        where: whereClause,
+        _min: { year: true },
+        _max: { year: true },
+      });
+      const currentYear = new Date().getFullYear();
+      const minYear = yearAggregate._min.year ?? currentYear;
+      const maxYear = yearAggregate._max.year ?? currentYear;
+
       // If no year provided, find the max year for the given scope
       if (!targetYear) {
-        const maxYearStat = await this.prisma.projectStat.findFirst({
-          where: whereClause,
-          orderBy: { year: 'desc' },
-          select: { year: true },
-        });
-        targetYear = maxYearStat ? maxYearStat.year : new Date().getFullYear();
+        targetYear = maxYear;
       }
 
       whereClause.year = targetYear;
@@ -1321,6 +1325,8 @@ export class ProjectsService {
 
       return {
         year: targetYear,
+        minYear,
+        maxYear,
         summary,
         months,
       };
