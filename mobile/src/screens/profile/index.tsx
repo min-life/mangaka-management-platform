@@ -8,7 +8,7 @@ import { navigateToNotificationTarget } from '@/src/navigation/notificationTarge
 import { RootStackNavProp } from '@/src/navigation/types';
 import { Colors } from '@/src/constants/colors';
 import BottomNavBar from '@/src/components/shared/BottomNavBar';
-import { linkGoogleAccount, logout } from '@/src/services/authApi';
+import { logout } from '@/src/services/authApi';
 import { disconnectRealtime } from '@/src/services/realtimeClient';
 import { clearAccessToken, getAccessToken } from '@/src/services/tokenStorage';
 import {
@@ -30,7 +30,6 @@ import {
 } from './components';
 
 const ACCOUNT_MENU_ITEMS: AccountMenuItem[] = [
-  { id: 'google', icon: 'link', label: 'Google Account' },
   { id: 'security', icon: 'security', label: 'Security' },
   { id: 'logout', icon: 'logout', label: 'Sign Out', isDestructive: true },
 ];
@@ -65,7 +64,6 @@ export default function ProfileScreen() {
   const [activeForm, setActiveForm] = useState<ActiveProfileForm>(null);
   const [formErrorMessage, setFormErrorMessage] = useState('');
   const [isSubmittingForm, setIsSubmittingForm] = useState(false);
-  const [isLinkingGoogle, setIsLinkingGoogle] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [displayNameForm, setDisplayNameForm] = useState({ displayName: '' });
   const [passwordForm, setPasswordForm] = useState(EMPTY_PASSWORD_FORM);
@@ -184,19 +182,6 @@ export default function ProfileScreen() {
     const primaryRole = user?.roles?.[0];
     return primaryRole?.name || primaryRole?.code || 'Viewer';
   }, [user?.roles]);
-
-  const accountMenuItems = useMemo(
-    () =>
-      ACCOUNT_MENU_ITEMS.map((item) => {
-        if (item.id !== 'google') return item;
-
-        return {
-          ...item,
-          badge: user?.googleLinked ? 'Linked' : isLinkingGoogle ? 'Linking' : 'Not linked',
-        };
-      }),
-    [isLinkingGoogle, user?.googleLinked],
-  );
 
   const openDisplayNameForm = () => {
     setFormErrorMessage('');
@@ -358,37 +343,7 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleLinkGoogleAccount = async () => {
-    if (isLinkingGoogle) return;
-
-    if (user?.googleLinked) {
-      Alert.alert('Google Account', 'Your Google account is already linked.');
-      return;
-    }
-
-    setIsLinkingGoogle(true);
-
-    try {
-      await linkGoogleAccount();
-      const nextUser = await fetchMe();
-      setUser(nextUser);
-      Alert.alert('Linked', 'Google account has been linked.');
-      void loadActivityLogs();
-    } catch (error) {
-      Alert.alert(
-        'Unable to link Google account',
-        error instanceof Error ? error.message : 'Please try again.',
-      );
-    } finally {
-      setIsLinkingGoogle(false);
-    }
-  };
-
   const handleMenuPress = (id: string) => {
-    if (id === 'google') {
-      void handleLinkGoogleAccount();
-      return;
-    }
     if (id === 'security') return openSecurityForm();
     if (id === 'logout' && !isSigningOut)
       return Alert.alert('Sign Out', 'Are you sure?', [
@@ -424,7 +379,7 @@ export default function ProfileScreen() {
 
         <ProfileMenuSection
           title="Account"
-          items={accountMenuItems}
+          items={ACCOUNT_MENU_ITEMS}
           onItemPress={handleMenuPress}
         />
 

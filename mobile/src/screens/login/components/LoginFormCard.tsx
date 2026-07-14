@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
@@ -12,7 +12,6 @@ interface LoginFormCardProps {
   password: string;
   showPassword: boolean;
   isLoading: boolean;
-  isGoogleLoading: boolean;
   loginSuccess: boolean;
   isFormValid: boolean;
   errorMessage?: string;
@@ -21,7 +20,6 @@ interface LoginFormCardProps {
   onTogglePassword: () => void;
   onLogin: () => void;
   onForgotPassword: () => void;
-  onGoogleLogin: () => void;
 }
 
 export default function LoginFormCard({
@@ -29,7 +27,6 @@ export default function LoginFormCard({
   password,
   showPassword,
   isLoading,
-  isGoogleLoading,
   loginSuccess,
   isFormValid,
   errorMessage,
@@ -38,10 +35,9 @@ export default function LoginFormCard({
   onTogglePassword,
   onLogin,
   onForgotPassword,
-  onGoogleLogin,
 }: LoginFormCardProps) {
   const [rememberMe, setRememberMe] = React.useState(false);
-  const isBusy = isLoading || isGoogleLoading;
+  const isBusy = isLoading;
 
   return (
     <View className="w-full">
@@ -125,50 +121,11 @@ export default function LoginFormCard({
       ) : null}
 
       <LoginSubmitButton
-        isFormValid={isFormValid && !isGoogleLoading}
+        isFormValid={isFormValid}
         isLoading={isLoading}
         loginSuccess={loginSuccess}
         onPress={onLogin}
       />
-
-      <View className="my-4 flex-row items-center gap-2">
-        <View className="h-px flex-1" style={{ backgroundColor: Colors.borderFaint }} />
-        <Text className="text-[11px] font-semibold uppercase" style={{ color: Colors.textMuted }}>
-          or
-        </Text>
-        <View className="h-px flex-1" style={{ backgroundColor: Colors.borderFaint }} />
-      </View>
-
-      <TouchableOpacity
-        activeOpacity={isBusy ? 1 : 0.85}
-        accessibilityRole="button"
-        accessibilityState={{ busy: isGoogleLoading, disabled: isBusy }}
-        className="h-12 flex-row items-center justify-center gap-2 rounded-xl"
-        disabled={isBusy}
-        onPress={onGoogleLogin}
-        style={{
-          backgroundColor: 'rgba(34,40,49,0.58)',
-          borderColor: Colors.borderFaint,
-          borderWidth: 1,
-          opacity: isBusy && !isGoogleLoading ? 0.72 : 1,
-        }}
-      >
-        {isGoogleLoading ? (
-          <ActivityIndicator color={Colors.text} size="small" />
-        ) : (
-          <View
-            className="h-5 w-5 items-center justify-center rounded-full"
-            style={{ backgroundColor: Colors.surfaceContainer }}
-          >
-            <Text className="text-[12px] font-bold" style={{ color: Colors.text }}>
-              G
-            </Text>
-          </View>
-        )}
-        <Text className="text-[13px] font-semibold" style={{ color: Colors.text }}>
-          {isGoogleLoading ? 'Signing in with Google...' : 'Continue with Google'}
-        </Text>
-      </TouchableOpacity>
 
       <Text className="mt-8 text-center text-[13px] leading-5" style={{ color: Colors.textMuted }}>
         By signing in you accept our{' '}
