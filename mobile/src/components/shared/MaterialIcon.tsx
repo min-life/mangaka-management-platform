@@ -43,6 +43,7 @@ const ICON_MAP: Record<string, MaterialIconName> = {
   code: 'code',
   file: 'insert-drive-file',
   article: 'article',
+  inventory_2: 'inventory-2',
   image: 'image',
   close: 'close',
   check: 'check',
@@ -62,9 +63,11 @@ const ICON_MAP: Record<string, MaterialIconName> = {
   expand_more: 'expand-more',
   expand_less: 'expand-less',
   frame_person: 'crop-free',
+  how_to_vote: 'how-to-vote',
 
   // ── Common ────────────────────────────────────────────────
   person: 'person-outline',
+  manage_accounts: 'manage-accounts',
   settings: 'settings',
   notifications: 'notifications',
   chevron_right: 'chevron-right',

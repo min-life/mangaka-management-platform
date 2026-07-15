@@ -27,10 +27,10 @@ import {
 
 import { C } from '@/src/screens/taskDetail/components';
 
-export type ResourceFileTab = 'Overview' | 'Tasks' | 'Discussion' | 'Materials';
+export type ResourceFileTab = 'Overview' | 'Tasks' | 'Discussion' | 'Versions' | 'Materials';
 export type DiscussionScope = 'file' | 'task' | 'frame';
 
-const FILE_TABS: ResourceFileTab[] = ['Overview', 'Tasks', 'Discussion', 'Materials'];
+const FILE_TABS: ResourceFileTab[] = ['Overview', 'Tasks', 'Discussion', 'Versions'];
 const INITIAL_COMMENT_COUNT = 5;
 const COMMENT_BATCH_COUNT = 5;
 
@@ -1434,217 +1434,104 @@ function MaterialVersionRow({
   );
 }
 
-const MATERIAL_TASK_FILTER_ALL = '__ALL_TASKS__';
-const MATERIAL_TASK_FILTER_UNASSIGNED = '__NO_TASK__';
-
-interface MaterialTaskFilterOption {
-  count: number;
-  label: string;
-  value: string;
-}
-
-function MaterialTaskFilterButton({
-  isOpen,
-  onChange,
-  onOpenChange,
-  options,
-  value,
-}: {
-  isOpen: boolean;
-  onChange: (value: string) => void;
-  onOpenChange: (isOpen: boolean) => void;
-  options: MaterialTaskFilterOption[];
-  value: string;
-}) {
-  const selectedOption = options.find((option) => option.value === value) ?? options[0];
-
-  return (
-    <View style={{ position: 'relative', zIndex: isOpen ? 40 : 1 }}>
-      <TouchableOpacity
-        activeOpacity={0.78}
-        accessibilityRole="button"
-        accessibilityState={{ expanded: isOpen }}
-        className="h-11 flex-row items-center rounded-xl px-3"
-        onPress={() => onOpenChange(!isOpen)}
-        style={{
-          backgroundColor:
-            value === MATERIAL_TASK_FILTER_ALL ? C.surface : 'rgba(255,211,105,0.14)',
-          borderColor: value === MATERIAL_TASK_FILTER_ALL ? C.borderFaint : 'rgba(255,211,105,0.36)',
-          borderWidth: 1,
-        }}
-      >
-        <MaterialIcon
-          name="filter_list"
-          color={value === MATERIAL_TASK_FILTER_ALL ? C.textMuted : C.accent}
-          size={18}
-        />
-        <Text
-          className="ml-2 flex-1 text-[13px] font-bold"
-          numberOfLines={1}
-          style={{ color: value === MATERIAL_TASK_FILTER_ALL ? C.text : C.accent }}
-        >
-          {selectedOption?.label ?? 'All tasks'}
-        </Text>
-        <View
-          className="ml-2 rounded-full px-2 py-0.5"
-          style={{ backgroundColor: Colors.iconBg }}
-        >
-          <Text className="text-[11px] font-bold" style={{ color: C.textMuted }}>
-            {selectedOption?.count ?? 0}
-          </Text>
-        </View>
-        <MaterialIcon
-          name={isOpen ? 'expand_less' : 'expand_more'}
-          color={C.textMuted}
-          size={20}
-        />
-      </TouchableOpacity>
-
-      {isOpen ? (
-        <View
-          className="absolute left-0 right-0 rounded-xl p-2"
-          style={{
-            backgroundColor: C.surface,
-            borderColor: C.border,
-            borderWidth: 1,
-            top: 50,
-            zIndex: 50,
-          }}
-        >
-          <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} style={{ maxHeight: 220 }}>
-            {options.map((option) => {
-              const isSelected = option.value === value;
-
-              return (
-                <TouchableOpacity
-                  key={option.value}
-                  activeOpacity={0.78}
-                  className="flex-row items-center rounded-lg px-3 py-2.5"
-                  onPress={() => {
-                    onChange(option.value);
-                    onOpenChange(false);
-                  }}
-                  style={{
-                    backgroundColor: isSelected ? 'rgba(255,211,105,0.12)' : 'transparent',
-                  }}
-                >
-                  <Text
-                    className="min-w-0 flex-1 text-[13px] font-semibold"
-                    numberOfLines={1}
-                    style={{ color: isSelected ? C.accent : C.text }}
-                  >
-                    {option.label}
-                  </Text>
-                  <Text className="ml-3 text-[12px] font-bold" style={{ color: C.textMuted }}>
-                    {option.count}
-                  </Text>
-                  {isSelected ? (
-                    <View className="ml-2">
-                      <MaterialIcon name="check" color={C.accent} size={16} />
-                    </View>
-                  ) : null}
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
-export function MaterialsPanel({
+export function VersionsPanel({
+  errorMessage,
+  focusedTask,
+  isLoading,
   selectedVersionId,
-  tasks,
   versions,
+  onClearFocusedTask,
+  onRetry,
   onSelectVersion,
 }: {
+  errorMessage?: string;
+  focusedTask?: ResourceFileTask | null;
+  isLoading: boolean;
   selectedVersionId: string | null;
-  tasks: ResourceFileTask[];
   versions: ResourceFileMaterialVersion[];
+  onClearFocusedTask?: () => void;
+  onRetry: () => void;
   onSelectVersion: (version: ResourceFileMaterialVersion) => void;
 }) {
-  const [taskFilter, setTaskFilter] = useState(MATERIAL_TASK_FILTER_ALL);
-  const [isTaskFilterOpen, setIsTaskFilterOpen] = useState(false);
-
-  const taskFilterOptions = useMemo<MaterialTaskFilterOption[]>(() => {
-    const countsByTaskId = versions.reduce<Record<string, number>>((acc, version) => {
-      const key = version.taskId ?? MATERIAL_TASK_FILTER_UNASSIGNED;
-      acc[key] = (acc[key] ?? 0) + 1;
-      return acc;
-    }, {});
-    const knownTaskIds = new Set(tasks.map((task) => task.id));
-    const options: MaterialTaskFilterOption[] = [
-      { count: versions.length, label: 'All tasks', value: MATERIAL_TASK_FILTER_ALL },
-      ...tasks.map((task) => ({
-        count: countsByTaskId[task.id] ?? 0,
-        label: task.title,
-        value: task.id,
-      })),
-    ];
-
-    versions.forEach((version) => {
-      if (!version.taskId || knownTaskIds.has(version.taskId)) {
-        return;
-      }
-
-      knownTaskIds.add(version.taskId);
-      options.push({
-        count: countsByTaskId[version.taskId] ?? 0,
-        label: version.taskTitle ?? `Task ${version.taskId}`,
-        value: version.taskId,
-      });
-    });
-
-    if (countsByTaskId[MATERIAL_TASK_FILTER_UNASSIGNED]) {
-      options.push({
-        count: countsByTaskId[MATERIAL_TASK_FILTER_UNASSIGNED],
-        label: 'No task',
-        value: MATERIAL_TASK_FILTER_UNASSIGNED,
-      });
-    }
-
-    return options;
-  }, [tasks, versions]);
-
-  const filteredVersions = useMemo(() => {
-    if (taskFilter === MATERIAL_TASK_FILTER_ALL) {
-      return versions;
-    }
-
-    if (taskFilter === MATERIAL_TASK_FILTER_UNASSIGNED) {
-      return versions.filter((version) => !version.taskId);
-    }
-
-    return versions.filter((version) => version.taskId === taskFilter);
-  }, [taskFilter, versions]);
-
   return (
-    <View className="mt-6 gap-4" style={{ zIndex: isTaskFilterOpen ? 30 : 1 }}>
-      <MaterialTaskFilterButton
-        isOpen={isTaskFilterOpen}
-        onChange={setTaskFilter}
-        onOpenChange={setIsTaskFilterOpen}
-        options={taskFilterOptions}
-        value={taskFilter}
-      />
+    <View className="mt-6 gap-4">
+      <View className="flex-row items-center justify-between">
+        <View className="min-w-0 flex-1">
+          <Text
+            className="text-[11px] font-bold uppercase"
+            style={{ color: C.textMuted, letterSpacing: 1.1 }}
+          >
+            Versions
+          </Text>
+          {focusedTask ? (
+            <Text className="mt-1 text-[12px] font-semibold" numberOfLines={1} style={{ color: C.textMuted }}>
+              Task: {focusedTask.title}
+            </Text>
+          ) : null}
+        </View>
+        <View className="flex-row items-center gap-2">
+          <Text className="text-[12px] font-semibold" style={{ color: C.textMuted }}>
+            {versions.length} shown
+          </Text>
+          {focusedTask && onClearFocusedTask ? (
+            <TouchableOpacity
+              activeOpacity={0.78}
+              className="h-8 w-8 items-center justify-center rounded-full"
+              onPress={onClearFocusedTask}
+              style={{ backgroundColor: Colors.iconBg }}
+            >
+              <MaterialIcon name="close" color={C.textMuted} size={16} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </View>
 
-      <View className="gap-3">
-        {versions.length === 0 ? (
-          <EmptyState title="No material versions" />
-        ) : filteredVersions.length === 0 ? (
-          <EmptyState title="No materials for this task" />
-        ) : (
-          filteredVersions.map((version) => (
+      {isLoading ? (
+        <View
+          className="items-center rounded-xl px-5 py-8"
+          style={{ backgroundColor: C.surface, borderWidth: 1, borderColor: C.border }}
+        >
+          <ActivityIndicator color={C.accent} />
+          <Text className="mt-3 text-[14px] font-semibold" style={{ color: C.textMuted }}>
+            Loading versions...
+          </Text>
+        </View>
+      ) : errorMessage ? (
+        <View
+          className="items-center rounded-xl px-5 py-8"
+          style={{ backgroundColor: C.surface, borderWidth: 1, borderColor: C.border }}
+        >
+          <Text className="text-[14px] font-semibold" style={{ color: C.text }}>
+            Unable to load versions
+          </Text>
+          <Text className="mt-2 text-center text-[12px]" style={{ color: C.textMuted }}>
+            {errorMessage}
+          </Text>
+          <TouchableOpacity
+            activeOpacity={0.78}
+            className="mt-4 rounded-full px-4 py-2"
+            onPress={onRetry}
+            style={{ backgroundColor: Colors.iconBg }}
+          >
+            <Text className="text-[12px] font-bold" style={{ color: C.text }}>
+              Try again
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : versions.length === 0 ? (
+        <EmptyState title={focusedTask ? 'No versions for this task' : 'No versions uploaded yet'} />
+      ) : (
+        <View className="gap-3">
+          {versions.map((version) => (
             <MaterialVersionRow
               key={version.id}
               isSelected={version.id === selectedVersionId}
               version={version}
               onPress={() => onSelectVersion(version)}
             />
-          ))
-        )}
-      </View>
+          ))}
+        </View>
+      )}
     </View>
   );
 }

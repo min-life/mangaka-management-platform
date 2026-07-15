@@ -21,7 +21,7 @@ export interface NotificationItem {
     folderId?: string;
     frameId?: string;
     initialDiscussionScope?: 'file' | 'task' | 'frame';
-    initialTab?: 'Overview' | 'Tasks' | 'Discussion' | 'Materials';
+    initialTab?: 'Overview' | 'Tasks' | 'Discussion' | 'Versions' | 'Materials';
     parentFolderId?: string;
     projectId?: string;
     taskId?: string;

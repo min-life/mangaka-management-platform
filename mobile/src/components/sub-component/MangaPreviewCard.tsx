@@ -1,5 +1,13 @@
-import React, { useRef } from 'react';
-import { View, Text, Image, Animated } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  Image,
+  Animated,
+  ImageLoadEventData,
+  LayoutChangeEvent,
+  NativeSyntheticEvent,
+} from 'react-native';
 import { Colors } from '@/src/constants/colors';
 import { FrameAnnotation } from '@/src/types/taskDetail';
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
@@ -9,6 +17,113 @@ interface MangaPreviewCardProps {
   status: string;
   selectedFrame?: FrameAnnotation | null;
   showStatusBadge?: boolean;
+}
+
+const WEB_CANVAS_ASPECT_RATIO = 16 / 10;
+
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+const clampPercent = (value: number) => Math.min(100, Math.max(0, value));
+
+function normalizeRegion(frame: FrameAnnotation) {
+  const startX = Number.isFinite(frame.startX) ? Number(frame.startX) : frame.x;
+  const startY = Number.isFinite(frame.startY) ? Number(frame.startY) : frame.y;
+  const endX = Number.isFinite(frame.endX) ? Number(frame.endX) : frame.x + frame.width;
+  const endY = Number.isFinite(frame.endY) ? Number(frame.endY) : frame.y + frame.height;
+  const rawValues = [startX, startY, endX, endY];
+  const valuesAreFinite = rawValues.every(Number.isFinite);
+
+  if (!valuesAreFinite || endX <= startX || endY <= startY) {
+    return null;
+  }
+
+  const maxAbs = Math.max(...rawValues.map((value) => Math.abs(value)));
+  const scale = maxAbs <= 1.5 ? 1 : 1 / 100;
+  const left = clamp01(startX * scale);
+  const top = clamp01(startY * scale);
+  const right = clamp01(endX * scale);
+  const bottom = clamp01(endY * scale);
+
+  if (right <= left || bottom <= top) {
+    return null;
+  }
+
+  return {
+    bottom,
+    left,
+    right,
+    top,
+  };
+}
+
+function containedImageRect(
+  canvas: { height: number; width: number },
+  image: { height: number; width: number } | null,
+) {
+  if (!image || image.width <= 0 || image.height <= 0 || canvas.width <= 0 || canvas.height <= 0) {
+    return { height: canvas.height, left: 0, top: 0, width: canvas.width };
+  }
+
+  const scale = Math.min(canvas.width / image.width, canvas.height / image.height);
+  const width = image.width * scale;
+  const height = image.height * scale;
+
+  return {
+    height,
+    left: (canvas.width - width) / 2,
+    top: (canvas.height - height) / 2,
+    width,
+  };
+}
+
+function webCanvasRegionToImageRegion(
+  region: NonNullable<ReturnType<typeof normalizeRegion>>,
+  image: { height: number; width: number },
+) {
+  const canonicalCanvas = { height: 1, width: WEB_CANVAS_ASPECT_RATIO };
+  const canonicalImageRect = containedImageRect(canonicalCanvas, image);
+
+  const toImageX = (x: number) =>
+    clamp01((x * canonicalCanvas.width - canonicalImageRect.left) / canonicalImageRect.width);
+  const toImageY = (y: number) =>
+    clamp01((y * canonicalCanvas.height - canonicalImageRect.top) / canonicalImageRect.height);
+
+  return {
+    bottom: toImageY(region.bottom),
+    left: toImageX(region.left),
+    right: toImageX(region.right),
+    top: toImageY(region.top),
+  };
+}
+
+function frameRenderBox(
+  frame: FrameAnnotation,
+  canvas: { height: number; width: number },
+  image: { height: number; width: number } | null,
+) {
+  const region = normalizeRegion(frame);
+
+  if (!region) return null;
+
+  const imageRegion = image ? webCanvasRegionToImageRegion(region, image) : region;
+  const imageRect = containedImageRect(canvas, image);
+
+  const left = clampPercent(((imageRect.left + imageRegion.left * imageRect.width) / canvas.width) * 100);
+  const top = clampPercent(((imageRect.top + imageRegion.top * imageRect.height) / canvas.height) * 100);
+  const right = clampPercent(((imageRect.left + imageRegion.right * imageRect.width) / canvas.width) * 100);
+  const bottom = clampPercent(((imageRect.top + imageRegion.bottom * imageRect.height) / canvas.height) * 100);
+  const width = right - left;
+  const height = bottom - top;
+
+  if (width <= 0 || height <= 0) {
+    return null;
+  }
+
+  return {
+    height: Math.max(height, 1.5),
+    left,
+    top,
+    width: Math.max(width, 1.5),
+  };
 }
 
 /**
@@ -25,6 +140,27 @@ export default function MangaPreviewCard({
   const pulse = useRef(new Animated.Value(1)).current;
   const frameOpacity = useRef(new Animated.Value(0)).current;
   const frameScale = useRef(new Animated.Value(1.08)).current;
+  const [canvasSize, setCanvasSize] = useState({ height: 0, width: 0 });
+  const [imageSize, setImageSize] = useState<{ height: number; width: number } | null>(null);
+  const selectedFrameBox = useMemo(
+    () => (selectedFrame && canvasSize.width > 0 && canvasSize.height > 0
+      ? frameRenderBox(selectedFrame, canvasSize, imageSize)
+      : null),
+    [canvasSize, imageSize, selectedFrame],
+  );
+
+  const handleLayout = (event: LayoutChangeEvent) => {
+    const { height, width } = event.nativeEvent.layout;
+    setCanvasSize({ height, width });
+  };
+
+  const handleImageLoad = (event: NativeSyntheticEvent<ImageLoadEventData>) => {
+    const { height, width } = event.nativeEvent.source;
+
+    if (width > 0 && height > 0) {
+      setImageSize({ height, width });
+    }
+  };
 
   // Pulse cho status badge
   React.useEffect(() => {
@@ -64,11 +200,13 @@ export default function MangaPreviewCard({
         borderColor: Colors.borderFaint,
         aspectRatio: 3 / 4,
       }}
+      onLayout={handleLayout}
     >
       {imageUri ? (
         <Image
           source={{ uri: imageUri }}
           className="w-full h-full"
+          onLoad={handleImageLoad}
           resizeMode="contain"
           style={{ opacity: 0.9 }}
         />
@@ -82,14 +220,15 @@ export default function MangaPreviewCard({
       )}
 
       {/* ── Bounding box đỏ cho frame được chọn ───────────────── */}
-      {selectedFrame && (
+      {selectedFrame && selectedFrameBox && (
         <Animated.View
+          pointerEvents="none"
           style={{
             position: 'absolute',
-            left: `${selectedFrame.x}%`,
-            top: `${selectedFrame.y}%`,
-            width: `${selectedFrame.width}%`,
-            height: `${selectedFrame.height}%`,
+            left: `${selectedFrameBox.left}%`,
+            top: `${selectedFrameBox.top}%`,
+            width: `${selectedFrameBox.width}%`,
+            height: `${selectedFrameBox.height}%`,
             opacity: frameOpacity,
             transform: [{ scale: frameScale }],
           }}

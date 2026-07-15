@@ -45,6 +45,10 @@ function emptyListResponse<T>(): ApiListResponse<T> {
   return { data: [], pagination: undefined };
 }
 
+function isFileName(value?: string | null) {
+  return Boolean(value && /\.[a-zA-Z0-9]+$/.test(value));
+}
+
 async function fetchAllList<T>(path: string, params: ListParams = {}) {
   const firstResponse = await apiRequest<ApiListResponse<T>>(path, {
     params: { ...params, limit: params.limit ?? 100, page: 1 },
@@ -164,8 +168,8 @@ export async function fetchFolderBundle(folderId: string) {
 export async function fetchResourceFileBundle(fileId: string) {
   const [fileResponse, versionsResponse, tasksResponse, commentsResponse] = await Promise.all([
     apiRequest<ApiDataResponse<ApiFile>>(`/files/${fileId}`),
-    apiRequest<ApiListResponse<ApiMaterial>>(`/files/${fileId}/versions`, {
-      params: { limit: 50, page: 1 },
+    apiRequest<ApiListResponse<ApiMaterial>>(`/files/${fileId}/materials`, {
+      params: { limit: 100, page: 1 },
     }).catch(() => ({ data: [] })),
     apiRequest<ApiListResponse<ApiTask>>(`/files/${fileId}/tasks`, {
       params: { limit: 50, page: 1 },
@@ -277,6 +281,25 @@ export async function fetchMaterialVersion(materialId: string) {
   return mapMaterialVersion(response.data);
 }
 
+export async function fetchTaskMaterials(taskId: string) {
+  const response = await fetchAllList<ApiMaterial>(`/tasks/${taskId}/materials`, {
+    limit: 100,
+  });
+  const sortedMaterials = [...(response.data ?? [])].sort(
+    (a, b) => (new Date(a.createdAt).getTime() || 0) - (new Date(b.createdAt).getTime() || 0),
+  );
+
+  return uniqueById(
+    sortedMaterials
+      .map((material, index) => {
+        const versionTitle =
+          material.name && !isFileName(material.name) ? material.name : `Material v${index + 1}`;
+        return mapMaterialVersion(material, { title: versionTitle });
+      })
+      .reverse(),
+  );
+}
+
 export async function createDiscussionComment(params: {
   frameId?: string | null;
   taskId: string;
@@ -314,7 +337,9 @@ export async function fetchProjectMaterials(projectId: string): Promise<ProjectM
           `/files/${item.id}/versions`,
           { params: { limit: 20, page: 1 } },
         ).catch(() => ({ data: [] }));
-        const versions = uniqueById((versionsResponse.data ?? []).map(mapMaterialVersion));
+        const versions = uniqueById(
+          (versionsResponse.data ?? []).map((material) => mapMaterialVersion(material)),
+        );
         const latestVersion = versions[0];
         if (latestVersion) {
           const file = {

@@ -31,7 +31,6 @@ import { subscribeToComments } from '@/src/services/realtimeClient';
 
 import { C, TaskDetailTopBar, TaskPreviewSection } from '@/src/screens/taskDetail/components';
 import {
-  MaterialsPanel,
   OverviewPanel,
   DiscussionComposer,
   DiscussionPanel,
@@ -39,9 +38,15 @@ import {
   ResourceFileTab,
   ResourceFileTabBar,
   TasksPanel,
+  VersionsPanel,
 } from './components/ResourceFilePanels';
+import { useTaskMaterialVersions } from './useTaskMaterialVersions';
 
 type ResourceFileScreenProps = NativeStackScreenProps<RootStackParamList, 'ResourceFile'>;
+
+function normalizeResourceFileTab(tab?: ResourceFileTab): ResourceFileTab {
+  return tab === 'Materials' ? 'Versions' : (tab ?? 'Overview');
+}
 
 function buildFileDescription(content: string, language: string) {
   const meaningfulLines = content
@@ -61,7 +66,7 @@ function buildFileDescription(content: string, language: string) {
 
 export default function ResourceFileScreen({ navigation, route }: ResourceFileScreenProps) {
   const [activeTab, setActiveTab] = useState<ResourceFileTab>(
-    route.params.initialTab ?? 'Overview',
+    normalizeResourceFileTab(route.params.initialTab),
   );
   const [file, setFile] = useState<ResourceFileNode | null>(null);
   const [parentName, setParentName] = useState('Resource');
@@ -86,11 +91,29 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
   const [discussionFrameStatusMessage, setDiscussionFrameStatusMessage] = useState('');
   const [selectedDiscussionFrameId, setSelectedDiscussionFrameId] = useState<string | null>(null);
   const scrollViewRef = useRef<ScrollView | null>(null);
+  const versionsRef = useRef<ResourceFileMaterialVersion[]>([]);
   const initialDiscussionAppliedRef = useRef(false);
   const didScrollToInitialCommentRef = useRef(false);
   const didScrollToLatestDiscussionRef = useRef(false);
   const initialCommentLayoutYRef = useRef<number | null>(null);
   const initialCommentId = route.params.initialCommentId;
+  const versions = file?.materialVersions ?? [];
+  const tasks = file?.tasks ?? [];
+  const {
+    errorMessage: materialVersionsErrorMessage,
+    isLoading: isTaskMaterialsLoading,
+    loadTaskMaterials,
+    previewVersions,
+    resetTaskMaterials,
+    versionsByTaskId: materialVersionsByTaskId,
+  } = useTaskMaterialVersions(versions);
+  const focusedTask = selectedTaskId
+    ? (tasks.find((task) => task.id === selectedTaskId) ?? null)
+    : null;
+  const focusedTaskVersions = selectedTaskId
+    ? (materialVersionsByTaskId[selectedTaskId] ?? [])
+    : [];
+  const visibleVersions = selectedTaskId ? focusedTaskVersions : versions;
 
   const loadFile = useCallback(async () => {
     setIsLoading(true);
@@ -104,16 +127,18 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
         : null;
       setFile(nextFile);
       setMaterialDetailsById({});
+      resetTaskMaterials();
       setFileDiscussionCommentCount(nextFile.comments?.length ?? 0);
       setParentName(parentBundle?.folder.name ?? 'Resource');
       const initialTask = route.params.initialTaskId
         ? nextFile.tasks?.find((task) => task.id === route.params.initialTaskId)
         : undefined;
-      const selectedTask = initialTask ?? nextFile.tasks?.[0] ?? null;
+      const selectedTask = route.params.initialTaskId ? (initialTask ?? null) : null;
+      const initialVersionId =
+        route.params.initialMaterialVersionId ??
+        (selectedTask ? null : (nextFile.materialVersions?.[0]?.id ?? null));
 
-      setSelectedVersionId(
-        route.params.initialMaterialVersionId ?? nextFile.materialVersions?.[0]?.id ?? null,
-      );
+      setSelectedVersionId(initialVersionId);
       setSelectedTaskId(selectedTask?.id ?? null);
       setSelectedFrame(route.params.initialTaskId ? (selectedTask?.frames[0] ?? null) : null);
     } catch (error) {
@@ -122,6 +147,7 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
       setIsLoading(false);
     }
   }, [
+    resetTaskMaterials,
     route.params.fileId,
     route.params.initialMaterialVersionId,
     route.params.initialTaskId,
@@ -132,8 +158,9 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
     void loadFile();
   }, [loadFile]);
 
-  const versions = file?.materialVersions ?? [];
-  const tasks = file?.tasks ?? [];
+  useEffect(() => {
+    versionsRef.current = previewVersions;
+  }, [previewVersions]);
 
   const description = useMemo(
     () => (file ? buildFileDescription(file.content, file.language) : ''),
@@ -160,8 +187,11 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
     [discussionFrames],
   );
 
+  const versionTabFallbackVersion =
+    activeTab === 'Versions' ? visibleVersions[0] : previewVersions[0];
   const selectedVersionSummary =
-    versions.find((version) => version.id === selectedVersionId) ?? versions[0];
+    previewVersions.find((version) => version.id === selectedVersionId) ??
+    versionTabFallbackVersion;
   const selectedVersionDetail = selectedVersionSummary
     ? materialDetailsById[selectedVersionSummary.id]
     : undefined;
@@ -179,43 +209,95 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
     fetchMaterialVersion(versionId)
       .then((detail) => {
         if (!isMounted) return;
-        setMaterialDetailsById((prev) => ({ ...prev, [detail.id]: detail }));
+        setMaterialDetailsById((prev) => ({
+          ...prev,
+          [detail.id]: {
+            ...detail,
+            materials: {
+              ...detail.materials,
+              title: selectedVersionSummary.materials.title,
+            },
+          },
+        }));
       })
       .catch(() => undefined);
 
     return () => {
       isMounted = false;
     };
-  }, [selectedVersionDetail?.hasDetail, selectedVersionSummary?.id]);
+  }, [
+    selectedVersionDetail?.hasDetail,
+    selectedVersionSummary?.id,
+    selectedVersionSummary?.materials.title,
+  ]);
+
+  const focusFrameMaterial = useCallback((frame: ResourceTaskFrame) => {
+    if (!frame.materialId) return;
+    const hasMaterial = versionsRef.current.some((version) => version.id === frame.materialId);
+    if (hasMaterial) {
+      setSelectedVersionId(frame.materialId);
+    }
+  }, []);
+
+  const handleSelectMaterialTask = useCallback(
+    async (taskId: string) => {
+      setSelectedTaskId(taskId);
+      setSelectedFrame(null);
+      setSelectedVersionId(null);
+
+      const nextVersions = await loadTaskMaterials(taskId);
+      setSelectedVersionId(nextVersions[0]?.id ?? null);
+    },
+    [loadTaskMaterials],
+  );
+
+  useEffect(() => {
+    if (activeTab !== 'Versions' || !selectedTaskId) return;
+    if (materialVersionsByTaskId[selectedTaskId]) return;
+
+    void handleSelectMaterialTask(selectedTaskId);
+  }, [activeTab, handleSelectMaterialTask, materialVersionsByTaskId, selectedTaskId]);
 
   const handleSelectFrame = (frame: ResourceTaskFrame) => {
-    setSelectedFrame((prev) => (prev?.id === frame.id ? null : frame));
+    setSelectedFrame((prev) => {
+      if (prev?.id === frame.id) return null;
+      focusFrameMaterial(frame);
+      return frame;
+    });
   };
 
   const handleSelectTask = (task: ResourceFileTask | null) => {
     if (task === null) {
       setSelectedTaskId(null);
       setSelectedFrame(null);
+      setSelectedVersionId(versions[0]?.id ?? null);
       return;
     }
     setSelectedTaskId(task.id);
     setSelectedFrame(null);
+    setSelectedVersionId(null);
     setActiveTab('Tasks');
   };
 
   const handleSelectVersion = (version: ResourceFileMaterialVersion) => {
     setSelectedVersionId(version.id);
+    if (version.taskId) {
+      setSelectedTaskId(version.taskId);
+    }
     setSelectedFrame(null);
-    setActiveTab('Materials');
+    setActiveTab('Versions');
   };
 
   const handleOpenCommentMaterial = useCallback(
     async (materialId: string) => {
-      const localVersion = versions.find((version) => version.id === materialId);
+      const localVersion = previewVersions.find((version) => version.id === materialId);
       if (localVersion) {
         setSelectedVersionId(localVersion.id);
+        if (localVersion.taskId) {
+          setSelectedTaskId(localVersion.taskId);
+        }
         setSelectedFrame(null);
-        setActiveTab('Materials');
+        setActiveTab('Versions');
         return;
       }
 
@@ -226,7 +308,7 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
         navigation.navigate('ResourceFile', {
           fileId: material.fileId,
           initialMaterialVersionId: materialId,
-          initialTab: 'Materials',
+          initialTab: 'Versions',
           projectId: route.params.projectId,
         });
       } catch (error) {
@@ -236,7 +318,7 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
         );
       }
     },
-    [navigation, route.params.projectId, versions],
+    [navigation, previewVersions, route.params.projectId],
   );
 
   const addRealtimeDiscussionComment = useCallback(
@@ -343,6 +425,7 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
 
     try {
       const frameDetail = await fetchFrameDetail(frameId);
+      focusFrameMaterial(frameDetail);
       setSelectedFrame(frameDetail);
 
       const nextComments = await fetchFrameDiscussionComments(frameId);
@@ -355,7 +438,7 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
     } finally {
       setIsDiscussionCommentsLoading(false);
     }
-  }, []);
+  }, [focusFrameMaterial]);
 
   useEffect(() => {
     if (activeTab !== 'Discussion') return;
@@ -548,7 +631,7 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
           imageUri={previewImageUri}
           selectedFrame={selectedFrame}
           showStatusBadge={false}
-          status={selectedVersion ? 'Material Preview' : 'File Preview'}
+          status={selectedVersion ? 'Version Preview' : 'File Preview'}
         />
 
         <ResourceFileTabBar activeTab={activeTab} onTabChange={setActiveTab} />
@@ -600,11 +683,25 @@ export default function ResourceFileScreen({ navigation, route }: ResourceFileSc
           />
         )}
 
-        {activeTab === 'Materials' && (
-          <MaterialsPanel
+        {activeTab === 'Versions' && (
+          <VersionsPanel
+            errorMessage={materialVersionsErrorMessage}
+            focusedTask={focusedTask}
+            isLoading={Boolean(selectedTaskId) && isTaskMaterialsLoading}
             selectedVersionId={selectedVersion?.id ?? null}
-            tasks={tasks}
-            versions={versions}
+            versions={visibleVersions}
+            onClearFocusedTask={() => {
+              setSelectedTaskId(null);
+              setSelectedFrame(null);
+              setSelectedVersionId(versions[0]?.id ?? null);
+            }}
+            onRetry={() => {
+              if (selectedTaskId) {
+                void handleSelectMaterialTask(selectedTaskId);
+                return;
+              }
+              void loadFile();
+            }}
             onSelectVersion={handleSelectVersion}
           />
         )}

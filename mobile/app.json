@@ -12,11 +12,17 @@
       "adaptiveIcon": {
         "backgroundColor": "#222831"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.minlife.mangakamobile"
     },
     "web": {},
     "plugins": [
       "expo-web-browser"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "9cdae2de-43cf-43c5-8950-b06e48e6f975"
+      }
+    }
   }
 }
