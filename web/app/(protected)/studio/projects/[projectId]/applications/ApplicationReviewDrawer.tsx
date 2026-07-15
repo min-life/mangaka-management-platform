@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Check, FileUp, X, AlertTriangle, Download, UserCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
@@ -95,7 +95,10 @@ export function ApplicationReviewDrawer({
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
   const { createdComments } = useRealtimeComments('APPLICATION', application?.id);
 
-  const mergeComment = (comment: ApplicationCommentResponse) => {
+  const commentsScrollRef = useRef<HTMLDivElement>(null);
+  const shouldScrollCommentsToBottomRef = useRef(false);
+
+  const mergeComment = useCallback((comment: ApplicationCommentResponse) => {
     setComments((currentComments) => {
       const exists = currentComments.some((currentComment) => currentComment.id === comment.id);
       if (exists) {
@@ -109,7 +112,7 @@ export function ApplicationReviewDrawer({
           new Date(first.createdAt).getTime() - new Date(second.createdAt).getTime(),
       );
     });
-  };
+  }, []);
 
   const handleReply = (displayName: string | null | undefined) => {
     if (displayName) {
@@ -128,6 +131,7 @@ export function ApplicationReviewDrawer({
     try {
       const response = await createApplicationComment(application.id, { text: newComment.trim() });
       if (response) {
+        shouldScrollCommentsToBottomRef.current = true;
         mergeComment(response);
       }
       setNewComment('');
@@ -194,9 +198,31 @@ export function ApplicationReviewDrawer({
   useEffect(() => {
     const newestComment = createdComments.at(-1) as ApplicationCommentResponse | undefined;
     if (newestComment) {
-      mergeComment(newestComment);
+      const scrollElement = commentsScrollRef.current;
+      const isViewingLatest = scrollElement
+        ? scrollElement.scrollHeight - scrollElement.scrollTop - scrollElement.clientHeight < 72
+        : true;
+
+      shouldScrollCommentsToBottomRef.current = isViewingLatest;
+      queueMicrotask(() => mergeComment(newestComment));
     }
-  }, [createdComments]);
+  }, [createdComments, mergeComment]);
+
+  useEffect(() => {
+    if (!shouldScrollCommentsToBottomRef.current || isLoadingComments) {
+      return;
+    }
+
+    const animationFrameId = window.requestAnimationFrame(() => {
+      const scrollElement = commentsScrollRef.current;
+      if (scrollElement) {
+        scrollElement.scrollTop = scrollElement.scrollHeight;
+      }
+      shouldScrollCommentsToBottomRef.current = false;
+    });
+
+    return () => window.cancelAnimationFrame(animationFrameId);
+  }, [comments.length, isLoadingComments]);
 
   const handleOpenRejectDialog = () => {
     setDraftRejectReason(rejectionReason ?? '');
@@ -259,7 +285,16 @@ export function ApplicationReviewDrawer({
                 </div>
               </SheetHeader>
 
-              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 [scrollbar-gutter:stable]">
+              <div 
+                className="min-h-0 flex-1 overflow-y-auto px-5 py-5 [scrollbar-gutter:stable]"
+                ref={commentsScrollRef}
+                onScroll={(e) => {
+                  const target = e.currentTarget;
+                  const isViewingLatest =
+                    target.scrollHeight - target.scrollTop - target.clientHeight < 72;
+                  shouldScrollCommentsToBottomRef.current = isViewingLatest;
+                }}
+              >
                 <div className="grid grid-cols-2 gap-3">
                   <article className="rounded-[4px] border border-[#303842] bg-[#151c25] p-4">
                     <p className="text-[10px] font-black uppercase tracking-[0.08em] text-[#8b94a1]">

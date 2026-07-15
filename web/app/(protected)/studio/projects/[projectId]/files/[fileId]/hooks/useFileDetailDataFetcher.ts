@@ -45,7 +45,9 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
 
   // Track whether deferred sections have been loaded
   const [versionsLoaded, setVersionsLoaded] = useState(false);
+  const [loadedTaskVersionsId, setLoadedTaskVersionsId] = useState<string | null>(null);
   const [commentsLoaded, setCommentsLoaded] = useState(false);
+  const [loadedTaskCommentsId, setLoadedTaskCommentsId] = useState<string | null>(null);
   const [isLoadingVersions, setIsLoadingVersions] = useState(false);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
 
@@ -75,50 +77,48 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
     setError(null);
 
     try {
-      // 1. Fetch Project Data
-      let projData = null;
-      try {
-        projData = await getProjectById(projectId);
-      } catch (err) {
-        console.error('Failed to load project details:', err);
-      }
-      if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
-
-      const folderResult = await getProjectFolders(projectId);
-      const productionFolders = folderResult.folders;
-      if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
-
-      let apiMembers: { id: number; name: string }[] = [];
-      try {
-        const membersRes = await getProjectMembers(projectId);
-        apiMembers = (membersRes.members || []).map((m) => ({
-          id: m.id,
-          name: m.displayName || m.email,
-        }));
-      } catch (err) {
-        console.error('Failed to load project members:', err);
-      }
-      if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
-
       if (isNaN(Number(fileId)) || fileId < 0) {
         throw new Error('File was not found in the current project workspace.');
       }
 
-      // 2. Fetch File Data (has previewUrl for canvas — no need to call materials yet)
-      const response = await getFileById(fileId);
+      const [
+        projData,
+        folderResult,
+        membersRes,
+        response,
+        tasksRes
+      ] = await Promise.all([
+        getProjectById(projectId).catch(err => {
+          console.error('Failed to load project details:', err);
+          return null;
+        }),
+        getProjectFolders(projectId),
+        getProjectMembers(projectId).catch(err => {
+          console.error('Failed to load project members:', err);
+          return { members: [] };
+        }),
+        getFileById(fileId),
+        getFileTasks(fileId).catch(err => {
+          console.error('Failed to load file tasks:', err);
+          return [];
+        })
+      ]);
+
       if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
+
+      const productionFolders = folderResult.folders;
+      const apiMembers = (membersRes?.members || []).map((m: any) => ({
+        id: m.id,
+        name: m.displayName || m.email,
+      }));
 
       const createdByLabel =
         response.createdByUser?.displayName ||
         response.createdByUser?.email ||
         (response.createdBy ? `User #${response.createdBy}` : 'Unknown user');
 
-      // 3. Fetch Tasks only (materials fetched lazily when Versions tab is opened)
       let dbTasks: FileTaskItem[] = [];
       try {
-        const tasksRes = await getFileTasks(fileId);
-        if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
-
         const tasksWithFramesPromises = (tasksRes || []).map(async (t: any) => {
           let region: FileTaskRegion | undefined = undefined;
 
@@ -241,7 +241,17 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
         latestMaterialVersion,
       };
 
-      setData(result);
+      setData((prev) => {
+        if (prev && isRefresh) {
+          return {
+            ...result,
+            versions: prev.versions,
+            comments: prev.comments,
+            frameComments: prev.frameComments,
+          };
+        }
+        return result;
+      });
       setHasLoaded(true);
       // Reset deferred flags on full reload so they can be triggered again
       if (!isRefresh) {
@@ -265,8 +275,9 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
   // ─────────────────────────────────────────────────────────────────────────────
   // DEFERRED: load versions/materials (triggered when Versions tab is opened)
   // ─────────────────────────────────────────────────────────────────────────────
-  const loadVersions = useCallback(async () => {
-    if (versionsLoaded || isLoadingVersions) return;
+  const loadVersions = useCallback(async (force = false) => {
+    if (!force && versionsLoaded && loadedTaskVersionsId === selectedTaskId) return;
+    if (isLoadingVersions) return;
     setIsLoadingVersions(true);
     try {
       let dbVersions: FileVersionItem[] = [];
@@ -287,8 +298,21 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
             ? taskMaterials
             : (taskMaterials?.data ?? (taskMaterials ?? []));
 
+          // Fetch full details for each material to get the 'materials' array (Bypassing Redis cache bug)
+          const fullTaskVersions = await Promise.all(
+            rawList.map(async (material) => {
+              try {
+                const fullDetail = await getMaterialById(String(material.id));
+                return ((fullDetail as any)?.data || fullDetail || material) as FileMaterialVersionRecord;
+              } catch (err) {
+                console.error(`Failed to get full material for id ${material.id}`, err);
+                return material;
+              }
+            })
+          );
+
           const isFileName = (name: string) => /\.[a-zA-Z0-9]+$/.test(name);
-          const sortedMaterials = [...rawList].sort(
+          const sortedMaterials = [...fullTaskVersions].sort(
             (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
           );
           const newestId = sortedMaterials.at(-1)?.id;
@@ -317,6 +341,7 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
 
       setData(prev => prev ? { ...prev, versions: dbVersions } : prev);
       setVersionsLoaded(true);
+      setLoadedTaskVersionsId(selectedTaskId);
     } catch (err) {
       console.error('Failed to load version history:', err);
     } finally {
@@ -328,7 +353,8 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
   // DEFERRED: load comments (triggered when Discussion tab is opened)
   // ─────────────────────────────────────────────────────────────────────────────
   const loadComments = useCallback(async () => {
-    if (commentsLoaded || isLoadingComments) return;
+    if (commentsLoaded && loadedTaskCommentsId === selectedTaskId) return;
+    if (isLoadingComments) return;
     setIsLoadingComments(true);
     try {
       const commentsRes = selectedTaskId
@@ -371,6 +397,7 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
 
       setData(prev => prev ? { ...prev, comments: dbComments, frameComments: dbTaskComments } : prev);
       setCommentsLoaded(true);
+      setLoadedTaskCommentsId(selectedTaskId);
     } catch (err) {
       console.error('Failed to load comments:', err);
     } finally {
@@ -383,16 +410,22 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
     setHasLoaded(false);
     setData(null);
     setVersionsLoaded(false);
+    setLoadedTaskVersionsId(null);
     setCommentsLoaded(false);
+    setLoadedTaskCommentsId(null);
     void loadData(false, false, controller.signal).catch(() => { });
     return () => controller.abort();
   }, [projectId, fileId]);
 
   useEffect(() => {
     if (hasLoaded) {
-      const controller = new AbortController();
-      void loadData(true, false, controller.signal).catch(() => { });
-      return () => controller.abort();
+      // When switching tasks, only reset deferred flags so they reload on-demand.
+      // Do NOT call loadData() here — it would re-fetch project/folders/members/file/tasks
+      // all over again, causing unnecessary slowness.
+      setCommentsLoaded(false);
+      setVersionsLoaded(false);
+      setLoadedTaskVersionsId(null);
+      setLoadedTaskCommentsId(null);
     }
   }, [selectedTaskId]);
 
@@ -466,6 +499,7 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
                   taskId: materialObj?.taskId ? String(materialObj.taskId) : undefined,
                   targetVersion: undefined,
                   frameId: String(frameId),
+                  frameName: frameDetails.name,
                   materialId: String(frameDetails.materialId),
                   materialName: (materialObj as any)?.name || undefined,
                 } as SubmissionFrameComment));
@@ -496,6 +530,7 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
             taskId: existing.taskId,
             targetVersion: undefined,
             frameId: String(frameId),
+            frameName: existing.frameName,
             materialId: existing.materialId,
             materialName: existing.materialName,
           } as SubmissionFrameComment));

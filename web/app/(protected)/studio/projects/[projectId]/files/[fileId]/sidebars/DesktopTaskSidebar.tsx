@@ -15,6 +15,8 @@ export function DesktopTaskSidebar({
   canCreateTask,
   canReviewTask,
   canSubmitTask,
+  canEditTask,
+  canDeleteTask,
   file,
   focusedTask,
   isOpen,
@@ -33,11 +35,13 @@ export function DesktopTaskSidebar({
   latestMaterialVersion,
   members,
   onRefresh,
+  onMaterialUploaded,
   discussionContextKey,
   setDiscussionContext,
   commentFilterMode,
   setCommentFilterMode,
   discussionFrameComments,
+  isLoadingVersions,
 }: DesktopTaskSidebarProps) {
   const [sidebarTab, setSidebarTab] = useState<'task' | 'material'>('task');
   const [sidebarWidth, setSidebarWidth] = useState(320);
@@ -90,19 +94,19 @@ export function DesktopTaskSidebar({
   }
 
   return (
-    <aside 
+    <aside
       className="relative hidden h-full shrink-0 flex-col overflow-visible border-l border-[#26303b] bg-[#0d151e] lg:flex"
       style={{ width: sidebarWidth }}
     >
       {/* Resizer Handle */}
-      <div 
+      <div
         className="absolute -left-1 top-0 bottom-0 w-2 cursor-col-resize z-50 hover:bg-[#FFD369]/20 transition-colors"
         onMouseDown={(e) => {
           e.preventDefault();
           setIsResizing(true);
         }}
       />
-      
+
       <button
         className="absolute left-0 top-6 z-40 hidden h-8 w-6 place-items-center justify-center rounded-r-full border border-l-0 border-[#FFD369] bg-[#FFD369] text-[#222831] shadow-[4px_4px_12px_rgba(0,0,0,0.6)] transition-all hover:bg-[#eac04f] hover:w-7 lg:flex"
         onClick={onClose}
@@ -114,7 +118,7 @@ export function DesktopTaskSidebar({
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
 
-        <section 
+        <section
           ref={topSectionRef}
           className="shrink-0 p-4 overflow-y-auto"
           style={{ height: topSectionHeight }}
@@ -128,6 +132,8 @@ export function DesktopTaskSidebar({
             onDeleteTask={setDeletingTask}
             selectedTaskId={selectedTaskId}
             tasks={tasks}
+            canEditTask={canEditTask}
+            canDeleteTask={canDeleteTask}
           />
           {editingTask && (
             <TaskActionDialogs
@@ -147,7 +153,7 @@ export function DesktopTaskSidebar({
         </section>
 
         {/* Vertical Resizer Handle */}
-        <div 
+        <div
           className="relative h-1 cursor-row-resize bg-[#26303b] z-40 hover:bg-[#FFD369] transition-colors shrink-0"
           onMouseDown={(e) => {
             e.preventDefault();
@@ -157,9 +163,8 @@ export function DesktopTaskSidebar({
 
         <div className="flex h-11 shrink-0 items-center border-b border-[#26303b] bg-[#091018] px-4">
           <button
-            className={`relative h-full px-4 text-xs font-black capitalize ${
-              sidebarTab === 'material' ? 'text-[#FFD369]' : 'text-[#8b94a1] hover:text-white'
-            }`}
+            className={`relative h-full px-4 text-xs font-black capitalize ${sidebarTab === 'material' ? 'text-[#FFD369]' : 'text-[#8b94a1] hover:text-white'
+              }`}
             onClick={() => setSidebarTab('material')}
           >
             Material
@@ -168,9 +173,8 @@ export function DesktopTaskSidebar({
             )}
           </button>
           <button
-            className={`relative h-full px-4 text-xs font-black capitalize ${
-              sidebarTab === 'task' ? 'text-[#FFD369]' : 'text-[#8b94a1] hover:text-white'
-            }`}
+            className={`relative h-full px-4 text-xs font-black capitalize ${sidebarTab === 'task' ? 'text-[#FFD369]' : 'text-[#8b94a1] hover:text-white'
+              }`}
             onClick={() => setSidebarTab('task')}
           >
             Task
@@ -182,7 +186,7 @@ export function DesktopTaskSidebar({
 
         <section className="flex-1 overflow-y-auto bg-[#101820]">
           {sidebarTab === 'material' ? (
-            <MaterialTabDetail versions={versions} latestMaterialVersion={latestMaterialVersion} focusedTask={focusedTask} fileId={file.id} onRefresh={onRefresh} />
+            <MaterialTabDetail versions={versions} latestMaterialVersion={latestMaterialVersion} focusedTask={focusedTask} fileId={file.id} onRefresh={onMaterialUploaded || onRefresh} isLoadingVersions={isLoadingVersions} />
           ) : (
             <div className="p-4">
               <TaskDetailPanel

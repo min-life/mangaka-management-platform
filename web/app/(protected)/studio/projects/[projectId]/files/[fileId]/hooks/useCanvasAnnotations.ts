@@ -37,12 +37,11 @@ export function useCanvasAnnotations({
   const [pendingTaskRegion, setPendingTaskRegion] = useState<FileTaskRegion | null>(null);
   const [pendingFrameRegion, setPendingFrameRegion] = useState<FileTaskRegion | null>(null);
 
-  const getCanvasPoint = (event: ReactPointerEvent<HTMLDivElement>): NormalizedPoint => {
-    const bounds = event.currentTarget.getBoundingClientRect();
-
-    const clientX = event.clientX;
-    const clientY = event.clientY;
-
+  const getCanvasPointFromClient = (
+    clientX: number,
+    clientY: number,
+    bounds: DOMRect,
+  ): NormalizedPoint => {
     const centerX = bounds.left + bounds.width / 2;
     const centerY = bounds.top + bounds.height / 2;
 
@@ -64,6 +63,14 @@ export function useCanvasAnnotations({
       x: Math.min(1, Math.max(0, finalX / bounds.width)),
       y: Math.min(1, Math.max(0, finalY / bounds.height)),
     };
+  };
+
+  const getCanvasPoint = (event: ReactPointerEvent<HTMLDivElement>): NormalizedPoint => {
+    return getCanvasPointFromClient(
+      event.clientX,
+      event.clientY,
+      event.currentTarget.getBoundingClientRect(),
+    );
   };
 
   const buildRegion = (start: NormalizedPoint, end: NormalizedPoint): FileTaskRegion => ({
@@ -151,6 +158,7 @@ export function useCanvasAnnotations({
     pendingFrameRegion,
     setPendingFrameRegion,
     getCanvasPoint,
+    getCanvasPointFromClient,
     buildRegion,
     handleCanvasPointerDown,
     handleCanvasPointerMove,

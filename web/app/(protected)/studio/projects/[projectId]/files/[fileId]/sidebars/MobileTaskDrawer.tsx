@@ -15,6 +15,8 @@ export function MobileTaskDrawer({
   canCreateTask,
   canReviewTask,
   canSubmitTask,
+  canEditTask,
+  canDeleteTask,
   file,
   focusedTask,
   onClose,
@@ -36,7 +38,9 @@ export function MobileTaskDrawer({
   setCommentFilterMode,
   members,
   onRefresh,
+  onMaterialUploaded,
   discussionFrameComments,
+  isLoadingVersions,
 }: MobileTaskDrawerProps) {
   const [sidebarTab, setSidebarTab] = useState<'task' | 'material'>('task');
   const [mobileEditingTask, setMobileEditingTask] = useState<FileTaskItem | null>(null);
@@ -67,6 +71,8 @@ export function MobileTaskDrawer({
               onDeleteTask={setMobileDeletingTask}
               selectedTaskId={selectedTaskId}
               tasks={tasks}
+              canEditTask={canEditTask}
+              canDeleteTask={canDeleteTask}
             />
             {mobileEditingTask && (
               <TaskActionDialogs
@@ -87,9 +93,8 @@ export function MobileTaskDrawer({
 
           <div className="flex h-11 shrink-0 items-center border-b border-[#26303b] bg-[#091018] px-4">
             <button
-              className={`relative h-full px-4 text-xs font-black capitalize ${
-                sidebarTab === 'material' ? 'text-[#FFD369]' : 'text-[#8b94a1] hover:text-white'
-              }`}
+              className={`relative h-full px-4 text-xs font-black capitalize ${sidebarTab === 'material' ? 'text-[#FFD369]' : 'text-[#8b94a1] hover:text-white'
+                }`}
               onClick={() => setSidebarTab('material')}
             >
               Material
@@ -98,9 +103,8 @@ export function MobileTaskDrawer({
               )}
             </button>
             <button
-              className={`relative h-full px-4 text-xs font-black capitalize ${
-                sidebarTab === 'task' ? 'text-[#FFD369]' : 'text-[#8b94a1] hover:text-white'
-              }`}
+              className={`relative h-full px-4 text-xs font-black capitalize ${sidebarTab === 'task' ? 'text-[#FFD369]' : 'text-[#8b94a1] hover:text-white'
+                }`}
               onClick={() => setSidebarTab('task')}
             >
               Task
@@ -112,7 +116,7 @@ export function MobileTaskDrawer({
 
           <section className="flex-1 overflow-y-auto bg-[#101820]">
             {sidebarTab === 'material' ? (
-              <MaterialTabDetail versions={versions} latestMaterialVersion={latestMaterialVersion} focusedTask={focusedTask} fileId={file.id} onRefresh={onRefresh} />
+              <MaterialTabDetail versions={versions} latestMaterialVersion={latestMaterialVersion} focusedTask={focusedTask} fileId={file.id} onRefresh={onMaterialUploaded || onRefresh} isLoadingVersions={isLoadingVersions} />
             ) : (
               <div className="p-4">
                 <TaskDetailPanel

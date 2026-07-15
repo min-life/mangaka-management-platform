@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
+import { Loader2 } from 'lucide-react';
 import { FileActivityPanel } from './FileActivityPanel';
 import { FileCanvas } from './FileCanvas';
 import { FileCommentsPanel } from './FileCommentsPanel';
@@ -14,6 +15,7 @@ import {
 import { FileVersionsTab } from './FileVersionsTab';
 import { TaskFormDialog } from './TaskFormDialog';
 import { CreateFrameCommentDialog } from './CreateFrameCommentDialog';
+import { AiFrameDetectionDialog } from './AiFrameDetectionDialog';
 
 import { type FileVersionItem } from '../file-ui';
 import { getCommentText } from './file-detail-types';
@@ -28,6 +30,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
   const {
     annotationMode,
     assignedToName,
+    aiFrameDialogOpen,
     canCreateTask,
     canReviewTask,
     canSubmitTask,
@@ -46,16 +49,20 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
     focusFileTask,
     focusedTask,
     handleCreateAnnotatedTask,
+    handleCancelAiFrame,
     handleCreateDiscussionComment,
     handleCreateFrameComment,
     handleReplyToFrame,
     handleCreateReview,
+    handleDetectAiFrame,
     handleDeleteDiscussionComment,
     handleFocusedTaskChange,
     handleSubmitTaskWork,
     handleMarkReadyForReview,
     handleUpdateDiscussionComment,
     isLoading,
+    isAiFrameReviewing,
+    isDetectingAiFrame,
     isTaskContextLoading,
     isSavingComment,
     isSubmittingReview,
@@ -114,9 +121,12 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
     if (activities.length > 0) {
       const latestActivity = activities[0];
       if (latestActivity?.fileId === Number(file.id)) {
-        const metadata = latestActivity.metadata as any;
+        const metadata = latestActivity.metadata as { frameId?: string | number } | null;
         if (latestActivity.action === 'COMMENT_CREATED' && metadata?.frameId) {
-          void refreshFrameComments(metadata.frameId);
+          const frameId = Number(metadata.frameId);
+          if (Number.isFinite(frameId)) {
+            void refreshFrameComments(frameId);
+          }
         } else if (latestActivity.action === 'COMMENT_CREATED') {
           // Already handled optimistically by appendComment via useRealtimeComments — skip full reload
         } else {
@@ -131,6 +141,11 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
   if (!file) {
     return null;
   }
+  const handleMaterialUploaded = useCallback(async () => {
+    setSelectedVersion(null);
+    await loadFile();
+  }, [setSelectedVersion, loadFile]);
+
   return (
     <section className="h-full flex flex-col overflow-hidden bg-[#101820]">
 
@@ -147,6 +162,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
 
         taskCount={tasks.length}
         versions={versions}
+        isInitialLoading={controller.isInitialLoading}
       />
 
 
@@ -162,18 +178,14 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
         <main className="min-w-0 bg-[#091018] h-full overflow-y-auto relative flex-1">
 
           <div className="p-5 lg:p-8">
-            <div className="mx-auto max-w-6xl">
-
-
-
-
+            <div className="mx-auto max-w-6xl relative">
               <FileCanvas controller={controller} />
-              
+
               {isTaskContextLoading && (
-                <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#091018]/90 backdrop-blur-xl transition-all duration-300">
-                  <div className="flex flex-col items-center">
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#39424f] border-t-[#FFD369]"></div>
-                    <span className="mt-3 text-xs font-black text-[#aeb7c2]">Loading context...</span>
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#091018]/60 backdrop-blur-sm transition-all duration-300 rounded-[4px] pointer-events-none">
+                  <div className="flex flex-col items-center gap-3 bg-[#0d151e]/80 p-4 rounded-lg shadow-2xl backdrop-blur-sm border border-[#39424f]">
+                    <Loader2 className="size-8 animate-spin text-[#FFD369]" />
+                    <span className="text-xs font-bold text-[#FFD369] uppercase tracking-wider">Loading context...</span>
                   </div>
                 </div>
               )}
@@ -213,52 +225,52 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
                     </div>
                   </div>
                 ) : (
-                <div className="text-white">
-                  <FileCommentsPanel
-                    discussionListComments={controller.discussionListComments}
+                  <div className="text-white">
+                    <FileCommentsPanel
+                      discussionListComments={controller.discussionListComments}
 
-                    focusedFrameId={controller.focusedFrameId}
-                    isFrameLoading={controller.isFrameLoading}
-                    isContextLoading={isTaskContextLoading}
-                    handleFrameClick={controller.handleFrameClick}
-                    comments={discussionContextKey === 'file' ? fileComments : taskComments}
-                    fileId={file.id}
-                    taskId={focusedTask?.id ? Number(focusedTask.id) : null}
-                    contextKey={discussionContextKey}
-                    contextLabel={discussionContextLabel}
-                    frameComments={discussionFrameComments}
-                    filterMode={commentFilterMode}
-                    setFilterMode={setCommentFilterMode}
-                    isSaving={isSavingComment}
-                    onCreateComment={handleCreateDiscussionComment}
-                    onUpdateComment={handleUpdateDiscussionComment}
-                    onDeleteComment={handleDeleteDiscussionComment}
-                    onReplyToFrame={handleReplyToFrame}
-                    replyingFrameId={controller.replyingFrameId}
-                    setReplyingFrameId={controller.setReplyingFrameId}
-                    onLoadMore={controller.loadMoreComments}
-                    hasMore={controller.hasMoreComments}
-                    isLoadingMore={controller.isLoadingMoreComments}
-                    onSelectFrame={(comment) => {
-                      let nextVersion: FileVersionItem | null = null;
-                      if (comment.materialId) {
-                        nextVersion = versions.find((v) => String(v.id) === comment.materialId) ?? null;
-                      } else if (comment.materialVersion) {
-                        nextVersion = versions.find((v) => `v${v.version}` === comment.materialVersion) ?? null;
-                      }
-                      if (comment.taskId) {
-                        const matchedTask = tasks.find(t => t.id === comment.taskId);
-                        if (matchedTask) {
-                          focusFileTask(matchedTask);
+                      focusedFrameId={controller.focusedFrameId}
+                      isFrameLoading={controller.isFrameLoading}
+                      isContextLoading={isTaskContextLoading}
+                      handleFrameClick={controller.handleFrameClick}
+                      comments={discussionContextKey === 'file' ? fileComments : taskComments}
+                      fileId={file.id}
+                      taskId={focusedTask?.id ? Number(focusedTask.id) : null}
+                      contextKey={discussionContextKey}
+                      contextLabel={discussionContextLabel}
+                      frameComments={discussionFrameComments}
+                      filterMode={commentFilterMode}
+                      setFilterMode={setCommentFilterMode}
+                      isSaving={isSavingComment}
+                      onCreateComment={handleCreateDiscussionComment}
+                      onUpdateComment={handleUpdateDiscussionComment}
+                      onDeleteComment={handleDeleteDiscussionComment}
+                      onReplyToFrame={handleReplyToFrame}
+                      replyingFrameId={controller.replyingFrameId}
+                      setReplyingFrameId={controller.setReplyingFrameId}
+                      onLoadMore={controller.loadMoreComments}
+                      hasMore={controller.hasMoreComments}
+                      isLoadingMore={controller.isLoadingMoreComments}
+                      onSelectFrame={(comment) => {
+                        let nextVersion: FileVersionItem | null = null;
+                        if (comment.materialId) {
+                          nextVersion = versions.find((v) => String(v.id) === comment.materialId) ?? null;
+                        } else if (comment.materialVersion) {
+                          nextVersion = versions.find((v) => `v${v.version}` === comment.materialVersion) ?? null;
                         }
-                      }
-                      if (nextVersion) {
-                        setSelectedVersion(nextVersion.isCurrent ? null : nextVersion);
-                      }
+                        if (comment.taskId) {
+                          const matchedTask = tasks.find(t => t.id === comment.taskId);
+                          if (matchedTask) {
+                            focusFileTask(matchedTask);
+                          }
+                        }
+                        if (nextVersion) {
+                          setSelectedVersion(nextVersion.isCurrent ? null : nextVersion);
+                        }
 
-                      canvasRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }}
-                  />
+                        canvasRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }}
+                    />
                   </div>
                 )
               ) : resourceTab === 'versions' ? (
@@ -270,26 +282,26 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
                     </div>
                   </div>
                 ) : (
-                <FileVersionsTab
-                  versions={versions}
-                  selectedVersion={selectedVersion}
-                  setSelectedVersion={setSelectedVersion}
-                  selectedVersionForDetails={selectedVersionForDetails}
-                  setSelectedVersionForDetails={setSelectedVersionForDetails}
+                  <FileVersionsTab
+                    versions={versions}
+                    selectedVersion={selectedVersion}
+                    setSelectedVersion={setSelectedVersion}
+                    selectedVersionForDetails={selectedVersionForDetails}
+                    setSelectedVersionForDetails={setSelectedVersionForDetails}
 
 
-                  canvasRef={canvasRef}
+                    canvasRef={canvasRef}
 
 
-                  isLoading={isLoading}
-                  isSubmittingReview={isSubmittingReview}
-                  setIsSubmittingReview={setIsSubmittingReview}
-                  fileId={file.id}
-                  loadFile={loadFile}
-                  file={file}
-                  setError={setError}
+                    isLoading={isLoading}
+                    isSubmittingReview={isSubmittingReview}
+                    setIsSubmittingReview={setIsSubmittingReview}
+                    fileId={file.id}
+                    loadFile={loadFile}
+                    file={file}
+                    setError={setError}
 
-                />
+                  />
                 )
               ) : resourceTab === 'activity' ? (
                 <FileActivityPanel fileId={file.id} projectId={projectId} />
@@ -333,11 +345,15 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
           onTaskChange={handleFocusedTaskChange}
           selectedTaskId={selectedTaskId}
           selectedVersion={selectedVersion}
+          canEditTask={controller.canEditTask}
+          canDeleteTask={controller.canDeleteTask}
           tasks={tasks}
           versions={versions}
           latestMaterialVersion={latestMaterialVersion}
+          isLoadingVersions={controller.isLoadingVersions}
           members={members}
           onRefresh={loadFile}
+          onMaterialUploaded={handleMaterialUploaded}
           discussionContextKey={discussionContextKey}
           setDiscussionContext={setDiscussionContext}
           commentFilterMode={commentFilterMode}
@@ -378,11 +394,15 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
           open={mobileTasksOpen}
           selectedTaskId={selectedTaskId}
           selectedVersion={selectedVersion}
+          canEditTask={controller.canEditTask}
+          canDeleteTask={controller.canDeleteTask}
           tasks={tasks}
           versions={versions}
           latestMaterialVersion={latestMaterialVersion}
+          isLoadingVersions={controller.isLoadingVersions}
           members={members}
           onRefresh={loadFile}
+          onMaterialUploaded={handleMaterialUploaded}
           discussionContextKey={discussionContextKey}
           setDiscussionContext={setDiscussionContext}
           commentFilterMode={commentFilterMode}
@@ -412,7 +432,13 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
           setFrameAnnotationMode(false);
         }}
         onCreate={handleCreateFrameComment}
-        region={pendingFrameRegion}
+        region={isAiFrameReviewing ? null : pendingFrameRegion}
+      />
+      <AiFrameDetectionDialog
+        isDetecting={isDetectingAiFrame}
+        onCancel={handleCancelAiFrame}
+        onDetect={handleDetectAiFrame}
+        open={aiFrameDialogOpen}
       />
     </section>
   );

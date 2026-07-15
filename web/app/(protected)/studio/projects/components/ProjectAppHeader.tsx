@@ -30,11 +30,21 @@ export function ProjectAppHeader({ projectId, projectName }: ProjectAppHeaderPro
   const [activeProject, setActiveProject] = useState<ProjectResponse | null>(null);
   const [allProjects, setAllProjects] = useState<ProjectResponse[]>([]);
 
+  const [isLoading, setIsLoading] = useState(true);
+
   useEffect(() => {
+    setIsLoading(true);
     if (projectId) {
       void getProjectById(parseId(projectId))
-        .then(setActiveProject)
-        .catch(() => {});
+        .then((res) => {
+          setActiveProject(res);
+          setIsLoading(false);
+        })
+        .catch(() => {
+          setIsLoading(false);
+        });
+    } else {
+      setIsLoading(false);
     }
     void getProjects()
       .then((res) => {
@@ -42,8 +52,6 @@ export function ProjectAppHeader({ projectId, projectName }: ProjectAppHeaderPro
       })
       .catch(() => {});
   }, [projectId]);
-
-  const displayProjectName = activeProject?.name || projectName;
 
   const displayName = user?.displayName || user?.email || 'Current user';
   const email = user?.email ?? 'No email';
@@ -73,7 +81,11 @@ export function ProjectAppHeader({ projectId, projectName }: ProjectAppHeaderPro
                 className="flex h-9 items-center gap-1 rounded-[4px] border border-transparent px-3 text-[#FFD369] hover:border-[#39424f] hover:bg-[#222a34]"
                 type="button"
               >
-                <span>{displayProjectName}</span>
+                {isLoading ? (
+                  <div className="h-4 w-28 rounded bg-[#39424f] animate-pulse mx-1" />
+                ) : (
+                  <span>{activeProject?.name || projectName}</span>
+                )}
                 <ChevronDown className="size-3.5 text-[#dce7f3] ml-0.5" />
               </button>
             </DropdownMenuTrigger>

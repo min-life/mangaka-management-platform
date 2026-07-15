@@ -13,12 +13,14 @@ export function MaterialTabDetail({
   focusedTask,
   fileId,
   onRefresh,
+  isLoadingVersions,
 }: {
   versions: FileVersionItem[];
   latestMaterialVersion?: FileVersionItem | null;
   focusedTask: TaskWorkspaceItem | null;
   fileId: number;
   onRefresh?: () => void | Promise<void>;
+  isLoadingVersions?: boolean;
 }) {
   const [pendingFiles, setPendingFiles] = useState<{
     img?: File | null;
@@ -28,10 +30,10 @@ export function MaterialTabDetail({
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
 
   // Get the most recent version for the focused task, or the most recent overall version
-  const targetVersion = focusedTask 
+  const targetVersion = focusedTask
     ? (versions.find(v => v.taskId === Number(focusedTask.id) && v.isCurrent) ?? versions.find(v => v.taskId === Number(focusedTask.id)))
     : (versions[0] ?? latestMaterialVersion);
-    
+
   const imgMat: any = (targetVersion?.materials as any[] || []).find((m: any) => m.type === 'IMAGE' || m.originalName?.match(/\.(png|jpe?g)$/i) || m.name?.match(/\.(png|jpe?g)$/i));
   const textMat: any = (targetVersion?.materials as any[] || []).find((m: any) => m.type === 'TEXT' || m.originalName?.match(/\.(txt|md|docx?)$/i) || m.name?.match(/\.(txt|md|docx?)$/i));
   const srcMat: any = (targetVersion?.materials as any[] || []).find((m: any) => m.type === 'SOURCE' || m.originalName?.match(/\.(zip|rar|clip|psd)$/i) || m.name?.match(/\.(zip|rar|clip|psd)$/i));
@@ -47,6 +49,18 @@ export function MaterialTabDetail({
   };
 
   const hasPending = Object.values(pendingFiles).some(v => v !== undefined);
+
+  if (isLoadingVersions) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 text-[#8b94a1]">
+        <svg className="size-6 animate-spin mb-3 text-[#FFD369]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <p className="text-xs font-bold uppercase tracking-wider">Loading Materials...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -79,7 +93,7 @@ export function MaterialTabDetail({
                   )}
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-1">
                 {item.current && item.url && item.pending !== null && (
                   <a
@@ -102,15 +116,15 @@ export function MaterialTabDetail({
                     <Download className="size-4" />
                   </a>
                 )}
-                
+
                 <label className="flex size-7 cursor-pointer items-center justify-center rounded text-[#8b94a1] hover:bg-[#202832] hover:text-[#FFD369] transition-colors" title={item.current ? 'Update' : 'Upload'}>
                   <Upload className="size-4" />
-                  <input 
-                    type="file" 
-                    className="hidden" 
+                  <input
+                    type="file"
+                    className="hidden"
                     accept={item.accept}
                     onClick={(e) => { (e.target as HTMLInputElement).value = ''; }}
-                    onChange={(e) => handleFileChange(item.type, e.target.files?.[0])} 
+                    onChange={(e) => handleFileChange(item.type, e.target.files?.[0])}
                   />
                 </label>
 
@@ -141,7 +155,7 @@ export function MaterialTabDetail({
       </div>
 
       {hasPending && (
-        <Button 
+        <Button
           className="mt-2 w-full gap-2 bg-[#FFD369] text-[#222831] hover:bg-[#eac04f]"
           onClick={() => setIsUpdateModalOpen(true)}
         >

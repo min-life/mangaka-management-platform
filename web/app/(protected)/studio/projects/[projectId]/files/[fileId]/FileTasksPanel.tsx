@@ -18,6 +18,8 @@ type FileTasksPanelProps = {
   onSelectTask: (taskId: string | null) => void;
   onEditTask?: (task: FileTaskItem) => void;
   onDeleteTask?: (task: FileTaskItem) => void;
+  canEditTask?: (task: FileTaskItem) => boolean;
+  canDeleteTask?: (task: FileTaskItem) => boolean;
   selectedTaskId: string | null;
   tasks: FileTaskItem[];
 };
@@ -29,6 +31,8 @@ export function FileTasksPanel({
   onSelectTask,
   onEditTask,
   onDeleteTask,
+  canEditTask,
+  canDeleteTask,
   selectedTaskId,
   tasks,
 }: FileTasksPanelProps) {
@@ -119,7 +123,7 @@ export function FileTasksPanel({
                     {fileStatusLabels[task.status]}
                   </Badge>
                   <div className="flex items-center gap-1">
-                    {onEditTask && (
+                    {onEditTask && canEditTask?.(task) !== false && (
                       <button
                         type="button"
                         className="p-1 rounded text-[#8b94a1] hover:text-white hover:bg-[#202832] transition-colors"
@@ -132,7 +136,7 @@ export function FileTasksPanel({
                         <Edit3 className="size-3.5" />
                       </button>
                     )}
-                    {onDeleteTask && (
+                    {onDeleteTask && canDeleteTask?.(task) !== false && (
                       <button
                         type="button"
                         className="p-1 rounded text-[#8b94a1] hover:text-red-400 hover:bg-[#451a1a] transition-colors"

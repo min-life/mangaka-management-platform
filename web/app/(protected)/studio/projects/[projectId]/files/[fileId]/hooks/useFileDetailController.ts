@@ -10,6 +10,11 @@ import {
 
 import { useCanvasViewport } from './useCanvasViewport';
 import { useCanvasAnnotations } from './useCanvasAnnotations';
+import {
+  getContainedImageRect,
+  mapImageRegionToCanvas,
+  type CanvasImageMetrics,
+} from '../canvas-image-geometry';
 
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/use-permissions';
@@ -26,7 +31,6 @@ import { useFileDetailTaskActions } from './useFileDetailTaskActions';
 import { useFileDetailCommentActions } from './useFileDetailCommentActions';
 
 import {
-  formatFileDate,
   type FileExplorerItem,
   type FileTaskItem,
   type FileTaskRegion,
@@ -37,8 +41,38 @@ import type { TaskWorkspaceItem } from '../../../tasks/task-ui';
 
 import {
   getCommentText,
+  type FileDiscussionComment,
   type ResourceTab,
 } from '../file-detail-types';
+import type { AiFrameDetectResponse } from '@/types/ai-frame';
+
+type StateUpdate<T> = T | ((current: T) => T);
+type FileDiscussionCommentWithContext = FileDiscussionComment & {
+  context?: string | null;
+};
+type FileMaterialPreview = {
+  downloadUrl?: string;
+  isThumbnail?: boolean;
+  name?: string;
+  originalName?: string;
+  type?: string;
+  url?: string;
+};
+type IncomingDiscussionComment = {
+  content: unknown;
+  createdAt?: string | null;
+  createdBy?: number | string | null;
+  createdByUser?: {
+    displayName?: string | null;
+    email?: string | null;
+  } | null;
+  id: number | string;
+  context?: string | null;
+};
+
+function resolveStateUpdate<T>(update: StateUpdate<T>, current: T) {
+  return typeof update === 'function' ? (update as (value: T) => T)(current) : update;
+}
 
 type UseFileDetailControllerProps = {
   fileId: number;
@@ -67,17 +101,23 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
   const [deletingVersionId, setDeletingVersionId] = useState<string | null>(null);
   const [mobileTasksOpen, setMobileTasksOpen] = useState(false);
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(focusedTaskId);
-  const [focusedTask, setFocusedTask] = useState<TaskWorkspaceItem | null>(null); const viewport = useCanvasViewport();
-  
-  // Reset filter when switching task context
-  useEffect(() => {
+  const [selectedTaskId, setSelectedTaskIdState] = useState<string | null>(focusedTaskId);
+  const [focusedTask, setFocusedTask] = useState<TaskWorkspaceItem | null>(null);
+  const viewport = useCanvasViewport();
+  const [aiFrameDialogOpen, setAiFrameDialogOpen] = useState(false);
+  const [isDetectingAiFrame, setIsDetectingAiFrame] = useState(false);
+  const [isAiFrameReviewing, setIsAiFrameReviewing] = useState(false);
+  const [canvasImageMetrics, setCanvasImageMetrics] = useState<CanvasImageMetrics | null>(null);
+
+  const setSelectedTaskId = useCallback((update: StateUpdate<string | null>) => {
+    setSelectedTaskIdState((current) => resolveStateUpdate(update, current));
     setCommentFilterMode('all');
-  }, [selectedTaskId]);
+  }, []);
 
   // Cache for lazy loading material details
-  const [detailedMaterialCache, setDetailedMaterialCache] = useState<Record<string, any[]>>({});
-  const [isCanvasLoading, setIsCanvasLoading] = useState(false);
+  const [detailedMaterialCache, setDetailedMaterialCache] = useState<
+    Record<string, FileMaterialPreview[]>
+  >({});
 
   const { user } = useAuth();
   const { can: canProject } = usePermissions({ resource: 'PROJECT', resourceId: projectId });
@@ -96,10 +136,10 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
 
   // Auto-trigger deferred loads when tabs are first opened
   useEffect(() => {
-    if ((resourceTab === 'versions') && !versionsLoaded && !isLoadingVersions) {
+    if ((resourceTab === 'versions' || resourceTab === 'discussion' || focusedTask) && !versionsLoaded && !isLoadingVersions) {
       void loadVersions();
     }
-  }, [resourceTab, versionsLoaded, isLoadingVersions, loadVersions]);
+  }, [resourceTab, focusedTask, versionsLoaded, isLoadingVersions, loadVersions]);
 
   useEffect(() => {
     if (resourceTab === 'discussion' && !commentsLoaded && !isLoadingComments) {
@@ -110,6 +150,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
   const {
     selectedVersion,
     setSelectedVersion,
+    setExplicitMaterialId,
   } = useTaskVersionResolver({
     focusedTaskId,
     selectedTaskId,
@@ -166,8 +207,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     setPendingTaskRegion,
     pendingFrameRegion,
     setPendingFrameRegion,
-    getCanvasPoint,
-    buildRegion,
+    getCanvasPointFromClient,
     handleCanvasPointerDown,
     handleCanvasPointerMove,
     handleCanvasPointerUp,
@@ -175,12 +215,12 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
 
   const versions = useMemo(() => {
     const rawVersions = data?.versions ?? [];
-    return rawVersions.filter((v: any) => {
+    return rawVersions.filter((v: FileVersionItem) => {
       if (!focusedTask) {
         return v.taskId === null || v.taskId === undefined;
       }
       return v.taskId === Number(focusedTask.id);
-    }).map((v: any) => {
+    }).map((v: FileVersionItem) => {
       const cachedMaterials = detailedMaterialCache[v.id];
       return {
         ...v,
@@ -189,14 +229,36 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     });
   }, [data?.versions, focusedTask, detailedMaterialCache]);
 
-  const activeVersionIdForCache = focusedTask
-    ? (versions.find((v) => v.isCurrent)?.id ?? versions[0]?.id)
-    : (selectedVersion?.id ?? versions.find((v) => v.isCurrent)?.id ?? versions[0]?.id);
+  const mergedSelectedVersion = useMemo(() => {
+    if (!selectedVersion) return null;
+    return versions.find(v => String(v.id) === String(selectedVersion.id)) || selectedVersion;
+  }, [selectedVersion, versions]);
+
+  // Synchronize selectedVersion with main view state
+  useEffect(() => {
+    if (focusedTask) return; // Managed by useTaskVersionResolver
+
+    if (resourceTab === 'versions' && versions.length > 0) {
+      const isSynthetic = selectedVersion && !versions.some(v => String(v.id) === String(selectedVersion.id));
+      if (isSynthetic || !selectedVersion) {
+        setSelectedVersion(versions.find(v => v.isCurrent) || versions[0]);
+      }
+    }
+  }, [focusedTask, resourceTab, versions, selectedVersion, setSelectedVersion]);
+
+  const activeVersionIdForCache = selectedVersion?.id ?? versions.find((v) => v.isCurrent)?.id ?? versions[0]?.id;
+
+
+
+  const isCanvasLoading = Boolean(
+    activeVersionIdForCache &&
+    !Object.prototype.hasOwnProperty.call(detailedMaterialCache, activeVersionIdForCache),
+  );
 
   // Lazy load detailed material data when active version changes
   useEffect(() => {
     if (!activeVersionIdForCache) return;
-    
+
     const versionId = activeVersionIdForCache;
     if (detailedMaterialCache[versionId]) {
       return; // Already cached
@@ -205,15 +267,21 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     let isMounted = true;
 
     getMaterialById(versionId)
-      .then((res: any) => {
+      .then((res) => {
         if (!isMounted) return;
         setDetailedMaterialCache(prev => ({
           ...prev,
-          [versionId]: res.data?.materials || res.materials || []
+          [versionId]: (res?.materials as any[]) || [],
         }));
       })
       .catch((err) => {
         console.error('Failed to load material details:', err);
+        if (isMounted) {
+          setDetailedMaterialCache((prev) => ({
+            ...prev,
+            [versionId]: [],
+          }));
+        }
       });
 
     return () => {
@@ -221,8 +289,12 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     };
   }, [activeVersionIdForCache, detailedMaterialCache]);
   const frameComments = data?.frameComments ?? [];
-  const fileComments = (data?.comments ?? []).filter((c: any) => !c.context);
-  const taskComments = (data?.comments ?? []).filter((c: any) => c.context?.startsWith('task:'));
+  const fileComments = ((data?.comments ?? []) as FileDiscussionCommentWithContext[]).filter(
+    (comment) => !comment.context,
+  );
+  const taskComments = ((data?.comments ?? []) as FileDiscussionCommentWithContext[]).filter(
+    (comment) => comment.context?.startsWith('task:'),
+  );
   const members = data?.members ?? [];
   const isLoading = isInitialLoading || isRefreshing;
   const isTaskContextLoading = isRefreshing;
@@ -233,7 +305,8 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
 
   const loadFile = useCallback(async () => {
     await reload();
-  }, [reload]);
+    await loadVersions(true);
+  }, [reload, loadVersions]);
 
   const setIsLoading = useCallback((val: boolean) => {
     // No-op
@@ -252,6 +325,14 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
   const canCreateTask = canProject('project:task.create') || canProject('admin') || isProjectOwner;
   const canRestoreVersion = canProject('project:material.restore') || canProject('project:material.update') || canProject('admin') || isProjectOwner;
   const canDeleteVersion = canProject('project:material.delete') || canProject('admin') || isProjectOwner;
+
+  const canEditTask = useCallback((task: FileTaskItem) => {
+    return task.assignedByUserId === user?.id || canProject('admin') || isProjectOwner;
+  }, [user?.id, canProject, isProjectOwner]);
+
+  const canDeleteTask = useCallback((task: FileTaskItem) => {
+    return task.assignedByUserId === user?.id || canProject('admin') || isProjectOwner;
+  }, [user?.id, canProject, isProjectOwner]);
 
   const {
     handleCreateReview,
@@ -272,10 +353,10 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
 
   });
 
-  const setFileCustom = useCallback((update: any) => {
+  const setFileCustom = useCallback((update: StateUpdate<FileExplorerItem | null>) => {
     setData((currentData) => {
       if (!currentData) return null;
-      const nextFile = typeof update === 'function' ? update(currentData.file) : update;
+      const nextFile = resolveStateUpdate(update, currentData.file);
       return {
         ...currentData,
         file: nextFile,
@@ -283,10 +364,10 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     });
   }, [setData]);
 
-  const setTasksCustom = useCallback((update: any) => {
+  const setTasksCustom = useCallback((update: StateUpdate<FileTaskItem[]>) => {
     setData((currentData) => {
       if (!currentData) return null;
-      const nextTasks = typeof update === 'function' ? update(currentData.tasks) : update;
+      const nextTasks = resolveStateUpdate(update, currentData.tasks);
       return {
         ...currentData,
         tasks: nextTasks,
@@ -294,7 +375,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     });
   }, [setData]);
 
-  const setVersionsCustom = useCallback((nextVersions: any[]) => {
+  const setVersionsCustom = useCallback((nextVersions: FileVersionItem[]) => {
     setData((currentData) => {
       if (!currentData) return null;
       return {
@@ -304,10 +385,10 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     });
   }, [setData]);
 
-  const setFrameCommentsCustom = useCallback((update: any) => {
+  const setFrameCommentsCustom = useCallback((update: StateUpdate<SubmissionFrameComment[]>) => {
     setData((currentData) => {
       if (!currentData) return null;
-      const nextComments = typeof update === 'function' ? update(currentData.frameComments) : update;
+      const nextComments = resolveStateUpdate(update, currentData.frameComments);
       return {
         ...currentData,
         frameComments: nextComments,
@@ -315,36 +396,68 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     });
   }, [setData]);
 
-  const setCommentsCustom = useCallback((update: any) => {
-    setData((currentData) => {
-      if (!currentData) return null;
-      const nextComments = typeof update === 'function' ? update(currentData.comments) : update;
-      return {
-        ...currentData,
-        comments: nextComments,
-      };
-    });
-  }, [setData]);
+  const setCommentsCustom = useCallback(
+    (update: StateUpdate<FileDiscussionCommentWithContext[]>) => {
+      setData((currentData) => {
+        if (!currentData) return null;
+        const nextComments = resolveStateUpdate(
+          update,
+          currentData.comments as FileDiscussionCommentWithContext[],
+        );
+        return {
+          ...currentData,
+          comments: nextComments,
+        };
+      });
+    }, [setData]);
 
-  const appendComment = useCallback((newestComment: any) => {
+  const appendComment = useCallback((newestComment: IncomingDiscussionComment) => {
     setData((prev) => {
       if (!prev) return prev;
-      const exists = prev.comments.some((c: any) => String(c.id) === String(newestComment.id));
-      if (exists) return prev;
-      return {
-        ...prev,
-        comments: [
-          ...prev.comments,
-          {
-            id: String(newestComment.id),
-            content: getCommentText(newestComment.content),
-            author: newestComment.createdByUser?.displayName || newestComment.createdByUser?.email || `User #${newestComment.createdBy}`,
-            time: newestComment.createdAt ? new Date(newestComment.createdAt).toISOString() : new Date().toISOString(),
-            timestamp: newestComment.createdAt ? new Date(newestComment.createdAt).getTime() : Date.now(),
-            context: newestComment.context ?? null,
-          }
-        ]
-      };
+
+      const frameId = (newestComment as any).frameId;
+      if (frameId) {
+        const exists = prev.frameComments.some((c) => String(c.id) === String(newestComment.id));
+        if (exists) return prev;
+
+        const parentFrame = prev.frameComments.find((c) => String(c.frameId) === String(frameId));
+        return {
+          ...prev,
+          frameComments: [
+            ...prev.frameComments,
+            {
+              id: String(newestComment.id),
+              content: getCommentText(newestComment.content),
+              author: newestComment.createdByUser?.displayName || newestComment.createdByUser?.email || `User #${newestComment.createdBy}`,
+              time: newestComment.createdAt ? new Date(newestComment.createdAt).toISOString() : new Date().toISOString(),
+              timestamp: newestComment.createdAt ? new Date(newestComment.createdAt).getTime() : Date.now(),
+              frameId: String(frameId),
+              frameName: parentFrame?.frameName || `Frame ${frameId}`,
+              materialId: parentFrame?.materialId,
+              materialName: parentFrame?.materialName,
+              taskId: parentFrame?.taskId,
+              region: parentFrame?.region,
+            }
+          ]
+        };
+      } else {
+        const exists = prev.comments.some((c: any) => String(c.id) === String(newestComment.id));
+        if (exists) return prev;
+        return {
+          ...prev,
+          comments: [
+            ...prev.comments,
+            {
+              id: String(newestComment.id),
+              content: getCommentText(newestComment.content),
+              author: newestComment.createdByUser?.displayName || newestComment.createdByUser?.email || `User #${newestComment.createdBy}`,
+              time: newestComment.createdAt ? new Date(newestComment.createdAt).toISOString() : new Date().toISOString(),
+              timestamp: newestComment.createdAt ? new Date(newestComment.createdAt).getTime() : Date.now(),
+              context: newestComment.context ?? null,
+            }
+          ]
+        };
+      }
     });
   }, [setData]);
 
@@ -419,15 +532,124 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
 
   const folder = file ? folders.find((candidate) => candidate.id === file.folderId) : undefined;
   const currentVersion = versions.find((v) => v.isCurrent) ?? versions[0] ?? null;
-  const activeVersionId = focusedTask
-    ? currentVersion?.id
-    : (selectedVersion?.id || currentVersion?.id);
+  const activeMaterialDetails = activeVersionIdForCache
+    ? detailedMaterialCache[activeVersionIdForCache]
+    : null;
+  const activeThumbnail = activeMaterialDetails?.find(
+    (item) => item.isThumbnail,
+  ) || activeMaterialDetails?.find(
+    (item) =>
+      item.type === 'IMAGE' ||
+      item.originalName?.match(/\.(png|jpe?g)$/i) ||
+      item.name?.match(/\.(png|jpe?g)$/i),
+  );
+  const fallbackPreviewUrl = selectedVersion?.previewUrl || currentVersion?.previewUrl;
+  const displayedPreviewUrl =
+    activeThumbnail?.downloadUrl || activeThumbnail?.url || fallbackPreviewUrl || file?.previewUrl || '';
 
-  const activeMaterialDetails = activeVersionId ? detailedMaterialCache[activeVersionId] : null;
-  const activeThumbnail = activeMaterialDetails?.find((item: Record<string, any>) => item.isThumbnail) ||
-    activeMaterialDetails?.find((item: Record<string, any>) => item.type === 'IMAGE' || item.originalName?.match(/\.(png|jpe?g)$/i) || item.name?.match(/\.(png|jpe?g)$/i));
+  const handleOpenAiFrameDialog = useCallback(() => {
+    if (!displayedPreviewUrl) {
+      toast.error('Preview image is not available for AI detection.');
+      return;
+    }
 
-  const displayedPreviewUrl = activeThumbnail?.downloadUrl || activeThumbnail?.url || file?.previewUrl || '';
+    setPendingTaskRegion(null);
+    setPendingFrameRegion(null);
+    setDraftRegion(null);
+    setAnnotationStart(null);
+    setAnnotationMode(false);
+    setFrameAnnotationMode(false);
+    setIsAiFrameReviewing(false);
+    setAiFrameDialogOpen(true);
+  }, [
+    displayedPreviewUrl,
+    setAnnotationMode,
+    setAnnotationStart,
+    setDraftRegion,
+    setFrameAnnotationMode,
+    setPendingFrameRegion,
+    setPendingTaskRegion,
+  ]);
+
+  const handleCancelAiFrame = useCallback(() => {
+    setAiFrameDialogOpen(false);
+    setIsDetectingAiFrame(false);
+    setIsAiFrameReviewing(false);
+    setPendingFrameRegion(null);
+    setDraftRegion(null);
+  }, [setDraftRegion, setPendingFrameRegion]);
+
+  const handleDetectAiFrame = useCallback(
+    async (objectName: string) => {
+      if (!displayedPreviewUrl) {
+        toast.error('Preview image is not available for AI detection.');
+        return;
+      }
+
+      setIsDetectingAiFrame(true);
+      setError(null);
+
+      try {
+        const response = await fetch('/api/ai/frame-detect', {
+          body: JSON.stringify({
+            imageUrl: displayedPreviewUrl,
+            objectName,
+          }),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          method: 'POST',
+        });
+        const result = (await response.json()) as AiFrameDetectResponse;
+
+        if (!response.ok || !result.found || !result.region) {
+          toast.error(result.message || 'AI could not locate that object.');
+          return;
+        }
+
+        const canvasBounds = canvasRef.current?.getBoundingClientRect();
+        if (
+          !canvasBounds ||
+          !canvasImageMetrics ||
+          canvasImageMetrics.imageUrl !== displayedPreviewUrl
+        ) {
+          toast.error('Image preview is still loading. Please try AI detection again shortly.');
+          return;
+        }
+
+        const region = mapImageRegionToCanvas(
+          result.region,
+          getContainedImageRect(canvasBounds, canvasImageMetrics),
+          canvasBounds,
+        );
+
+        setPendingFrameRegion(region);
+        setDraftRegion(region);
+        setIsAiFrameReviewing(true);
+        setAiFrameDialogOpen(false);
+        setResourceTab('discussion');
+        toast.success('AI created a draft frame. Adjust it, then confirm.');
+        requestAnimationFrame(() =>
+          canvasRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+        );
+      } catch (error) {
+        console.error('AI frame detection failed:', error);
+        toast.error('AI frame detection failed. Please try again.');
+      } finally {
+        setIsDetectingAiFrame(false);
+      }
+    },
+    [canvasImageMetrics, displayedPreviewUrl, setDraftRegion, setError, setPendingFrameRegion],
+  );
+
+  const handleConfirmAiFrame = useCallback(() => {
+    if (!pendingFrameRegion) {
+      return;
+    }
+
+    setDraftRegion(pendingFrameRegion);
+    setIsAiFrameReviewing(false);
+  }, [pendingFrameRegion, setDraftRegion]);
   const isViewingHistoricalVersion = Boolean(selectedVersion && !selectedVersion.isCurrent);
   const currentVersionName = selectedVersion
     ? `v${selectedVersion.version}`
@@ -435,20 +657,30 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
       ? `v${versions[0].version}`
       : 'v1';
   const currentMaterialId = selectedVersion?.id ?? versions[0]?.id ?? null;
-  const currentMaterialFrameComments = currentMaterialId
-    ? frameComments.filter((comment) => comment.materialId === currentMaterialId)
-    : [];
 
   const handleFrameClick = useCallback(async (frameId: string, materialId: string) => {
     const fId = Number(frameId);
     latestRequestedFrameIdRef.current = fId;
-    
+
     // Switch to the correct material
-    const targetMaterial = versions.find(v => String(v.id) === String(materialId));
+    const rawVersions = data?.versions ?? [];
+    let targetMaterial = rawVersions.find((v: any) => String(v.id) === String(materialId));
+
     if (targetMaterial) {
-      setSelectedVersion(targetMaterial);
+      if (targetMaterial.taskId) {
+        const matchedTask = tasks.find(t => String(t.id) === String(targetMaterial.taskId));
+        if (matchedTask && String(matchedTask.id) !== String(focusedTask?.id)) {
+          focusFileTask(matchedTask);
+        }
+      } else if (focusedTask) {
+        // Frame belongs to a global material, but we are viewing a task
+        focusFileTask(null);
+      }
+
+      setExplicitMaterialId(String(materialId));
+      setSelectedVersion(targetMaterial as FileVersionItem);
     }
-    
+
     setIsFrameLoading(true);
 
     try {
@@ -483,7 +715,13 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
         setIsFrameLoading(false);
       }
     }
-  }, [versions, setSelectedVersion, setPanOffset, zoom]);
+  }, [versions, setSelectedVersion]);
+
+  const handleClearFocusedFrame = useCallback(() => {
+    setFocusedFrameId(null);
+    setFocusedFrameMaterialId(null);
+    setFocusedFrameRegion(null);
+  }, []);
 
   const canvasFrameComments = useMemo(() => {
     if (!focusedFrameId || !focusedFrameRegion || String(focusedFrameMaterialId) !== String(activeVersionIdForCache)) return [];
@@ -518,8 +756,8 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     return frameComments;
   }, [frameComments, discussionContextKey]);
   const discussionContextLabel = focusedTask
-      ? `Task: ${focusedTask.title}`
-      : `File: ${file?.title ?? 'Untitled file'}`;
+    ? `Task: ${focusedTask.title}`
+    : `File: ${file?.title ?? 'Untitled file'}`;
   const assignedToName = tasks.find((t) => t.assignedTo && t.assignedTo !== 'Unassigned')?.assignedTo || 'Unassigned';
 
   const setDiscussionContext = useCallback((key: string) => {
@@ -534,9 +772,11 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     }
   }, [tasks, focusFileTask]);
 
+
   return {
     annotationMode,
     assignedToName,
+    aiFrameDialogOpen,
     canCreateTask,
     canReviewTask,
     canSubmitTask,
@@ -556,6 +796,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     focusedFrameId,
     isFrameLoading,
     handleFrameClick,
+    handleClearFocusedFrame,
     commentFilterMode,
     setCommentFilterMode,
     displayedPreviewUrl,
@@ -570,20 +811,27 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     focusFileTask,
     focusedTask,
     frameAnnotationMode,
+    getCanvasPointFromClient,
     handleCanvasPointerDown,
     handleCanvasPointerMove,
     handleCanvasPointerUp,
+    handleCancelAiFrame,
     handleCreateAnnotatedTask,
     handleCreateDiscussionComment,
     handleCreateFrameComment,
     handleReplyToFrame,
     handleCreateReview,
+    handleDetectAiFrame,
     handleDeleteDiscussionComment,
     handleFocusedTaskChange,
     handleSubmitTaskWork,
     handleMarkReadyForReview: canSubmitTask ? handleMarkReadyForReview : undefined,
+    handleConfirmAiFrame,
+    handleOpenAiFrameDialog,
     handleUpdateDiscussionComment,
     isLoading,
+    isAiFrameReviewing,
+    isDetectingAiFrame,
     isInitialLoading,
     isTaskContextLoading,
     isRefreshing,
@@ -606,10 +854,11 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     resourceTab,
     rotation,
     selectedTaskId,
-    selectedVersion,
+    selectedVersion: mergedSelectedVersion,
     selectedVersionForDetails,
     setAnnotationMode,
     setAnnotationStart,
+    setCanvasImageMetrics,
     setComparisonOpacity,
     setDesktopSidebarOpen,
     setDraftRegion,
@@ -627,6 +876,8 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     setSelectedVersion,
     setSelectedVersionForDetails,
     setTaskDialogOpen,
+    canEditTask,
+    canDeleteTask,
 
 
     setZoom,
