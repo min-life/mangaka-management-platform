@@ -5184,7 +5184,6 @@
                 "api",
                 "projects",
                 ":id",
-                "members",
                 "me"
               ],
               "host": [
@@ -7679,7 +7678,6 @@
                 "api",
                 "editor-boards",
                 ":id",
-                "members",
                 "me"
               ],
               "host": [

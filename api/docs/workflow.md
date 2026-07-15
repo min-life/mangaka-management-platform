@@ -1032,7 +1032,7 @@ Hệ thống cho phép nhập và tổng hợp số liệu của dự án thông
 ---
 
 ### Leave project 
-**DELETE** `/api/projects/{id}/members/me`
+**DELETE** `/api/projects/{id}/me`
 
 #### Parameters
 | Name | In | Required | Type | Description |
@@ -1444,7 +1444,7 @@ Hệ thống cho phép nhập và tổng hợp số liệu của dự án thông
 ---
 
 ### Leave editor board 
-**DELETE** `/api/editor-boards/{id}/members/me`
+**DELETE** `/api/editor-boards/{id}/me`
 
 #### Parameters
 | Name | In | Required | Type | Description |

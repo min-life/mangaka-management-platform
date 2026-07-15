@@ -313,6 +313,22 @@ export class ProjectsController {
 
   @Permissions({
     mode: 'ANY',
+    permissions: ['project:read'],
+    resource: 'PROJECT',
+  })
+  @ApiOperation({ summary: 'Leave project' })
+  @ApiParam({ name: 'id', type: Number, description: 'Project id' })
+  @ApiOkResponse({ description: 'Successfully left the project', type: SuccessResponseDto })
+  @Delete(':id/me')
+  async leaveProject(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() currentUser: JwtPayload,
+  ) {
+    await this.projectsService.leaveProject(id, currentUser.userId);
+  }
+
+  @Permissions({
+    mode: 'ANY',
     permissions: ['project:owner', 'project:member.remove'],
     resource: 'PROJECT',
   })
@@ -327,22 +343,6 @@ export class ProjectsController {
     @CurrentUser() currentUser: JwtPayload,
   ) {
     await this.projectsService.removeProjectMember(id, userId, currentUser.userId);
-  }
-
-  @Permissions({
-    mode: 'ANY',
-    permissions: ['project:read'],
-    resource: 'PROJECT',
-  })
-  @ApiOperation({ summary: 'Leave project' })
-  @ApiParam({ name: 'id', type: Number, description: 'Project id' })
-  @ApiOkResponse({ description: 'Successfully left the project', type: SuccessResponseDto })
-  @Delete(':id/members/me')
-  async leaveProject(
-    @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() currentUser: JwtPayload,
-  ) {
-    await this.projectsService.leaveProject(id, currentUser.userId);
   }
 
   @Permissions({
