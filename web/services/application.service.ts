@@ -277,7 +277,10 @@ export async function voteApplication(
   return response.data;
 }
 
-export async function getApplicationComments(applicationId: number | string) {
+export async function getApplicationComments(
+  applicationId: number | string,
+  options?: { limit?: number; page?: number }
+) {
   try {
     const response = await api.get<ApplicationCommentsResponse, ApplicationCommentsResponse>(
       `/applications/${applicationId}/comments`,
@@ -285,6 +288,8 @@ export async function getApplicationComments(applicationId: number | string) {
         params: {
           field: 'createdAt',
           order: 'desc',
+          limit: options?.limit ?? 10,
+          page: options?.page ?? 1,
         },
       },
     );
@@ -310,6 +315,22 @@ export async function createApplicationComment(applicationId: number | string, c
     { data?: ApplicationCommentResponse }
   >(`/applications/${applicationId}/comments`, { content });
 
+  return response.data;
+}
+
+export async function updateApplicationComment(commentId: number | string, text: string) {
+  const response = await api.patch<{ data?: ApplicationCommentResponse }, { data?: ApplicationCommentResponse }>(
+    `/comments/${commentId}`,
+    {
+      content: text,
+    },
+  );
+
+  return response.data;
+}
+
+export async function deleteApplicationComment(commentId: number | string) {
+  const response = await api.delete(`/comments/${commentId}`);
   return response.data;
 }
 

@@ -320,16 +320,16 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
   const isTaskAssigner = user?.id != null && focusedTask?.createdByUserId === user.id;
   const isTaskAssignee = user?.id != null && focusedTask?.assigneeId === user.id;
 
-  const canReviewTask = (isTaskAssigner && !isTaskAssignee) || canProject('admin') || isProjectOwner;
-  const canSubmitTask = canProject('admin') || isProjectOwner || isTaskAssignee || isTaskAssigner;
+  const canReviewTask = (isTaskAssigner && !isTaskAssignee);
+  const canSubmitTask = isTaskAssignee || isTaskAssigner;
   const canUpdateMaterial = focusedTask ? canSubmitTask : (canProject('project:material.create') || canProject('admin') || isProjectOwner);
   const canCreateTask = canProject('project:task.create') || canProject('admin') || isProjectOwner;
   const canRestoreVersion = canProject('project:material.restore') || canProject('project:material.update') || canProject('admin') || isProjectOwner;
   const canDeleteVersion = canProject('project:material.delete') || canProject('admin') || isProjectOwner;
 
   const canEditTask = useCallback((task: FileTaskItem) => {
-    return canProject('admin') || isProjectOwner || (task.createdByUserId === user?.id) || (task.assignedToUserId === user?.id);
-  }, [user?.id, canProject, isProjectOwner]);
+    return (task.createdByUserId === user?.id) || (task.assignedToUserId === user?.id);
+  }, [user?.id]);
 
   const canDeleteTask = useCallback((task: FileTaskItem) => {
     return task.createdByUserId === user?.id || canProject('admin') || isProjectOwner;

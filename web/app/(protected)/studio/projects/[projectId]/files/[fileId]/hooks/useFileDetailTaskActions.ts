@@ -59,7 +59,7 @@ export function useFileDetailTaskActions({
 }: TaskActionsProps) {
   const handleCreateAnnotatedTask = async (
     task: Partial<FileTaskItem>,
-    options?: { assignedBy?: number; parentId?: number },
+    options?: { assignedBy?: number | null; parentId?: number },
   ) => {
     try {
       const statusValue = task.status || 'PENDING';

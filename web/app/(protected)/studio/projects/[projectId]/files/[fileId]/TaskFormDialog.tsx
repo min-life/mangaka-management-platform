@@ -29,7 +29,7 @@ type TaskFormDialogProps = {
   onCancel: () => void;
   onSubmit: (
     task: Partial<FileTaskItem>,
-    options?: { assignedBy?: number; parentId?: number },
+    options?: { assignedBy?: number | null; parentId?: number },
   ) => Promise<void> | void;
   open: boolean;
   tasks?: FileTaskItem[];
@@ -47,7 +47,7 @@ export function TaskFormDialog({
 }: TaskFormDialogProps) {
   const [title, setTitle] = useState(initialData?.title || '');
   const [description, setDescription] = useState(initialData?.description || '');
-  const [assigneeId, setAssigneeId] = useState(initialData?.assignedToUserId ? String(initialData.assignedToUserId) : '');
+  const [assigneeId, setAssigneeId] = useState(initialData?.assignedToUserId ? String(initialData.assignedToUserId) : 'unassigned');
   const [dueDate, setDueDate] = useState(() => {
     if (initialData?.dueDate && initialData.dueDate !== 'No due date') {
       const parsedDate = new Date(initialData.dueDate);
@@ -81,12 +81,12 @@ export function TaskFormDialog({
     return name.slice(0, 2).toUpperCase();
   };
 
-  const effectiveAssigneeId = assigneeId || (members[0]?.id ? String(members[0].id) : '');
+  const effectiveAssigneeId = assigneeId === 'unassigned' ? '' : assigneeId;
 
   const resetForm = () => {
     setTitle('');
     setDescription('');
-    setAssigneeId('');
+    setAssigneeId('unassigned');
     setDueDate('');
     setParentId('');
     setStatus('PENDING');
@@ -109,6 +109,7 @@ export function TaskFormDialog({
       await onSubmit(
         {
           assignedTo: assigneeName,
+          assignedToUserId: effectiveAssigneeId ? Number(effectiveAssigneeId) : undefined,
           description: description.trim() || 'No description.',
           dueDate: dueDate || undefined,
           id: initialData?.id || `task-local-${Date.now()}`,
@@ -116,7 +117,7 @@ export function TaskFormDialog({
           title: title.trim(),
         },
         {
-          assignedBy: effectiveAssigneeId ? Number(effectiveAssigneeId) : undefined,
+          assignedBy: effectiveAssigneeId ? Number(effectiveAssigneeId) : null,
           parentId: parentId ? Number(parentId) : undefined,
         },
       );
@@ -227,7 +228,7 @@ export function TaskFormDialog({
                     type="button"
                     className="flex w-full items-center px-4 py-2.5 text-xs font-bold text-white hover:bg-[#151c25] transition-colors"
                     onClick={() => {
-                      setAssigneeId('');
+                      setAssigneeId('unassigned');
                       setIsAssigneeDropdownOpen(false);
                     }}
                   >

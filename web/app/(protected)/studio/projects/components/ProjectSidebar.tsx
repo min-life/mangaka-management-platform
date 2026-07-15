@@ -20,9 +20,9 @@ export function ProjectSidebar({ projectId }: ProjectSidebarProps) {
   const baseHref = `/studio/projects/${projectId}`;
   const navItems: StudioSidebarItem[] = [
     { exact: true, href: baseHref, icon: LayoutDashboard, label: 'Dashboard' },
+    { href: `${baseHref}/files`, icon: FolderOpen, label: 'Resources' },
     { href: `${baseHref}/members`, icon: Users, label: 'Members' },
     { href: `${baseHref}/applications`, icon: FileCheck2, label: 'Applications' },
-    { href: `${baseHref}/files`, icon: FolderOpen, label: 'Resources' },
     { href: `${baseHref}/tasks`, icon: ClipboardList, label: 'Tasks' },
     { href: `${baseHref}/statistics`, icon: BarChart3, label: 'Statistics' },
   ];
