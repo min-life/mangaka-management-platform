@@ -48,6 +48,7 @@ import {
 } from './application-ui';
 
 import { useProjectParams } from '@/hooks/useProjectParams';
+import { useProjectStore, selectApplications } from '../../store/project-store';
 
 type ApplicationStatusFilter = 'ALL' | ApplicationStatus;
 
@@ -94,10 +95,17 @@ export function ApplicationsClient() {
   const autoOpenAppId = searchParams.get('applicationId');
   const hasAutoOpened = useRef(false);
   const { numericId: projectId } = useProjectParams();
-  const [applications, setApplications] = useState<ApplicationResponse[]>([]);
+
+  // ── Store ─────────────────────────────────────────────────────────────────
+  const { loadApplications, invalidateApplications } = useProjectStore();
+  const applicationsState = useProjectStore(selectApplications(projectId));
+  const applications = applicationsState.list;
+  const isLoadingApps = applicationsState.isLoading || !applicationsState.loaded;
+
   const [permissions, setPermissions] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<ApplicationStatusFilter>('ALL');
+  // isLoading relates to permissions and folders now
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -132,13 +140,12 @@ export function ApplicationsClient() {
     permissions.includes('board:owner') ||
     permissions.includes('board:leader');
 
-  const loadApplications = useCallback(async () => {
+  const loadPermissionsAndFolders = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const [applicationResult, permissionResult, folderResult, projectResult] = await Promise.all([
-        getProjectApplications(projectId),
+      const [permissionResult, folderResult, projectResult] = await Promise.all([
         getMyProjectPermissions(projectId),
         getProjectFolders(projectId, { type: 'ARC' }),
         getProjectById(projectId),
@@ -155,12 +162,10 @@ export function ApplicationsClient() {
         }
       }
 
-      setApplications(applicationResult.applications);
       setPermissions(allPermissions);
       setParentFolders(folderResult.folders);
     } catch {
-      setError('Unable to load approvals.');
-      setApplications([]);
+      setError('Unable to load permissions.');
     } finally {
       setIsLoading(false);
     }
@@ -185,20 +190,24 @@ export function ApplicationsClient() {
 
   useEffect(() => {
     queueMicrotask(() => {
-      void loadApplications();
+      void loadPermissionsAndFolders();
+      void loadApplications(projectId);
     });
-  }, [loadApplications]);
+  }, [loadPermissionsAndFolders, loadApplications, projectId]);
 
   useEffect(() => {
     if (activities.length > 0) {
       const latestActivity = activities[0];
       if (latestActivity?.action?.startsWith('APPLICATION_')) {
-        void loadApplications();
+        void loadApplications(projectId, true);
       }
     }
-  }, [activities.length, loadApplications]);
+  }, [activities.length, loadApplications, projectId]);
 
-  const applicationIdParam = searchParams.get('applicationId');
+  const handleApplicationCreated = () => {
+    void loadApplications(projectId, true);
+    toast.success('Application created successfully.');
+  };
 
   const filteredApplications = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -277,8 +286,7 @@ export function ApplicationsClient() {
       });
       setOpenCreateDialog(false);
       resetCreateForm();
-      await loadApplications();
-      toast.success('Request submitted.');
+      handleApplicationCreated();
     } catch (createError) {
       console.error('Unable to create approval request:', createError);
       if (createError instanceof AxiosError && createError.response?.data) {
@@ -360,21 +368,21 @@ export function ApplicationsClient() {
 
   // Deep link from activity-log/notification clicks, e.g. ?applicationId=123
   useEffect(() => {
-    if (!applicationIdParam) return;
-    const applicationId = Number(applicationIdParam);
+    if (!autoOpenAppId) return;
+    const applicationId = Number(autoOpenAppId);
     if (!Number.isFinite(applicationId)) return;
 
     queueMicrotask(() => {
       void handleOpenApplication({ id: applicationId } as ApplicationResponse);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [applicationIdParam]);
+  }, [autoOpenAppId]);
 
   const refreshSelectedApplication = async (applicationId: number) => {
     const [detail, commentResult] = await Promise.all([
       getApplicationById(applicationId),
       getApplicationComments(applicationId),
-      loadApplications(),
+      loadApplications(projectId, true),
     ]);
 
     if (detail) {
@@ -407,9 +415,10 @@ export function ApplicationsClient() {
 
     try {
       await deleteApplication(application.id);
+      invalidateApplications(projectId);
+      void loadApplications(projectId, true);
       setSelectedApplication(null);
       setSelectedComments([]);
-      await loadApplications();
       toast.success('Application deleted.');
     } catch (deleteError) {
       console.error('Unable to delete application:', deleteError);
@@ -464,7 +473,7 @@ export function ApplicationsClient() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || isLoadingApps) {
     return (
       <section className="px-5 py-6">
         <div className="flex items-end justify-between">

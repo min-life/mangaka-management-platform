@@ -1,5 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { getProjectFolders, getProjectMembers, getProjectById, type ProjectFolderResponse, type ProjectResponse } from '@/services/project.service';
+import { useFileDetailStore, selectFileDetail, EMPTY_FILE_CACHE_STATE } from '../../../../store/file-detail-store';
+import { useProjectStore, selectProject, selectFolders, selectMembers } from '../../../../store/project-store';
 import { parseDecimal } from '@/lib/utils';
 import { getFileById, getFileComments, getFileMaterials, getFileTasks } from '@/services/file.service';
 import { getTaskComments, getTaskMaterials } from '@/services/task.service';
@@ -26,18 +28,86 @@ type UseFileDetailDataFetcherProps = {
   selectedTaskId: string | null;
 };
 
+export type FileDetailData = {
+  project: any;
+  folders: ProjectFolderResponse[];
+  members: { id: number; name: string }[];
+  file: FileExplorerItem | null;
+  versions: FileVersionItem[];
+  tasks: FileTaskItem[];
+  comments: FileDiscussionComment[];
+  frameComments: SubmissionFrameComment[];
+  latestMaterialVersion: FileVersionItem | null;
+};
+
 export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: UseFileDetailDataFetcherProps) {
-  const [data, setData] = useState<{
-    project: any;
-    folders: ProjectFolderResponse[];
-    members: { id: number; name: string }[];
-    file: FileExplorerItem | null;
+  const [localData, setLocalData] = useState<{
     versions: FileVersionItem[];
-    tasks: FileTaskItem[];
     comments: FileDiscussionComment[];
     frameComments: SubmissionFrameComment[];
-    latestMaterialVersion: FileVersionItem | null;
   } | null>(null);
+
+  const fileDetailCache = useFileDetailStore(selectFileDetail(fileId));
+  const { setFileData } = useFileDetailStore();
+
+  const projectState = useProjectStore(selectProject(projectId));
+  const foldersState = useProjectStore(selectFolders(projectId));
+  const membersState = useProjectStore(selectMembers(projectId));
+
+  const data = useMemo((): FileDetailData | null => {
+    if (!localData && !fileDetailCache.file) return null;
+    return {
+      project: projectState.data,
+      folders: foldersState.folders || [],
+      members: (membersState.list || []).map(m => ({ id: m.id, name: m.displayName || m.email || '' })),
+      file: fileDetailCache.file,
+      tasks: fileDetailCache.tasks,
+      latestMaterialVersion: fileDetailCache.latestMaterialVersion,
+      versions: localData?.versions || [],
+      comments: localData?.comments || [],
+      frameComments: localData?.frameComments || [],
+    };
+  }, [localData, fileDetailCache, projectState.data, foldersState.folders, membersState.list]);
+
+  const setData = useCallback((updater: React.SetStateAction<FileDetailData | null>) => {
+    setLocalData((prevLocal) => {
+      const currentState = useFileDetailStore.getState().files[String(fileId)] || EMPTY_FILE_CACHE_STATE;
+      const projState = useProjectStore.getState().projects[String(projectId)];
+      const foldState = useProjectStore.getState().folders[String(projectId)];
+      const memState = useProjectStore.getState().members[String(projectId)];
+
+      const mergedPrev = (prevLocal || currentState.file) ? {
+        ...(prevLocal || { versions: [], comments: [], frameComments: [] }),
+        file: currentState.file,
+        tasks: currentState.tasks,
+        latestMaterialVersion: currentState.latestMaterialVersion,
+        project: projState?.data || null,
+        folders: foldState?.folders || [],
+        members: (memState?.list || []).map(m => ({ id: m.id, name: m.displayName || m.email || '' })),
+      } : null;
+
+      const nextMerged = typeof updater === 'function' ? updater(mergedPrev) : updater;
+      if (!nextMerged) return null;
+
+      if (
+        nextMerged.file !== currentState.file ||
+        nextMerged.tasks !== currentState.tasks ||
+        nextMerged.latestMaterialVersion !== currentState.latestMaterialVersion
+      ) {
+        useFileDetailStore.getState().setFileData(fileId, {
+          file: nextMerged.file,
+          tasks: nextMerged.tasks,
+          latestMaterialVersion: nextMerged.latestMaterialVersion,
+        });
+      }
+
+      return {
+        versions: nextMerged.versions,
+        comments: nextMerged.comments,
+        frameComments: nextMerged.frameComments,
+      };
+    });
+  }, [fileId, projectId]);
 
   const [commentPagination, setCommentPagination] = useState<{ page: number; totalPages: number }>({ page: 1, totalPages: 1 });
   const [isLoadingMoreComments, setIsLoadingMoreComments] = useState(false);
@@ -82,21 +152,9 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
       }
 
       const [
-        projData,
-        folderResult,
-        membersRes,
         response,
         tasksRes
       ] = await Promise.all([
-        getProjectById(projectId).catch(err => {
-          console.error('Failed to load project details:', err);
-          return null;
-        }),
-        getProjectFolders(projectId),
-        getProjectMembers(projectId).catch(err => {
-          console.error('Failed to load project members:', err);
-          return { members: [] };
-        }),
         getFileById(fileId),
         getFileTasks(fileId).catch(err => {
           console.error('Failed to load file tasks:', err);
@@ -106,11 +164,7 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
 
       if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
 
-      const productionFolders = folderResult.folders;
-      const apiMembers = (membersRes?.members || []).map((m: any) => ({
-        id: m.id,
-        name: m.displayName || m.email,
-      }));
+      // Removed duplicate project/folders/members loading
 
       const createdByLabel =
         response.createdByUser?.displayName ||
@@ -217,40 +271,35 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
         } as FileVersionItem;
       }
 
-      const result = {
-        project: projData,
-        folders: productionFolders,
-        members: apiMembers,
-        file: ({
-          id: String(response.id),
-          title: response.title,
-          updatedAt: response.updatedAt ? formatFileDate(response.updatedAt) : '',
-          updatedBy: response.updatedByUser?.displayName || response.updatedByUser?.email || 'Unknown',
-          previewUrl: latestPreviewUrl,
-          isFolder: false,
-          createdBy: createdByLabel,
-          createdAt: response.createdAt ? formatFileDate(response.createdAt) : '',
-          status: (response as any).status || 'DRAFT',
-          folderId: (response as any).folder?.id,
-        } as unknown) as FileExplorerItem,
-        // Versions & comments start empty — loaded lazily on demand
-        versions: [],
-        tasks: dbTasks,
-        comments: [],
-        frameComments: [],
-        latestMaterialVersion,
-      };
+      const resultFile = {
+        id: String(response.id),
+        title: response.title,
+        updatedAt: response.updatedAt ? formatFileDate(response.updatedAt) : '',
+        updatedBy: response.updatedByUser?.displayName || response.updatedByUser?.email || 'Unknown',
+        previewUrl: latestPreviewUrl,
+        isFolder: false,
+        createdBy: createdByLabel,
+        createdAt: response.createdAt ? formatFileDate(response.createdAt) : '',
+        status: (response as any).status || 'DRAFT',
+        folderId: (response as any).folder?.id,
+      } as unknown as FileExplorerItem;
 
-      setData((prev) => {
+      setFileData(fileId, {
+        file: resultFile,
+        tasks: dbTasks,
+        latestMaterialVersion,
+        loaded: true,
+      });
+
+      setLocalData((prev) => {
         if (prev && isRefresh) {
-          return {
-            ...result,
-            versions: prev.versions,
-            comments: prev.comments,
-            frameComments: prev.frameComments,
-          };
+          return prev;
         }
-        return result;
+        return {
+          versions: [],
+          comments: [],
+          frameComments: [],
+        };
       });
       setHasLoaded(true);
       // Reset deferred flags on full reload so they can be triggered again
@@ -339,7 +388,7 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
         }
       }
 
-      setData(prev => prev ? { ...prev, versions: dbVersions } : prev);
+      setLocalData(prev => prev ? { ...prev, versions: dbVersions } : prev);
       setVersionsLoaded(true);
       setLoadedTaskVersionsId(selectedTaskId);
     } catch (err) {
@@ -395,7 +444,7 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
         }
       }
 
-      setData(prev => prev ? { ...prev, comments: dbComments, frameComments: dbTaskComments } : prev);
+      setLocalData(prev => prev ? { ...prev, comments: dbComments, frameComments: dbTaskComments } : prev);
       setCommentsLoaded(true);
       setLoadedTaskCommentsId(selectedTaskId);
     } catch (err) {
@@ -408,7 +457,7 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
   useEffect(() => {
     const controller = new AbortController();
     setHasLoaded(false);
-    setData(null);
+    setLocalData(null);
     setVersionsLoaded(false);
     setLoadedTaskVersionsId(null);
     setCommentsLoaded(false);

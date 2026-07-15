@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useProjectParams } from '@/hooks/useProjectParams';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import {
   CheckCircle2,
   Clock3,
@@ -28,6 +28,7 @@ import {
   type ProjectDashboardResponse,
 } from '@/services/project.service';
 import { useRealtimeProjectActivity } from '@/hooks/use-realtime-activity';
+import { useProjectStore, selectProject, selectDashboard } from '../store/project-store';
 
 function formatUpdatedAt(dateStr: string) {
   try {
@@ -51,40 +52,24 @@ export default function ProjectDashboardPage() {
 
   const { activities } = useRealtimeProjectActivity(numericId);
 
-  const [project, setProject] = useState<ProjectResponse | null>(null);
-  const [dashboard, setDashboard] = useState<ProjectDashboardResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { loadDashboard } = useProjectStore();
+  const projectState = useProjectStore(selectProject(numericId));
+  const dashboardState = useProjectStore(selectDashboard(numericId));
+
+  const project = projectState.data;
+  const dashboard = dashboardState.data;
+  const isLoading = dashboardState.isLoading || !dashboardState.loaded;
 
   useEffect(() => {
     if (!numericId) return;
+    void loadDashboard(numericId);
+  }, [numericId, loadDashboard]);
 
-    let isMounted = true;
-
-    async function loadDashboardData() {
-      try {
-        const [proj, dash] = await Promise.all([
-          getProjectById(numericId),
-          getProjectDashboard(numericId),
-        ]);
-        if (!isMounted) return;
-
-        setProject(proj);
-        setDashboard(dash ?? null);
-      } catch (err) {
-        console.error('Failed to load project dashboard details:', err);
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    void loadDashboardData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [numericId, activities.length]);
+  // Re-fetch when activity comes in (realtime)
+  useEffect(() => {
+    if (!numericId || activities.length === 0) return;
+    void loadDashboard(numericId, true);
+  }, [numericId, activities.length, loadDashboard]);
 
 function DashboardSkeleton() {
   return (
