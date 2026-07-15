@@ -42,7 +42,7 @@ export function MobileTaskDrawer({
   discussionFrameComments,
   isLoadingVersions,
 }: MobileTaskDrawerProps) {
-  const [sidebarTab, setSidebarTab] = useState<'task' | 'material'>('task');
+  const [sidebarTab, setSidebarTab] = useState<'task' | 'material'>('material');
   const [mobileEditingTask, setMobileEditingTask] = useState<FileTaskItem | null>(null);
   const [mobileDeletingTask, setMobileDeletingTask] = useState<FileTaskItem | null>(null);
 
