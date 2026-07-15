@@ -17,17 +17,22 @@ import HeaderBackButton from '@/src/components/shared/HeaderBackButton';
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
 import { RootStackParamList } from '@/src/navigation/types';
-import { ApiFolder, ApiProjectStat } from '@/src/services/apiTypes';
+import { ApiFolder, ApiProjectStat, ApiProjectStatMonth } from '@/src/services/apiTypes';
 import {
+  fetchFolderChildren,
   fetchProjectById,
   fetchProjectFolders,
   fetchProjectStats,
 } from '@/src/services/projectApi';
 import {
-  aggregateProjectStats,
   formatProjectStatValue,
+  getProjectStatMonthValue,
   getProjectStatsYears,
-  ProjectStatRow,
+  isProjectStatsEmpty,
+  PROJECT_STATS_CHARTS,
+  PROJECT_STATS_KPIS,
+  ProjectStatsMetricKey,
+  ProjectStatsSummaryKey,
 } from '@/src/services/projectStats';
 import { ProjectItem } from '@/src/types/projects';
 
@@ -37,25 +42,6 @@ type FilterOption = {
   label: string;
   value: string;
 };
-
-const TREND_COLORS = ['#FFD369', '#60A5FA', '#34D399', '#F87171', '#A78BFA'];
-
-function formatUpdatedAt(value?: string) {
-  if (!value) return 'No upload recorded';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'No upload recorded';
-  return `Updated ${date.toLocaleDateString('en-US', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })}`;
-}
-
-function getMetricKindLabel(key: string) {
-  const normalized = key.toLowerCase();
-  if (normalized.includes('average') || normalized.includes('rating')) return 'Average';
-  return 'Total';
-}
 
 function ReportHeader({ onBack, project }: { onBack: () => void; project: ProjectItem | null }) {
   return (
@@ -193,7 +179,17 @@ function FilterSelect({
   );
 }
 
-function KpiCard({ label, value }: { label: string; value: string }) {
+function KpiCard({
+  icon,
+  label,
+  meta,
+  value,
+}: {
+  icon: string;
+  label: string;
+  meta: string;
+  value: string;
+}) {
   return (
     <View
       className="rounded-xl p-4"
@@ -204,39 +200,48 @@ function KpiCard({ label, value }: { label: string; value: string }) {
         width: '48%',
       }}
     >
-      <Text className="text-[11px] font-black uppercase" style={{ color: Colors.textMuted }}>
-        {label}
-      </Text>
-      <Text className="mt-2 text-[24px] font-black" style={{ color: Colors.text }} numberOfLines={1}>
+      <View className="flex-row items-center gap-2">
+        <MaterialIcon name={icon} color={Colors.textMuted} size={16} />
+        <Text className="text-[11px] font-black uppercase" style={{ color: Colors.textMuted }}>
+          {label}
+        </Text>
+      </View>
+      <Text
+        className="mt-2 text-[24px] font-black"
+        style={{ color: Colors.text }}
+        numberOfLines={1}
+      >
         {value}
+      </Text>
+      <Text className="mt-1 text-[10px] font-semibold" style={{ color: Colors.textFaint }}>
+        {meta}
       </Text>
     </View>
   );
 }
 
-function metricValue(row: ProjectStatRow, key: string) {
-  const value = row[key];
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
 function MetricTrendCard({
   color,
+  icon,
   metricKey,
   months,
   summaryValue,
+  title,
 }: {
   color: string;
-  metricKey: string;
-  months: ProjectStatRow[];
+  icon: string;
+  metricKey: ProjectStatsMetricKey;
+  months: ApiProjectStatMonth[];
   summaryValue: number;
+  title: string;
 }) {
   const { width } = useWindowDimensions();
   const chartWidth = Math.max(260, width - 64);
   const chartHeight = 120;
   const chartPadding = 14;
   const points = months
-    .map((row, index) => ({ index, value: metricValue(row, metricKey) }))
-    .filter((point): point is { index: number; value: number } => point.value !== null);
+    .map((row) => ({ month: row.month, value: getProjectStatMonthValue(row, metricKey) }))
+    .filter((point): point is { month: number; value: number } => point.value !== null);
   const values = points.map((point) => point.value);
   const maxValue = Math.max(...values, 1);
   const minValue = Math.min(...values, 0);
@@ -245,12 +250,12 @@ function MetricTrendCard({
   const usableHeight = chartHeight - chartPadding * 2;
   const polylinePoints = points
     .map((point) => {
-      const x = chartPadding + (point.index / 11) * usableWidth;
+      const x = chartPadding + ((point.month - 1) / 11) * usableWidth;
       const y = chartPadding + ((maxValue - point.value) / valueRange) * usableHeight;
       return `${x},${y}`;
     })
     .join(' ');
-  const latestPoint = [...points].reverse()[0];
+  const latestPoint = [...points].sort((a, b) => b.month - a.month)[0];
 
   return (
     <View
@@ -263,12 +268,16 @@ function MetricTrendCard({
     >
       <View className="flex-row items-start justify-between gap-3">
         <View className="min-w-0 flex-1">
-          <Text className="text-[15px] font-black" numberOfLines={1} style={{ color: Colors.text }}>
-            {metricKey}
-          </Text>
-          <Text className="mt-1 text-[12px] font-semibold" style={{ color: Colors.textMuted }}>
-            {getMetricKindLabel(metricKey)}
-          </Text>
+          <View className="flex-row items-center gap-2">
+            <MaterialIcon name={icon} color={Colors.textMuted} size={16} />
+            <Text
+              className="text-[15px] font-black"
+              numberOfLines={1}
+              style={{ color: Colors.text }}
+            >
+              {title}
+            </Text>
+          </View>
         </View>
         <Text className="text-[18px] font-black" style={{ color }}>
           {formatProjectStatValue(metricKey, summaryValue)}
@@ -301,9 +310,9 @@ function MetricTrendCard({
               strokeWidth={2.5}
             />
             {points.map((point) => {
-              const x = chartPadding + (point.index / 11) * usableWidth;
+              const x = chartPadding + ((point.month - 1) / 11) * usableWidth;
               const y = chartPadding + ((maxValue - point.value) / valueRange) * usableHeight;
-              return <Circle key={`${point.index}-${point.value}`} cx={x} cy={y} fill={color} r={3} />;
+              return <Circle key={`${point.month}-${point.value}`} cx={x} cy={y} fill={color} r={3} />;
             })}
           </Svg>
         ) : (
@@ -321,7 +330,7 @@ function MetricTrendCard({
         </Text>
         {latestPoint ? (
           <Text className="text-[11px] font-bold" style={{ color: Colors.textMuted }}>
-            Latest M{latestPoint.index + 1}: {formatProjectStatValue(metricKey, latestPoint.value)}
+            Latest M{latestPoint.month}: {formatProjectStatValue(metricKey, latestPoint.value)}
           </Text>
         ) : null}
         <Text className="text-[11px] font-bold uppercase" style={{ color: Colors.textFaint }}>
@@ -343,10 +352,10 @@ function EmptyStatisticsState() {
     >
       <MaterialIcon name="assessment" color={Colors.textFaint} size={32} />
       <Text className="mt-4 text-center text-[15px] font-black" style={{ color: Colors.text }}>
-        No statistics data
+        No stats imported for this scope yet
       </Text>
       <Text className="mt-2 text-center text-[13px] leading-5" style={{ color: Colors.textMuted }}>
-        No metrics were found for the selected year, arc, and chapter.
+        Upload CSV records on web to see project statistics here.
       </Text>
     </View>
   );
@@ -354,11 +363,12 @@ function EmptyStatisticsState() {
 
 export default function ProjectReportScreen({ navigation, route }: ProjectReportScreenProps) {
   const [project, setProject] = useState<ProjectItem | null>(null);
-  const [statsRecord, setStatsRecord] = useState<ApiProjectStat | null>(null);
-  const [folders, setFolders] = useState<ApiFolder[]>([]);
+  const [stats, setStats] = useState<ApiProjectStat | null>(null);
+  const [arcs, setArcs] = useState<ApiFolder[]>([]);
+  const [chaptersByArc, setChaptersByArc] = useState<Record<string, ApiFolder[]>>({});
   const [selectedArcId, setSelectedArcId] = useState('all');
   const [selectedChapterId, setSelectedChapterId] = useState('all');
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -367,20 +377,44 @@ export default function ProjectReportScreen({ navigation, route }: ProjectReport
     setErrorMessage('');
 
     try {
-      const [projectResult, statsResult, foldersResult] = await Promise.all([
+      const statsQuery = {
+        arcId:
+          selectedChapterId === 'all' && selectedArcId !== 'all'
+            ? Number(selectedArcId)
+            : undefined,
+        chapterId: selectedChapterId !== 'all' ? Number(selectedChapterId) : undefined,
+        year: selectedYear ?? undefined,
+      };
+      const [projectResult, statsResult, arcsResult] = await Promise.all([
         fetchProjectById(route.params.projectId).catch(() => null),
-        fetchProjectStats(route.params.projectId),
-        fetchProjectFolders(route.params.projectId, { limit: 100 }),
+        fetchProjectStats(route.params.projectId, statsQuery),
+        fetchProjectFolders(route.params.projectId, { limit: 100, type: 'ARC' }),
       ]);
+      const chapterResponses = await Promise.all(
+        arcsResult.folders.map((arc) =>
+          fetchFolderChildren(String(arc.id)).catch(() => ({ folders: [] as ApiFolder[] })),
+        ),
+      );
+      const nextChaptersByArc = arcsResult.folders.reduce<Record<string, ApiFolder[]>>(
+        (result, arc, index) => {
+          result[String(arc.id)] = chapterResponses[index]?.folders.filter(
+            (folder) => folder.type === 'CHAPTER',
+          ) ?? [];
+          return result;
+        },
+        {},
+      );
+
       setProject(projectResult);
-      setStatsRecord(statsResult);
-      setFolders(foldersResult.folders);
+      setStats(statsResult);
+      setArcs(arcsResult.folders);
+      setChaptersByArc(nextChaptersByArc);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to load statistics data.');
     } finally {
       setIsLoading(false);
     }
-  }, [route.params.projectId]);
+  }, [route.params.projectId, selectedArcId, selectedChapterId, selectedYear]);
 
   useEffect(() => {
     void loadReport();
@@ -388,32 +422,29 @@ export default function ProjectReportScreen({ navigation, route }: ProjectReport
 
   const yearOptions = useMemo(
     () =>
-      getProjectStatsYears(statsRecord?.metrics).map((year) => ({
+      getProjectStatsYears(stats).map((year) => ({
         label: String(year),
         value: String(year),
       })),
-    [statsRecord?.metrics],
+    [stats],
   );
-
   useEffect(() => {
-    if (yearOptions.length === 0) return;
+    if (selectedYear === null) return;
     if (!yearOptions.some((option) => option.value === String(selectedYear))) {
-      setSelectedYear(Number(yearOptions[0].value));
+      setSelectedYear(null);
     }
   }, [selectedYear, yearOptions]);
 
-  const arcs = useMemo(() => folders.filter((folder) => folder.type === 'ARC'), [folders]);
+  const effectiveYear = selectedYear ?? stats?.year ?? new Date().getFullYear();
   const chapters = useMemo(
-    () =>
-      folders.filter(
-        (folder) =>
-          folder.type === 'CHAPTER' &&
-          (selectedArcId === 'all' || String(folder.parentId) === selectedArcId),
-      ),
-    [folders, selectedArcId],
+    () => (selectedArcId === 'all' ? [] : (chaptersByArc[selectedArcId] ?? [])),
+    [chaptersByArc, selectedArcId],
   );
   const arcOptions = useMemo<FilterOption[]>(
-    () => [{ label: 'All arcs', value: 'all' }, ...arcs.map((arc) => ({ label: arc.title, value: String(arc.id) }))],
+    () => [
+      { label: 'All arcs', value: 'all' },
+      ...arcs.map((arc) => ({ label: arc.title, value: String(arc.id) })),
+    ],
     [arcs],
   );
   const chapterOptions = useMemo<FilterOption[]>(
@@ -423,22 +454,7 @@ export default function ProjectReportScreen({ navigation, route }: ProjectReport
     ],
     [chapters],
   );
-
-  const { months, summary } = useMemo(
-    () =>
-      aggregateProjectStats(
-        statsRecord?.metrics,
-        {
-          arcId: selectedArcId !== 'all' ? selectedArcId : undefined,
-          chapterId: selectedChapterId !== 'all' ? selectedChapterId : undefined,
-          year: selectedYear,
-        },
-        folders,
-      ),
-    [folders, selectedArcId, selectedChapterId, selectedYear, statsRecord?.metrics],
-  );
-
-  const summaryKeys = useMemo(() => Object.keys(summary), [summary]);
+  const showEmptyState = !stats || isProjectStatsEmpty(stats);
 
   if (isLoading) {
     return (
@@ -480,10 +496,8 @@ export default function ProjectReportScreen({ navigation, route }: ProjectReport
                 Project Statistics
               </Text>
               <Text className="mt-1 text-[13px] leading-5" style={{ color: Colors.textMuted }}>
-                Detailed metrics aggregated from uploaded CSV records.
-              </Text>
-              <Text className="mt-2 text-[12px] font-semibold" style={{ color: Colors.textFaint }}>
-                {formatUpdatedAt(statsRecord?.updatedAt)}
+                Views, sales, revenue and reviews imported per chapter from CSV.
+                {stats ? ` Showing year ${stats.year}.` : ''}
               </Text>
             </View>
           </View>
@@ -495,12 +509,6 @@ export default function ProjectReportScreen({ navigation, route }: ProjectReport
             showsHorizontalScrollIndicator={false}
           >
             <FilterSelect
-              label="Year"
-              onSelect={(value) => setSelectedYear(Number(value))}
-              options={yearOptions}
-              value={String(selectedYear)}
-            />
-            <FilterSelect
               label="Arc"
               onSelect={(value) => {
                 setSelectedArcId(value);
@@ -510,32 +518,58 @@ export default function ProjectReportScreen({ navigation, route }: ProjectReport
               value={selectedArcId}
             />
             <FilterSelect
-              disabled={chapters.length === 0}
+              disabled={selectedArcId === 'all' || chapters.length === 0}
               label="Chapter"
               onSelect={setSelectedChapterId}
               options={chapterOptions}
               value={selectedChapterId}
             />
+            <FilterSelect
+              label="Year"
+              onSelect={(value) => setSelectedYear(Number(value))}
+              options={yearOptions}
+              value={String(effectiveYear)}
+            />
           </ScrollView>
 
-          {summaryKeys.length > 0 ? (
+          {stats && !showEmptyState ? (
             <>
               <View className="mt-5 flex-row flex-wrap justify-between gap-y-3">
-                {summaryKeys.map((key) => (
-                  <KpiCard key={key} label={key} value={formatProjectStatValue(key, summary[key])} />
-                ))}
+                {PROJECT_STATS_KPIS.map((kpi) => {
+                  const value = stats.summary[kpi.key];
+                  return (
+                    <KpiCard
+                      key={kpi.key}
+                      icon={kpi.icon}
+                      label={kpi.label}
+                      meta={kpi.meta(stats)}
+                      value={formatProjectStatValue(kpi.key, value)}
+                    />
+                  );
+                })}
               </View>
 
               <View className="mt-5 gap-4">
-                {summaryKeys.map((key, index) => (
-                  <MetricTrendCard
-                    key={key}
-                    color={TREND_COLORS[index % TREND_COLORS.length]}
-                    metricKey={key}
-                    months={months}
-                    summaryValue={summary[key]}
-                  />
-                ))}
+                {PROJECT_STATS_CHARTS.map((chart) => {
+                  const summaryKeyByMetric: Record<ProjectStatsMetricKey, ProjectStatsSummaryKey> = {
+                    rating: 'averageRating',
+                    revenue: 'totalRevenue',
+                    reviews: 'totalReviews',
+                    sales: 'totalSales',
+                    views: 'totalViews',
+                  };
+                  return (
+                    <MetricTrendCard
+                      key={chart.key}
+                      color={chart.color}
+                      icon={chart.icon}
+                      metricKey={chart.key}
+                      months={stats.months}
+                      summaryValue={stats.summary[summaryKeyByMetric[chart.key]]}
+                      title={chart.title}
+                    />
+                  );
+                })}
               </View>
             </>
           ) : (

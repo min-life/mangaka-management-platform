@@ -481,7 +481,9 @@ export function mapTaskCard(task: ApiTask): Task {
   const projectId = String(task.file?.folder?.projectId ?? task.file?.folder?.project?.id ?? '');
 
   return {
+    assignedById: String(task.assignedBy ?? task.assignedByUser?.id ?? ''),
     assignees,
+    createdById: creatorId(task),
     dueLabel: task.deadline ? relativeDate(task.deadline) : 'No due date',
     fileId,
     id: String(task.id),
