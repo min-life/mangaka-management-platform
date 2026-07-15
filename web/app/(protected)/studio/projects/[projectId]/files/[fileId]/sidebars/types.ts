@@ -14,6 +14,7 @@ export type FileTaskSidebarProps = {
   canCreateTask: boolean;
   canReviewTask: boolean;
   canSubmitTask: boolean;
+  canUpdateMaterial?: boolean;
   canEditTask?: (task: FileTaskItem) => boolean;
   canDeleteTask?: (task: FileTaskItem) => boolean;
   file: FileExplorerItem;

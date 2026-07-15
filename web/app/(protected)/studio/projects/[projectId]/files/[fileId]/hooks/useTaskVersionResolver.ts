@@ -77,9 +77,10 @@ export function useTaskVersionResolver({
         region: dbTask.region,
         submissions: dbTask.submissions || [],
         isMine: user?.id != null && dbTask.assignedToUserId === user.id,
-        assignedByUserId: dbTask.assignedByUserId,
+        createdByUserId: dbTask.createdByUserId,
         updatedAt: dbTask.updatedAt ?? new Date().toISOString(),
         targetVersion: dbTask.targetVersion,
+        parent: dbTask.parent,
       };
 
       setFocusedTask((prev) => {

@@ -159,12 +159,11 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
         getFileTasks(fileId).catch(err => {
           console.error('Failed to load file tasks:', err);
           return [];
-        })
+        }),
+        useProjectStore.getState().loadMembers(projectId),
       ]);
 
       if (signal?.aborted || currentLoadId !== activeLoadRef.current) return;
-
-      // Removed duplicate project/folders/members loading
 
       const createdByLabel =
         response.createdByUser?.displayName ||
@@ -200,8 +199,8 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
 
           return {
             assignedTo: t.assignedByUser?.displayName || t.assignedByUser?.email || 'Unassigned',
-            assignedToUserId: t.assignedBy,
-            assignedByUserId: t.createdBy,
+            assignedToUserId: t.assignedByUser?.id,
+            createdByUserId: t.createdByUser?.id,
             description: rawDesc.replace(/\[Note:\s*([\s\S]*?)\](?:\s*\[version:(v\d+)\])?/g, '').replace(/\s*\[version:v\d+\]/g, '').trim() || 'No description.',
             dueDate: t.deadline ? formatFileDate(t.deadline) : '',
             id: String(t.id),
@@ -213,6 +212,12 @@ export function useFileDetailDataFetcher({ projectId, fileId, selectedTaskId }: 
             targetVersion: taskVersion,
             submissions,
             isMine: t.isMine,
+            parent: t.parent ? {
+              id: String(t.parent.id),
+              title: t.parent.title,
+              description: t.parent.description,
+              status: t.parent.status,
+            } : undefined,
           } as FileTaskItem;
         });
 

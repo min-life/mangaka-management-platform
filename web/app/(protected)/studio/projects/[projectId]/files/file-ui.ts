@@ -31,7 +31,7 @@ export type FileMaterialItem = {
 export type FileTaskItem = {
   assignedTo: string;
   assignedToUserId?: number | null;
-  assignedByUserId?: number | null;
+  createdByUserId?: number | null;
   description: string;
   dueDate?: string;
   id: string;

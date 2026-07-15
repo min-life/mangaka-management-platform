@@ -631,7 +631,7 @@ export function ApplicationsClient() {
         }}
         rejectionReason={
           (() => {
-            const comment = selectedComments.find(
+            const comment = selectedComments?.find(
               (c) =>
                 c.content &&
                 typeof c.content === 'object' &&

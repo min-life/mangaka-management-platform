@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { createMaterial } from '@/services/file.service';
 import { updateMaterial } from '@/services/material.service';
+import { updateTask, getTaskMaterials } from '@/services/task.service';
 import { toast } from '@/lib/toast';
 import type { FileVersionItem } from '../../file-ui';
 import type { TaskWorkspaceItem } from '../../../tasks/task-ui';
@@ -30,7 +31,7 @@ export function UpdateMaterialsDialog({
   open: boolean;
   onClose: () => void;
   pendingFiles: { img?: File | null; text?: File | null; src?: File | null };
-  targetVersion: FileVersionItem | undefined;
+  targetVersion: FileVersionItem | undefined | null;
   focusedTask: TaskWorkspaceItem | null;
   fileId: number;
   onRefresh?: () => void | Promise<void>;
@@ -39,6 +40,9 @@ export function UpdateMaterialsDialog({
     label: string;
     icon: any;
     current: string | undefined;
+    url?: string;
+    downloadUrl?: string;
+    accept?: string;
     pending: File | null | undefined;
   }>;
 }) {
@@ -52,24 +56,34 @@ export function UpdateMaterialsDialog({
       if (pendingFiles.img instanceof File) formData.append('image', pendingFiles.img);
       if (pendingFiles.text instanceof File) formData.append('text', pendingFiles.text);
       if (pendingFiles.src instanceof File) formData.append('source', pendingFiles.src);
-      
-      const options: { taskId?: number; deleteImage?: boolean; deleteText?: boolean; deleteSource?: boolean; name?: string } = {};
-      if (commitMessage.trim()) {
-        formData.append('name', commitMessage.trim());
-        options.name = commitMessage.trim();
-      }
+      if (commitMessage.trim()) formData.append('name', commitMessage.trim());
+
       if (focusedTask) {
         formData.append('taskId', String(focusedTask.id));
-        options.taskId = Number(focusedTask.id);
       }
-      if (pendingFiles.img === null) options.deleteImage = true;
-      if (pendingFiles.text === null) options.deleteText = true;
-      if (pendingFiles.src === null) options.deleteSource = true;
 
       if (targetVersion) {
+        const options: { deleteImage?: boolean; deleteText?: boolean; deleteSource?: boolean; name?: string } = {};
+        if (commitMessage.trim()) options.name = commitMessage.trim();
+        if (pendingFiles.img === null) options.deleteImage = true;
+        if (pendingFiles.text === null) options.deleteText = true;
+        if (pendingFiles.src === null) options.deleteSource = true;
         await updateMaterial(targetVersion.id, formData, options);
       } else {
         await createMaterial(fileId, formData);
+      }
+
+      // If uploading for a task, also update the task description with version tag to display as submission
+      if (focusedTask) {
+        try {
+          const taskMaterials = await getTaskMaterials(focusedTask.id);
+          const versionTag = `v${(taskMaterials || []).length || 1}`;
+          const note = commitMessage.trim();
+          const updatedDesc = `${focusedTask.description || ''}\n[Note: ${note || 'Material uploaded'}] [version:${versionTag}]`.trim();
+          await updateTask(focusedTask.id, { description: updatedDesc });
+        } catch {
+          // non-critical
+        }
       }
 
       toast.success('Materials updated successfully');

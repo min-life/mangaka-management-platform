@@ -14,6 +14,7 @@ export function MaterialTabDetail({
   fileId,
   onRefresh,
   isLoadingVersions,
+  canUpdateMaterial,
 }: {
   versions: FileVersionItem[];
   latestMaterialVersion?: FileVersionItem | null;
@@ -21,6 +22,7 @@ export function MaterialTabDetail({
   fileId: number;
   onRefresh?: () => void | Promise<void>;
   isLoadingVersions?: boolean;
+  canUpdateMaterial?: boolean;
 }) {
   const [pendingFiles, setPendingFiles] = useState<{
     img?: File | null;
@@ -100,53 +102,59 @@ export function MaterialTabDetail({
                     href={item.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex size-7 items-center justify-center rounded text-[#8b94a1] hover:bg-[#202832] hover:text-white transition-colors"
-                    title="View"
+                    className="flex size-7 items-center justify-center rounded bg-[#202832] text-[#8b94a1] hover:bg-[#2a3441] hover:text-white"
                   >
-                    <Eye className="size-4" />
+                    <Eye className="size-3.5" />
                   </a>
                 )}
                 {item.current && item.downloadUrl && item.pending !== null && (
                   <a
                     href={item.downloadUrl}
                     download
-                    className="flex size-7 items-center justify-center rounded text-[#8b94a1] hover:bg-[#202832] hover:text-white transition-colors"
-                    title="Download"
+                    className="flex size-7 items-center justify-center rounded bg-[#202832] text-[#8b94a1] hover:bg-[#2a3441] hover:text-white"
                   >
-                    <Download className="size-4" />
+                    <Download className="size-3.5" />
                   </a>
                 )}
-
-                <label className="flex size-7 cursor-pointer items-center justify-center rounded text-[#8b94a1] hover:bg-[#202832] hover:text-[#FFD369] transition-colors" title={item.current ? 'Update' : 'Upload'}>
-                  <Upload className="size-4" />
-                  <input
-                    type="file"
-                    className="hidden"
-                    accept={item.accept}
-                    onClick={(e) => { (e.target as HTMLInputElement).value = ''; }}
-                    onChange={(e) => handleFileChange(item.type, e.target.files?.[0])}
-                  />
-                </label>
-
-                {item.current && item.pending !== null && (
+                {item.pending === undefined ? (
+                  canUpdateMaterial ? (
+                    <label className={`flex size-7 cursor-pointer items-center justify-center rounded bg-[#202832] text-[#8b94a1] hover:bg-[#2a3441] hover:text-white ${focusedTask?.parent && focusedTask.parent.status !== 'DONE' ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}>
+                      <Upload className="size-3.5" />
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept={item.accept}
+                        disabled={focusedTask?.parent ? focusedTask.parent.status !== 'DONE' : false}
+                        onChange={(e) => handleFileChange(item.type, e.target.files?.[0])}
+                      />
+                    </label>
+                  ) : (
+                    <div className="flex size-7 items-center justify-center rounded bg-[#202832]/50 text-[#8b94a1]/50 cursor-not-allowed">
+                      <Upload className="size-3.5" />
+                    </div>
+                  )
+                ) : (
                   <button
-                    type="button"
-                    className="flex size-7 items-center justify-center rounded text-[#8b94a1] hover:bg-[#202832] hover:text-red-500 transition-colors"
-                    title="Delete"
-                    onClick={() => handleFileChange(item.type, null)}
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
-                )}
-                {item.pending !== undefined && (
-                  <button
-                    type="button"
-                    className="flex size-7 items-center justify-center rounded text-[#FFD369] hover:bg-[#202832] transition-colors"
-                    title="Undo Changes"
+                    className="flex size-7 items-center justify-center rounded bg-[#3b2a2a] text-[#ff6b6b] hover:bg-[#4a3535]"
                     onClick={() => handleFileChange(item.type, undefined)}
                   >
-                    <X className="size-4" />
+                    <X className="size-3.5" />
                   </button>
+                )}
+                {item.current && item.pending === undefined && (
+                  canUpdateMaterial ? (
+                    <button
+                      className={`flex size-7 items-center justify-center rounded bg-[#202832] text-[#8b94a1] hover:bg-[#3b2a2a] hover:text-[#ff6b6b] ${focusedTask?.parent && focusedTask.parent.status !== 'DONE' ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`}
+                      disabled={focusedTask?.parent ? focusedTask.parent.status !== 'DONE' : false}
+                      onClick={() => handleFileChange(item.type, null)}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  ) : (
+                    <div className="flex size-7 items-center justify-center rounded bg-[#202832]/50 text-[#8b94a1]/50 cursor-not-allowed">
+                      <Trash2 className="size-3.5" />
+                    </div>
+                  )
                 )}
               </div>
             </div>
