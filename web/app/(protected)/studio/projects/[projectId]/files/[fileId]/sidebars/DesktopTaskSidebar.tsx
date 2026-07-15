@@ -15,6 +15,7 @@ export function DesktopTaskSidebar({
   canCreateTask,
   canReviewTask,
   canSubmitTask,
+  canUpdateMaterial,
   canEditTask,
   canDeleteTask,
   file,
@@ -186,7 +187,15 @@ export function DesktopTaskSidebar({
 
         <section className="flex-1 overflow-y-auto bg-[#101820]">
           {sidebarTab === 'material' ? (
-            <MaterialTabDetail versions={versions} latestMaterialVersion={latestMaterialVersion} focusedTask={focusedTask} fileId={file.id} onRefresh={onMaterialUploaded || onRefresh} isLoadingVersions={isLoadingVersions} />
+            <MaterialTabDetail 
+              versions={versions} 
+              latestMaterialVersion={latestMaterialVersion} 
+              focusedTask={focusedTask} 
+              fileId={file.id} 
+              onRefresh={onMaterialUploaded || onRefresh} 
+              isLoadingVersions={isLoadingVersions}
+              canUpdateMaterial={canUpdateMaterial} 
+            />
           ) : (
             <div className="p-4">
               <TaskDetailPanel

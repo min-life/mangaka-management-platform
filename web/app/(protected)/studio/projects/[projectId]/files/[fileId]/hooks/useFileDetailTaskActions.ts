@@ -135,7 +135,7 @@ export function useFileDetailTaskActions({
       fileTitle: file?.title ?? `File #${fileId}`,
       id: task.id,
       isMine: user?.id != null && task.assignedToUserId === user.id,
-      assignedByUserId: task.assignedByUserId,
+      createdByUserId: task.createdByUserId,
       previewUrl: file?.previewUrl ?? '',
       priority: 'MEDIUM',
       region: task.region,
@@ -253,14 +253,22 @@ export function useFileDetailTaskActions({
     if (!focusedTask) return;
     setIsLoading(true);
     try {
+      const newStatus = 'REVIEW';
+      const newDesc = `${focusedTask.description || ''}\n[Note: Marked as ready for review without file upload]`.trim();
+
       await updateTask(focusedTask.id, { 
-        status: 'REVIEW',
-        description: `${focusedTask.description || ''}\n[Note: Marked as ready for review without file upload]`.trim()
+        status: newStatus,
+        description: newDesc
       });
+
+      setTasks((currentTasks) =>
+        currentTasks.map((t) => (t.id === focusedTask.id ? { ...t, status: newStatus, description: newDesc } : t))
+      );
+      setFocusedTask({ ...focusedTask, status: newStatus, description: newDesc });
+
       toast.success('Task submitted for review.', {
         description: 'The task is now in the review queue.',
       });
-      void loadFile();
     } catch (err) {
       console.error('Failed to mark task as ready for review:', err);
       toast.error('Failed to submit for review. Please try again.');

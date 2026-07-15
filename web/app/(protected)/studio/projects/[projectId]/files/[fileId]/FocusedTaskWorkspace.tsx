@@ -25,7 +25,6 @@ import {
   type TaskWorkspaceItem,
 } from '../../tasks/task-ui';
 import { ReviewTaskDialog, type ReviewActionType } from '../../tasks/ReviewTaskDialog';
-import { SubmitWorkDialog } from '../../tasks/[taskId]/SubmitWorkDialog';
 
 type FocusedTaskWorkspaceProps = {
   canReview: boolean;
@@ -139,6 +138,12 @@ export function FocusedTaskWorkspace({
         </div>
       <div className="mt-3 border border-[#303842] bg-[#151c25] p-3">
         <p className="text-xs font-black text-white">{task.title}</p>
+        {task.parent && (
+          <div className="mt-2 flex items-center gap-1 overflow-hidden rounded bg-[#202832] px-2 py-1" title={`Parent Task: ${task.parent.title} (${taskStatusLabels[task.parent.status] || task.parent.status})`}>
+            <span className="truncate text-[10px] font-bold text-[#FFD369]">Parent: {task.parent.title}</span>
+            <span className={`shrink-0 text-[10px] font-bold ${task.parent.status === 'DONE' ? 'text-[#9df2c7]' : 'text-[#8b94a1]'}`}>({taskStatusLabels[task.parent.status] || task.parent.status})</span>
+          </div>
+        )}
         <p className="mt-2 text-[10px] leading-4 text-[#dce7f3]">{getCleanTaskDescription(task.description)}</p>
 
         <p className="mt-2 flex items-center gap-1 text-[9px] font-bold text-[#8b94a1]">
@@ -154,24 +159,21 @@ export function FocusedTaskWorkspace({
             <div>
               <p className="font-black">Submission Blocked</p>
               <p className="text-[#dce7f3] mt-0.5 font-medium">
-                This task is a subtask of &ldquo;{task.parent.title}&rdquo; which is currently <strong>{task.parent.status}</strong>. The parent task must be completed (Done) first.
+                This task is a subtask of &ldquo;{task.parent.title}&rdquo; which is currently <strong>{taskStatusLabels[task.parent.status] || task.parent.status}</strong>. The parent task must be completed (Done) first.
               </p>
             </div>
           </div>
-        ) : (
-          <div className="mt-3 space-y-2">
-            <SubmitWorkDialog onSubmit={onSubmitWork ?? (() => undefined)} />
-            {onMarkReadyForReview && (
-              <button
-                className="w-full rounded-[3px] border border-[#FFD369]/30 bg-[#30270d] py-2 text-[10px] font-black text-[#FFD369] transition hover:border-[#FFD369]/60 hover:bg-[#3a3011]"
-                onClick={onMarkReadyForReview}
-                type="button"
-              >
-                ✓ Mark as Ready for Review
-              </button>
-            )}
+        ) : onMarkReadyForReview ? (
+          <div className="mt-3">
+            <button
+              className="w-full rounded-[3px] border border-[#FFD369]/30 bg-[#30270d] py-2 text-[10px] font-black text-[#FFD369] transition hover:border-[#FFD369]/60 hover:bg-[#3a3011]"
+              onClick={onMarkReadyForReview}
+              type="button"
+            >
+              ✓ Mark as Ready for Review
+            </button>
           </div>
-        )
+        ) : null
       ) : null}
 
       {canReview && task.status === 'REVIEW' ? (

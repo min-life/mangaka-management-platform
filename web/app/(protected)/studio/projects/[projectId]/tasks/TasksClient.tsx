@@ -126,13 +126,14 @@ export function TasksClient() {
 
             return {
               assignee: assigneeName,
+              assigneeId: t.assignedByUser?.id,
               description: cleanDesc,
               dueDate: t.deadline ? new Date(t.deadline).toLocaleDateString() : 'No due date',
               fileId: file.id,
               fileTitle: file.title,
               id: String(t.id),
               isMine: user?.id != null && t.assignedByUser?.id === user.id,
-              assignedByUserId: t.createdByUser?.id || t.assignedByUserId,
+              createdByUserId: t.createdByUser?.id,
               previewUrl: '',
               priority: 'MEDIUM',
               region,
@@ -141,6 +142,12 @@ export function TasksClient() {
               title: t.title,
               updatedAt: new Date(t.updatedAt).toLocaleDateString(),
               targetVersion: taskVersion,
+              parent: t.parent ? {
+                id: String(t.parent.id),
+                title: t.parent.title,
+                description: getCleanTaskDescription(t.parent.description),
+                status: t.parent.status,
+              } : null,
             } as TaskWorkspaceItem;
           });
         } catch {
@@ -183,7 +190,7 @@ export function TasksClient() {
     canProject('project:owner');
 
   const canReviewTask = useCallback((task: TaskWorkspaceItem) => {
-    const isTaskAssigner = user?.id != null && task.assignedByUserId === user.id;
+    const isTaskAssigner = user?.id != null && task.createdByUserId === user.id;
     const isTaskAssignee = task.isMine === true;
     return (isTaskAssigner && !isTaskAssignee) || canProject('admin') || isProjectOwner || canProject('project:task.update');
   }, [user?.id, canProject, isProjectOwner]);

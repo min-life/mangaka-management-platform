@@ -34,6 +34,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
     canCreateTask,
     canReviewTask,
     canSubmitTask,
+    canUpdateMaterial,
     canvasRef,
     desktopSidebarOpen,
     discussionContextKey,
@@ -318,6 +319,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
           canCreateTask={canCreateTask}
           canReviewTask={canReviewTask}
           canSubmitTask={canSubmitTask}
+          canUpdateMaterial={canUpdateMaterial}
           file={file}
           focusedTask={focusedTask}
           isOpen={desktopSidebarOpen}
@@ -366,6 +368,7 @@ export function FileDetailView({ controller }: FileDetailViewProps) {
           canCreateTask={canCreateTask}
           canReviewTask={canReviewTask}
           canSubmitTask={canSubmitTask}
+          canUpdateMaterial={canUpdateMaterial}
           file={file}
           focusedTask={focusedTask}
           onClose={() => setMobileTasksOpen(false)}

@@ -110,6 +110,11 @@ export function FileTasksPanel({
                   )}
                   <div className="min-w-0">
                     <span className="block truncate text-xs font-black text-white">{task.title}</span>
+                    {task.parent && (
+                      <div className="mt-1 flex items-center gap-1 overflow-hidden rounded bg-[#202832] px-1.5 py-0.5" title={`Parent Task: ${task.parent.title} (${fileStatusLabels[task.parent.status] || task.parent.status})`}>
+                        <span className="truncate text-[9px] font-bold text-[#FFD369]">Parent: {task.parent.title}</span>
+                      </div>
+                    )}
                     <span className="mt-1 block truncate text-[10px] font-bold text-[#8b94a1]">
                       {task.assignedTo || 'Unassigned'}
                     </span>

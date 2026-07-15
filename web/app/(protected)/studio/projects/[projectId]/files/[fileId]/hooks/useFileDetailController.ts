@@ -317,21 +317,22 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     canProject('project:owner');
 
   // Reviewer = is owner/admin or the user who assigned the task, but not the worker themselves (unless self-assigned)
-  const isTaskAssigner = user?.id != null && focusedTask?.assignedByUserId === user.id;
-  const isTaskAssignee = focusedTask?.isMine === true;
+  const isTaskAssigner = user?.id != null && focusedTask?.createdByUserId === user.id;
+  const isTaskAssignee = user?.id != null && focusedTask?.assigneeId === user.id;
 
   const canReviewTask = (isTaskAssigner && !isTaskAssignee) || canProject('admin') || isProjectOwner;
-  const canSubmitTask = canProject('project:material.create') || canProject('admin') || isProjectOwner;
+  const canSubmitTask = canProject('admin') || isProjectOwner || isTaskAssignee || isTaskAssigner;
+  const canUpdateMaterial = focusedTask ? canSubmitTask : (canProject('project:material.create') || canProject('admin') || isProjectOwner);
   const canCreateTask = canProject('project:task.create') || canProject('admin') || isProjectOwner;
   const canRestoreVersion = canProject('project:material.restore') || canProject('project:material.update') || canProject('admin') || isProjectOwner;
   const canDeleteVersion = canProject('project:material.delete') || canProject('admin') || isProjectOwner;
 
   const canEditTask = useCallback((task: FileTaskItem) => {
-    return task.assignedByUserId === user?.id || canProject('admin') || isProjectOwner;
+    return canProject('admin') || isProjectOwner || (task.createdByUserId === user?.id) || (task.assignedToUserId === user?.id);
   }, [user?.id, canProject, isProjectOwner]);
 
   const canDeleteTask = useCallback((task: FileTaskItem) => {
-    return task.assignedByUserId === user?.id || canProject('admin') || isProjectOwner;
+    return task.createdByUserId === user?.id || canProject('admin') || isProjectOwner;
   }, [user?.id, canProject, isProjectOwner]);
 
   const {
@@ -780,6 +781,7 @@ export function useFileDetailController({ fileId, focusedTaskId, projectId }: Us
     canCreateTask,
     canReviewTask,
     canSubmitTask,
+    canUpdateMaterial,
     canRestoreVersion,
     canDeleteVersion,
     canvasFrameComments,
