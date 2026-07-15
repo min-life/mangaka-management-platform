@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { ChevronDown, FolderKanban, LogOut, User } from 'lucide-react';
 
 import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,41 +17,37 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { useAuth } from '@/hooks/useAuth';
-import { getProjectById, getProjects, type ProjectResponse } from '@/services/project.service';
+import { getProjects, type ProjectResponse } from '@/services/project.service';
+import { useProjectStore, selectProject } from '../store/project-store';
 
 type ProjectAppHeaderProps = {
   projectId: string;
-  projectName: string;
+  projectName?: string;
 };
 
 export function ProjectAppHeader({ projectId, projectName }: ProjectAppHeaderProps) {
   const router = useRouter();
   const { logout, user } = useAuth();
-  const [activeProject, setActiveProject] = useState<ProjectResponse | null>(null);
+
+  const numericId = parseId(projectId);
+  const { loadProject } = useProjectStore();
+  const projectState = useProjectStore(selectProject(numericId));
+  const activeProject = projectState.data;
+  const isLoading = projectState.isLoading || !projectState.loaded;
+
+  // allProjects stays local — it's not per-project cached data
   const [allProjects, setAllProjects] = useState<ProjectResponse[]>([]);
 
-  const [isLoading, setIsLoading] = useState(true);
-
   useEffect(() => {
-    setIsLoading(true);
-    if (projectId) {
-      void getProjectById(parseId(projectId))
-        .then((res) => {
-          setActiveProject(res);
-          setIsLoading(false);
-        })
-        .catch(() => {
-          setIsLoading(false);
-        });
-    } else {
-      setIsLoading(false);
+    if (numericId) {
+      void loadProject(numericId);
     }
     void getProjects()
       .then((res) => {
         setAllProjects(res.projects || res || []);
       })
       .catch(() => {});
-  }, [projectId]);
+  }, [numericId, loadProject]);
 
   const displayName = user?.displayName || user?.email || 'Current user';
   const email = user?.email ?? 'No email';

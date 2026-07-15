@@ -16,7 +16,6 @@ import { Button } from '@/components/ui/button';
 import {
   getProjectFolders,
   getFolderFiles,
-  getProjectMembers,
 } from '@/services/project.service';
 import {
   getFileTasks,
@@ -51,12 +50,22 @@ const scopeLabels: Record<TaskScope, string> = {
 };
 
 import { useProjectParams } from '@/hooks/useProjectParams';
+import { useProjectStore, selectProject, selectMembers } from '../../store/project-store';
 
 export function TasksClient() {
   const router = useRouter();
   const { user } = useAuth();
   const { slug, numericId } = useProjectParams();
   const { can: canProject } = usePermissions({ resource: 'PROJECT', resourceId: numericId });
+
+  // ── Store ─────────────────────────────────────────────────────────
+  const { loadMembers } = useProjectStore();
+  const membersState = useProjectStore(selectMembers(numericId));
+  const storeMembers = membersState.list.map((m) => ({
+    id: m.id,
+    name: m.displayName || m.email,
+  }));
+
   const [query, setQuery] = useState('');
   const [scope, setScope] = useState<TaskScope>('ALL');
   const [view, setView] = useState<TaskView>('TABLE');
@@ -70,20 +79,14 @@ export function TasksClient() {
 
   const { activities } = useRealtimeProjectActivity(numericId);
 
+  // Load members from store
+  useEffect(() => {
+    void loadMembers(numericId);
+  }, [numericId, loadMembers]);
+
   const { data, error, isInitialLoading, isRefreshing, reload } = useAsyncResource(async () => {
     const foldersRes = await getProjectFolders(numericId);
     const foldersList = foldersRes.folders || [];
-
-    let apiMembers: { id: number; name: string }[] = [];
-    try {
-      const membersRes = await getProjectMembers(numericId);
-      apiMembers = (membersRes.members || []).map((m) => ({
-        id: m.id,
-        name: m.displayName || m.email,
-      }));
-    } catch (err) {
-      console.error('Failed to load project members:', err);
-    }
 
     const filesPromises = foldersList.map(async (folder) => {
       try {
@@ -127,8 +130,8 @@ export function TasksClient() {
             fileTitle: file.title,
             id: String(t.id),
             isMine: user?.id != null && t.assignedByUser?.id === user.id,
-            assignedByUserId: t.createdByUser?.id || t.assignedByUserId, // Assuming createdByUser is the assigner if assignedByUserId is missing, but let's check API
-            previewUrl: '', // Not used in UI
+            assignedByUserId: t.createdByUser?.id || t.assignedByUserId,
+            previewUrl: '',
             priority: 'MEDIUM',
             region,
             status: t.status,
@@ -147,13 +150,12 @@ export function TasksClient() {
     const allTasks = tasksArrays.flat();
 
     return {
-      members: apiMembers,
       projectFiles: apiProjectFiles,
       tasks: allTasks
     };
   }, [numericId]);
 
-  const members = data?.members ?? [];
+  const members = storeMembers;
   const projectFiles = data?.projectFiles ?? [];
   const tasks = data?.tasks ?? [];
 

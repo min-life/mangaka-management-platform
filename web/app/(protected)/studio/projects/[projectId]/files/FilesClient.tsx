@@ -14,7 +14,6 @@ import {
   getFolderChildren,
   getFolderFiles,
   getProjectFolders,
-  getProjectById,
   type ProjectFolderResponse,
   type ProjectFileResponse,
 } from '@/services/project.service';
@@ -34,6 +33,7 @@ import {
 import {
   type FileExplorerItem,
 } from './file-ui';
+import { useProjectStore, selectProject } from '../../store/project-store';
 
 type FilesClientProps = {
   projectId: number;
@@ -83,6 +83,14 @@ export function FilesClient() {
   const searchParams = useSearchParams();
   const { slug, numericId: projectId } = useProjectParams();
 
+  // ── Project name from store ────────────────────────────────────────────────
+  const { loadProject } = useProjectStore();
+  const projectState = useProjectStore(selectProject(projectId));
+
+  useEffect(() => {
+    void loadProject(projectId);
+  }, [projectId, loadProject]);
+
   const [selectedArcId, setSelectedArcId] = useState<number | null>(() => {
     const val = searchParams.get('arcId');
     return val ? Number(val) : null;
@@ -101,12 +109,6 @@ export function FilesClient() {
   const loadedFileFolderIdsRef = React.useRef<Set<number>>(new Set());
 
   const { data, setData, error, isInitialLoading, isRefreshing, reload } = useAsyncResource(async () => {
-    let projName = '';
-    try {
-      const proj = await getProjectById(projectId);
-      projName = proj.name;
-    } catch { }
-
     const result = await getProjectFolders(projectId, { type: 'ARC' });
     const rootFolders = result.folders.map((folder) => ({
       ...normalizeFolder(folder, projectId),
@@ -117,7 +119,6 @@ export function FilesClient() {
     loadedFileFolderIdsRef.current.clear();
 
     return {
-      projectName: projName,
       folders: rootFolders as ProjectFolderResponse[],
       files: [] as FileExplorerItem[],
       folderCovers: readStoredFolderCovers(projectId)
@@ -126,7 +127,7 @@ export function FilesClient() {
 
   const folders = data?.folders ?? [];
   const files = data?.files ?? [];
-  const projectName = data?.projectName ?? '';
+  const projectName = projectState.data?.name ?? '';
   const folderCovers = data?.folderCovers ?? {};
 
   // Lazy load children folders when an arc is selected
