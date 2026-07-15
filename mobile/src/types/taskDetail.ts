@@ -4,13 +4,17 @@
 
 export type ReviewTab = 'Overview' | 'Discussion' | 'Action';
 
-/** Tọa độ bounding box trên ảnh, tính theo % so với chiều rộng/cao của ảnh */
+/** Tọa độ bounding box trên canvas ảnh. API/web hiện lưu dạng normalized 0–1. */
 export interface FrameAnnotation {
   id: string;
   materialId?: string;
   name: string; // Tên frame, ví dụ: "Tô viền nhân vật"
   description?: string;
-  /** Vị trí và kích thước: 0–100 (% của container ảnh) */
+  /** Vị trí và kích thước: normalized 0–1, hoặc legacy 0–100 nếu có dữ liệu cũ. */
+  startX?: number;
+  startY?: number;
+  endX?: number;
+  endY?: number;
   x: number;
   y: number;
   width: number;

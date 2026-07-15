@@ -33,14 +33,19 @@ import {
   DiscussionComposer,
   DiscussionPanel,
   DiscussionScope,
-  MaterialsPanel,
   OverviewPanel,
   ResourceFileTab,
   ResourceFileTabBar,
   TasksPanel,
+  VersionsPanel,
 } from '@/src/screens/resourceFile/components/ResourceFilePanels';
+import { useTaskMaterialVersions } from '@/src/screens/resourceFile/useTaskMaterialVersions';
 
-const TASK_DETAIL_TABS: ResourceFileTab[] = ['Overview', 'Tasks', 'Discussion', 'Materials'];
+const TASK_DETAIL_TABS: ResourceFileTab[] = ['Overview', 'Tasks', 'Discussion', 'Versions'];
+
+function normalizeTaskDetailTab(tab?: ResourceFileTab): ResourceFileTab {
+  return tab === 'Materials' ? 'Versions' : (tab ?? 'Overview');
+}
 
 function buildFileDescription(content: string, language: string) {
   const meaningfulLines = content
@@ -62,7 +67,7 @@ type TaskDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'TaskDet
 
 export default function TaskDetailScreen({ navigation, route }: TaskDetailScreenProps) {
   const [activeTab, setActiveTab] = useState<ResourceFileTab>(
-    route.params?.initialTab ?? 'Overview',
+    normalizeTaskDetailTab(route.params?.initialTab),
   );
   const [file, setFile] = useState<ResourceFileNode | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -83,11 +88,30 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
   const [discussionFrameStatusMessage, setDiscussionFrameStatusMessage] = useState('');
   const [selectedDiscussionFrameId, setSelectedDiscussionFrameId] = useState<string | null>(null);
   const scrollViewRef = useRef<ScrollView | null>(null);
+  const versionsRef = useRef<ResourceFileMaterialVersion[]>([]);
   const initialDiscussionAppliedRef = useRef(false);
   const didScrollToInitialCommentRef = useRef(false);
   const didScrollToLatestDiscussionRef = useRef(false);
   const initialCommentLayoutYRef = useRef<number | null>(null);
   const initialCommentId = route.params?.initialCommentId;
+  const versions = file?.materialVersions ?? [];
+  const tasks = file?.tasks ?? [];
+  const currentFileId = file?.id ?? null;
+  const {
+    errorMessage: materialVersionsErrorMessage,
+    isLoading: isTaskMaterialsLoading,
+    loadTaskMaterials,
+    previewVersions,
+    resetTaskMaterials,
+    versionsByTaskId: materialVersionsByTaskId,
+  } = useTaskMaterialVersions(versions);
+  const focusedTask = selectedTaskId
+    ? (tasks.find((task) => task.id === selectedTaskId) ?? null)
+    : null;
+  const focusedTaskVersions = selectedTaskId
+    ? (materialVersionsByTaskId[selectedTaskId] ?? [])
+    : [];
+  const visibleVersions = selectedTaskId ? focusedTaskVersions : versions;
 
   const loadTaskDetail = useCallback(async () => {
     const taskId = route.params?.taskId;
@@ -108,25 +132,26 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
       const selectedTask =
         nextFile.tasks?.find((item) => item.id === taskId) ?? nextFile.tasks?.[0];
       setFile(nextFile);
+      resetTaskMaterials();
       setFileDiscussionCommentCount(nextFile.comments?.length ?? 0);
       setSelectedTaskId(selectedTask?.id ?? taskId);
       setSelectedFrame(selectedTask?.frames[0] ?? null);
-      setSelectedVersionId(nextFile.materialVersions?.[0]?.id ?? null);
-      setActiveTab(route.params?.initialTab ?? 'Tasks');
+      setSelectedVersionId(null);
+      setActiveTab(normalizeTaskDetailTab(route.params?.initialTab ?? 'Tasks'));
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to load task.');
     } finally {
       setIsLoading(false);
     }
-  }, [route.params?.initialTab, route.params?.taskId]);
+  }, [resetTaskMaterials, route.params?.initialTab, route.params?.taskId]);
 
   useEffect(() => {
     void loadTaskDetail();
   }, [loadTaskDetail]);
 
-  const versions = file?.materialVersions ?? [];
-  const tasks = file?.tasks ?? [];
-  const currentFileId = file?.id ?? null;
+  useEffect(() => {
+    versionsRef.current = previewVersions;
+  }, [previewVersions]);
 
   const description = useMemo(
     () => (file ? buildFileDescription(file.content, file.language) : ''),
@@ -153,29 +178,68 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
     [discussionFrames],
   );
 
+  const versionTabFallbackVersion =
+    activeTab === 'Versions' ? visibleVersions[0] : previewVersions[0];
   const selectedVersion =
-    versions.find((version) => version.id === selectedVersionId) ?? versions[0];
+    previewVersions.find((version) => version.id === selectedVersionId) ??
+    versionTabFallbackVersion;
   const previewImageUri = selectedVersion?.materials.imageUri ?? file?.previewImageUri;
 
+  const focusFrameMaterial = useCallback((frame: ResourceTaskFrame) => {
+    if (!frame.materialId) return;
+    const hasMaterial = versionsRef.current.some((version) => version.id === frame.materialId);
+    if (hasMaterial) {
+      setSelectedVersionId(frame.materialId);
+    }
+  }, []);
+
   const handleSelectFrame = (frame: ResourceTaskFrame) => {
-    setSelectedFrame((prev) => (prev?.id === frame.id ? null : frame));
+    setSelectedFrame((prev) => {
+      if (prev?.id === frame.id) return null;
+      focusFrameMaterial(frame);
+      return frame;
+    });
   };
+
+  const handleSelectMaterialTask = useCallback(
+    async (taskId: string) => {
+      setSelectedTaskId(taskId);
+      setSelectedFrame(null);
+      setSelectedVersionId(null);
+
+      const nextVersions = await loadTaskMaterials(taskId);
+      setSelectedVersionId(nextVersions[0]?.id ?? null);
+    },
+    [loadTaskMaterials],
+  );
+
+  useEffect(() => {
+    if (activeTab !== 'Versions' || !selectedTaskId) return;
+    if (materialVersionsByTaskId[selectedTaskId]) return;
+
+    void handleSelectMaterialTask(selectedTaskId);
+  }, [activeTab, handleSelectMaterialTask, materialVersionsByTaskId, selectedTaskId]);
 
   const handleSelectTask = (task: ResourceFileTask | null) => {
     if (task === null) {
       setSelectedTaskId(null);
       setSelectedFrame(null);
+      setSelectedVersionId(versions[0]?.id ?? null);
       return;
     }
     setSelectedTaskId(task.id);
     setSelectedFrame(task.frames[0] ?? null);
+    setSelectedVersionId(null);
     setActiveTab('Tasks');
   };
 
   const handleSelectVersion = (version: ResourceFileMaterialVersion) => {
     setSelectedVersionId(version.id);
+    if (version.taskId) {
+      setSelectedTaskId(version.taskId);
+    }
     setSelectedFrame(null);
-    setActiveTab('Materials');
+    setActiveTab('Versions');
   };
 
   const addRealtimeDiscussionComment = useCallback(
@@ -287,6 +351,7 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
 
     try {
       const frameDetail = await fetchFrameDetail(frameId);
+      focusFrameMaterial(frameDetail);
       setSelectedFrame(frameDetail);
 
       const nextComments = await fetchFrameDiscussionComments(frameId);
@@ -299,7 +364,7 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
     } finally {
       setIsDiscussionCommentsLoading(false);
     }
-  }, []);
+  }, [focusFrameMaterial]);
 
   useEffect(() => {
     if (activeTab !== 'Discussion') return;
@@ -496,7 +561,7 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
           imageUri={previewImageUri}
           selectedFrame={selectedFrame}
           showStatusBadge={false}
-          status={selectedVersion ? 'Material Preview' : 'File Preview'}
+          status={selectedVersion ? 'Version Preview' : 'File Preview'}
         />
 
         <ResourceFileTabBar
@@ -551,11 +616,25 @@ export default function TaskDetailScreen({ navigation, route }: TaskDetailScreen
           />
         )}
 
-        {activeTab === 'Materials' && (
-          <MaterialsPanel
+        {activeTab === 'Versions' && (
+          <VersionsPanel
+            errorMessage={materialVersionsErrorMessage}
+            focusedTask={focusedTask}
+            isLoading={Boolean(selectedTaskId) && isTaskMaterialsLoading}
             selectedVersionId={selectedVersion?.id ?? null}
-            tasks={tasks}
-            versions={versions}
+            versions={visibleVersions}
+            onClearFocusedTask={() => {
+              setSelectedTaskId(null);
+              setSelectedFrame(null);
+              setSelectedVersionId(versions[0]?.id ?? null);
+            }}
+            onRetry={() => {
+              if (selectedTaskId) {
+                void handleSelectMaterialTask(selectedTaskId);
+                return;
+              }
+              void loadTaskDetail();
+            }}
             onSelectVersion={handleSelectVersion}
           />
         )}

@@ -142,7 +142,7 @@ File ->
 -> Material \_> xóa selected material
 
 - 1 combo box để filter theo task
-x`
+
 ---
 
 -Profile: Link account gg **\_\_**CHưa được đang chờ BE

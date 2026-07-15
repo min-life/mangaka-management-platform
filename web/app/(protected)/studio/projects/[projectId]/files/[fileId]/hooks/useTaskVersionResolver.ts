@@ -30,7 +30,12 @@ export function useTaskVersionResolver({
   user,
 }: UseTaskVersionResolverProps) {
   const lastProcessedTaskIdRef = useRef<string | null | undefined>(undefined);
+  const explicitMaterialIdRef = useRef<string | null>(null);
   const [selectedVersion, setSelectedVersion] = useState<FileVersionItem | null>(null);
+
+  const setExplicitMaterialId = (id: string | null) => {
+    explicitMaterialIdRef.current = id;
+  };
 
   useEffect(() => {
     // If the URL has no task selection and it hasn't changed to null from a previous value,
@@ -45,7 +50,8 @@ export function useTaskVersionResolver({
     }
 
     if (lastProcessedTaskIdRef.current !== focusedTaskId) {
-      setSelectedVersion(null);
+      // Do not setSelectedVersion(null) here, as it would wipe out explicit selections made just before the task switch (e.g. clicking a frame).
+      // The resolver below will handle switching to the correct material.
       lastProcessedTaskIdRef.current = focusedTaskId;
     }
 
@@ -124,5 +130,6 @@ export function useTaskVersionResolver({
   return {
     selectedVersion,
     setSelectedVersion,
+    setExplicitMaterialId,
   };
 }

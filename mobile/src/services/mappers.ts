@@ -372,10 +372,22 @@ export function materialImage(material?: Record<string, unknown> | Array<Record<
   return stringValue(imageUri);
 }
 
-export function mapMaterialVersion(material: ApiMaterial): ResourceFileMaterialVersion {
+function materialVersionTitle(material: ApiMaterial, fallbackTitle: string) {
+  const raw = material.materials ?? {};
+  return (
+    stringValue(material.name) ??
+    (isRecord(raw) && typeof raw.title === 'string' ? raw.title : fallbackTitle)
+  );
+}
+
+export function mapMaterialVersion(
+  material: ApiMaterial,
+  options: { fallbackTitle?: string; title?: string } = {},
+): ResourceFileMaterialVersion {
   const raw = material.materials ?? {};
   const rawSources = Array.isArray(raw) ? raw : [];
   const taskId = material.taskId ?? material.task?.id;
+  const title = options.title ?? materialVersionTitle(material, options.fallbackTitle ?? `Material ${material.id}`);
 
   return {
     createdAt: material.createdAt,
@@ -396,9 +408,7 @@ export function mapMaterialVersion(material: ApiMaterial): ResourceFileMaterialV
         isRecord(raw) && Array.isArray(raw.pages)
           ? (raw.pages as Array<{ index: number; url: string }>)
           : undefined,
-      title:
-        material.name ??
-        (isRecord(raw) && typeof raw.title === 'string' ? raw.title : `Material ${material.id}`),
+      title,
     },
     sourceCount: rawSources.length || undefined,
     taskId: taskId === undefined || taskId === null ? undefined : String(taskId),
@@ -409,13 +419,27 @@ export function mapMaterialVersion(material: ApiMaterial): ResourceFileMaterialV
   };
 }
 
+function mapFileMaterialVersions(versions: ApiMaterial[]) {
+  const versionsByAge = [...versions].sort(
+    (a, b) => (new Date(a.createdAt).getTime() || 0) - (new Date(b.createdAt).getTime() || 0),
+  );
+
+  return uniqueById(
+    versionsByAge
+      .map((material, index) =>
+        mapMaterialVersion(material, { fallbackTitle: `Version ${index + 1}` }),
+      )
+      .reverse(),
+  );
+}
+
 export function mapFile(
   file: ApiFile,
   versions: ApiMaterial[] = [],
   tasks: ResourceFileTask[] = [],
   comments: ApiComment[] = [],
 ): ResourceFileNode {
-  const mappedVersions = uniqueById(versions.map(mapMaterialVersion));
+  const mappedVersions = mapFileMaterialVersions(versions);
   const mappedTasks = uniqueById(tasks);
 
   return {
@@ -634,7 +658,7 @@ export function mapActivityLogTarget(
     return { fileId: entityId, initialTab: 'Overview', projectId, type: 'resourceFile' };
   }
   if (entityType === 'MATERIAL' && fileId && projectId) {
-    return { fileId, initialTab: 'Materials', projectId, type: 'resourceFile' };
+    return { fileId, initialTab: 'Versions', projectId, type: 'resourceFile' };
   }
   if (entityType === 'FRAME' && fileId && projectId) {
     return { fileId, initialTab: 'Discussion', projectId, type: 'resourceFile' };

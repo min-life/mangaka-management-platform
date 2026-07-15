@@ -23,6 +23,7 @@ type FileDetailHeaderProps = {
   folders?: any[];
   taskCount: number;
   versions: FileVersionItem[];
+  isInitialLoading?: boolean;
 };
 
 import { useProjectParams } from '@/hooks/useProjectParams';
@@ -39,6 +40,7 @@ export function FileDetailHeader({
   folders,
   taskCount,
   versions,
+  isInitialLoading,
 }: FileDetailHeaderProps) {
   const searchParams = useSearchParams();
   const backParam = searchParams.get('back');
@@ -55,7 +57,11 @@ export function FileDetailHeader({
       <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-[#8b94a1] overflow-hidden whitespace-nowrap">
 
         
-        <span className="hidden md:inline">{projectName}</span>
+        {isInitialLoading || !project ? (
+          <div className="hidden md:inline-block h-4 w-24 rounded bg-[#26303b] animate-pulse" />
+        ) : (
+          <span className="hidden md:inline">{project.name || `Project #${projectId}`}</span>
+        )}
         <ChevronRight className="size-3.5 hidden md:inline" />
         <Link href={`/studio/projects/${slug}/files`} className="hidden md:inline hover:text-white transition-colors">
           Resources

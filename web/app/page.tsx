@@ -235,14 +235,20 @@ function ProductMockup() {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="mb-4 text-xs font-black uppercase tracking-[0.16em] text-[#FFD369]">
-      {children}
-    </p>
+    <p className="mb-4 text-xs font-black uppercase tracking-[0.16em] text-[#FFD369]">{children}</p>
   );
 }
 
 function getDisplayName(user: ReturnType<typeof useAuth>['user']) {
   return user?.displayName?.trim() || user?.email || 'Inkly user';
+}
+
+function isAdminUser(user: ReturnType<typeof useAuth>['user']) {
+  return user?.roles?.some((role) => role.code === 'ADMIN' || role.code === 'STAFF') ?? false;
+}
+
+function getWorkspaceHref(user: ReturnType<typeof useAuth>['user']) {
+  return isAdminUser(user) ? '/admin' : '/studio';
 }
 
 function UserAvatar({ className = 'size-9' }: { className?: string }) {
@@ -310,7 +316,7 @@ function LandingNavActions() {
     <div className="flex items-center gap-3">
       <Link
         className="hidden rounded-[6px] border border-[#393E46] px-4 py-2 text-sm font-black text-white transition hover:bg-[#393E46] sm:inline-flex"
-        href="/studio"
+        href={getWorkspaceHref(user)}
       >
         Open Workspace
       </Link>
@@ -343,7 +349,7 @@ function LandingNavActions() {
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild className="cursor-pointer focus:bg-[#393E46] focus:text-white">
-            <Link href="/studio">
+            <Link href={getWorkspaceHref(user)}>
               <FolderKanban className="mr-2 size-4" />
               Workspace
             </Link>
@@ -379,7 +385,7 @@ function HeroActions() {
       <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
         <Link
           className="inline-flex h-12 items-center justify-center rounded-[6px] bg-[#FFD369] px-8 text-base font-black text-[#222831] transition hover:brightness-110"
-          href="/studio"
+          href={getWorkspaceHref(user)}
         >
           Open Workspace
         </Link>
@@ -459,8 +465,7 @@ export default function Home() {
           <h1 className="mx-auto max-w-5xl text-5xl font-black leading-tight text-white md:text-7xl">
             {isSignedIn ? (
               <>
-                Welcome back,{' '}
-                <span className="text-[#FFD369]">{displayName.split(' ')[0]}.</span>
+                Welcome back, <span className="text-[#FFD369]">{displayName.split(' ')[0]}.</span>
               </>
             ) : (
               <>
@@ -487,11 +492,15 @@ export default function Home() {
             Architected for industry leaders
           </p>
           <div className="grid gap-6 text-center text-lg font-black text-[#aeb7c2]/70 sm:grid-cols-2 lg:grid-cols-5">
-            {['ZENITH STUDIO', 'OMNI GRAPHICS', 'CROWN EDITORIAL', 'NOVA PUBLISHING', 'KINETIC ART'].map(
-              (studio) => (
-                <span key={studio}>{studio}</span>
-              ),
-            )}
+            {[
+              'ZENITH STUDIO',
+              'OMNI GRAPHICS',
+              'CROWN EDITORIAL',
+              'NOVA PUBLISHING',
+              'KINETIC ART',
+            ].map((studio) => (
+              <span key={studio}>{studio}</span>
+            ))}
           </div>
         </div>
       </section>
@@ -671,7 +680,10 @@ export default function Home() {
                 </div>
                 <ul className="mt-8 space-y-3">
                   {plan.features.map((feature) => (
-                    <li className="flex items-center gap-3 text-sm font-bold text-[#aeb7c2]" key={feature}>
+                    <li
+                      className="flex items-center gap-3 text-sm font-bold text-[#aeb7c2]"
+                      key={feature}
+                    >
                       <CheckCircle2 className="size-4 text-[#FFD369]" />
                       {feature}
                     </li>
@@ -783,4 +795,3 @@ export default function Home() {
     </main>
   );
 }
-
