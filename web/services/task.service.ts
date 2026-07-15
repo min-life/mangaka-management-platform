@@ -36,7 +36,7 @@ export type TaskResponse = {
 };
 
 export type UpdateTaskPayload = {
-  assignedBy?: number;
+  assignedBy?: number | null;
   description?: string;
   parentId?: number;
   status?: TaskStatus;

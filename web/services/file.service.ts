@@ -130,7 +130,7 @@ export async function getFileTasks(fileId: number | string) {
 export async function createFileTask(
   fileId: number | string,
   payload: {
-    assignedBy?: number;
+    assignedBy?: number | null;
     deadline?: string;
     description?: string;
     parentId?: number;

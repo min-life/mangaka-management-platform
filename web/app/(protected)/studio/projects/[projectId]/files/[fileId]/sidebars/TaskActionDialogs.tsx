@@ -32,7 +32,7 @@ export function TaskActionDialogs({
 
   const handleUpdateTaskSubmit = async (
     data: Partial<FileTaskItem>,
-    options?: { assignedBy?: number; parentId?: number }
+    options?: { assignedBy?: number | null; parentId?: number }
   ) => {
     setIsSavingEdit(true);
     try {

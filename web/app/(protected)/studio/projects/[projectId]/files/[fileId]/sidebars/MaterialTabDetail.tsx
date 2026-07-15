@@ -36,14 +36,15 @@ export function MaterialTabDetail({
     ? (versions.find(v => v.taskId === Number(focusedTask.id) && v.isCurrent) ?? versions.find(v => v.taskId === Number(focusedTask.id)))
     : (versions[0] ?? latestMaterialVersion);
 
-  const imgMat: any = (targetVersion?.materials as any[] || []).find((m: any) => m.type === 'IMAGE' || m.originalName?.match(/\.(png|jpe?g)$/i) || m.name?.match(/\.(png|jpe?g)$/i));
-  const textMat: any = (targetVersion?.materials as any[] || []).find((m: any) => m.type === 'TEXT' || m.originalName?.match(/\.(txt|md|docx?)$/i) || m.name?.match(/\.(txt|md|docx?)$/i));
-  const srcMat: any = (targetVersion?.materials as any[] || []).find((m: any) => m.type === 'SOURCE' || m.originalName?.match(/\.(zip|rar|clip|psd)$/i) || m.name?.match(/\.(zip|rar|clip|psd)$/i));
+  const materials: any[] = Array.isArray(targetVersion?.materials) ? targetVersion.materials : [];
+  const imgMat = materials.find((m: any) => m.type === 'IMAGE' || m.originalName?.match(/\.(png|jpe?g|webp|gif|pdf)$/i) || m.name?.match(/\.(png|jpe?g|webp|gif|pdf)$/i));
+  const textMat = materials.find((m: any) => m.type === 'TEXT' || m.originalName?.match(/\.(txt|md|docx?)$/i) || m.name?.match(/\.(txt|md|docx?)$/i));
+  const srcMat = materials.find((m: any) => m.type === 'SOURCE' || m.originalName?.match(/\.(zip|rar|clip|psd|ai|csp)$/i) || m.name?.match(/\.(zip|rar|clip|psd|ai|csp)$/i));
 
   const items = [
-    { type: 'img', label: 'IMG', icon: ImageIcon, current: imgMat?.originalName || imgMat?.name, url: imgMat?.url, downloadUrl: imgMat?.downloadUrl || imgMat?.url, pending: pendingFiles.img, accept: 'image/png, image/jpeg, image/jpg' },
-    { type: 'text', label: 'TEXT', icon: FileText, current: textMat?.originalName || textMat?.name, url: textMat?.url, downloadUrl: textMat?.downloadUrl || textMat?.url, pending: pendingFiles.text, accept: '.txt, .md, .doc, .docx' },
-    { type: 'src', label: 'SRC', icon: FileArchive, current: srcMat?.originalName || srcMat?.name, url: srcMat?.url, downloadUrl: srcMat?.downloadUrl || srcMat?.url, pending: pendingFiles.src, accept: '.zip, .rar, .clip, .psd' },
+    { type: 'img', label: 'IMG', icon: ImageIcon, current: imgMat?.originalName || imgMat?.name, url: imgMat?.url, downloadUrl: imgMat?.downloadUrl || imgMat?.url, pending: pendingFiles.img, accept: 'image/*,.pdf' },
+    { type: 'text', label: 'TEXT', icon: FileText, current: textMat?.originalName || textMat?.name, url: textMat?.url, downloadUrl: textMat?.downloadUrl || textMat?.url, pending: pendingFiles.text, accept: '.txt,.doc,.docx,text/*' },
+    { type: 'src', label: 'SRC', icon: FileArchive, current: srcMat?.originalName || srcMat?.name, url: srcMat?.url, downloadUrl: srcMat?.downloadUrl || srcMat?.url, pending: pendingFiles.src, accept: '.psd,.clip,.zip,.ai,.csp' },
   ] as const;
 
   const handleFileChange = (type: 'img' | 'text' | 'src', file: File | null | undefined) => {
