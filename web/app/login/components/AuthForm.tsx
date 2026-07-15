@@ -46,6 +46,18 @@ type AuthFormProps = {
   showSocialLogin?: boolean;
 };
 
+function isAdminUser(user: ReturnType<typeof useAuth>['user']) {
+  return user?.roles?.some((role) => role.code === 'ADMIN' || role.code === 'STAFF') ?? false;
+}
+
+function getSafeNextPath(value: string | null) {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) {
+    return null;
+  }
+
+  return value;
+}
+
 export function AuthForm({
   title,
   description,
@@ -59,32 +71,32 @@ export function AuthForm({
 }: AuthFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { logout, refreshUser, status, user } = useAuth();
+  const { refreshUser, status, user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<LoginErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
     if (status === 'authenticated') {
-      setIsRedirecting(true);
-      const isAdmin = user?.roles?.some(r => r.code === 'ADMIN' || r.code === 'STAFF') || false;
-      router.replace(isAdmin && (submitHref === '/studio' || submitHref === '/') ? '/admin' : submitHref);
+      const nextPath = getSafeNextPath(searchParams.get('next'));
+      const fallbackPath =
+        isAdminUser(user) && (submitHref === '/studio' || submitHref === '/')
+          ? '/admin'
+          : submitHref;
+
+      router.replace(nextPath ?? fallbackPath);
     }
-  }, [status, router, submitHref, user]);
-  const apiBaseUrl = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api').replace(
-    /\/$/,
-    '',
-  );
+  }, [searchParams, status, router, submitHref, user]);
   const oauthError =
     searchParams.get('error') === 'oauth_email_exists'
       ? 'This email is already registered. Please sign in with your email and password.'
       : searchParams.get('error') === 'oauth_failed'
         ? 'Unable to sign in with Google. Please try again.'
         : null;
-  const validate = () => {
+
+  const validate = () => {
     const nextErrors = validateLogin(email, password);
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -123,25 +135,15 @@ export function AuthForm({
     }
   };
 
-  const displayName = user?.displayName?.trim() || user?.email || 'Inkly user';
-  const userInitials = displayName
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join('');
-
   const shouldShowFullscreenLoader =
-    status === 'loading' || status === 'authenticated' || isRedirecting || isSubmitting;
+    status === 'loading' || status === 'authenticated' || isSubmitting;
 
   if (shouldShowFullscreenLoader) {
     return (
       <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#222831] text-[#eeeeee]">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="size-6 animate-spin text-[#FFD369]" />
-          <p className="text-sm font-medium text-[#EEEEEE]">
-            Loading workspace...
-          </p>
+          <p className="text-sm font-medium text-[#EEEEEE]">Loading workspace...</p>
         </div>
       </div>
     );

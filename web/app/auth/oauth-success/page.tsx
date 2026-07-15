@@ -2,13 +2,24 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
 
 import { useAuth } from '@/hooks/useAuth';
 import { setAccessToken } from '@/lib/auth-storage';
 import { toast } from '@/lib/toast';
 
 import { LoadingScreen } from '@/components/auth/LoadingScreen';
+
+function isAdminUser(user: ReturnType<typeof useAuth>['user']) {
+  return user?.roles?.some((role) => role.code === 'ADMIN' || role.code === 'STAFF') ?? false;
+}
+
+function getSafeNextPath(value: string | null) {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) {
+    return '/studio';
+  }
+
+  return value;
+}
 
 function OAuthSuccessContent() {
   const router = useRouter();
@@ -52,11 +63,9 @@ function OAuthSuccessContent() {
 
   useEffect(() => {
     if (!isProcessing && status === 'authenticated' && user) {
-      const nextPath = searchParams.get('next') ?? '/studio';
-      const safeNextPath = nextPath.startsWith('/') ? nextPath : '/studio';
-      
-      const isAdmin = user.roles?.some(r => r.code === 'ADMIN' || r.code === 'STAFF') || false;
-      if (isAdmin && safeNextPath === '/studio') {
+      const safeNextPath = getSafeNextPath(searchParams.get('next'));
+
+      if (isAdminUser(user) && safeNextPath === '/studio') {
         router.replace('/admin');
       } else {
         router.replace(safeNextPath);

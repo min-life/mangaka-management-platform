@@ -1,21 +1,24 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 import { useAuth } from '@/hooks/useAuth';
 
 import { LoadingScreen } from './LoadingScreen';
 
 export function AuthWrapper({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const router = useRouter();
   const { error, refreshUser, status } = useAuth();
 
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.replace('/login');
+      const queryString = window.location.search.replace(/^\?/, '');
+      const currentPath = `${pathname}${queryString ? `?${queryString}` : ''}`;
+      router.replace(`/login?next=${encodeURIComponent(currentPath)}`);
     }
-  }, [router, status]);
+  }, [pathname, router, status]);
 
   if (status === 'error') {
     return (
