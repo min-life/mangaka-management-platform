@@ -43,7 +43,7 @@ export function DesktopTaskSidebar({
   discussionFrameComments,
   isLoadingVersions,
 }: DesktopTaskSidebarProps) {
-  const [sidebarTab, setSidebarTab] = useState<'task' | 'material'>('task');
+  const [sidebarTab, setSidebarTab] = useState<'task' | 'material'>('material');
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [isResizing, setIsResizing] = useState(false);
   const [topSectionHeight, setTopSectionHeight] = useState(220);

@@ -85,73 +85,73 @@ export function TasksClient() {
   }, [numericId, loadMembers]);
 
   const { data, error, isInitialLoading, isRefreshing, reload } = useAsyncResource(async () => {
+    // Step 1: get folders (1 request)
     const foldersRes = await getProjectFolders(numericId);
     const foldersList = foldersRes.folders || [];
 
-    const filesPromises = foldersList.map(async (folder) => {
-      try {
-        const filesResult = await getFolderFiles(folder.id);
-        return filesResult.files || [];
-      } catch {
-        return [];
-      }
-    });
-    const filesArrays = await Promise.all(filesPromises);
+    // Step 2: fan-out getFolderFiles for ALL folders in parallel
+    const filesArrays = await Promise.all(
+      foldersList.map(async (folder) => {
+        try {
+          const res = await getFolderFiles(folder.id);
+          return res.files || [];
+        } catch {
+          return [];
+        }
+      })
+    );
     const allFiles = filesArrays.flat();
     const apiProjectFiles = allFiles.map((f) => ({ id: f.id, title: f.title }));
 
-    const tasksPromises = allFiles.map(async (file) => {
-      try {
-        const dbTasks = await getFileTasks(file.id);
+    // Step 3: fan-out getFileTasks for ALL files in parallel
+    const tasksArrays = await Promise.all(
+      allFiles.map(async (file) => {
+        try {
+          const dbTasks = await getFileTasks(file.id);
+          return dbTasks.map((t: any) => {
+            const frame = t.commentFrames?.[0];
+            const region = frame
+              ? {
+                startX: parseDecimal(frame.startX),
+                startY: parseDecimal(frame.startY),
+                endX: parseDecimal(frame.endX),
+                endY: parseDecimal(frame.endY),
+              }
+              : undefined;
 
-        return dbTasks.map((t: any) => {
-          const frame = t.commentFrames?.[0];
-          const region = frame
-            ? {
-              startX: parseDecimal(frame.startX),
-              startY: parseDecimal(frame.startY),
-              endX: parseDecimal(frame.endX),
-              endY: parseDecimal(frame.endY),
-            }
-            : undefined;
+            const assigneeName = t.assignedByUser?.displayName || t.assignedByUser?.email || 'Unassigned';
+            const versionMatch = t.description?.match(/\[version:(v\d+)\]/);
+            const taskVersion = versionMatch ? versionMatch[1] : undefined;
+            const cleanDesc = getCleanTaskDescription(t.description);
 
-          const assigneeName = t.assignedByUser?.displayName || t.assignedByUser?.email || 'Unassigned';
-
-          const versionMatch = t.description?.match(/\[version:(v\d+)\]/);
-          const taskVersion = versionMatch ? versionMatch[1] : undefined;
-
-          const cleanDesc = getCleanTaskDescription(t.description);
-
-          return {
-            assignee: assigneeName,
-            description: cleanDesc,
-            dueDate: t.deadline ? new Date(t.deadline).toLocaleDateString() : 'No due date',
-            fileId: file.id,
-            fileTitle: file.title,
-            id: String(t.id),
-            isMine: user?.id != null && t.assignedByUser?.id === user.id,
-            assignedByUserId: t.createdByUser?.id || t.assignedByUserId,
-            previewUrl: '',
-            priority: 'MEDIUM',
-            region,
-            status: t.status,
-            submissions: [],
-            title: t.title,
-            updatedAt: new Date(t.updatedAt).toLocaleDateString(),
-            targetVersion: taskVersion,
-          } as TaskWorkspaceItem;
-        });
-      } catch {
-        return [];
-      }
-    });
-
-    const tasksArrays = await Promise.all(tasksPromises);
-    const allTasks = tasksArrays.flat();
+            return {
+              assignee: assigneeName,
+              description: cleanDesc,
+              dueDate: t.deadline ? new Date(t.deadline).toLocaleDateString() : 'No due date',
+              fileId: file.id,
+              fileTitle: file.title,
+              id: String(t.id),
+              isMine: user?.id != null && t.assignedByUser?.id === user.id,
+              assignedByUserId: t.createdByUser?.id || t.assignedByUserId,
+              previewUrl: '',
+              priority: 'MEDIUM',
+              region,
+              status: t.status,
+              submissions: [],
+              title: t.title,
+              updatedAt: new Date(t.updatedAt).toLocaleDateString(),
+              targetVersion: taskVersion,
+            } as TaskWorkspaceItem;
+          });
+        } catch {
+          return [];
+        }
+      })
+    );
 
     return {
       projectFiles: apiProjectFiles,
-      tasks: allTasks
+      tasks: tasksArrays.flat(),
     };
   }, [numericId]);
 
