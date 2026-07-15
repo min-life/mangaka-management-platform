@@ -1,8 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import {
+  AlertTriangle,
+  LogOut,
   MoreVertical,
   Plus,
   Search,
@@ -48,6 +50,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/use-permissions';
 import type { UserResponse } from '@/services/user.service';
 import { Pagination } from '../../../../components/Pagination';
 
@@ -55,6 +59,7 @@ import {
   addEditorialMembers,
   getAvailableEditorialUsers,
   getEditorialMembers,
+  leaveEditorialBoard,
   removeEditorialMember,
   setEditorialMemberAsLead,
   type EditorialMember,
@@ -404,26 +409,6 @@ function MemberDetailDrawer({
                   Contact
                 </p>
                 <p className="mt-2 text-sm font-medium text-white">{member.email}</p>
-                <p className="mt-1 text-xs text-[#C8C8C8]">{member.region}*</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-[8px] border border-[#50555D] bg-[#0e141c] p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                    Projects
-                  </p>
-                  <p className="mt-2 text-[28px] font-bold leading-8 text-white">
-                    {member.activeProjects}
-                  </p>
-                </div>
-                <div className="rounded-[8px] border border-[#50555D] bg-[#0e141c] p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#C8C8C8]">
-                    Reviews
-                  </p>
-                  <p className="mt-2 text-[28px] font-bold leading-8 text-[#FFD369]">
-                    {member.reviewLoad}
-                  </p>
-                </div>
               </div>
 
               <div className="rounded-[8px] border border-[#50555D] bg-[#0e141c] p-4">
@@ -451,11 +436,97 @@ function MemberDetailDrawer({
   );
 }
 
+type ConfirmMemberAction = {
+  member: EditorialMember;
+  type: 'leave' | 'remove';
+};
+
+function ConfirmMemberActionDialog({
+  action,
+  isSubmitting,
+  onClose,
+  onConfirm,
+}: {
+  action: ConfirmMemberAction | null;
+  isSubmitting: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const isLeave = action?.type === 'leave';
+
+  return (
+    <Dialog
+      onOpenChange={(open) => {
+        if (!open) {
+          onClose();
+        }
+      }}
+      open={Boolean(action)}
+    >
+      <DialogContent
+        className="max-w-md gap-0 overflow-hidden rounded-[7px] border border-[#39424f] bg-[#101820] p-0 text-white"
+        showCloseButton={false}
+      >
+        {action ? (
+          <>
+            <DialogHeader className="border-b border-[#39424f] px-6 py-5">
+              <div className="mb-3 grid size-10 place-items-center rounded-[4px] border border-[#6b2637] bg-[#371522] text-[#ff9ab3]">
+                {isLeave ? <LogOut className="size-5" /> : <AlertTriangle className="size-5" />}
+              </div>
+              <DialogTitle className="text-xl font-black text-white">
+                {isLeave ? 'Leave Editor Board' : 'Remove Member'}
+              </DialogTitle>
+              <DialogDescription className="text-sm font-medium text-[#aeb7c2]">
+                {isLeave
+                  ? 'You will lose access to this editor board and its projects.'
+                  : `${action.member.displayName ?? action.member.email} will lose access to this editor board.`}
+              </DialogDescription>
+            </DialogHeader>
+
+            <DialogFooter className="mx-0 mb-0 rounded-none border-[#39424f] bg-[#151c25] px-6 py-4">
+              <DialogClose asChild>
+                <Button
+                  className="h-9 rounded-[4px] border-[#4b535f] bg-[#101820] px-4 text-xs font-black text-white hover:bg-[#303842]"
+                  type="button"
+                  variant="outline"
+                >
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button
+                className="h-9 rounded-[4px] border-[#6b2637] bg-[#371522] px-4 text-xs font-black text-[#ff9ab3] hover:bg-[#4a1d2c]"
+                disabled={isSubmitting}
+                onClick={onConfirm}
+                type="button"
+                variant="outline"
+              >
+                {isSubmitting
+                  ? isLeave
+                    ? 'Leaving...'
+                    : 'Removing...'
+                  : isLeave
+                    ? 'Leave Board'
+                    : 'Remove Member'}
+              </Button>
+            </DialogFooter>
+          </>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function EditorialMembersManagementPage() {
   const params = useParams<{ editorBoardId?: string }>();
+  const router = useRouter();
   const editorBoardId = params.editorBoardId ?? '1';
+  const { can: canBoard } = usePermissions({ resource: 'BOARD', resourceId: editorBoardId });
+  const { user: currentUser } = useAuth();
+  const isOwner = canBoard('board:owner');
+  const canRemoveMember = isOwner;
   const [members, setMembers] = useState<EditorialMember[]>([]);
   const [selectedMember, setSelectedMember] = useState<EditorialMember | null>(null);
+  const [confirmAction, setConfirmAction] = useState<ConfirmMemberAction | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -491,7 +562,7 @@ export function EditorialMembersManagementPage() {
     return members.filter((member) => {
       const matchesSearch =
         !normalizedSearch ||
-        [member.displayName ?? '', member.email, member.roleTitle, member.region].some((value) =>
+        [member.displayName ?? '', member.email, member.roleTitle].some((value) =>
           value.toLowerCase().includes(normalizedSearch),
         );
 
@@ -556,11 +627,37 @@ export function EditorialMembersManagementPage() {
     try {
       await removeEditorialMember(editorBoardId, member.id);
       setSelectedMember(null);
+      setConfirmAction(null);
       await loadMembers();
     } catch {
       setError('Unable to remove board member.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleLeave = async () => {
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      await leaveEditorialBoard(editorBoardId);
+      setConfirmAction(null);
+      router.push('/studio?tab=editorBoards');
+    } catch {
+      setError('Unable to leave editor board.');
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleConfirmAction = () => {
+    if (!confirmAction) {
+      return;
+    }
+    if (confirmAction.type === 'leave') {
+      void handleLeave();
+    } else {
+      void handleRemove(confirmAction.member);
     }
   };
 
@@ -691,6 +788,7 @@ export function EditorialMembersManagementPage() {
                           <DropdownMenuContent
                             align="end"
                             className="min-w-44 rounded-[5px] border-[#39424f] bg-[#151c25] p-1 text-white"
+                            onClick={(event) => event.stopPropagation()}
                           >
                             <DropdownMenuItem
                               className="gap-2 rounded-[3px] text-xs font-bold focus:bg-[#303842] focus:text-white"
@@ -700,14 +798,27 @@ export function EditorialMembersManagementPage() {
                               <ShieldCheck className="size-4" />
                               Set as Lead
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="gap-2 rounded-[3px] text-xs font-bold text-red-300 focus:bg-red-950/30 focus:text-red-200"
-                              disabled={isSubmitting}
-                              onClick={() => void handleRemove(member)}
-                            >
-                              <Trash2 className="size-4" />
-                              Remove
-                            </DropdownMenuItem>
+                            {member.id === currentUser?.id ? (
+                              !isOwner ? (
+                                <DropdownMenuItem
+                                  className="gap-2 rounded-[3px] text-xs font-bold text-red-300 focus:bg-red-950/30 focus:text-red-200"
+                                  disabled={isSubmitting}
+                                  onClick={() => setConfirmAction({ member, type: 'leave' })}
+                                >
+                                  <LogOut className="size-4" />
+                                  Leave Board
+                                </DropdownMenuItem>
+                              ) : null
+                            ) : canRemoveMember ? (
+                              <DropdownMenuItem
+                                className="gap-2 rounded-[3px] text-xs font-bold text-red-300 focus:bg-red-950/30 focus:text-red-200"
+                                disabled={isSubmitting}
+                                onClick={() => setConfirmAction({ member, type: 'remove' })}
+                              >
+                                <Trash2 className="size-4" />
+                                Remove
+                              </DropdownMenuItem>
+                            ) : null}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -740,6 +851,12 @@ export function EditorialMembersManagementPage() {
         </section>
       </main>
       <MemberDetailDrawer member={selectedMember} onClose={() => setSelectedMember(null)} />
+      <ConfirmMemberActionDialog
+        action={confirmAction}
+        isSubmitting={isSubmitting}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={handleConfirmAction}
+      />
     </>
   );
 }
