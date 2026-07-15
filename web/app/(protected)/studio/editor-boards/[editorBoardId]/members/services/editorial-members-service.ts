@@ -1,16 +1,14 @@
 import {
   addEditorBoardMembers,
   getEditorBoardMembers as getEditorBoardMembersRequest,
+  leaveEditorBoard,
   removeEditorBoardMember,
   setEditorBoardMemberLead,
   type BoardMemberResponse,
 } from '@/services/editor-board.service';
 import { getUsers, type UserResponse } from '@/services/user.service';
 
-export type MemberStatus = 'AVAILABLE' | 'BUSY' | 'OFFLINE';
-
 export type EditorialMember = {
-  activeProjects: number;
   avatarUrl: string | null;
   displayName: string | null;
   email: string;
@@ -18,10 +16,7 @@ export type EditorialMember = {
   isLead: boolean;
   joinedAt?: string;
   lastActiveAt?: string;
-  region: string;
-  reviewLoad: number;
   roleTitle: string;
-  status: MemberStatus;
   userEditorBoard: {
     editorBoardId: number;
     isLead: boolean;
@@ -37,7 +32,6 @@ function mapBoardMember(
   const numericBoardId = Number(editorBoardId);
 
   return {
-    activeProjects: 0,
     avatarUrl: member.avatarUrl ?? null,
     displayName: member.displayName ?? memberName,
     email: member.email ?? `${member.id}@inkly.local`,
@@ -45,10 +39,7 @@ function mapBoardMember(
     isLead: member.isLead,
     joinedAt: member.createdAt,
     lastActiveAt: member.updatedAt,
-    region: member.isLead ? 'Editorial Lead Desk' : 'Editorial Desk',
-    reviewLoad: 0,
     roleTitle: member.isLead ? 'Lead Editor' : 'Editorial Member',
-    status: 'OFFLINE',
     userEditorBoard: {
       editorBoardId: Number.isFinite(numericBoardId) ? numericBoardId : 0,
       isLead: member.isLead,
@@ -86,6 +77,10 @@ export async function addEditorialMembers(editorBoardId: number | string, userId
 
 export async function removeEditorialMember(editorBoardId: number | string, userId: number) {
   await removeEditorBoardMember(editorBoardId, userId);
+}
+
+export async function leaveEditorialBoard(editorBoardId: number | string) {
+  await leaveEditorBoard(editorBoardId);
 }
 
 export async function setEditorialMemberAsLead(editorBoardId: number | string, userId: number) {
