@@ -89,3 +89,22 @@ export async function createApplicationComment(applicationId: number | string, t
 
   return response.data;
 }
+
+export async function updateApplicationComment(commentId: number | string, text: string) {
+  const response = await api.patch<CommentItemResponse, CommentItemResponse>(
+    `/comments/${commentId}`,
+    {
+      content: text,
+    },
+  );
+
+  return response.data;
+}
+
+export async function deleteApplicationComment(commentId: number | string) {
+  const response = await api.delete<CommentItemResponse, CommentItemResponse>(
+    `/comments/${commentId}`,
+  );
+
+  return response.data;
+}

@@ -7,12 +7,24 @@ import {
   ChevronRight,
   FileUp,
   Loader2,
+  Pencil,
+  Trash2,
   UserCircle,
   X,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -47,8 +59,10 @@ import {
 } from './application-ui';
 import {
   createApplicationComment,
+  deleteApplicationComment,
   getApplicationComments,
   type ApplicationCommentResponse,
+  updateApplicationComment,
 } from './services/application-comments-service';
 
 type CommentItem = ApplicationCommentResponse;
@@ -240,11 +254,20 @@ export function ApplicationReviewDrawer({
   const [isLoadingOlderComments, setIsLoadingOlderComments] = useState(false);
   const [isSendingComment, setIsSendingComment] = useState(false);
   const [newComment, setNewComment] = useState('');
+  const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
+  const [updatingCommentId, setUpdatingCommentId] = useState<number | null>(null);
+  const [deletingCommentId, setDeletingCommentId] = useState<number | null>(null);
+  const [pendingDeleteCommentId, setPendingDeleteCommentId] = useState<number | null>(null);
   const commentsScrollRef = useRef<HTMLDivElement>(null);
+  const commentItemRefs = useRef(new Map<number, HTMLDivElement>());
   const isLoadingOlderCommentsRef = useRef(false);
   const shouldScrollCommentsToBottomRef = useRef(false);
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
-  const { createdComments } = useRealtimeComments('APPLICATION', application?.id);
+  const { createdComments, deletedCommentIds, updatedComments } = useRealtimeComments(
+    'APPLICATION',
+    application?.id,
+  );
 
   useEffect(() => {
     if (!isResizingDrawer) {
@@ -320,10 +343,88 @@ export function ApplicationReviewDrawer({
         mergeComment(comment);
       }
       setNewComment('');
-    } catch {
-      setCommentsError('Unable to send comment.');
+    } catch (error) {
+      setCommentsError(getEditorBoardApiErrorMessage(error, 'Unable to send comment.'));
     } finally {
       setIsSendingComment(false);
+    }
+  };
+
+  const handleStartEditComment = (comment: CommentItem) => {
+    setEditingCommentId(comment.id);
+    setEditingCommentText(getCommentText(comment.content));
+    setCommentsError('');
+    window.requestAnimationFrame(() => {
+      const commentElement = commentItemRefs.current.get(comment.id);
+      const scrollElement = commentsScrollRef.current;
+
+      if (!commentElement || !scrollElement) {
+        return;
+      }
+
+      scrollElement.scrollTo({
+        behavior: 'smooth',
+        top: Math.max(0, commentElement.offsetTop - scrollElement.offsetTop - 16),
+      });
+    });
+  };
+
+  const handleCancelEditComment = () => {
+    setEditingCommentId(null);
+    setEditingCommentText('');
+  };
+
+  const handleUpdateComment = async (commentId: number) => {
+    const nextText = editingCommentText.trim();
+    if (!nextText) {
+      return;
+    }
+
+    setUpdatingCommentId(commentId);
+    setCommentsError('');
+
+    try {
+      const updatedComment = await updateApplicationComment(commentId, nextText);
+      if (updatedComment) {
+        mergeComment(updatedComment);
+      } else {
+        setComments((currentComments) =>
+          currentComments.map((comment) =>
+            comment.id === commentId
+              ? {
+                  ...comment,
+                  content: nextText,
+                  updatedAt: new Date().toISOString(),
+                }
+              : comment,
+          ),
+        );
+      }
+      handleCancelEditComment();
+    } catch (error) {
+      setCommentsError(getEditorBoardApiErrorMessage(error, 'Unable to update comment.'));
+    } finally {
+      setUpdatingCommentId(null);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: number) => {
+    setDeletingCommentId(commentId);
+    setCommentsError('');
+
+    try {
+      await deleteApplicationComment(commentId);
+      setComments((currentComments) =>
+        currentComments.filter((comment) => comment.id !== commentId),
+      );
+      setPendingDeleteCommentId(null);
+      if (editingCommentId === commentId) {
+        handleCancelEditComment();
+      }
+    } catch (error) {
+      setCommentsError(getEditorBoardApiErrorMessage(error, 'Unable to delete comment.'));
+    } finally {
+      setDeletingCommentId(null);
     }
   };
 
@@ -398,6 +499,7 @@ export function ApplicationReviewDrawer({
         });
         if (isMounted) {
           setComments(normalizeComments(result.comments));
+          shouldScrollCommentsToBottomRef.current = true;
           setCommentPagination(
             result.pagination
               ? {
@@ -407,18 +509,12 @@ export function ApplicationReviewDrawer({
                 }
               : null,
           );
-          window.requestAnimationFrame(() => {
-            const scrollElement = commentsScrollRef.current;
-            if (scrollElement) {
-              scrollElement.scrollTop = scrollElement.scrollHeight;
-            }
-          });
         }
-      } catch {
+      } catch (error) {
         if (isMounted) {
           setComments([]);
           setCommentPagination(null);
-          setCommentsError('Unable to load comments.');
+          setCommentsError(getEditorBoardApiErrorMessage(error, 'Unable to load comments.'));
         }
       } finally {
         if (isMounted) {
@@ -446,6 +542,27 @@ export function ApplicationReviewDrawer({
       queueMicrotask(() => mergeComment(newestComment));
     }
   }, [createdComments, mergeComment]);
+
+  useEffect(() => {
+    const latestUpdatedComment = updatedComments.at(-1) as CommentItem | undefined;
+    if (latestUpdatedComment) {
+      queueMicrotask(() => mergeComment(latestUpdatedComment));
+    }
+  }, [mergeComment, updatedComments]);
+
+  useEffect(() => {
+    const latestDeletedCommentId = deletedCommentIds.at(-1);
+    if (latestDeletedCommentId) {
+      queueMicrotask(() => {
+        setComments((currentComments) =>
+          currentComments.filter((comment) => comment.id !== latestDeletedCommentId),
+        );
+        if (editingCommentId === latestDeletedCommentId) {
+          handleCancelEditComment();
+        }
+      });
+    }
+  }, [deletedCommentIds, editingCommentId]);
 
   useEffect(() => {
     if (!shouldScrollCommentsToBottomRef.current || isLoadingComments) {
@@ -509,8 +626,8 @@ export function ApplicationReviewDrawer({
             currentScrollElement.scrollTop;
         }
       });
-    } catch {
-      setCommentsError('Unable to load older comments.');
+    } catch (error) {
+      setCommentsError(getEditorBoardApiErrorMessage(error, 'Unable to load older comments.'));
     } finally {
       isLoadingOlderCommentsRef.current = false;
       setIsLoadingOlderComments(false);
@@ -535,8 +652,8 @@ export function ApplicationReviewDrawer({
       await voteApplication(application.id, { decision, comment: voteComment });
       await loadVotes(application.id);
       setVoteComment('');
-    } catch {
-      setVoteError('Unable to submit your vote.');
+    } catch (error) {
+      setVoteError(getEditorBoardApiErrorMessage(error, 'Unable to submit your vote.'));
     } finally {
       setIsVoting(false);
     }
@@ -642,6 +759,10 @@ export function ApplicationReviewDrawer({
           setCommentPagination(null);
           isLoadingOlderCommentsRef.current = false;
           setIsLoadingOlderComments(false);
+          handleCancelEditComment();
+          setDeletingCommentId(null);
+          setUpdatingCommentId(null);
+          setPendingDeleteCommentId(null);
           setNewComment('');
         }
       }}
@@ -1169,6 +1290,9 @@ export function ApplicationReviewDrawer({
                       {visibleComments.map((comment) => {
                         const isCurrentUserComment = comment.createdByUser?.id === user?.id;
                         const commentText = getCommentText(comment.content);
+                        const isEditingComment = editingCommentId === comment.id;
+                        const isUpdatingComment = updatingCommentId === comment.id;
+                        const isDeletingComment = deletingCommentId === comment.id;
 
                         return (
                           <div
@@ -1178,6 +1302,13 @@ export function ApplicationReviewDrawer({
                                 : 'border-transparent bg-[#101820]'
                             }`}
                             key={comment.id}
+                            ref={(element) => {
+                              if (element) {
+                                commentItemRefs.current.set(comment.id, element);
+                              } else {
+                                commentItemRefs.current.delete(comment.id);
+                              }
+                            }}
                           >
                             {comment.createdByUser?.avatarUrl ? (
                               // eslint-disable-next-line @next/next/no-img-element
@@ -1210,13 +1341,71 @@ export function ApplicationReviewDrawer({
                                   })}
                                 </span>
                               </div>
-                              <p
-                                className={`mt-1 text-xs text-[#dce7f3] ${
-                                  isCurrentUserComment ? 'font-semibold' : 'font-medium'
-                                }`}
-                              >
-                                {renderCommentText(commentText)}
-                              </p>
+                              {isEditingComment ? (
+                                <div className="mt-2">
+                                  <Textarea
+                                    className="min-h-16 resize-none border-[#39424f] bg-[#101820] text-xs font-medium text-white placeholder:text-[#4b535f] focus-visible:ring-[#FFD369]"
+                                    disabled={isUpdatingComment}
+                                    onChange={(event) => setEditingCommentText(event.target.value)}
+                                    value={editingCommentText}
+                                  />
+                                  <div className="mt-2 flex justify-end gap-2">
+                                    <Button
+                                      className="h-7 rounded-[4px] border-[#4b535f] bg-[#101820] px-3 text-[10px] font-black text-[#dce7f3] hover:bg-[#303842]"
+                                      disabled={isUpdatingComment}
+                                      onClick={handleCancelEditComment}
+                                      type="button"
+                                      variant="outline"
+                                    >
+                                      Cancel
+                                    </Button>
+                                    <Button
+                                      className="h-7 rounded-[4px] bg-[#FFD369] px-3 text-[10px] font-black text-[#222831] hover:bg-[#eac04f]"
+                                      disabled={!editingCommentText.trim() || isUpdatingComment}
+                                      onClick={() => void handleUpdateComment(comment.id)}
+                                      type="button"
+                                    >
+                                      {isUpdatingComment ? 'Saving...' : 'Save'}
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="mt-1 flex items-start justify-between gap-3">
+                                  <p
+                                    className={`min-w-0 flex-1 whitespace-pre-wrap break-words text-xs text-[#dce7f3] ${
+                                      isCurrentUserComment ? 'font-semibold' : 'font-medium'
+                                    }`}
+                                  >
+                                    {renderCommentText(commentText)}
+                                  </p>
+                                  {isCurrentUserComment ? (
+                                    <div className="flex shrink-0 items-center gap-1">
+                                      <button
+                                        className="grid size-7 place-items-center rounded-[4px] text-[#8b94a1] transition-colors hover:bg-[#303842] hover:text-[#FFD369]"
+                                        disabled={isDeletingComment}
+                                        onClick={() => handleStartEditComment(comment)}
+                                        title="Edit comment"
+                                        type="button"
+                                      >
+                                        <Pencil className="size-3.5" />
+                                      </button>
+                                      <button
+                                        className="grid size-7 place-items-center rounded-[4px] text-[#8b94a1] transition-colors hover:bg-[#371522] hover:text-[#ff9ab3] disabled:cursor-not-allowed disabled:opacity-50"
+                                        disabled={isDeletingComment}
+                                        onClick={() => setPendingDeleteCommentId(comment.id)}
+                                        title="Delete comment"
+                                        type="button"
+                                      >
+                                        {isDeletingComment ? (
+                                          <Loader2 className="size-3.5 animate-spin" />
+                                        ) : (
+                                          <Trash2 className="size-3.5" />
+                                        )}
+                                      </button>
+                                    </div>
+                                  ) : null}
+                                </div>
+                              )}
                             </div>
                           </div>
                         );
@@ -1274,6 +1463,45 @@ export function ApplicationReviewDrawer({
                   </div>
                 </ReviewSection>
               ) : null}
+              <AlertDialog
+                open={pendingDeleteCommentId !== null}
+                onOpenChange={(open) => {
+                  if (!open && deletingCommentId === null) {
+                    setPendingDeleteCommentId(null);
+                  }
+                }}
+              >
+                <AlertDialogContent className="border border-[#39424f] bg-[#151c25] text-white">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="font-black text-white">
+                      Delete comment?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription className="text-sm font-medium text-[#aeb7c2]">
+                      This comment will be removed from the review discussion.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter className="border-[#303842] bg-[#101820]">
+                    <AlertDialogCancel
+                      className="rounded-[4px] border-[#4b535f] !bg-[#101820] text-xs font-black text-[#dce7f3] hover:!bg-[#303842] hover:text-white"
+                      disabled={deletingCommentId !== null}
+                    >
+                      Cancel
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      className="rounded-[4px] bg-[#6b2637] text-xs font-black text-[#ffccd8] hover:bg-[#7a2d42]"
+                      disabled={deletingCommentId !== null || pendingDeleteCommentId === null}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        if (pendingDeleteCommentId !== null) {
+                          void handleDeleteComment(pendingDeleteCommentId);
+                        }
+                      }}
+                    >
+                      {deletingCommentId !== null ? 'Deleting...' : 'Delete'}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </>
         ) : null}
