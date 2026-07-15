@@ -5,8 +5,8 @@ import { useNavigation } from '@react-navigation/native';
 
 import { RootStackNavProp } from '@/src/navigation/types';
 import { Colors } from '@/src/constants/colors';
-import { login, loginWithGoogle } from '@/src/services/authApi';
-import { saveAccessToken, saveSession } from '@/src/services/tokenStorage';
+import { login } from '@/src/services/authApi';
+import { saveSession } from '@/src/services/tokenStorage';
 import LoginBrandHeader from './components/LoginBrandHeader';
 import LoginFormCard from './components/LoginFormCard';
 
@@ -17,12 +17,11 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
   const handleLogin = async () => {
-    if (isLoading || isGoogleLoading || loginSuccess) return;
+    if (isLoading || loginSuccess) return;
 
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail || !password) {
@@ -56,31 +55,6 @@ export default function LoginScreen() {
       setLoginSuccess(false);
       setErrorMessage(
         error instanceof Error ? error.message : 'Unable to sign in. Please try again.',
-      );
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    if (isLoading || isGoogleLoading || loginSuccess) return;
-
-    setErrorMessage('');
-    setIsGoogleLoading(true);
-
-    try {
-      const response = await loginWithGoogle();
-      await saveAccessToken(response.accessToken);
-
-      setIsGoogleLoading(false);
-      setLoginSuccess(true);
-
-      setTimeout(() => {
-        navigation.replace('Home');
-      }, 600);
-    } catch (error) {
-      setIsGoogleLoading(false);
-      setLoginSuccess(false);
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Unable to sign in with Google. Please try again.',
       );
     }
   };
@@ -130,7 +104,6 @@ export default function LoginScreen() {
               password={password}
               showPassword={showPassword}
               isLoading={isLoading}
-              isGoogleLoading={isGoogleLoading}
               loginSuccess={loginSuccess}
               isFormValid={isFormValid}
               errorMessage={errorMessage}
@@ -139,7 +112,6 @@ export default function LoginScreen() {
               onTogglePassword={() => setShowPassword(!showPassword)}
               onLogin={handleLogin}
               onForgotPassword={handleForgotPasswordPress}
-              onGoogleLogin={handleGoogleLogin}
             />
           </View>
         </ScrollView>

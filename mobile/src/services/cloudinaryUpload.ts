@@ -8,8 +8,12 @@ interface CloudinaryUploadResponse {
   url?: string;
 }
 
-const CLOUDINARY_CLOUD_NAME = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME?.trim();
-const CLOUDINARY_UPLOAD_PRESET = process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET?.trim();
+const CLOUDINARY_CLOUD_NAME =
+  process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME?.trim() ||
+  process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME?.trim();
+const CLOUDINARY_UPLOAD_PRESET =
+  process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET?.trim() ||
+  process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET?.trim();
 
 function getCloudinaryUploadUrl() {
   if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
