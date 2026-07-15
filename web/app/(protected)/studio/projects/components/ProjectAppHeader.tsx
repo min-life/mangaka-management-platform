@@ -21,11 +21,20 @@ import { getProjects, type ProjectResponse } from '@/services/project.service';
 import { useProjectStore, selectProject } from '../store/project-store';
 
 type ProjectAppHeaderProps = {
+  hideProjectSwitcher?: boolean;
   projectId: string;
   projectName?: string;
+  workspaceHref?: string;
+  workspaceLabel?: string;
 };
 
-export function ProjectAppHeader({ projectId, projectName }: ProjectAppHeaderProps) {
+export function ProjectAppHeader({
+  hideProjectSwitcher = false,
+  projectId,
+  projectName,
+  workspaceHref = '/studio',
+  workspaceLabel = 'Workspace',
+}: ProjectAppHeaderProps) {
   const router = useRouter();
   const { logout, user } = useAuth();
 
@@ -42,12 +51,14 @@ export function ProjectAppHeader({ projectId, projectName }: ProjectAppHeaderPro
     if (numericId) {
       void loadProject(numericId);
     }
-    void getProjects()
-      .then((res) => {
-        setAllProjects(res.projects || res || []);
-      })
-      .catch(() => {});
-  }, [numericId, loadProject]);
+    if (!hideProjectSwitcher) {
+      void getProjects()
+        .then((res) => {
+          setAllProjects(res.projects || res || []);
+        })
+        .catch(() => {});
+    }
+  }, [hideProjectSwitcher, numericId, loadProject]);
 
   const displayName = user?.displayName || user?.email || 'Current user';
   const email = user?.email ?? 'No email';
@@ -64,48 +75,54 @@ export function ProjectAppHeader({ projectId, projectName }: ProjectAppHeaderPro
       <div className="flex items-center gap-5">
         <div className="flex items-center text-xs font-black uppercase tracking-[0.08em] text-[#aeb7c2]">
           <Link
-            href="/studio"
+            href={workspaceHref}
             className="flex h-9 items-center gap-1.5 rounded-[4px] border border-transparent px-3 text-[#aeb7c2] hover:border-[#39424f] hover:bg-[#222a34]"
           >
             <FolderKanban className="size-4 text-[#FFD369]" />
-            <span>Workspace</span>
+            <span>{workspaceLabel}</span>
           </Link>
           <span className="text-[#5b626d] px-1">/</span>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                className="flex h-9 items-center gap-1 rounded-[4px] border border-transparent px-3 text-[#FFD369] hover:border-[#39424f] hover:bg-[#222a34]"
-                type="button"
-              >
-                {isLoading ? (
-                  <div className="h-4 w-28 rounded bg-[#39424f] animate-pulse mx-1" />
-                ) : (
-                  <span>{activeProject?.name || projectName}</span>
-                )}
-                <ChevronDown className="size-3.5 text-[#dce7f3] ml-0.5" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="start"
-              className="min-w-56 rounded-[4px] border border-[#39424f] bg-[#101820] p-1 text-white animate-in fade-in-50 duration-100"
-            >
-              {allProjects.map((p) => (
-                <DropdownMenuItem
-                  className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold focus:bg-[#303842] focus:text-white"
-                  key={p.id}
-                  onSelect={() => router.push(`/studio/projects/${getProjectSlug(p.id, p.name)}`)}
+          {hideProjectSwitcher ? (
+            <span className="flex h-9 items-center rounded-[4px] px-3 text-[#FFD369]">
+              {projectName}
+            </span>
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="flex h-9 items-center gap-1 rounded-[4px] border border-transparent px-3 text-[#FFD369] hover:border-[#39424f] hover:bg-[#222a34]"
+                  type="button"
                 >
-                  <FolderKanban className="size-3.5 text-[#8b94a1] mr-1.5" />
-                  {p.name}
-                </DropdownMenuItem>
-              ))}
-              {allProjects.length === 0 && (
-                <p className="px-2 py-1.5 text-[11px] font-bold text-[#8b94a1]">
-                  No other workspace projects
-                </p>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                  {isLoading ? (
+                    <div className="h-4 w-28 rounded bg-[#39424f] animate-pulse mx-1" />
+                  ) : (
+                    <span>{activeProject?.name || projectName}</span>
+                  )}
+                  <ChevronDown className="size-3.5 text-[#dce7f3] ml-0.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                className="min-w-56 rounded-[4px] border border-[#39424f] bg-[#101820] p-1 text-white animate-in fade-in-50 duration-100"
+              >
+                {allProjects.map((p) => (
+                  <DropdownMenuItem
+                    className="cursor-pointer rounded-[3px] px-2 py-2 text-xs font-bold focus:bg-[#303842] focus:text-white"
+                    key={p.id}
+                    onSelect={() => router.push(`/studio/projects/${getProjectSlug(p.id, p.name)}`)}
+                  >
+                    <FolderKanban className="size-3.5 text-[#8b94a1] mr-1.5" />
+                    {p.name}
+                  </DropdownMenuItem>
+                ))}
+                {allProjects.length === 0 && (
+                  <p className="px-2 py-1.5 text-[11px] font-bold text-[#8b94a1]">
+                    No other workspace projects
+                  </p>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
 

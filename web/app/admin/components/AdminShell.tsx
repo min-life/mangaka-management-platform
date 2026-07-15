@@ -35,10 +35,16 @@ type AdminShellProps = {
 export function AdminShell({ children }: AdminShellProps) {
   return (
     <div className="flex min-h-screen bg-[#222831] text-[#eeeeee]">
-      <StudioSidebar items={ADMIN_NAV_ITEMS} subtitle="Admin Console" />
+      <StudioSidebar items={ADMIN_NAV_ITEMS} logoHref="/admin" subtitle="Admin Console" />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="sticky top-0 z-50">
-          <ProjectAppHeader projectId="" projectName="Admin Console" />
+          <ProjectAppHeader
+            hideProjectSwitcher
+            projectId=""
+            projectName="Admin Console"
+            workspaceHref="/admin"
+            workspaceLabel="Admin"
+          />
         </div>
         <main className="relative flex w-full min-w-0 flex-1 flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
           {children}

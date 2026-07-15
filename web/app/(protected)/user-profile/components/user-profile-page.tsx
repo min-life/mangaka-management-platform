@@ -119,6 +119,10 @@ function getPrimaryRole(user: UserProfile | null) {
   return user?.roles[0]?.name ?? 'Team Member';
 }
 
+function isAdminUser(user: ReturnType<typeof useAuth>['user']) {
+  return user?.roles?.some((role) => role.code === 'ADMIN' || role.code === 'STAFF') ?? false;
+}
+
 function ActivityTimeline({ activities }: { activities: UserActivity[] }) {
   const icons = [CheckCheck, FilePenLine, UserPlus];
 
@@ -397,7 +401,8 @@ function SetPasswordDialog({
           <DialogHeader className="border-b border-white/[0.08] bg-[#18202c] px-6 py-5">
             <DialogTitle className="text-[22px] text-white">Set Password</DialogTitle>
             <DialogDescription className="text-[#b8c3d2]">
-              Your account doesn&apos;t have a password yet. Set one so you can also sign in with email.
+              Your account doesn&apos;t have a password yet. Set one so you can also sign in with
+              email.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 p-6">
@@ -483,22 +488,26 @@ export function UserProfilePage() {
     }
 
     const nextActivity = mapActivityLogToUserActivity(activityLog, { isDirectedAtViewer: true });
-    setAllActivities((currentActivities) => {
-      if (currentActivities.some((activity) => activity.id === nextActivity.id)) {
-        return currentActivities;
-      }
+    queueMicrotask(() => {
+      setAllActivities((currentActivities) => {
+        if (currentActivities.some((activity) => activity.id === nextActivity.id)) {
+          return currentActivities;
+        }
 
-      return [nextActivity, ...currentActivities];
+        return [nextActivity, ...currentActivities];
+      });
+      // Bump the visible window by one so the new item is shown immediately
+      // instead of silently pushing an already-visible item out of view.
+      setVisibleActivityCount((current) => current + 1);
     });
-    // Bump the visible window by one so the new item is shown immediately
-    // instead of silently pushing an already-visible item out of view.
-    setVisibleActivityCount((current) => current + 1);
   }, [notifications]);
 
   const displayName = currentUser?.displayName ?? authUser?.displayName ?? 'Unnamed User';
   const avatarUrl = currentUser?.avatarUrl ?? authUser?.avatarUrl ?? '';
   const roleName = getPrimaryRole(currentUser);
   const initials = getInitials(displayName);
+  const isAdmin = isAdminUser(authUser);
+  const workspaceHref = isAdmin ? '/admin' : '/studio';
   const activities = useMemo(
     () => allActivities.slice(0, visibleActivityCount),
     [allActivities, visibleActivityCount],
@@ -718,9 +727,20 @@ export function UserProfilePage() {
         onSubmit={handleCreatePassword}
       />
 
-      <WorkspaceHeader title="Profile" />
+      <WorkspaceHeader title="Profile" workspaceHref={workspaceHref} />
 
       <main className="mx-auto max-w-7xl p-6 lg:p-8">
+        {isAdmin ? (
+          <div className="mb-4">
+            <Link
+              className="inline-flex h-9 items-center gap-2 rounded-[4px] border border-[var(--profile-border)] bg-[var(--profile-surface)] px-3 text-xs font-black text-[var(--profile-text)] transition hover:bg-[var(--profile-surface-high)] hover:text-[var(--profile-title)]"
+              href="/admin"
+            >
+              <ChevronRight className="size-4 rotate-180 text-[var(--profile-accent)]" />
+              Admin Dashboard
+            </Link>
+          </div>
+        ) : null}
         <section className="relative mb-6 flex flex-col gap-6 overflow-hidden rounded-xl border border-[var(--profile-border)] bg-[var(--profile-surface)] p-6 md:flex-row md:items-end">
           <div className="pointer-events-none absolute -right-10 -top-10 rotate-12 opacity-5">
             <h2 className="text-[120px] font-bold leading-none text-[var(--profile-title)]">

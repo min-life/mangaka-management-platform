@@ -14,17 +14,19 @@ function AdminRoleCheck({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (status === 'authenticated' && user) {
       // Check if user has 'ADMIN' or 'STAFF' role code
-      const isAdmin = user.roles?.some(r => r.code === 'ADMIN' || r.code === 'STAFF') || false;
-      
+      const isAdmin =
+        user.roles?.some((role) => role.code === 'ADMIN' || role.code === 'STAFF') || false;
+
       if (!isAdmin) {
         // Redirect non-admins away from the admin area
-        router.replace('/studio/projects');
+        router.replace('/studio');
       }
     }
   }, [router, status, user]);
 
   if (status === 'authenticated' && user) {
-    const isAdmin = user.roles?.some(r => r.code === 'ADMIN' || r.code === 'STAFF') || false;
+    const isAdmin =
+      user.roles?.some((role) => role.code === 'ADMIN' || role.code === 'STAFF') || false;
     if (!isAdmin) {
       return null; // Avoid flashing admin content while redirecting
     }

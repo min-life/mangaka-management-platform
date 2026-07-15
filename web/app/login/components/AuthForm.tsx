@@ -58,6 +58,20 @@ function getSafeNextPath(value: string | null) {
   return value;
 }
 
+function getPostLoginPath(user: ReturnType<typeof useAuth>['user'], nextPath: string | null) {
+  const isAdmin = isAdminUser(user);
+
+  if (isAdmin) {
+    return nextPath?.startsWith('/admin') ? nextPath : '/admin';
+  }
+
+  if (nextPath?.startsWith('/admin')) {
+    return '/studio';
+  }
+
+  return nextPath ?? '/studio';
+}
+
 export function AuthForm({
   title,
   description,
@@ -81,12 +95,12 @@ export function AuthForm({
   useEffect(() => {
     if (status === 'authenticated') {
       const nextPath = getSafeNextPath(searchParams.get('next'));
-      const fallbackPath =
-        isAdminUser(user) && (submitHref === '/studio' || submitHref === '/')
-          ? '/admin'
-          : submitHref;
+      const fallbackPath = getPostLoginPath(
+        user,
+        submitHref === '/studio' || submitHref === '/' ? null : submitHref,
+      );
 
-      router.replace(nextPath ?? fallbackPath);
+      router.replace(getPostLoginPath(user, nextPath) ?? fallbackPath);
     }
   }, [searchParams, status, router, submitHref, user]);
   const oauthError =

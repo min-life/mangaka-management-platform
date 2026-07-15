@@ -19,11 +19,13 @@ import {
 type WorkspaceHeaderProps = {
   eyebrow?: string;
   title?: string;
+  workspaceHref?: string;
 };
 
 export function WorkspaceHeader({
   eyebrow = 'Workspace',
   title = 'Production Workspace',
+  workspaceHref = '/studio',
 }: WorkspaceHeaderProps = {}) {
   const { logout, user } = useAuth();
   const displayName = user?.displayName || user?.email || 'Current user';
@@ -41,8 +43,12 @@ export function WorkspaceHeader({
     <header className="flex h-16 items-center justify-between border-b border-[#393E46] bg-[#222831] px-6">
       {/* LEFT */}
       <div className="flex items-center gap-4">
-        <Link href="/studio">
-          <img src="/brand/1.png" alt="Inkly" className="h-[50px] w-auto object-contain hover:opacity-80 transition-opacity" />
+        <Link href={workspaceHref}>
+          <img
+            src="/brand/1.png"
+            alt="Inkly"
+            className="h-[50px] w-auto object-contain hover:opacity-80 transition-opacity"
+          />
         </Link>
 
         <div className="h-7 w-px bg-[#434A55]" />
