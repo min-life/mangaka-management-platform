@@ -17,6 +17,7 @@ type StudioSidebarProps = {
   footerItems?: StudioSidebarItem[];
   items: StudioSidebarItem[];
   logoAlt?: string;
+  logoHref?: string;
   logoSrc?: string;
   subtitle?: string;
 };
@@ -55,6 +56,7 @@ export function StudioSidebar({
   footerItems = [],
   items,
   logoAlt = 'Inkly',
+  logoHref = '/studio',
   logoSrc = '/brand/1.png',
   subtitle = 'Production Workspace',
 }: StudioSidebarProps) {
@@ -70,7 +72,7 @@ export function StudioSidebar({
         <div
           className={`flex h-14 items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}
         >
-          <Link href="/studio">
+          <Link href={logoHref}>
             <img
               alt={logoAlt}
               className={`w-auto object-contain hover:opacity-80 transition-opacity ${isCollapsed ? 'max-h-9 max-w-[44px]' : 'max-h-[68px] max-w-[170px]'}`}

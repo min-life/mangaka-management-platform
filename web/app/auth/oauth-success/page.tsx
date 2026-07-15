@@ -15,10 +15,24 @@ function isAdminUser(user: ReturnType<typeof useAuth>['user']) {
 
 function getSafeNextPath(value: string | null) {
   if (!value || !value.startsWith('/') || value.startsWith('//')) {
-    return '/studio';
+    return null;
   }
 
   return value;
+}
+
+function getPostLoginPath(user: ReturnType<typeof useAuth>['user'], nextPath: string | null) {
+  const isAdmin = isAdminUser(user);
+
+  if (isAdmin) {
+    return nextPath?.startsWith('/admin') ? nextPath : '/admin';
+  }
+
+  if (nextPath?.startsWith('/admin')) {
+    return '/studio';
+  }
+
+  return nextPath ?? '/studio';
 }
 
 function OAuthSuccessContent() {
@@ -65,11 +79,7 @@ function OAuthSuccessContent() {
     if (!isProcessing && status === 'authenticated' && user) {
       const safeNextPath = getSafeNextPath(searchParams.get('next'));
 
-      if (isAdminUser(user) && safeNextPath === '/studio') {
-        router.replace('/admin');
-      } else {
-        router.replace(safeNextPath);
-      }
+      router.replace(getPostLoginPath(user, safeNextPath));
     }
   }, [isProcessing, status, user, router, searchParams]);
 
