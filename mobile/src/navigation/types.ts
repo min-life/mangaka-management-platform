@@ -31,7 +31,7 @@ export type RootStackParamList = {
     projectId: string;
     fileId: string;
     parentFolderId?: string;
-    initialTab?: 'Overview' | 'Tasks' | 'Discussion' | 'Materials';
+    initialTab?: 'Overview' | 'Tasks' | 'Discussion' | 'Versions' | 'Materials';
     initialMaterialVersionId?: string;
     initialDiscussionScope?: 'file' | 'task' | 'frame';
     initialTaskId?: string;
@@ -41,7 +41,7 @@ export type RootStackParamList = {
   TaskDetail:
     | {
         taskId: string;
-        initialTab?: 'Overview' | 'Tasks' | 'Discussion' | 'Materials';
+        initialTab?: 'Overview' | 'Tasks' | 'Discussion' | 'Versions' | 'Materials';
         initialDiscussionScope?: 'file' | 'task' | 'frame';
         initialFrameId?: string;
         initialCommentId?: string;
