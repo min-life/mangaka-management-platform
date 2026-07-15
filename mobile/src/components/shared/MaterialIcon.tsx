@@ -98,6 +98,9 @@ const ICON_MAP: Record<string, MaterialIconName> = {
   warning: 'warning-amber',
   error: 'error-outline',
   assessment: 'assessment',
+  trending_up: 'trending-up',
+  attach_money: 'attach-money',
+  verified: 'verified',
   view_list: 'view-list',
   view_module: 'view-module',
 };

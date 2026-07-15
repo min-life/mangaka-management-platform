@@ -4,36 +4,35 @@ import { Text, TouchableOpacity, View } from 'react-native';
 import MaterialIcon from '@/src/components/shared/MaterialIcon';
 import { Colors } from '@/src/constants/colors';
 
-import { FILTER_CHIPS } from './taskData';
-import { FilterChip } from './types';
+import { TaskScopeFilter } from './types';
 
-interface TaskFilterSelectProps {
-  activeFilter: FilterChip;
-  onFilterChange: (filter: FilterChip) => void;
-  withDivider?: boolean;
+const SCOPE_FILTERS: Array<{ label: string; value: TaskScopeFilter }> = [
+  { label: 'All tasks', value: 'All' },
+  { label: 'My tasks', value: 'Mine' },
+];
+
+interface TaskScopeFilterSelectProps {
+  activeFilter: TaskScopeFilter;
+  onFilterChange: (filter: TaskScopeFilter) => void;
 }
 
-export default function TaskFilterSelect({
+export default function TaskScopeFilterSelect({
   activeFilter,
   onFilterChange,
-  withDivider = true,
-}: TaskFilterSelectProps) {
+}: TaskScopeFilterSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const activeLabel = useMemo(() => activeFilter, [activeFilter]);
+  const activeOption = useMemo(
+    () => SCOPE_FILTERS.find((option) => option.value === activeFilter) ?? SCOPE_FILTERS[0],
+    [activeFilter],
+  );
 
   return (
-    <View
-      className="relative py-1"
-      style={{
-        borderBottomColor: Colors.borderSubtle,
-        borderBottomWidth: withDivider ? 1 : 0,
-      }}
-    >
+    <View className="relative py-1">
       <TouchableOpacity
         activeOpacity={0.76}
-        accessibilityLabel="Select task filter"
+        accessibilityLabel="Select task scope"
         accessibilityRole="button"
-        className="h-10 flex-row items-center self-start rounded-full px-3"
+        className="h-10 flex-row items-center rounded-full px-3"
         onPress={() => setIsOpen((current) => !current)}
         style={{
           backgroundColor:
@@ -43,16 +42,16 @@ export default function TaskFilterSelect({
         }}
       >
         <MaterialIcon
-          name="filter_list"
+          name="person"
           color={activeFilter === 'All' ? Colors.textMuted : Colors.accent}
-          size={19}
+          size={18}
         />
         <Text
           className="ml-2 text-[13px] font-bold"
           numberOfLines={1}
           style={{ color: activeFilter === 'All' ? Colors.text : Colors.accent }}
         >
-          {activeLabel}
+          {activeOption.label}
         </Text>
         <MaterialIcon
           name={isOpen ? 'expand_less' : 'expand_more'}
@@ -63,37 +62,37 @@ export default function TaskFilterSelect({
 
       {isOpen ? (
         <View
-          className="absolute left-0 top-12 z-30 w-48 overflow-hidden rounded-2xl"
+          className="absolute left-0 top-12 z-30 w-44 overflow-hidden rounded-2xl"
           style={{
             backgroundColor: Colors.surface,
             borderColor: Colors.borderFaint,
             borderWidth: 1,
           }}
         >
-          {FILTER_CHIPS.map((filter, index) => {
-            const isActive = filter === activeFilter;
+          {SCOPE_FILTERS.map((filter, index) => {
+            const isActive = filter.value === activeFilter;
 
             return (
               <TouchableOpacity
-                key={filter}
+                key={filter.value}
                 activeOpacity={0.72}
                 accessibilityRole="button"
                 accessibilityState={{ selected: isActive }}
                 className="flex-row items-center px-3 py-3"
                 onPress={() => {
-                  onFilterChange(filter);
+                  onFilterChange(filter.value);
                   setIsOpen(false);
                 }}
                 style={{
                   borderBottomColor: Colors.borderFaint,
-                  borderBottomWidth: index === FILTER_CHIPS.length - 1 ? 0 : 1,
+                  borderBottomWidth: index === SCOPE_FILTERS.length - 1 ? 0 : 1,
                 }}
               >
                 <Text
                   className="flex-1 text-[13px] font-semibold"
                   style={{ color: isActive ? Colors.accent : Colors.text }}
                 >
-                  {filter}
+                  {filter.label}
                 </Text>
                 {isActive ? <MaterialIcon name="check" color={Colors.accent} size={16} /> : null}
               </TouchableOpacity>

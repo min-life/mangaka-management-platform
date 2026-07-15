@@ -7,12 +7,15 @@ import AppRefreshControl from '@/src/components/shared/AppRefreshControl';
 import BottomNavBar from '@/src/components/shared/BottomNavBar';
 import { Colors } from '@/src/constants/colors';
 import { RootStackParamList } from '@/src/navigation/types';
-import { fetchProjectBundle } from '@/src/services/projectApi';
+import { fetchProjectById } from '@/src/services/projectApi';
 import { fetchTaskResourceTarget, fetchTasks } from '@/src/services/taskApi';
+import { fetchMe } from '@/src/services/userApi';
 import {
   FilterChip,
   TaskCard,
   TaskFilterSelect,
+  TaskScopeFilter,
+  TaskScopeFilterSelect,
   TasksSearchBar,
   TasksSectionHeader,
   TasksTopBar,
@@ -23,10 +26,13 @@ type TasksScreenProps = NativeStackScreenProps<RootStackParamList, 'Tasks'>;
 
 export default function TasksScreen({ navigation, route }: TasksScreenProps) {
   const [activeFilter, setActiveFilter] = useState<FilterChip>('All');
+  const [scopeFilter, setScopeFilter] = useState<TaskScopeFilter>('All');
   const [search, setSearch] = useState('');
   const projectId = route.params?.projectId;
+  const isProjectTasks = Boolean(projectId);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projectName, setProjectName] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -39,12 +45,14 @@ export default function TasksScreen({ navigation, route }: TasksScreenProps) {
       setErrorMessage('');
 
       try {
-        const [tasksResult, projectResult] = await Promise.all([
+        const [tasksResult, projectResult, currentUser] = await Promise.all([
           fetchTasks({ projectId, search: search.trim() || undefined }),
-          projectId ? fetchProjectBundle(projectId).catch(() => null) : Promise.resolve(null),
+          projectId ? fetchProjectById(projectId).catch(() => null) : Promise.resolve(null),
+          projectId ? fetchMe().catch(() => null) : Promise.resolve(null),
         ]);
         setTasks(tasksResult.tasks);
-        setProjectName(projectResult?.project.name ?? null);
+        setProjectName(projectResult?.name ?? null);
+        setCurrentUserId(currentUser?.id ? String(currentUser.id) : null);
       } catch (error) {
         setErrorMessage(error instanceof Error ? error.message : 'Unable to load tasks.');
       } finally {
@@ -54,6 +62,10 @@ export default function TasksScreen({ navigation, route }: TasksScreenProps) {
     },
     [projectId, search],
   );
+
+  useEffect(() => {
+    if (!projectId) setScopeFilter('All');
+  }, [projectId]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -94,9 +106,18 @@ export default function TasksScreen({ navigation, route }: TasksScreenProps) {
   const filteredTasks = tasks.filter((t) => {
     const matchFilter =
       activeFilter === 'All' || activeFilter === 'Assigned' || t.status === activeFilter;
+    const matchScope =
+      !isProjectTasks ||
+      scopeFilter === 'All' ||
+      (currentUserId ? t.assignedById === currentUserId : false);
 
-    return matchFilter;
+    return matchFilter && matchScope;
   });
+  const sectionTitle = isProjectTasks
+    ? scopeFilter === 'Mine'
+      ? 'My Project Tasks'
+      : 'Project Tasks'
+    : 'My Tasks';
 
   return (
     <View className="flex-1" style={{ backgroundColor: Colors.bg }}>
@@ -116,8 +137,24 @@ export default function TasksScreen({ navigation, route }: TasksScreenProps) {
         <View className="mt-4">
           <TasksSearchBar search={search} onSearchChange={setSearch} />
         </View>
-        <View className="relative z-20 mt-3">
-          <TaskFilterSelect activeFilter={activeFilter} onFilterChange={setActiveFilter} />
+        <View
+          className="relative z-20 mt-3 flex-row flex-wrap gap-2 pb-1"
+          style={{
+            borderBottomColor: Colors.borderSubtle,
+            borderBottomWidth: 1,
+          }}
+        >
+          {isProjectTasks ? (
+            <TaskScopeFilterSelect
+              activeFilter={scopeFilter}
+              onFilterChange={setScopeFilter}
+            />
+          ) : null}
+          <TaskFilterSelect
+            activeFilter={activeFilter}
+            onFilterChange={setActiveFilter}
+            withDivider={false}
+          />
         </View>
         {isLoading ? (
           <ApiStateView type="loading" />
@@ -127,7 +164,7 @@ export default function TasksScreen({ navigation, route }: TasksScreenProps) {
           <>
             <TasksSectionHeader
               count={filteredTasks.length}
-              title={projectName ? 'Project Tasks' : 'My Tasks'}
+              title={sectionTitle}
             />
 
             {filteredTasks.length > 0 ? (
