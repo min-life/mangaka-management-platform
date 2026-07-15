@@ -303,7 +303,7 @@ export async function getEditorBoardMember(boardId: number | string, userId: num
 }
 
 export async function leaveEditorBoard(boardId: number | string) {
-  await api.delete(`/editor-boards/${boardId}/members/me`);
+  await api.delete(`/editor-boards/${boardId}/me`);
 }
 
 export async function addEditorBoardProjects(
