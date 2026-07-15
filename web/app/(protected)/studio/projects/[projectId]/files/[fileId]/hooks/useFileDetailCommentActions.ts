@@ -23,6 +23,7 @@ type CommentActionsProps = {
   setPendingFrameRegion: (val: any) => void;
   setDraftRegion: (val: any) => void;
   setFrameAnnotationMode: (val: boolean) => void;
+  appendComment?: (comment: any) => void;
 };
 
 export function useFileDetailCommentActions({
@@ -41,6 +42,7 @@ export function useFileDetailCommentActions({
   setPendingFrameRegion,
   setDraftRegion,
   setFrameAnnotationMode,
+  appendComment,
 }: CommentActionsProps) {
   const handleCreateFrameComment = async (comment: SubmissionFrameComment) => {
     try {
@@ -108,27 +110,32 @@ export function useFileDetailCommentActions({
     setIsSavingComment(true);
     setError(null);
     try {
-      let createdComment;
+      let createdComment: any;
       if (selectedTaskId) {
         createdComment = await createTaskComment(selectedTaskId, commentContent);
       } else {
         createdComment = await createFileComment(file.id, commentContent);
       }
 
-      setComments((prev: any[]) => [
-        ...prev,
-        {
-          id: String(createdComment?.id || `temp-${Date.now()}`),
-          author: user?.displayName || user?.email || 'You',
-          content: commentContent,
-          time: 'Just now',
-          timestamp: Date.now(),
-          context: selectedTaskId ? `task:${selectedTaskId}` : null,
-        }
-      ]);
+      // Use appendComment (with dedup) so the socket doesn't add it again.
+      // Fall back to a local optimistic entry only if appendComment is unavailable.
+      if (appendComment && createdComment) {
+        appendComment(createdComment);
+      } else {
+        setComments((prev: any[]) => [
+          ...prev,
+          {
+            id: String(createdComment?.id || `temp-${Date.now()}`),
+            author: user?.displayName || user?.email || 'You',
+            content: commentContent,
+            time: 'Just now',
+            timestamp: Date.now(),
+            context: selectedTaskId ? `task:${selectedTaskId}` : null,
+          }
+        ]);
+      }
 
       toast.success('Comment posted.');
-      void quietReload();
     } catch (err) {
       console.error('Failed to create comment:', err);
       toast.error('Failed to post comment.');

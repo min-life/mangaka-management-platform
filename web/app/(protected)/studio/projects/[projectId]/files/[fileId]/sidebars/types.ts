@@ -14,6 +14,8 @@ export type FileTaskSidebarProps = {
   canCreateTask: boolean;
   canReviewTask: boolean;
   canSubmitTask: boolean;
+  canEditTask?: (task: FileTaskItem) => boolean;
+  canDeleteTask?: (task: FileTaskItem) => boolean;
   file: FileExplorerItem;
   focusedTask: TaskWorkspaceItem | null;
   onCloseFocusedTask: () => void;
@@ -27,13 +29,16 @@ export type FileTaskSidebarProps = {
   selectedVersion: FileVersionItem | null;
   tasks: FileTaskItem[];
   versions: FileVersionItem[];
+  latestMaterialVersion: FileVersionItem | null;
   members?: Array<{ id: number; name: string }>;
   onRefresh?: () => void | Promise<void>;
+  onMaterialUploaded?: () => void;
   discussionContextKey: string;
   setDiscussionContext: (key: string) => void;
   commentFilterMode: string;
   setCommentFilterMode: Dispatch<SetStateAction<string>>;
   discussionFrameComments: any[];
+  isLoadingVersions?: boolean;
 };
 
 export type DesktopTaskSidebarProps = FileTaskSidebarProps & {

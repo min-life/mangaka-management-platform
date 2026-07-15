@@ -134,13 +134,18 @@ export default function EditorBoardDashboardPage({ params }: PageProps) {
   const dashboardData = dashboard?.data;
   const isLoading = dashboard?.isLoading ?? !dashboard?.loaded;
   const board = dashboardData?.board ?? null;
+  const dashboardError = dashboard?.error ?? null;
 
   if (isLoading) {
     return <DashboardSkeleton />;
   }
 
   if (!board) {
-    return <div className="p-8 text-center text-red-400">Failed to load board details.</div>;
+    return (
+      <div className="p-8 text-center text-red-400">
+        {dashboardError ?? 'Failed to load board details.'}
+      </div>
+    );
   }
 
   const members = dashboardData?.members ?? [];

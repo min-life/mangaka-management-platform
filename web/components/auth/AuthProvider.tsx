@@ -4,9 +4,35 @@ import axios from 'axios';
 import { createContext, useCallback, useEffect, useMemo, useState } from 'react';
 
 import api from '@/lib/api';
-import { clearAccessToken, getAccessToken } from '@/lib/auth-storage';
+import { clearAccessToken, getAccessToken, setAccessToken } from '@/lib/auth-storage';
 import { logout as logoutRequest } from '@/services/auth.service';
-import { AUTH_LOGOUT_EVENT, type AuthContextType, type AuthStatus, type AuthUser } from '@/types/auth';
+import {
+  AUTH_LOGOUT_EVENT,
+  type AuthContextType,
+  type AuthStatus,
+  type AuthUser,
+} from '@/types/auth';
+
+type RefreshResponse = {
+  accessToken?: string;
+  access_token?: string;
+  data?: {
+    accessToken?: string;
+    access_token?: string;
+  };
+};
+
+type RefreshResult =
+  | {
+      status: 'refreshed';
+    }
+  | {
+      status: 'unauthenticated';
+    }
+  | {
+      status: 'error';
+      message: string;
+    };
 
 type UserMeResponse = {
   data?: AuthUser;
@@ -31,9 +57,51 @@ function normalizeUser(response: UserMeResponse): AuthUser {
   return response.data ?? (response as AuthUser);
 }
 
+function getRefreshAccessToken(response: RefreshResponse) {
+  return (
+    response.accessToken ??
+    response.access_token ??
+    response.data?.accessToken ??
+    response.data?.access_token
+  );
+}
+
+async function refreshAccessTokenFromCookie(): Promise<RefreshResult> {
+  try {
+    const response = await api.post<RefreshResponse, RefreshResponse>('/auth/refresh', {});
+    const accessToken = getRefreshAccessToken(response);
+
+    if (!accessToken) {
+      clearAccessToken();
+      return { status: 'unauthenticated' };
+    }
+
+    setAccessToken(accessToken);
+    return { status: 'refreshed' };
+  } catch (refreshError) {
+    if (axios.isAxiosError(refreshError) && refreshError.response?.status === 401) {
+      clearAccessToken();
+      return { status: 'unauthenticated' };
+    }
+
+    return {
+      status: 'error',
+      message: 'Unable to restore your session. Please try again.',
+    };
+  }
+}
+
 async function checkCurrentUser(): Promise<AuthCheckResult> {
   if (!getAccessToken()) {
-    return { status: 'unauthenticated' };
+    const refreshResult = await refreshAccessTokenFromCookie();
+
+    if (refreshResult.status === 'unauthenticated') {
+      return { status: 'unauthenticated' };
+    }
+
+    if (refreshResult.status === 'error') {
+      return refreshResult;
+    }
   }
 
   try {

@@ -4,14 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 
 import {
-  getProjectMembers,
   removeProjectMember,
   updateProjectMember,
-  getProjectById,
   type ProjectMemberResponse,
-  type ProjectResponse,
 } from '@/services/project.service';
-import { getRoles, type RoleResponse } from '@/services/role.service';
 import { toast } from '@/lib/toast';
 
 import { LoadingState } from '@/components/ui/loading-state';
@@ -25,79 +21,56 @@ import { usePermissions } from '@/hooks/use-permissions';
 import { useAuth } from '@/hooks/useAuth';
 
 import { useProjectParams } from '@/hooks/useProjectParams';
+import {
+  useProjectStore,
+  selectProject,
+  selectMembers,
+} from '../../store/project-store';
 
 export function ProjectMembersClient() {
   const { user: currentUser } = useAuth();
   const { numericId: projectId } = useProjectParams();
   const { can: canProject } = usePermissions({ resource: 'PROJECT', resourceId: projectId });
-  
-  const [members, setMembers] = useState<ProjectMemberResponse[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
+  // ── Store ─────────────────────────────────────────────────────────────────
+  const { loadProject, loadMembers, loadProjectRoles, upsertMember, removeMember, projectRoles } =
+    useProjectStore();
+  const projectState = useProjectStore(selectProject(projectId));
+  const membersState = useProjectStore(selectMembers(projectId));
+
+  const project = projectState.data;
+  const members = membersState.list;
+  const isLoading = membersState.isLoading || !membersState.loaded;
+  const error = membersState.error;
+
+  // ── Local UI state ────────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
-
-  useEffect(() => {
-    setPage(1);
-  }, [searchQuery]);
-  const [totalMembers, setTotalMembers] = useState(0);
-  const [projectRoles, setProjectRoles] = useState<RoleResponse[]>([]);
   const [selectedMember, setSelectedMember] = useState<ProjectMemberResponse | null>(null);
   const [roleDialogMember, setRoleDialogMember] = useState<ProjectMemberResponse | null>(null);
   const [removeDialogMember, setRemoveDialogMember] = useState<ProjectMemberResponse | null>(null);
   const [isSubmittingMemberAction, setIsSubmittingMemberAction] = useState(false);
 
-  const [project, setProject] = useState<ProjectResponse | null>(null);
-
-  const loadMembers = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const result = await getProjectMembers(projectId);
-      setMembers(result.members);
-      setTotalMembers(result.pagination?.total ?? result.members.length);
-    } catch {
-      setError('Unable to load project members.');
-      setMembers([]);
-      setTotalMembers(0);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [projectId]);
-
-  const loadProject = useCallback(async () => {
-    try {
-      const result = await getProjectById(projectId);
-      setProject(result);
-    } catch {
-      setProject(null);
-    }
-  }, [projectId]);
-
-  const loadProjectRoles = useCallback(async () => {
-    try {
-      const roles = await getRoles('PRJ');
-      setProjectRoles(roles);
-    } catch {
-      setProjectRoles([]);
-    }
-  }, []);
-
   useEffect(() => {
-    queueMicrotask(() => {
-      void loadMembers();
-      void loadProjectRoles();
-      void loadProject();
-    });
-  }, [loadMembers, loadProjectRoles, loadProject]);
+    setPage(1);
+  }, [searchQuery]);
 
+  // ── Load data ─────────────────────────────────────────────────────────────
+  useEffect(() => {
+    void loadProject(projectId);
+    void loadMembers(projectId);
+    void loadProjectRoles();
+  }, [projectId, loadProject, loadMembers, loadProjectRoles]);
+
+  // ── Derived ───────────────────────────────────────────────────────────────
   const filteredMembers = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
 
     const mappedMembers = members.map((member) => {
-      const isOwner = project && (project.createdBy === member.id || project.createdByUser?.id === member.id);
+      const isOwner =
+        project &&
+        (project.createdBy === member.id || project.createdByUser?.id === member.id);
       if (isOwner) {
         return {
           ...member,
@@ -128,13 +101,29 @@ export function ProjectMembersClient() {
 
   const totalPages = Math.ceil(filteredMembers.length / limit);
 
-  const isProjectOwner = !!(project && (project.createdBy === currentUser?.id || project.createdByUser?.id === currentUser?.id));
-  const canAddMember = canProject('project:member.add') || canProject('admin') || canProject('project:owner') || isProjectOwner;
-  const canUpdateMember = canProject('project:member.update') || canProject('admin') || canProject('project:owner') || isProjectOwner;
-  const canRemoveMember = canProject('project:member.remove') || canProject('admin') || canProject('project:owner') || isProjectOwner;
+  const isProjectOwner = !!(
+    project &&
+    (project.createdBy === currentUser?.id || project.createdByUser?.id === currentUser?.id)
+  );
+  const canAddMember =
+    canProject('project:member.add') ||
+    canProject('admin') ||
+    canProject('project:owner') ||
+    isProjectOwner;
+  const canUpdateMember =
+    canProject('project:member.update') ||
+    canProject('admin') ||
+    canProject('project:owner') ||
+    isProjectOwner;
+  const canRemoveMember =
+    canProject('project:member.remove') ||
+    canProject('admin') ||
+    canProject('project:owner') ||
+    isProjectOwner;
 
   const subtitle = 'Manage project access and roles for this production workspace.';
 
+  // ── Handlers ──────────────────────────────────────────────────────────────
   const handleOpenRoleDialog = (member: ProjectMemberResponse) => {
     setSelectedMember(null);
     setRoleDialogMember(member);
@@ -146,16 +135,15 @@ export function ProjectMembersClient() {
   };
 
   const handleUpdateMemberRole = async (roleId: number) => {
-    if (!roleDialogMember) {
-      return;
-    }
+    if (!roleDialogMember) return;
 
     setIsSubmittingMemberAction(true);
 
     try {
-      await updateProjectMember(projectId, roleDialogMember.id, { roleId });
+      const updated = await updateProjectMember(projectId, roleDialogMember.id, { roleId });
       setRoleDialogMember(null);
-      await loadMembers();
+      // Optimistic update — re-fetch to ensure correctness
+      await loadMembers(projectId, true);
       toast.success('Role updated.');
     } catch {
       toast.error('Failed to update role. Please try again.');
@@ -165,16 +153,15 @@ export function ProjectMembersClient() {
   };
 
   const handleRemoveMember = async () => {
-    if (!removeDialogMember) {
-      return;
-    }
+    if (!removeDialogMember) return;
 
     setIsSubmittingMemberAction(true);
 
     try {
       await removeProjectMember(projectId, removeDialogMember.id);
       setRemoveDialogMember(null);
-      await loadMembers();
+      removeMember(projectId, removeDialogMember.id); // Optimistic remove
+      await loadMembers(projectId, true);             // Then sync with server
       toast.success('Member removed.');
     } catch {
       toast.error('Failed to remove member. Please try again.');
@@ -183,8 +170,7 @@ export function ProjectMembersClient() {
     }
   };
 
-
-
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <section className="px-5 py-6">
       <div className="flex items-end justify-between">
@@ -196,7 +182,7 @@ export function ProjectMembersClient() {
         <div className="flex items-center gap-3">
           {canAddMember && (
             <AddMemberDialog
-              onAdded={() => void loadMembers()}
+              onAdded={() => void loadMembers(projectId, true)}
               projectId={projectId}
               roles={projectRoles}
             />
