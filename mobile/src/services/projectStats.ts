@@ -1,152 +1,68 @@
-import { ApiFolder } from './apiTypes';
+import { ApiProjectStat, ApiProjectStatMonth } from './apiTypes';
 
-export type ProjectStatRow = {
-  Month: number;
-  Year: number;
-  [key: string]: number;
-};
+export type ProjectStatsMetricKey = 'views' | 'sales' | 'revenue' | 'reviews' | 'rating';
 
-export type ProjectStatsAggregate = {
-  months: ProjectStatRow[];
-  summary: Record<string, number>;
-};
+export type ProjectStatsSummaryKey =
+  | 'averageRating'
+  | 'totalRevenue'
+  | 'totalReviews'
+  | 'totalSales'
+  | 'totalViews';
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+export const PROJECT_STATS_KPIS: Array<{
+  icon: string;
+  key: ProjectStatsSummaryKey;
+  label: string;
+  meta: (stats: ApiProjectStat) => string;
+}> = [
+  { icon: 'visibility', key: 'totalViews', label: 'Total Views', meta: (stats) => String(stats.year) },
+  { icon: 'trending_up', key: 'totalSales', label: 'Total Sales', meta: (stats) => String(stats.year) },
+  { icon: 'attach_money', key: 'totalRevenue', label: 'Total Revenue', meta: (stats) => String(stats.year) },
+  { icon: 'forum', key: 'totalReviews', label: 'Total Reviews', meta: (stats) => String(stats.year) },
+  { icon: 'star', key: 'averageRating', label: 'Average Rating', meta: () => 'Out of 5' },
+];
+
+export const PROJECT_STATS_CHARTS: Array<{
+  color: string;
+  icon: string;
+  key: ProjectStatsMetricKey;
+  title: string;
+}> = [
+  { color: '#60A5FA', icon: 'visibility', key: 'views', title: 'Views Over Time' },
+  { color: '#FFD369', icon: 'trending_up', key: 'sales', title: 'Sales Over Time' },
+  { color: '#34D399', icon: 'attach_money', key: 'revenue', title: 'Revenue Over Time' },
+  { color: '#F472B6', icon: 'forum', key: 'reviews', title: 'Reviews Over Time' },
+];
+
+export function getProjectStatsYears(stats?: ApiProjectStat | null) {
+  if (!stats) return [new Date().getFullYear()];
+
+  const minYear = Math.min(stats.minYear, stats.maxYear);
+  const maxYear = Math.max(stats.minYear, stats.maxYear);
+  return Array.from({ length: maxYear - minYear + 1 }, (_, index) => maxYear - index);
 }
 
-function isAverageMetric(key: string) {
-  const normalized = key.toLowerCase();
-  return normalized.includes('average') || normalized.includes('rating');
+export function isProjectStatsEmpty(stats?: ApiProjectStat | null) {
+  if (!stats) return true;
+  return (
+    stats.summary.totalViews === 0 &&
+    stats.summary.totalSales === 0 &&
+    stats.summary.totalRevenue === 0 &&
+    stats.summary.totalReviews === 0
+  );
 }
 
-function normalizeRow(row: unknown): ProjectStatRow | null {
-  if (!isRecord(row)) return null;
-  const month = typeof row.Month === 'number' ? row.Month : undefined;
-  const year = typeof row.Year === 'number' ? row.Year : undefined;
-  if (!month || !year) return null;
-
-  const nextRow: ProjectStatRow = { Month: month, Year: year };
-  for (const [key, value] of Object.entries(row)) {
-    if (key === 'Month' || key === 'Year') continue;
-    if (typeof value === 'number' && Number.isFinite(value)) {
-      nextRow[key] = value;
-    }
+export function formatProjectStatValue(
+  key: ProjectStatsMetricKey | ProjectStatsSummaryKey,
+  value: number,
+) {
+  if (key === 'averageRating' || key === 'rating') return value.toFixed(1);
+  if (key === 'totalRevenue' || key === 'revenue') {
+    return Math.round(value).toLocaleString();
   }
-
-  return nextRow;
-}
-
-function getChapterStats(metrics: unknown) {
-  if (!isRecord(metrics) || !isRecord(metrics.chapters)) {
-    return {};
-  }
-
-  const chapters: Record<string, ProjectStatRow[]> = {};
-  for (const [chapterId, rows] of Object.entries(metrics.chapters)) {
-    if (!Array.isArray(rows)) continue;
-    chapters[chapterId] = rows.map(normalizeRow).filter((row): row is ProjectStatRow => !!row);
-  }
-
-  return chapters;
-}
-
-export function getProjectStatsYears(metrics: unknown) {
-  const years = new Set<number>();
-  const chapters = getChapterStats(metrics);
-
-  for (const rows of Object.values(chapters)) {
-    for (const row of rows) {
-      years.add(row.Year);
-    }
-  }
-
-  if (years.size === 0) {
-    const currentYear = new Date().getFullYear();
-    return Array.from({ length: 5 }, (_, index) => currentYear - index);
-  }
-
-  return Array.from(years).sort((a, b) => b - a);
-}
-
-export function aggregateProjectStats(
-  metrics: unknown,
-  filters: { arcId?: string; chapterId?: string; year?: number },
-  folders: ApiFolder[],
-): ProjectStatsAggregate {
-  const chapters = getChapterStats(metrics);
-  const targetYear = filters.year ?? getProjectStatsYears(metrics)[0] ?? new Date().getFullYear();
-  let targetChapterIds: string[];
-
-  if (filters.chapterId) {
-    targetChapterIds = [filters.chapterId];
-  } else if (filters.arcId) {
-    targetChapterIds = folders
-      .filter((folder) => folder.type === 'CHAPTER' && String(folder.parentId) === filters.arcId)
-      .map((folder) => String(folder.id));
-  } else {
-    targetChapterIds = Object.keys(chapters);
-  }
-
-  const monthlyAggregations: Record<number, Record<string, number>> = {};
-  const monthlyCounts: Record<number, Record<string, number>> = {};
-
-  for (const chapterId of targetChapterIds) {
-    const rows = chapters[chapterId] ?? [];
-    for (const row of rows) {
-      if (row.Year !== targetYear) continue;
-      if (!monthlyAggregations[row.Month]) {
-        monthlyAggregations[row.Month] = {};
-        monthlyCounts[row.Month] = {};
-      }
-
-      for (const [key, value] of Object.entries(row)) {
-        if (key === 'Month' || key === 'Year') continue;
-        monthlyAggregations[row.Month][key] = (monthlyAggregations[row.Month][key] ?? 0) + value;
-        monthlyCounts[row.Month][key] = (monthlyCounts[row.Month][key] ?? 0) + 1;
-      }
-    }
-  }
-
-  for (const [month, values] of Object.entries(monthlyAggregations)) {
-    const numericMonth = Number(month);
-    for (const key of Object.keys(values)) {
-      if (isAverageMetric(key) && monthlyCounts[numericMonth]?.[key]) {
-        values[key] = values[key] / monthlyCounts[numericMonth][key];
-      }
-    }
-  }
-
-  const months = Array.from({ length: 12 }, (_, index) => {
-    const month = index + 1;
-    return {
-      Month: month,
-      Year: targetYear,
-      ...(monthlyAggregations[month] ?? {}),
-    };
-  });
-
-  const summary: Record<string, number> = {};
-  const summaryCounts: Record<string, number> = {};
-
-  for (const row of months) {
-    for (const [key, value] of Object.entries(row)) {
-      if (key === 'Month' || key === 'Year') continue;
-      summary[key] = (summary[key] ?? 0) + value;
-      summaryCounts[key] = (summaryCounts[key] ?? 0) + 1;
-    }
-  }
-
-  for (const key of Object.keys(summary)) {
-    if (isAverageMetric(key) && summaryCounts[key] > 0) {
-      summary[key] = summary[key] / summaryCounts[key];
-    }
-  }
-
-  return { months, summary };
-}
-
-export function formatProjectStatValue(key: string, value: number) {
-  if (isAverageMetric(key)) return value.toFixed(1);
   return Math.round(value).toLocaleString();
+}
+
+export function getProjectStatMonthValue(month: ApiProjectStatMonth, key: ProjectStatsMetricKey) {
+  return typeof month[key] === 'number' && Number.isFinite(month[key]) ? month[key] : null;
 }

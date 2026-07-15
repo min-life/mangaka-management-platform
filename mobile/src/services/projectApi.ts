@@ -13,6 +13,7 @@ import {
 import { apiRequest } from './apiClient';
 import { mapProject, mapProjectMember, uniqueById } from './mappers';
 import { fetchProjectResourceStats } from './resourceApi';
+import { fetchProjectFileTasks } from './taskApi';
 
 function emptyListResponse<T>(): ApiListResponse<T> {
   return { data: [], pagination: undefined };
@@ -72,12 +73,34 @@ export async function leaveProject(projectId: string) {
   });
 }
 
-export async function fetchProjectStats(projectId: string) {
+export async function fetchProjectStats(
+  projectId: string,
+  query: { arcId?: number; chapterId?: number; year?: number } = {},
+) {
   const response = await apiRequest<ApiDataResponse<ApiProjectStat | null>>(
     `/projects/${projectId}/stats`,
+    {
+      params: query,
+    },
   );
 
   return response.data ?? null;
+}
+
+export async function fetchFolderChildren(folderId: string) {
+  const response = await apiRequest<ApiListResponse<ApiFolder>>(`/folders/${folderId}/children`, {
+    params: {
+      field: 'createdAt',
+      limit: 100,
+      order: 'desc',
+      page: 1,
+    },
+  });
+
+  return {
+    folders: response.data ?? [],
+    pagination: response.pagination,
+  };
 }
 
 export async function fetchProjectFolders(
@@ -125,9 +148,11 @@ export async function fetchProjectBundle(
     apiRequest<ApiDataResponse<{ metrics?: Record<string, unknown> }>>(
       `/projects/${projectId}/stats`,
     ).catch(() => ({ data: undefined })),
-    apiRequest<ApiListResponse<ApiTask>>(`/projects/${projectId}/tasks`, {
-      params: { limit: 100, me: true, page: 1 },
-    }).catch(() => emptyListResponse<ApiTask>()),
+    fetchProjectFileTasks(projectId).catch(() => ({
+      pagination: undefined,
+      rawTasks: [] as ApiTask[],
+      tasks: [],
+    })),
     apiRequest<ApiListResponse<ApiFolder>>(`/projects/${projectId}/folders`, {
       params: { limit: 100, page: 1 },
     }).catch(() => emptyListResponse<ApiFolder>()),
@@ -143,7 +168,7 @@ export async function fetchProjectBundle(
   if (!project) throw new Error('Project not found');
   const applications = applicationsResponse.data ?? [];
   const folders = foldersResponse.data ?? [];
-  const tasks = tasksResponse.data ?? [];
+  const tasks = tasksResponse.rawTasks ?? [];
 
   return {
     applications,

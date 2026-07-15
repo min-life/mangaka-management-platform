@@ -120,12 +120,27 @@ export interface ApiFolder {
   updatedByUser?: ApiUserSummary | null;
 }
 
+export interface ApiProjectStatMonth {
+  month: number;
+  rating: number;
+  revenue: number;
+  reviews: number;
+  sales: number;
+  views: number;
+}
+
 export interface ApiProjectStat {
-  id: number;
-  metrics?: unknown;
-  project?: ApiProject;
-  projectId?: number;
-  updatedAt: string;
+  maxYear: number;
+  minYear: number;
+  months: ApiProjectStatMonth[];
+  summary: {
+    averageRating: number;
+    totalRevenue: number;
+    totalReviews: number;
+    totalSales: number;
+    totalViews: number;
+  };
+  year: number;
 }
 
 export interface ApiFile {
