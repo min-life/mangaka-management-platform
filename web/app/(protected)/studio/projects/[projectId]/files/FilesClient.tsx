@@ -190,18 +190,7 @@ export function FilesClient() {
     return () => { isMounted = false; };
   }, [selectedChapterId, selectedArcId, data, setData]);
 
-  useEffect(() => {
-    if (selectedArcId && !selectedChapterId && folders.length > 0) {
-      // We only auto-select chapter if we've already loaded the children for this arc
-      if (loadedFolderIdsRef.current.has(selectedArcId)) {
-        const hasChapters = folders.some((folder) => folder.parentId === selectedArcId);
-        if (!hasChapters) {
-          setSelectedChapterId(selectedArcId);
-          updateUrlParams(selectedArcId, selectedArcId);
-        }
-      }
-    }
-  }, [selectedArcId, selectedChapterId, folders]);
+
 
 
   const visibleFiles = useMemo(() => {

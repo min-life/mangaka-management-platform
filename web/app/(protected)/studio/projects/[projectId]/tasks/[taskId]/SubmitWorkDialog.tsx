@@ -74,14 +74,14 @@ export function SubmitWorkDialog({ onSubmit }: SubmitWorkDialogProps) {
           Submit for Review *
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-lg gap-0 overflow-hidden border-[#39424f] bg-[#101820] p-0 text-white" showCloseButton={false}>
-        <DialogHeader className="border-b border-[#39424f] px-6 py-5">
+      <DialogContent className="flex flex-col max-h-[90vh] max-w-lg gap-0 overflow-hidden border-[#39424f] bg-[#101820] p-0 text-white" showCloseButton={false}>
+        <DialogHeader className="shrink-0 border-b border-[#39424f] px-6 py-5">
           <DialogTitle className="text-xl font-black text-white">Submit Work for Review</DialogTitle>
           <DialogDescription className="text-sm text-[#aeb7c2]">
             Attach the completed result and leave context for the reviewer.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 px-6 py-5">
+        <div className="flex-1 space-y-4 px-6 py-5 overflow-y-auto">
           {/* File slot 1: Image (Required) */}
           <div className="space-y-1">
             <label className="text-[10px] font-black uppercase text-[#8b94a1] tracking-wider">
@@ -193,7 +193,7 @@ export function SubmitWorkDialog({ onSubmit }: SubmitWorkDialogProps) {
             </p>
           ) : null}
         </div>
-        <DialogFooter className="mx-0 mb-0 rounded-none border-[#39424f] bg-[#151c25] px-6 py-4">
+        <DialogFooter className="shrink-0 mx-0 mb-0 rounded-none border-t border-[#39424f] bg-[#151c25] px-6 py-4">
           <DialogClose asChild><Button variant="outline" disabled={isSubmitting}>Cancel</Button></DialogClose>
           <Button className="bg-[#FFD369] text-[#222831] hover:bg-[#eac04f] inline-flex items-center justify-center gap-1.5" disabled={!imageFile || !note.trim() || !confirmed || isSubmitting} onClick={handleSubmit}>
             {isSubmitting ? (

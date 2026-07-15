@@ -11,6 +11,7 @@ import {
   RotateCw,
   Loader2,
   Sparkles,
+  X,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -69,6 +70,8 @@ export function FileCanvas({ controller }: FileCanvasProps) {
     tasks,
     versions,
     zoom,
+    focusedFrameId,
+    handleClearFocusedFrame,
   } = controller;
 
   const [loadedImageUrl, setLoadedImageUrl] = useState<string | null>(null);
@@ -231,6 +234,18 @@ export function FileCanvas({ controller }: FileCanvasProps) {
           >
             <RotateCw className="size-4" />
           </ToolbarButton>
+          
+          {focusedFrameId !== null && (
+            <>
+              <div className="mx-1 h-4 w-px bg-[#26303b]" />
+              <ToolbarButton
+                label="Clear Focused Frame"
+                onClick={handleClearFocusedFrame}
+              >
+                <X className="size-4 text-red-400" />
+              </ToolbarButton>
+            </>
+          )}
 
           {isViewingHistoricalVersion && versions[0]?.previewUrl && (
             <div className="flex items-center gap-2 border-l border-[#26303b] pl-3 ml-2">
@@ -315,6 +330,7 @@ export function FileCanvas({ controller }: FileCanvasProps) {
             <>
               {/* Hidden img to track load state */}
               <img
+                key={displayedPreviewUrl}
                 src={displayedPreviewUrl}
                 className="hidden"
                 onLoad={(event) => {
@@ -334,7 +350,7 @@ export function FileCanvas({ controller }: FileCanvasProps) {
 
               <div
                 className={`w-full h-full absolute inset-0 transition-opacity duration-150 ${
-                  loadedImageUrl !== displayedPreviewUrl || isLoading || controller.isCanvasLoading
+                  loadedImageUrl !== displayedPreviewUrl || isLoading || controller.isCanvasLoading || controller.isLoadingVersions
                     ? 'opacity-0'
                     : 'opacity-100'
                 }`}
@@ -346,7 +362,7 @@ export function FileCanvas({ controller }: FileCanvasProps) {
                 }}
               />
               
-              {(loadedImageUrl !== displayedPreviewUrl || controller.isCanvasLoading) && (
+              {(!controller.isTaskContextLoading && (loadedImageUrl !== displayedPreviewUrl || controller.isCanvasLoading || controller.isLoadingVersions)) && (
                 <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
                   <div className="flex flex-col items-center gap-3 bg-[#0d151e]/80 p-4 rounded-lg shadow-2xl backdrop-blur-sm border border-[#39424f]">
                     <Loader2 className="size-8 animate-spin text-[#FFD369]" />
@@ -355,7 +371,7 @@ export function FileCanvas({ controller }: FileCanvasProps) {
                 </div>
               )}
             </>
-          ) : controller.isCanvasLoading ? (
+          ) : (!controller.isTaskContextLoading && (controller.isCanvasLoading || controller.isLoadingVersions)) ? (
             <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
               <div className="flex flex-col items-center gap-3 bg-[#0d151e]/80 p-4 rounded-lg shadow-2xl backdrop-blur-sm border border-[#39424f]">
                 <Loader2 className="size-8 animate-spin text-[#FFD369]" />

@@ -87,6 +87,7 @@ export function FileCommentsPanel({
   const replyRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const prevScrollHeightRef = useRef<number>(0);
+  const shouldScrollCommentsToBottomRef = useRef(true);
 
   useEffect(() => {
     if (replyingFrameId) {
@@ -96,11 +97,7 @@ export function FileCommentsPanel({
     }
   }, [replyingFrameId]);
 
-  // Auto-scroll to bottom on initial load
-  useEffect(() => {
-    const el = scrollContainerRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, []);
+  // Removed static initial scroll; handled dynamically by new logic
 
   // After loading more (prepend), restore scroll position
   useEffect(() => {
@@ -116,7 +113,12 @@ export function FileCommentsPanel({
 
   const handleScroll = () => {
     const el = scrollContainerRef.current;
-    if (!el || !onLoadMore || !hasMore || isLoadingMore) return;
+    if (!el) return;
+
+    const isViewingLatest = el.scrollHeight - el.scrollTop - el.clientHeight < 72;
+    shouldScrollCommentsToBottomRef.current = isViewingLatest;
+
+    if (!onLoadMore || !hasMore || isLoadingMore) return;
     if (el.scrollTop < 60) {
       prevScrollHeightRef.current = el.scrollHeight;
       void onLoadMore();
@@ -165,6 +167,8 @@ export function FileCommentsPanel({
   const handleComment = async () => {
     if (!content.trim()) return;
 
+    shouldScrollCommentsToBottomRef.current = true;
+
     if (replyingFrameId && onReplyToFrame) {
       await onReplyToFrame(replyingFrameId, content.trim());
       setReplyingFrameId?.(null);
@@ -191,6 +195,21 @@ export function FileCommentsPanel({
     setEditingCommentId(null);
     setEditingContent('');
   };
+
+  useEffect(() => {
+    if (!shouldScrollCommentsToBottomRef.current) {
+      return;
+    }
+
+    const animationFrameId = window.requestAnimationFrame(() => {
+      const scrollElement = scrollContainerRef.current;
+      if (scrollElement) {
+        scrollElement.scrollTop = scrollElement.scrollHeight;
+      }
+    });
+
+    return () => window.cancelAnimationFrame(animationFrameId);
+  }, [displayComments.length]);
 
   return (
     <section data-context-key={contextKey} className="flex flex-col h-full">
@@ -258,16 +277,18 @@ export function FileCommentsPanel({
               </div>
             )}
             <div className="flex flex-col gap-3">
-            {displayComments.map((comment) => {
+            {displayComments.map((comment, idx) => {
               const isFrameComment = 'frameId' in comment;
-          const displayIndex = isFrameComment ? frameDisplayIndexMap.get(String((comment as SubmissionFrameComment).frameId || comment.id)) : undefined;
+              const isFirstForFrame = isFrameComment && 
+                  displayComments.findIndex(c => 'frameId' in c && c.frameId === (comment as SubmissionFrameComment).frameId) === idx;
+              const displayIndex = isFrameComment ? frameDisplayIndexMap.get(String((comment as SubmissionFrameComment).frameId || comment.id)) : undefined;
           return (
             <article
               className={`group rounded-r-[4px] border-y border-r border-l-4 p-3 ${isFrameComment
                   ? 'border-[#ff9ab3]/30 border-l-[#ff9ab3] bg-[#160d11]'
                   : 'border-[#303842] border-l-[#4b535f] bg-[#151c25]'
                 }`}
-              key={comment.id}
+              key={isFrameComment ? `frame-${comment.id}` : `comment-${comment.id}`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2">
@@ -292,12 +313,13 @@ export function FileCommentsPanel({
                               onSelectFrame?.(comment as SubmissionFrameComment);
                             }
                           }}
-                          className={`text-[10px] font-black ${
+                          className={`flex items-center gap-1 text-[10px] font-black ${
                             String(focusedFrameId) === String((comment as any).frameId)
                               ? 'text-white underline decoration-[#ff9ab3]'
                               : 'text-[#ff9ab3] hover:underline'
                           } ${isFrameLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
+                          {!isFirstForFrame && <Reply className="size-3" />}
                           {comment.frameName || `Frame ${displayIndex}`}
                         </button>
                       </>
@@ -375,7 +397,7 @@ export function FileCommentsPanel({
       <div className={`mt-2 shrink-0 rounded-[4px] border transition-colors bg-[#151c25] p-3 ${replyingFrameId ? 'border-[#ff9ab3]' : 'border-[#39424f]'}`}>
         {replyingFrameId && (
           <div className="mb-2 flex items-center justify-between rounded bg-[#ff9ab3]/10 px-2 py-1 text-[10px] font-bold text-[#ff9ab3]">
-            <span className="flex items-center gap-1.5"><Reply className="size-3" /> Replying to Frame {frameDisplayIndexMap.get(String(replyingFrameId))}</span>
+            <span className="flex items-center gap-1.5"><Reply className="size-3" /> Replying to {frameComments.find(c => String(c.frameId || c.id) === String(replyingFrameId))?.frameName || `Frame ${frameDisplayIndexMap.get(String(replyingFrameId))}`}</span>
             <button
               onClick={() => setReplyingFrameId?.(null)}
               className="hover:text-white transition-colors"
