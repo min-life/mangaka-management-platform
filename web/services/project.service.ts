@@ -306,8 +306,8 @@ export async function getProjectMember(projectId: number, userId: number) {
   return normalizeProjectMember(response.data ?? (response as ProjectMemberApiResponse));
 }
 
-export async function leaveProject(projectId: number) {
-  await api.delete(`/projects/${projectId}/members/me`);
+export async function leaveProject(projectId: number | string) {
+  await api.delete(`/projects/${projectId}/me`);
 }
 
 export async function getProjectApplications(

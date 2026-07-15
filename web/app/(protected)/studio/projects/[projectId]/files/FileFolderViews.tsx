@@ -474,11 +474,7 @@ export function ChapterGrid({
                         </span>
                       )}
                     </div>
-                    <div className="mt-3 flex items-center justify-between">
-                      <span className="flex items-center gap-1.5 text-[11px] font-bold text-[#aeb7c2]">
-                        <FileText className="size-3 text-[#FFD369]/60" />
-                        {fileCounts[chapter.id] ?? 0} files
-                      </span>
+                    <div className="mt-3 flex items-center justify-end">
                       {chapter.createdByUser?.displayName && (
                         <span className="truncate max-w-[90px] text-[10px] font-medium text-[#5d6878]">
                           {chapter.createdByUser.displayName}

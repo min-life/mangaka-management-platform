@@ -176,8 +176,6 @@ export function CreateApplicationDialog({
                 >
                   <option value="CREATE_ARC">Create Story Arc</option>
                   <option value="CREATE_CHAPTER">Create Chapter</option>
-                  <option value="MANUSCRIPT_REVIEW">Manuscript Review</option>
-                  <option value="PUBLISH_REQUEST">Publish Request</option>
                 </select>
               </label>
 
