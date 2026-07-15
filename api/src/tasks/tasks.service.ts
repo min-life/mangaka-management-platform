@@ -17,6 +17,7 @@ import { UsersService } from '../users/users.service';
 import { CacheService } from '../redis/cache.service';
 import { UseCache, InvalidateCache } from '../share/decorators/cache.decorator';
 import { MATERIAL_LIST_SELECT } from '../files/files.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 const USER_SELECT = {
   select: {
@@ -74,19 +75,36 @@ export class TasksService {
     private readonly eventEmitter: EventEmitter2,
     private readonly cacheService: CacheService,
     private readonly usersService: UsersService,
+    private readonly realtimeGateway: RealtimeGateway,
   ) {}
 
   @UseCache((args) => `task:${args[0]}`)
   async getTaskById(id: number) {
     try {
+      const { file: _file, task: _task, ...MATERIAL_BASIC_SELECT } = MATERIAL_LIST_SELECT;
       const task = await this.prisma.task.findUnique({
         where: { id },
-        select: TASK_SELECT,
+        select: {
+          ...TASK_SELECT,
+          fileMaterials: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: {
+              ...MATERIAL_BASIC_SELECT,
+              materials: true,
+            },
+          },
+        },
       });
       if (!task) {
         throw new NotFoundException(ERROR.NFTASK);
       }
-      return task;
+      
+      const { fileMaterials, ...rest } = task;
+      return {
+        ...rest,
+        latestMaterial: fileMaterials?.[0] || null,
+      };
     } catch (error) {
       this.handleError(error, 'Get task fail', ERROR.SVGETTASK);
     }
@@ -483,6 +501,8 @@ export class TasksService {
           mentionedUserIds: data.mentionedUserIds || [],
         },
       } satisfies ActivityEventPayload);
+
+      this.realtimeGateway.broadcastComment('TASK', taskId, 'comment:new', comment);
 
       return comment;
     } catch (error) {

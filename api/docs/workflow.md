@@ -1712,7 +1712,7 @@ Hệ thống cho phép nhập và tổng hợp số liệu của dự án thông
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `status` | `string` | `Yes` |  |
-| `voteDeadline` | `string` | `No` | Applicable only when status is SUBMITTED |
+
 | `comment` | `string` | `No` | Comment to attach when updating status |
 
 #### Responses
@@ -1723,6 +1723,29 @@ Hệ thống cho phép nhập và tổng hợp số liệu của dự án thông
   |-------|------|-------------|
   | `data` | `string` |  |
 
+
+---
+
+### Update application voting deadline 
+**PATCH** `/api/applications/{id}/deadline`
+
+#### Parameters
+| Name | In | Required | Type | Description |
+|------|----|----------|------|-------------|
+| `id` | `path` | `Yes` | `number` | Application id |
+
+#### Request Body
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `voteDeadline` | `string` | `Yes` | The deadline for voting (ISO-8601 string) |
+
+#### Responses
+- **200**: Application deadline updated successfully
+  
+  **Response Schema:**
+  | Field | Type | Description |
+  |-------|------|-------------|
+  | `data` | `ApplicationResDto` | Application details, now includes `voteDeadline` |
 
 ---
 
@@ -2058,7 +2081,8 @@ Upload ảnh bìa cho folder. Ảnh sẽ được đẩy lên AWS S3 và hệ th
   **Response Schema:**
   | Field | Type | Description |
   |-------|------|-------------|
-  | `data` | `string` |  |
+  | `data` | `object` | Đối tượng File, chứa thông tin cơ bản của file |
+  | `data.latestMaterial` | `object` | Phiên bản Material mới nhất của file (không dính tới task nào) |
 
 
 ---
@@ -2139,7 +2163,7 @@ Upload ảnh bìa cho folder. Ảnh sẽ được đẩy lên AWS S3 và hệ th
   **Response Schema:**
   | Field | Type | Description |
   |-------|------|-------------|
-  | `data` | `array` | Danh sách materials đã được chuẩn hóa (có name, file, task) |
+  | `data` | `array` | Danh sách materials đã được chuẩn hóa (có name, file, task). (Không bao gồm mảng chi tiết `materials`, cần gọi API `/api/materials/:id` để lấy chi tiết) |
   | `pagination` | `string` |  |
 
 
@@ -2419,7 +2443,8 @@ Upload ảnh bìa cho folder. Ảnh sẽ được đẩy lên AWS S3 và hệ th
   **Response Schema:**
   | Field | Type | Description |
   |-------|------|-------------|
-  | `data` | `string` |  |
+  | `data` | `object` | Đối tượng Task, chứa thông tin cơ bản của task |
+  | `data.latestMaterial` | `object` | Phiên bản Material mới nhất tương ứng với task này |
 
 #### Ràng buộc
 - Yêu cầu xác thực JWT. Người dùng phải có quyền `project:owner`.
@@ -2570,7 +2595,7 @@ Upload ảnh bìa cho folder. Ảnh sẽ được đẩy lên AWS S3 và hệ th
   **Response Schema:**
   | Field | Type | Description |
   |-------|------|-------------|
-  | `data` | `array` | Danh sách materials đã được chuẩn hóa (có name, file, task) |
+  | `data` | `array` | Danh sách materials đã được chuẩn hóa (có name, file, task). (Không bao gồm mảng chi tiết `materials`, cần gọi API `/api/materials/:id` để lấy chi tiết) |
   | `pagination` | `string` |  |
 
 ---

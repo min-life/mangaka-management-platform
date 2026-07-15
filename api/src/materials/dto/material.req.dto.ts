@@ -3,7 +3,10 @@ import { IsBoolean, IsOptional, IsString } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class UpdateMaterialQueryDto {
-  @ApiPropertyOptional({ description: 'Tên ghi chú (commit message) cho lần cập nhật này', type: String })
+  @ApiPropertyOptional({
+    description: 'Tên ghi chú (commit message) cho lần cập nhật này',
+    type: String,
+  })
   @IsOptional()
   @IsString()
   name?: string;

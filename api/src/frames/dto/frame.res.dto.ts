@@ -24,23 +24,29 @@ export class FrameResDto {
   name?: string | null;
 
   @ApiProperty({ example: 10.5, type: Number })
-  @Transform(({ value }) => value ? Number(value) : value)
+  @Transform(({ value }) => (value ? Number(value) : value))
   startX!: number;
 
   @ApiProperty({ example: 20.3, type: Number })
-  @Transform(({ value }) => value ? Number(value) : value)
+  @Transform(({ value }) => (value ? Number(value) : value))
   startY!: number;
 
   @ApiProperty({ example: 100.7, type: Number })
-  @Transform(({ value }) => value ? Number(value) : value)
+  @Transform(({ value }) => (value ? Number(value) : value))
   endX!: number;
 
   @ApiProperty({ example: 150.2, type: Number })
-  @Transform(({ value }) => value ? Number(value) : value)
+  @Transform(({ value }) => (value ? Number(value) : value))
   endY!: number;
 
-  @ApiProperty({ example: 10 })
-  taskId!: number;
+  @ApiPropertyOptional({ example: 10, nullable: true })
+  taskId?: number | null;
+
+  @ApiPropertyOptional({ example: 5, nullable: true })
+  materialId?: number | null;
+
+  @ApiPropertyOptional({ example: 1, nullable: true })
+  fileId?: number | null;
 
   @ApiPropertyOptional({ type: () => UserResDto, nullable: true })
   createdByUser?: UserResDto | null;
@@ -104,6 +110,9 @@ export class SimpleFrameContextDto {
 export class CommentWithContextResDto extends CommentResDto {
   @ApiPropertyOptional({ example: 1, nullable: true })
   taskId?: number | null;
+
+  @ApiPropertyOptional({ example: 1, nullable: true })
+  fileId?: number | null;
 
   @ApiPropertyOptional({ type: () => SimpleFrameContextDto, nullable: true })
   frame?: SimpleFrameContextDto | null;

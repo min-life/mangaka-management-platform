@@ -60,13 +60,15 @@ export type SubmissionFrameComment = {
   author: string;
   content: string;
   frameId?: string;
+  frameName?: string;
   id: string;
   materialId?: string;
   materialVersion?: string;
   materialName?: string;
-  region: FileTaskRegion;
+  region?: FileTaskRegion;
   taskId?: string;
   time: string;
+  timestamp?: number;
 };
 
 export type FileActivityItem = {

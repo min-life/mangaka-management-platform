@@ -47,11 +47,11 @@ export function useFileDetailCommentActions({
       const material = selectedVersion ?? versions[0];
       if (material) {
         const frame = await createMaterialFrame(material.id, {
-          name: selectedTaskId ? `Task #${selectedTaskId}` : 'Review frame',
-          startX: comment.region.startX,
-          startY: comment.region.startY,
-          endX: comment.region.endX,
-          endY: comment.region.endY,
+          name: comment.frameName || (selectedTaskId ? `Task #${selectedTaskId}` : 'Review frame'),
+          startX: comment.region?.startX ?? 0,
+          startY: comment.region?.startY ?? 0,
+          endX: comment.region?.endX ?? 0,
+          endY: comment.region?.endY ?? 0,
         });
         await createFrameComment(frame.id, {
           text: comment.content,
@@ -68,6 +68,7 @@ export function useFileDetailCommentActions({
             taskId: selectedTaskId || undefined,
             author: user?.displayName || user?.email || 'You',
             time: 'Just now',
+            timestamp: Date.now(),
           }
         ]);
 
@@ -121,6 +122,7 @@ export function useFileDetailCommentActions({
           author: user?.displayName || user?.email || 'You',
           content: commentContent,
           time: 'Just now',
+          timestamp: Date.now(),
           context: selectedTaskId ? `task:${selectedTaskId}` : null,
         }
       ]);

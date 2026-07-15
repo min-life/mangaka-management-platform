@@ -58,6 +58,7 @@ const APPLICATION_LIST_SELECT = {
   title: true,
   type: true,
   status: true,
+  voteDeadline: true,
   parentFolderId: true,
   folderImageUrl: true,
   project: {
@@ -288,7 +289,6 @@ export class ApplicationsService {
     data: {
       status: APPLICATION_STATUS;
       userId: number;
-      voteDeadline?: string;
       comment?: string;
     },
   ) {
@@ -313,13 +313,6 @@ export class ApplicationsService {
           throw new ForbiddenException(
             'Only project owners and application approvers can submit this application',
           );
-        }
-        if (
-          data.voteDeadline &&
-          !permissions.includes('board:leader') &&
-          !permissions.includes('board:owner')
-        ) {
-          throw new ForbiddenException('Only board leaders and owners can set a vote deadline');
         }
       } else if (data.status === APPLICATION_STATUS.APPROVE) {
         if (application.status !== APPLICATION_STATUS.SUBMITTED) {
@@ -364,10 +357,6 @@ export class ApplicationsService {
         status: data.status,
         verifyBy: data.userId,
       };
-
-      if (data.status === APPLICATION_STATUS.SUBMITTED && data.voteDeadline) {
-        updateData.voteDeadline = new Date(data.voteDeadline);
-      }
 
       const updatedApp = await this.prisma.application.update({
         where: { id },
@@ -480,6 +469,31 @@ export class ApplicationsService {
       return updatedApp;
     } catch (error) {
       this.handleError(error, 'Update application status fail', ERROR.SVUPDATEAPPLICATION);
+    }
+  }
+
+  @InvalidateCache((args) => [
+    `application:${args[0]}`,
+    `application:list:*`,
+    `project:*:applications:*`,
+  ])
+  async updateApplicationDeadline(id: number, voteDeadline: string) {
+    try {
+      const application = await this.ensureApplication(id);
+
+      if (application.status !== APPLICATION_STATUS.SUBMITTED) {
+        throw new BadRequestException('Chỉ có thể cài đặt/cập nhật deadline khi application ở trạng thái SUBMITTED');
+      }
+
+      return await this.prisma.application.update({
+        where: { id },
+        data: {
+          voteDeadline: new Date(voteDeadline),
+        },
+        select: APPLICATION_SELECT,
+      });
+    } catch (error) {
+      this.handleError(error, 'Update application deadline fail', ERROR.SVUPDATEAPPLICATION);
     }
   }
 

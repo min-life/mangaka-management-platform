@@ -21,11 +21,13 @@ export function CreateUserDialog({
   isOpen,
   isSubmitting,
   onOpenChange,
+  onLoadRoles,
   onSubmit,
   roles,
 }: {
   isOpen?: boolean;
   isSubmitting: boolean;
+  onLoadRoles: () => Promise<AdminRoleResponse[]>;
   onOpenChange?: (open: boolean) => void;
   onSubmit: (payload: { displayName?: string; email: string; roleIds: number[] }) => Promise<void>;
   roles: AdminRoleResponse[];
@@ -44,6 +46,9 @@ export function CreateUserDialog({
       setDisplayName('');
       setEmail('');
       setRoleIds([]);
+      queueMicrotask(() => {
+        void onLoadRoles().catch(() => undefined);
+      });
     }
   };
 
@@ -72,7 +77,7 @@ export function CreateUserDialog({
         <DialogHeader>
           <DialogTitle>Create User</DialogTitle>
           <DialogDescription className="text-[#aeb7c2]">
-            Create an admin or staff user. A random password will be emailed after creation.
+            Create a user with selected roles. The backend will email the generated password.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
@@ -98,9 +103,9 @@ export function CreateUserDialog({
             selectedRoleIds={roleIds}
           />
         </div>
-        <DialogFooter>
+        <DialogFooter className="border-[#4A5260] bg-[#222831]">
           <Button
-            className="bg-[#FFD369] text-[#222831] hover:bg-white disabled:opacity-60"
+            className="bg-[#FFD369] text-[#222831] hover:bg-white disabled:bg-[#FFD369] disabled:opacity-45"
             disabled={isSubmitting || !email.trim() || roleIds.length === 0}
             onClick={() => void handleSubmit()}
           >
@@ -117,6 +122,7 @@ export function ManageRolesDialog({
   hasLoadedCurrentRoles,
   isSubmitting,
   onLoadRoles,
+  onLoadAvailableRoles,
   onSubmit,
   roles,
   user,
@@ -124,6 +130,7 @@ export function ManageRolesDialog({
   currentRoles: AdminRoleResponse[];
   hasLoadedCurrentRoles: boolean;
   isSubmitting: boolean;
+  onLoadAvailableRoles: () => Promise<AdminRoleResponse[]>;
   onLoadRoles: () => Promise<AdminRoleResponse[]>;
   onSubmit: (roleIds: number[]) => Promise<void>;
   roles: AdminRoleResponse[];
@@ -132,24 +139,20 @@ export function ManageRolesDialog({
   const [open, setOpen] = useState(false);
   const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>([]);
   const [isLoadingCurrentRoles, setIsLoadingCurrentRoles] = useState(false);
-  const [rolesError, setRolesError] = useState<string | null>(null);
+  const [hasResolvedCurrentRoles, setHasResolvedCurrentRoles] = useState(false);
 
   const loadCurrentRoles = async () => {
-    setRolesError(null);
-
-    if (hasLoadedCurrentRoles) {
-      setSelectedRoleIds(currentRoles.map((role) => Number(role.id)));
-      return;
-    }
-
     setIsLoadingCurrentRoles(true);
+    setHasResolvedCurrentRoles(false);
 
     try {
-      const nextRoles = await onLoadRoles();
+      await onLoadAvailableRoles();
+      const nextRoles = hasLoadedCurrentRoles ? currentRoles : await onLoadRoles();
       setSelectedRoleIds(nextRoles.map((role) => Number(role.id)));
+      setHasResolvedCurrentRoles(true);
     } catch {
       setSelectedRoleIds([]);
-      setRolesError('Unable to load current roles.');
+      setHasResolvedCurrentRoles(false);
     } finally {
       setIsLoadingCurrentRoles(false);
     }
@@ -157,6 +160,11 @@ export function ManageRolesDialog({
 
   const handleOpenChange = (nextOpen: boolean) => {
     setOpen(nextOpen);
+
+    if (!nextOpen) {
+      setHasResolvedCurrentRoles(false);
+      return;
+    }
 
     if (nextOpen) {
       queueMicrotask(() => {
@@ -189,15 +197,18 @@ export function ManageRolesDialog({
             Replace SYS roles assigned to {user.displayName || user.email}.
           </DialogDescription>
         </DialogHeader>
-        {rolesError ? <p className="text-sm font-medium text-red-200">{rolesError}</p> : null}
         {isLoadingCurrentRoles ? (
-          <p className="text-sm font-medium text-[#aeb7c2]">Loading current roles...</p>
+          <div className="rounded-lg border border-[#4A5260] bg-[#393E46] px-4 py-5 text-center text-sm font-medium text-[#aeb7c2]">
+            Loading current roles...
+          </div>
         ) : null}
-        <RoleCheckboxList
-          onChange={setSelectedRoleIds}
-          roles={roles}
-          selectedRoleIds={selectedRoleIds}
-        />
+        {hasResolvedCurrentRoles && !isLoadingCurrentRoles ? (
+          <RoleCheckboxList
+            onChange={setSelectedRoleIds}
+            roles={roles}
+            selectedRoleIds={selectedRoleIds}
+          />
+        ) : null}
         <DialogFooter>
           <Button
             className="bg-[#FFD369] text-[#222831] hover:bg-white disabled:opacity-60"

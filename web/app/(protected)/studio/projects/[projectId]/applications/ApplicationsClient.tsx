@@ -303,7 +303,7 @@ export function ApplicationsClient() {
   const handleUpdateStatus = async (
     application: ApplicationResponse,
     status: ApplicationStatus,
-    options?: { rejectionReason?: string; voteDeadline?: string },
+    options?: { rejectionReason?: string },
   ) => {
     setIsSubmitting(true);
     setError(null);
@@ -312,7 +312,6 @@ export function ApplicationsClient() {
       await updateApplicationStatus(
         application.id,
         status,
-        options?.voteDeadline,
         options?.rejectionReason
           ? JSON.stringify({
             kind: 'REJECTION_REASON',
@@ -466,9 +465,22 @@ export function ApplicationsClient() {
   };
 
   if (isLoading) {
-    return <LoadingState message="Loading applications..." minHeight="70vh" />;
+    return (
+      <section className="px-5 py-6">
+        <div className="flex items-end justify-between">
+          <div>
+            <h1 className="text-[24px] font-black leading-8 text-white">Applications</h1>
+            <p className="mt-1 text-sm font-medium text-[#aeb7c2]">
+              Review manuscript submissions and publishing requests for this project.
+            </p>
+          </div>
+        </div>
+        <div className="mt-6 flex flex-col gap-4">
+          <ApplicationListSkeleton />
+        </div>
+      </section>
+    );
   }
-
   return (
     <section className="px-5 py-6">
       <div className="flex items-end justify-between">

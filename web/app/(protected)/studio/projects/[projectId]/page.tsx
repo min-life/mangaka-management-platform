@@ -86,8 +86,46 @@ export default function ProjectDashboardPage() {
     };
   }, [numericId, activities.length]);
 
+function DashboardSkeleton() {
+  return (
+    <div className="flex flex-col gap-6 p-5">
+      {/* Header Skeleton */}
+      <div className="flex items-start justify-between">
+        <div className="space-y-2">
+          <div className="h-8 w-64 animate-pulse rounded-[4px] bg-[#1f2937]" />
+          <div className="flex gap-2">
+            <div className="h-5 w-20 animate-pulse rounded-full bg-[#1f2937]" />
+            <div className="h-5 w-24 animate-pulse rounded-full bg-[#1f2937]" />
+          </div>
+        </div>
+        <div className="h-9 w-32 animate-pulse rounded-[4px] bg-[#1f2937]" />
+      </div>
+
+      {/* Action Cards Skeleton */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="h-[90px] animate-pulse rounded-[5px] border border-[#26303b] bg-[#1a222d]" />
+        ))}
+      </div>
+
+      {/* Overview Stats Skeleton */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="h-[80px] animate-pulse rounded-[5px] border border-[#303842] bg-[#161d26]" />
+        ))}
+      </div>
+
+      {/* Main Columns Skeleton */}
+      <div className="grid grid-cols-[minmax(0,1fr)_340px] gap-5">
+        <div className="h-[300px] animate-pulse rounded-[5px] border border-[#39424f] bg-[#1a222d]" />
+        <div className="h-[300px] animate-pulse rounded-[5px] border border-[#39424f] bg-[#1a222d]" />
+      </div>
+    </div>
+  );
+}
+
   if (isLoading) {
-    return <LoadingState message="Loading project workspace..." minHeight="70vh" />;
+    return <DashboardSkeleton />;
   }
 
   if (!project || !dashboard) {
@@ -282,7 +320,7 @@ export default function ProjectDashboardPage() {
           ) : (
             <div className="flex h-[200px] items-center">
               <div className="flex-1 h-full relative min-h-0 min-w-0">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="99%" height="100%">
                   <PieChart>
                     <Pie
                       data={chartData}

@@ -36,20 +36,19 @@ export class UpdateApplicationStatusReqDto {
   @IsEnum(APPLICATION_STATUS)
   status!: APPLICATION_STATUS;
 
-  @ApiPropertyOptional({
-    example: '2026-07-10T12:00:00Z',
-    description: 'Applicable only when status is SUBMITTED',
-  })
-  @ValidateIf(
-    (o) => o.voteDeadline !== undefined && o.voteDeadline !== null && o.voteDeadline !== '',
-  )
-  @IsDateString()
-  voteDeadline?: string;
-
   @ApiPropertyOptional({ example: 'Looks good to me' })
   @IsOptional()
   @IsString()
   comment?: string;
+}
+
+export class UpdateApplicationDeadlineReqDto {
+  @ApiProperty({
+    example: '2026-07-10T12:00:00Z',
+    description: 'The deadline for voting',
+  })
+  @IsDateString()
+  voteDeadline!: string;
 }
 
 export class ApplicationMaterialReqDto {

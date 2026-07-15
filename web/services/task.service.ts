@@ -185,9 +185,9 @@ export async function getTaskMaterials(taskId: number | string) {
   return response.data ?? response;
 }
 
-export async function getTaskComments(taskId: number | string) {
-  const response = await api.get<{ data: any[] }, { data: any[] }>(`/tasks/${taskId}/comments`);
-  return response.data ?? [];
+export async function getTaskComments(taskId: number | string, page = 1, limit = 20) {
+  const response = await api.get<{ data: any[]; pagination?: { total: number; page: number; limit: number; totalPages: number } }, any>(`/tasks/${taskId}/comments?page=${page}&limit=${limit}`);
+  return response;
 }
 
 export async function createTaskComment(taskId: number | string, content: string) {

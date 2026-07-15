@@ -58,7 +58,6 @@ export const MATERIAL_LIST_SELECT = {
   id: true,
   name: true,
   taskId: true,
-  materials: true,
   createdByUser: USER_SELECT,
   updatedByUser: USER_SELECT,
   createdAt: true,
@@ -122,14 +121,31 @@ export class FilesService {
   @UseCache((args) => `file:${args[0]}`)
   async getFileById(id: number) {
     try {
+      const { file: _file, task: _task, ...MATERIAL_BASIC_SELECT } = MATERIAL_LIST_SELECT;
       const file = await this.prisma.file.findUnique({
         where: { id },
-        select: FILE_SELECT,
+        select: {
+          ...FILE_SELECT,
+          fileMaterials: {
+            where: { taskId: null },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: {
+              ...MATERIAL_BASIC_SELECT,
+              materials: true,
+            },
+          },
+        },
       });
       if (!file) {
         throw new NotFoundException(ERROR.NFFILE);
       }
-      return file;
+      
+      const { fileMaterials, ...rest } = file;
+      return {
+        ...rest,
+        latestMaterial: fileMaterials?.[0] || null,
+      };
     } catch (error) {
       this.handleError(error, 'Get file fail', ERROR.SVGETFILE);
     }
@@ -444,6 +460,69 @@ export class FilesService {
     }
   }
 
+  @UseCache((args) => `file:${args[0]}:frames`)
+  async getFileFrames(
+    fileId: number,
+    sort?: { field: 'createdAt'; order: 'asc' | 'desc' },
+    pagination?: Pagination,
+  ) {
+    try {
+      await this.ensureFile(fileId);
+
+      const where: Prisma.MaterialCommentFrameWhereInput = {
+        material: {
+          fileId: fileId,
+          taskId: null,
+        },
+      };
+      const orderBy: Prisma.MaterialCommentFrameOrderByWithRelationInput = sort
+        ? { [sort.field]: sort.order }
+        : { createdAt: 'desc' };
+      const { page, limit, skip } = this.buildPagination(pagination);
+
+      const [total, frames] = await this.prisma.$transaction([
+        this.prisma.materialCommentFrame.count({ where }),
+        this.prisma.materialCommentFrame.findMany({
+          where,
+          orderBy,
+          skip,
+          take: limit,
+          select: {
+            id: true,
+            name: true,
+            startX: true,
+            startY: true,
+            endX: true,
+            endY: true,
+            materialId: true,
+            material: {
+              select: {
+                fileId: true,
+              },
+            },
+            createdByUser: USER_SELECT,
+            updatedByUser: USER_SELECT,
+            createdAt: true,
+            updatedAt: true,
+          },
+        }),
+      ]);
+
+      const mappedFrames = frames.map((f) => ({
+        ...f,
+        fileId: f.material?.fileId,
+        material: undefined,
+      }));
+
+      return {
+        frames: mappedFrames,
+        pagination: this.buildPaginationMeta(total, page, limit),
+      };
+    } catch (error) {
+      this.handleError(error, 'Get file frames fail', ERROR.SVGETFILEFRAMES);
+    }
+  }
+
   @UseCache((args) => `file:${args[0]}:comments`)
   async getFileComments(
     fileId: number,
@@ -482,6 +561,20 @@ export class FilesService {
             id: true,
             content: true,
             fileId: true,
+            taskId: true,
+            frameId: true,
+            frame: {
+              select: {
+                id: true,
+                name: true,
+                material: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
             createdByUser: {
               select: { id: true, email: true, displayName: true, avatarUrl: true },
             },
@@ -491,8 +584,18 @@ export class FilesService {
         }),
       ]);
 
+      const mappedComments = comments.map((c) => {
+        const material = c.frame?.material;
+        const frame = c.frame ? { id: c.frame.id, name: c.frame.name } : null;
+        return {
+          ...c,
+          frame,
+          material,
+        };
+      });
+
       return {
-        comments,
+        comments: mappedComments,
         pagination: this.buildPaginationMeta(total, page, limit),
       };
     } catch (error) {

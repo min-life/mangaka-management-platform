@@ -144,12 +144,12 @@ export function MobileTaskDrawer({
 export function ExpandTaskSidebarButton({ onClick }: { onClick: () => void }) {
   return (
     <button
-      className="absolute right-2 top-1/2 z-40 hidden size-8 -translate-y-1/2 place-items-center rounded-full border border-[#FFD369] bg-[#FFD369] text-[#222831] shadow-[0_4px_12px_rgba(0,0,0,0.6)] transition-all hover:bg-[#eac04f] lg:grid"
+      className="absolute right-0 top-6 z-40 hidden h-8 w-6 place-items-center justify-center rounded-l-full border border-r-0 border-[#FFD369] bg-[#FFD369] text-[#222831] shadow-[-4px_4px_12px_rgba(0,0,0,0.6)] transition-all hover:bg-[#eac04f] hover:w-7 lg:flex"
       onClick={onClick}
       title="Expand Sidebar"
       type="button"
     >
-      <ChevronLeft className="size-4" />
+      <ChevronLeft className="size-4 ml-0.5" />
     </button>
   );
 }

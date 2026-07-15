@@ -1,5 +1,5 @@
 import api from '@/lib/api';
-import { getProjectApplications, type ApplicationResponse } from './application.service';
+import type { ApplicationResponse } from './application.service';
 import type { ProjectResponse } from './project.service';
 
 export type CreateEditorBoardPayload = {
@@ -74,6 +74,11 @@ type BoardProjectsResponse = {
 
 type BoardMembersResponse = {
   data?: BoardMemberApiResponse[];
+  pagination?: PaginationResponse;
+};
+
+type BoardApplicationsResponse<TApplication> = {
+  data?: TApplication[];
   pagination?: PaginationResponse;
 };
 
@@ -318,80 +323,26 @@ export async function getEditorBoardApplications<
 >(
   boardId: number | string,
   params?: {
-    field?: 'createdAt' | 'updatedAt' | 'title';
+    field?: 'createdAt' | 'title';
     limit?: number;
     order?: 'asc' | 'desc';
     page?: number;
     search?: string;
   },
 ) {
-  const projectsResponse = await getEditorBoardProjects(boardId, { limit: 100 });
-  const projects = projectsResponse.projects;
-
-  const allApplications: TApplication[] = [];
-  const visibleApplicationStatuses = new Set<string>([
-    'APPROVE',
-    'INTERNAL_APPROVED',
-    'REJECT',
-    'SUBMITTED',
-  ]);
-
-  await Promise.all(
-    projects.map(async (project) => {
-      const response = await getProjectApplications(project.id);
-      const projectApps = (response.applications || []) as TApplication[];
-      allApplications.push(...projectApps);
-    }),
-  );
-
-  let filteredApplications = allApplications.filter((app) => {
-    return (
-      (app.type === 'CREATE_ARC' || app.type === 'CREATE_CHAPTER') &&
-      visibleApplicationStatuses.has(app.status)
-    );
+  const response = await api.get<
+    BoardApplicationsResponse<TApplication>,
+    BoardApplicationsResponse<TApplication>
+  >(`/editor-boards/${boardId}/applications`, {
+    params: {
+      field: 'createdAt',
+      order: 'desc',
+      ...params,
+    },
   });
-
-  if (params?.search) {
-    const searchLower = params.search.toLowerCase();
-    filteredApplications = filteredApplications.filter((app) =>
-      app.title?.toLowerCase().includes(searchLower),
-    );
-  }
-
-  const field = params?.field || 'createdAt';
-  const order = params?.order || 'desc';
-
-  const getSortableValue = (application: TApplication) => {
-    if (field === 'createdAt' || field === 'updatedAt') {
-      return new Date(application[field] || 0).getTime();
-    }
-
-    return application[field] ?? '';
-  };
-
-  filteredApplications.sort((a, b) => {
-    const valA = getSortableValue(a);
-    const valB = getSortableValue(b);
-
-    if (valA < valB) return order === 'asc' ? -1 : 1;
-    if (valA > valB) return order === 'asc' ? 1 : -1;
-    return 0;
-  });
-
-  const page = params?.page || 1;
-  const limit = params?.limit || 10;
-  const startIndex = (page - 1) * limit;
-  const endIndex = startIndex + limit;
-
-  const paginatedApplications = filteredApplications.slice(startIndex, endIndex);
 
   return {
-    applications: paginatedApplications as TApplication[],
-    pagination: {
-      total: filteredApplications.length,
-      page,
-      limit,
-      totalPages: Math.max(1, Math.ceil(filteredApplications.length / limit)),
-    },
+    applications: response.data ?? [],
+    pagination: response.pagination,
   };
 }
